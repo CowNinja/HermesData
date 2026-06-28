@@ -1,0 +1,46 @@
+# Node modules
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Hermes internal
+.hermes/sessions/
+.hermes/cache/
+cron/output/
+cron/.jobs.lock
+cron/.tick.lock
+cron/ticker_heartbeat
+_success
+*.backup-*
+
+# Sub-projects with their own repos (MemoryTools/* all have .git)
+MemoryTools/
+
+# ComfyUI (huge)
+ComfyUI/
+
+# LSP/tooling with bundled deps
+lsp/
+
+# Backups (already on K:)
+Backups/
+
+# Temp
+tmp/
+cache/
+*.tmp
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Don't push these agents/tools with own sub-repos
+agent-tools/
