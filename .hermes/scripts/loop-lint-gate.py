@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+"""Hermes cron wrapper — delegates to PhronesisVault loop_lint_gate."""
+import runpy
+import sys
+from pathlib import Path
+
+TARGET = Path(r"D:\PhronesisVault\scripts\loop_lint_gate.py")
+if not TARGET.is_file():
+    print(f"LOOP_LINT_ISSUES:\n  - missing:{TARGET}")
+    sys.exit(1)
+runpy.run_path(str(TARGET), run_name="__main__")
