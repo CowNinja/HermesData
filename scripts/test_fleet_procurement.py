@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Self-test for Autonomous Fleet Procurement Engine."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPTS))
+
+ERRORS: list = []
+
+
+def check(name: str, cond: bool, detail: str = "") -> None:
+    if cond:
+        print(f"  PASS {name}")
+    else:
+        ERRORS.append(f"{name}: {detail}")
+        print(f"  FAIL {name} — {detail}")
+
+
+def main() -> int:
+    print("=== Fleet Procurement Engine Self-Test ===\n")
+
+    from external_fleet_manager import FleetManager, REGISTRY_PATH
+
+    check("registry_exists", REGISTRY_PATH.is_file(), str(REGISTRY_PATH))
+    fm = FleetManager()
+    proc = fm._registry.get("procurement") or {}
+    check("procurement_block", bool(proc.get("enabled")))
+    check("sandbox_section", "sandbox_providers" in fm._registry)
+    check("discovery_auto_enable", (fm._registry.get("policy") or {}).get("discovery_auto_enable") is True)
+
+    check("find_provider_any", hasattr(fm, "_find_provider_any"))
+    check("save_registry", hasattr(fm, "save_registry"))
+    check("list_sandbox", hasattr(fm, "list_sandbox_providers"))
+
+    from fleet_procurement_engine import (
+        FleetProcurementEngine,
+        ResourceGovernor,
+        infer_capabilities_from_text,
+    )
+
+    caps = infer_capabilities_from_text("Llama 3.3 70B with 1M context real-time search")
+    check("cap_inference_70b", "70b-reasoning" in caps)
+    check("cap_inference_1m", "1m-context" in caps)
+    check("cap_inference_search", "real-time-search" in caps)
+
+    gov = ResourceGovernor.from_registry(fm._registry)
+    check("governor_limits", gov.max_discoveries_per_tick >= 1 and gov.max_benchmarks_per_tick >= 1)
+
+    engine = FleetProcurementEngine()
+    check("engine_init", engine.fm is not None)
+
+    # Sandbox inject + lookup
+    test_id = "test-proc-sandbox-lookup"
+    inj = engine.inject_sandbox(
+        {
+            "id": test_id,
+            "name": "Test Sandbox",
+            "base_url": "https://api.duckduckgo.com/",
+            "api_mode": "duckduckgo_instant",
+            "capabilities": ["real-time-search"],
+        },
+        "context",
+    )
+    check("sandbox_inject", inj.get("ok"), str(inj))
+    engine.fm.reload()
+    found = engine.fm._find_provider_any(test_id)
+    check("sandbox_find", found is not None and found.get("lifecycle") == "sandbox", str(found))
+
+    # Sandbox must NOT appear in routable list
+    routable = [p.get("id") for p in fm.list_providers("context")]
+    check("sandbox_not_routable", test_id not in routable)
+
+    # Cleanup test sandbox
+    engine.disable_provider(test_id, "test_cleanup")
+    sandbox = fm._registry.get("sandbox_providers") or []
+    fm._registry["sandbox_providers"] = [p for p in sandbox if p.get("id") != test_id]
+    fm.save_registry()
+    fm.reload()
+
+    # Curator wrapper
+    import opportunistic_fleet_agent as curator
+
+    check("curator_procure_tick", hasattr(curator, "procure_tick"))
+    check("curator_simulate", hasattr(curator, "simulate_loop"))
+    check("curator_full_tick", hasattr(curator, "full_tick"))
+
+    # Simulated loop (live DDG benchmark, cleanup after)
+    sim = curator.simulate_loop()
+    check("simulate_ran", sim.get("mode") == "simulate_loop")
+    check("simulate_steps", len(sim.get("steps") or []) >= 3)
+    check("simulate_pass", sim.get("all_pass") is True, str(sim.get("steps")))
+
+    # Provider-agnostic dispatch still works
+    ctx = fm.dispatch_context("Python", capabilities=["real-time-search"])
+    check("dispatch_after_sim", ctx.get("success") or ctx.get("provider_id"))
+
+    print(f"\n=== Results: {len(ERRORS)} failures ===")
+    if ERRORS:
+        for e in ERRORS:
+            print(f"  - {e}")
+        return 1
+    print("ALL PASS — Procurement Engine wired")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

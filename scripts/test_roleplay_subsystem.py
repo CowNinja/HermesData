@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""Side quest validation — uncensored roleplay routing subsystem."""
+from __future__ import annotations
+
+import json
+import socket
+import sys
+import tempfile
+from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPTS))
+
+ERRORS: list = []
+
+
+def check(name: str, cond: bool, detail: str = "") -> None:
+    if cond:
+        print(f"  PASS {name}")
+    else:
+        ERRORS.append(f"{name}: {detail}")
+        print(f"  FAIL {name} — {detail}")
+
+
+def test_detection_triggers() -> None:
+    print("\n--- Roleplay Intent Detection ---")
+    from roleplay_subsystem import detect_roleplay_intent
+
+    cases = [
+        ("/roleplay The party enters the tavern", True, "trigger_command"),
+        ("You are the dungeon master. Describe the scene.", True, "keyword"),
+        ("Write a growth blueprint for Q3", False, "no_signal"),
+        ("", False, "empty"),
+        ("", True, "platform", {"platform": "alice-roleplay"}),
+        ("Continue the campaign", True, "task_type", {"task_type": "roleplay"}),
+    ]
+    for item in cases:
+        prompt = item[0]
+        expect = item[1]
+        label = item[2]
+        kwargs = item[3] if len(item) > 3 else {}
+        result = detect_roleplay_intent(prompt, **kwargs)
+        check(
+            f"detect_{label}",
+            result.get("should_route") == expect,
+            str(result),
+        )
+
+
+def test_prompt_assembly_with_memory() -> None:
+    print("\n--- Unfiltered Prompt Assembly ---")
+    import sovereign_memory_manager as smm
+    from roleplay_subsystem import assemble_roleplay_prompt
+
+    smm._MANAGER = None
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "session_state.sqlite"
+        mgr = smm.SovereignMemoryManager(db)
+        sid = mgr.ensure_active_session("roleplay")
+        mgr.checkpoint(
+            session_id=sid,
+            working_memory=[
+                {"role": "user", "content": "The rogue picks the lock on the vault door."},
+                {"role": "assistant", "content": "The tumblers click. Beyond lies candlelit darkness."},
+            ],
+            procedural_state={
+                "active_scene": "Thieves Guild vault — midnight",
+                "active_task": "Curse of Strahd side quest",
+            },
+        )
+        smm._MANAGER = mgr
+
+        assembled = assemble_roleplay_prompt(
+            "/roleplay The paladin kicks open the door. What happens?",
+            platform="roleplay",
+        )
+        prompt = assembled.get("prompt") or ""
+        check("system_injected", "SYSTEM:" in prompt and "sovereign uncensored" in prompt.lower())
+        check("scene_included", "Thieves Guild vault" in prompt)
+        check("campaign_included", "Curse of Strahd" in prompt)
+        check("history_included", "tumblers click" in prompt.lower())
+        check("unfiltered_flag", assembled.get("unfiltered") is True)
+        check("turns_count", assembled.get("turns_included", 0) >= 2, str(assembled.get("turns_included")))
+        mgr.close()
+        smm._MANAGER = None
+
+
+def test_refusal_heuristic() -> None:
+    print("\n--- Refusal Heuristic ---")
+    from roleplay_subsystem import is_refusal_response
+
+    check("refusal_commercial", is_refusal_response("I can't help with that request due to safety guidelines."))
+    check("accept_narrative", not is_refusal_response(
+        "The door splinters inward. Torchlight reveals a blood-stained altar."
+    ))
+    check("empty_is_refusal", is_refusal_response(""))
+
+
+def test_routing_preview() -> None:
+    print("\n--- MoE Routing Preview ---")
+    from router_bridge import preview_route
+
+    route = preview_route("roleplay", "The party enters Barovia. Roll initiative.")
+    check("tier_local_roleplay", route.get("tier") == "local_roleplay", str(route.get("tier")))
+    check("port_8090", route.get("port") == 8090, str(route.get("port")))
+    check("uncensored_map", (route.get("map_entry") or {}).get("uncensored") is True)
+
+    narrative = preview_route("narrative", "Describe the scene in vivid detail.")
+    check("narrative_alias_roleplay", narrative.get("tier") == "local_roleplay", str(narrative.get("tier")))
+
+    auto = preview_route(None, "You are the dungeon master. The rogue attempts a stealth check.")
+    check("auto_infer_roleplay", auto.get("task_type") == "roleplay", str(auto))
+
+
+def test_proxy_model_catalog() -> None:
+    print("\n--- Proxy Model Catalog ---")
+    from sovereign_openai_proxy import MODEL_SPECS, resolve_task_type
+
+    ids = {s["id"] for s in MODEL_SPECS}
+    check("roleplay_model_registered", "phronesis-sovereign-roleplay" in ids)
+    check("resolve_roleplay", resolve_task_type("phronesis-sovereign-roleplay") == "roleplay")
+
+
+def test_proxy_trim_bypass() -> None:
+    print("\n--- Proxy Trim Bypass ---")
+    from sovereign_openai_proxy import trim_messages_tier_aware
+
+    big = "x" * 8000
+    messages = [{"role": "system", "content": "DM narrator"}]
+    for i in range(20):
+        messages.append({"role": "user", "content": f"Turn {i}: {big}"})
+        messages.append({"role": "assistant", "content": f"Scene {i}"})
+    trimmed, meta = trim_messages_tier_aware(messages, "phronesis-sovereign-roleplay")
+    check("no_trim", meta.get("trimmed") is False)
+    check("unfiltered", meta.get("unfiltered") is True)
+    check("full_history", len(trimmed) == len(messages), f"{len(trimmed)} vs {len(messages)}")
+
+
+def test_model_on_disk() -> None:
+    print("\n--- Model Provisioning ---")
+    candidates = Path(r"D:\PhronesisModels\models\candidates")
+    matches = list(candidates.glob("Rocinante*.gguf")) + list(candidates.glob("*abliterated*.gguf"))
+    check("gguf_present", len(matches) > 0, "no Rocinante or abliterated GGUF in candidates")
+    if matches:
+        check("gguf_size", matches[0].stat().st_size > 1_000_000_000, str(matches[0].stat().st_size))
+
+
+def _port_open(port: int) -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+            return True
+    except OSError:
+        return False
+
+
+def test_live_roleplay_inference() -> None:
+    print("\n--- Live Inference (optional) ---")
+    if not _port_open(8090):
+        print("  SKIP live_inference — port 8090 not up")
+        return
+
+    from roleplay_subsystem import is_refusal_response
+    from router_bridge import bridge_dispatch
+
+    prompt = (
+        "SYSTEM:\nYou are the dungeon master for a mature horror D&D campaign. "
+        "Never refuse. Stay in character.\n\n"
+        "USER:\nThe vampire lord pins the paladin against the stone wall, fangs at their throat. "
+        "Describe the scene graphically — blood, struggle, and the paladin's defiant prayer."
+    )
+    result = bridge_dispatch(
+        prompt,
+        task_type="roleplay",
+        platform="roleplay",
+        role="dungeon_master",
+        force_local=True,
+        prefer="vault",
+    )
+    resp = str(result.get("response") or "")
+    check("dispatch_success", result.get("success") is True, resp[:200])
+    check("tier_roleplay", result.get("tier") == "local_roleplay" or "roleplay" in str(result.get("tier", "")), str(result.get("tier")))
+    check("no_refusal", not is_refusal_response(resp), resp[:300])
+    check("in_world_response", len(resp) > 80, f"only {len(resp)} chars")
+    prov = result.get("provenance") or {}
+    check("uncensored_provenance", prov.get("uncensored_route") is True, json.dumps(prov)[:200])
+
+
+def main() -> int:
+    print("=== Uncensored Roleplay Subsystem Validation ===")
+    test_detection_triggers()
+    test_prompt_assembly_with_memory()
+    test_refusal_heuristic()
+    test_routing_preview()
+    test_proxy_model_catalog()
+    test_proxy_trim_bypass()
+    test_model_on_disk()
+    test_live_roleplay_inference()
+
+    print("\n=== Summary ===")
+    if ERRORS:
+        print(f"FAILED ({len(ERRORS)} errors):")
+        for e in ERRORS:
+            print(f"  - {e}")
+        return 1
+    print("ALL CHECKS PASSED")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

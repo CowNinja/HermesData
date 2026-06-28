@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""
+HermesData entrypoint for relay dispatch — delegates to PhronesisVault canonical script.
+
+Usage:
+  python D:\\HermesData\\scripts\\dispatch_hermes_relay.py --assess-local
+  python D:\\HermesData\\scripts\\dispatch_hermes_relay.py relay.txt --assess-local
+"""
+from __future__ import annotations
+
+import runpy
+import sys
+from pathlib import Path
+
+_CANONICAL = Path(r"D:\PhronesisVault\scripts\dispatch_hermes_relay.py")
+
+if __name__ == "__main__":
+    if not _CANONICAL.is_file():
+        print(f"Canonical relay script missing: {_CANONICAL}", file=sys.stderr)
+        raise SystemExit(2)
+    sys.argv[0] = str(_CANONICAL)
+    runpy.run_path(str(_CANONICAL), run_name="__main__")

@@ -1,0 +1,1102 @@
+#!/usr/bin/env python3
+"""
+sovereign_openai_proxy.py — Phronesis MoE gateway (OpenAI-compatible wire format).
+
+Bridges Hermes primary agent loop → router_bridge → local MoE 8081/8082/8083.
+Hermes config: custom_providers phronesis-sovereign @ http://127.0.0.1:8091/v1
+
+The /v1/* paths follow the OpenAI Chat Completions *protocol* so Hermes
+custom_providers (api_mode: chat_completions) work without cloud OpenAI.
+Service identity: phronesis-moe-gateway — local mixture-of-experts only.
+
+Tier-aware context: Hermes may send up to 64K-equivalent payloads; this proxy
+trims/compresses to per-tier safe budgets before llama-server dispatch.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import socket
+import sys
+import time
+import uuid
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
+
+HERMES_SCRIPTS = Path(__file__).resolve().parent
+VAULT_SCRIPTS = Path(r"D:\PhronesisVault\scripts")
+sys.path.insert(0, str(HERMES_SCRIPTS))
+sys.path.insert(0, str(VAULT_SCRIPTS))
+
+DEFAULT_PORT = 8091
+UNIFIED_ROUTER_PORT = 8090
+UNIFIED_ROUTER_CHAT = f"http://127.0.0.1:{UNIFIED_ROUTER_PORT}/v1/chat/completions"
+PROXY_LOG = Path(r"D:\PhronesisVault\Operations\logs\sovereign-proxy.jsonl")
+GENERATION_PROVENANCE_LOG = Path(r"D:\PhronesisVault\Operations\logs\generation-provenance-trace.jsonl")
+
+NARRATIVE_FAST_MARKERS = (
+    "roleplay_mode:",
+    "uncensored_roleplay:",
+    "[platform: alice-roleplay]",
+    "roleplay:",
+)
+
+_THINK_BLOCK_RE = re.compile(
+    r"<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\b[^>]*>.*?</(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>",
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Model id suffix → task_type (config extensible via env JSON path later)
+MODEL_TASK_MAP = {
+    "auto": None,
+    "code": "code",
+    "synthesis": "synthesis",
+    "classify": "classify",
+    "hot": "simple",
+    "warm": "synthesis",
+    "deep": "deep_analysis",
+    "metadata": "metadata_extraction",
+    "roleplay": "roleplay",
+    "rp": "roleplay",
+    "narrative": "roleplay",
+}
+
+MOE_CATALOG_CREATED = 1719446400
+DEFAULT_CONTEXT_LENGTH = 65536
+MOE_GATEWAY_ID = "phronesis-moe-gateway"
+MOE_OWNER = "phronesis-moe"
+
+MODEL_SPECS: List[Dict[str, Any]] = [
+    {"id": "phronesis-sovereign-auto", "name": "Phronesis MoE Auto", "tier": "auto", "task_type": None},
+    {"id": "phronesis-sovereign-code", "name": "Phronesis MoE Code", "tier": "local_hot", "task_type": "code"},
+    {"id": "phronesis-sovereign-synthesis", "name": "Phronesis MoE Synthesis", "tier": "local_warm", "task_type": "synthesis"},
+    {"id": "phronesis-sovereign-classify", "name": "Phronesis MoE Classify", "tier": "local_hot", "task_type": "classify"},
+    {"id": "phronesis-sovereign-warm", "name": "Phronesis MoE Warm", "tier": "local_warm", "task_type": "synthesis"},
+    {"id": "phronesis-sovereign-hot", "name": "Phronesis MoE Hot", "tier": "local_hot", "task_type": "simple"},
+    {"id": "phronesis-sovereign-deep", "name": "Phronesis MoE Deep", "tier": "local_cold", "task_type": "deep_analysis"},
+    {"id": "phronesis-sovereign-metadata", "name": "Phronesis MoE Metadata", "tier": "local_hot", "task_type": "metadata_extraction"},
+    {
+        "id": "phronesis-sovereign-roleplay",
+        "name": "Phronesis MoE Uncensored Roleplay",
+        "tier": "local_roleplay",
+        "task_type": "roleplay",
+    },
+]
+
+
+def _model_catalog_entry(spec: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "id": spec["id"],
+        "object": "model",
+        "created": MOE_CATALOG_CREATED,
+        "owned_by": MOE_OWNER,
+        "name": spec["name"],
+        "context_length": DEFAULT_CONTEXT_LENGTH,
+        "phronesis": {
+            "gateway": MOE_GATEWAY_ID,
+            "tier": spec["tier"],
+            "task_type": spec["task_type"],
+            "local": True,
+            "moe": True,
+        },
+    }
+
+
+REGISTERED_MODELS = [_model_catalog_entry(spec) for spec in MODEL_SPECS]
+
+SYSTEM_BUDGET_RATIO = 0.15
+STUB_MAX_CHARS = 6000
+MESSAGE_PREVIEW_CHARS = 180
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _log_event(event: Dict[str, Any]) -> None:
+    try:
+        PROXY_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(PROXY_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
+    except Exception:
+        pass
+
+
+def _log_generation_provenance(event: Dict[str, Any]) -> None:
+    try:
+        GENERATION_PROVENANCE_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(GENERATION_PROVENANCE_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
+    except Exception:
+        pass
+
+
+def _extract_content(content: Any) -> str:
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("type") == "text":
+                    parts.append(str(block.get("text", "")))
+                elif "text" in block:
+                    parts.append(str(block["text"]))
+            elif isinstance(block, str):
+                parts.append(block)
+        return "\n".join(parts)
+    return str(content)
+
+
+def estimate_tokens(text: str) -> int:
+    return max(1, len(text or "") // 3)
+
+
+def _message_tokens(msg: Dict[str, Any]) -> int:
+    return estimate_tokens(_extract_content(msg.get("content")))
+
+
+def _truncate_text(text: str, max_tokens: int) -> str:
+    if max_tokens <= 0:
+        return ""
+    max_chars = max(1, max_tokens * 3)
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + f"\n...[truncated {len(text) - max_chars} chars for tier budget]"
+
+
+def _truncate_message(msg: Dict[str, Any], max_tokens: int) -> Dict[str, Any]:
+    content = _extract_content(msg.get("content"))
+    return {**msg, "content": _truncate_text(content, max_tokens)}
+
+
+def _truncate_messages(messages: List[Dict[str, Any]], max_tokens: int) -> List[Dict[str, Any]]:
+    remaining = max_tokens
+    out: List[Dict[str, Any]] = []
+    for msg in messages:
+        need = _message_tokens(msg)
+        if need <= remaining:
+            out.append(msg)
+            remaining -= need
+            continue
+        if remaining > 64:
+            out.append(_truncate_message(msg, remaining))
+        break
+    return out
+
+
+def _compress_history_stub(dropped: List[Dict[str, Any]]) -> str:
+    lines: List[str] = []
+    for msg in dropped[-24:]:
+        role = str(msg.get("role", "user"))
+        content = _extract_content(msg.get("content")).replace("\n", " ").strip()
+        if not content:
+            continue
+        preview = content[:MESSAGE_PREVIEW_CHARS]
+        suffix = "..." if len(content) > MESSAGE_PREVIEW_CHARS else ""
+        lines.append(f"- {role}: {preview}{suffix}")
+    body = "\n".join(lines) if lines else "(no recoverable text in dropped turns)"
+    stub = (
+        f"[TIER-AWARE CONTEXT TRIM — {len(dropped)} earlier turns compressed "
+        f"to protect local MoE hardware]\n{body}"
+    )
+    try:
+        from headroom_backends import compress_via_backend
+
+        stub = compress_via_backend(stub, role="summary", mode="local")
+    except Exception:
+        pass
+    if len(stub) > STUB_MAX_CHARS:
+        stub = stub[:STUB_MAX_CHARS] + f"...[stub capped at {STUB_MAX_CHARS} chars]"
+    return stub
+
+
+def resolve_task_type(model: str) -> Optional[str]:
+    model_l = (model or "").lower()
+    for suffix, task_type in MODEL_TASK_MAP.items():
+        if model_l.endswith(f"-{suffix}") or model_l == f"phronesis-sovereign-{suffix}":
+            return task_type
+    if "sovereign" in model_l:
+        return None
+    return None
+
+
+def preview_route_for_request(model: str, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    from router_bridge import preview_route
+
+    task_type = resolve_task_type(model)
+    infer_prompt = messages_to_prompt(messages, max_chars=12000)
+    route = preview_route(task_type, infer_prompt)
+    try:
+        from model_resource_manager import effective_tier_for_trim
+
+        planned = str(route.get("tier") or "local_hot")
+        effective = effective_tier_for_trim(planned)
+        if effective != planned:
+            route["planned_tier"] = planned
+            route["tier"] = effective
+            route["tier_downgraded"] = True
+    except Exception:
+        pass
+    if route.get("unified_router"):
+        try:
+            from lru_router_manager import preload_from_route_preview
+            route["preload"] = preload_from_route_preview(route)
+        except Exception as exc:
+            route["preload"] = {"ok": False, "error": str(exc)}
+    return route
+
+
+def _roleplay_route_requested(model: str, messages: List[Dict[str, Any]], body: Optional[Dict[str, Any]] = None) -> bool:
+    try:
+        from roleplay_route_guard import is_uncensored_roleplay_route
+
+        routing = resolve_roleplay_routing(messages, model, body or {})
+        return is_uncensored_roleplay_route(
+            prompt=messages_to_prompt(messages, max_chars=12000),
+            messages=messages,
+            model=model,
+            routing=routing,
+            body=body,
+        )
+    except Exception:
+        return False
+
+
+def trim_messages_tier_aware(
+    messages: List[Dict[str, Any]],
+    model: str,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Trim chat history to the safe input budget for the resolved MoE tier.
+    Preserves system prompts + recent turns; middle history becomes a stub.
+    Roleplay tier bypasses trim — full unfiltered working memory preserved.
+    """
+    from model_resource_manager import context_budget_for_tier, input_budget_for_tier
+
+    if _roleplay_route_requested(model, messages):
+        original_tokens = sum(_message_tokens(m) for m in messages)
+        route = preview_route_for_request(model, messages)
+        return list(messages), {
+            "tier": "local_roleplay",
+            "tier_budget_tokens": context_budget_for_tier("local_roleplay"),
+            "input_cap_tokens": input_budget_for_tier("local_roleplay"),
+            "original_tokens_estimate": original_tokens,
+            "original_message_count": len(messages),
+            "trimmed": False,
+            "unfiltered": True,
+            "route_preview": route,
+            "final_tokens_estimate": original_tokens,
+            "final_message_count": len(messages),
+        }
+
+    route = preview_route_for_request(model, messages)
+    tier = str(route.get("tier") or "local_hot")
+    tier_budget = context_budget_for_tier(tier)
+    input_cap = input_budget_for_tier(tier)
+
+    original_tokens = sum(_message_tokens(m) for m in messages)
+    meta: Dict[str, Any] = {
+        "tier": tier,
+        "tier_budget_tokens": tier_budget,
+        "input_cap_tokens": input_cap,
+        "original_tokens_estimate": original_tokens,
+        "original_message_count": len(messages),
+        "trimmed": False,
+        "route_preview": route,
+    }
+
+    if original_tokens <= input_cap:
+        meta["final_tokens_estimate"] = original_tokens
+        meta["final_message_count"] = len(messages)
+        return list(messages), meta
+
+    system_msgs = [m for m in messages if str(m.get("role")) == "system"]
+    non_system = [m for m in messages if str(m.get("role")) != "system"]
+
+    system_cap = max(512, int(input_cap * SYSTEM_BUDGET_RATIO))
+    trimmed_system = _truncate_messages(system_msgs, system_cap)
+    system_used = sum(_message_tokens(m) for m in trimmed_system)
+    remaining = max(0, input_cap - system_used)
+
+    kept_tail: List[Dict[str, Any]] = []
+    first_kept_idx: Optional[int] = None
+    for rev_i, msg in enumerate(reversed(non_system)):
+        orig_idx = len(non_system) - 1 - rev_i
+        need = _message_tokens(msg)
+        if need <= remaining:
+            if first_kept_idx is None:
+                first_kept_idx = orig_idx
+            kept_tail.insert(0, msg)
+            remaining -= need
+            continue
+        if not kept_tail and remaining > 64:
+            first_kept_idx = orig_idx
+            kept_tail.insert(0, _truncate_message(msg, remaining))
+            remaining = 0
+        break
+
+    if first_kept_idx is not None:
+        dropped_middle = non_system[:first_kept_idx]
+    else:
+        dropped_middle = list(non_system)
+
+    result: List[Dict[str, Any]] = list(trimmed_system)
+    if dropped_middle:
+        result.append({"role": "user", "content": _compress_history_stub(dropped_middle)})
+    result.extend(kept_tail)
+
+    final_tokens = sum(_message_tokens(m) for m in result)
+    if final_tokens > input_cap:
+        prompt_text = messages_to_prompt(result, max_chars=input_cap * 3)
+        result = [{"role": "user", "content": prompt_text}]
+        final_tokens = estimate_tokens(prompt_text)
+        meta["hard_cap_applied"] = True
+
+    meta.update(
+        {
+            "trimmed": True,
+            "dropped_turns": len(dropped_middle),
+            "kept_tail_turns": len(kept_tail),
+            "final_tokens_estimate": final_tokens,
+            "final_message_count": len(result),
+            "compression": "middle_history_stub",
+        }
+    )
+    return result, meta
+
+
+def messages_to_prompt(messages: List[Dict[str, Any]], max_chars: Optional[int] = None) -> str:
+    """Flatten chat messages into a single prompt for bridge_dispatch."""
+    parts: List[str] = []
+    for msg in messages or []:
+        role = str(msg.get("role", "user")).upper()
+        content = _extract_content(msg.get("content"))
+        if not content.strip():
+            continue
+        parts.append(f"{role}:\n{content}")
+    text = "\n\n".join(parts)
+    if max_chars is not None and len(text) > max_chars:
+        text = text[-max_chars:]
+    return text
+
+
+def prepare_prompt_for_dispatch(
+    messages: List[Dict[str, Any]],
+    model: str,
+) -> Tuple[str, Dict[str, Any]]:
+    trimmed_messages, trim_meta = trim_messages_tier_aware(messages, model)
+    prompt = messages_to_prompt(trimmed_messages)
+    return prompt, trim_meta
+
+
+def estimate_context_tokens(messages: List[Dict[str, Any]]) -> int:
+    return sum(_message_tokens(m) for m in messages)
+
+
+def _unified_router_up() -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", UNIFIED_ROUTER_PORT), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+def _message_blob(messages: List[Dict[str, Any]]) -> str:
+    parts: List[str] = []
+    for msg in messages or []:
+        parts.append(_extract_content(msg.get("content")))
+    return "\n".join(parts)
+
+
+def is_narrative_fast_path(
+    messages: List[Dict[str, Any]],
+    body: Optional[Dict[str, Any]] = None,
+    routing: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """Detect creative/narrative turns that must skip reasoning traces."""
+    body = body or {}
+    routing = routing or {}
+    try:
+        from roleplay_route_guard import extract_phronesis_body
+
+        phronesis = extract_phronesis_body(body)
+    except Exception:
+        phronesis = {}
+    plat = str(
+        phronesis.get("platform")
+        or routing.get("platform")
+        or body.get("platform")
+        or ""
+    ).lower()
+    if plat in ("alice-roleplay", "dnd", "dungeon", "citadel", "narrative"):
+        return True
+    if phronesis.get("narrative_fast") or phronesis.get("suppress_reasoning"):
+        return True
+    blob = _message_blob(messages).lower()
+    return any(marker in blob for marker in NARRATIVE_FAST_MARKERS)
+
+
+def _strip_think_blocks(text: str) -> str:
+    cleaned = _THINK_BLOCK_RE.sub("", text or "")
+    cleaned = re.sub(
+        r"</?(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    return cleaned.strip()
+
+
+_TOOL_XML_PATTERNS = (
+    re.compile(r"<tools>\s*(\{.*?\})\s*</tools>", re.DOTALL | re.IGNORECASE),
+    re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL | re.IGNORECASE),
+    re.compile(r"<response>\s*(\{.*?\})\s*</response>", re.DOTALL | re.IGNORECASE),
+)
+
+
+def _normalize_llamacpp_tool_message(message: Dict[str, Any]) -> Dict[str, Any]:
+    """Coerce llama.cpp XML/JSON tool blobs into OpenAI tool_calls array."""
+    msg = dict(message or {})
+    if msg.get("tool_calls"):
+        return msg
+    content = str(msg.get("content") or "")
+    extracted: List[Dict[str, Any]] = []
+    for pattern in _TOOL_XML_PATTERNS:
+        for match in pattern.finditer(content):
+            try:
+                payload = json.loads(match.group(1))
+            except Exception:
+                continue
+            name = payload.get("name") or payload.get("tool")
+            args = payload.get("arguments") or payload.get("parameters") or {}
+            if not name:
+                continue
+            extracted.append(
+                {
+                    "id": f"call_{uuid.uuid4().hex[:12]}",
+                    "type": "function",
+                    "function": {
+                        "name": str(name),
+                        "arguments": json.dumps(args) if isinstance(args, dict) else str(args),
+                    },
+                }
+            )
+    if not extracted:
+        return msg
+    msg["tool_calls"] = extracted
+    msg["content"] = None
+    for key in ("reasoning", "reasoning_content", "reasoning_details"):
+        msg.pop(key, None)
+    return msg
+
+
+def resolve_backend_logical_model(
+    gateway_model: str,
+    routing: Optional[Dict[str, Any]] = None,
+) -> str:
+    try:
+        from lru_router_manager import load_pin_config, logical_model_for_tier, normalize_logical_model_id
+
+        cfg = load_pin_config()
+        pinned = cfg.get("generalist_logical")
+        if pinned:
+            return normalize_logical_model_id(str(pinned))
+        task_type = (routing or {}).get("task_type") or resolve_task_type(gateway_model)
+        tier = "local_generalist"
+        if task_type in ("code", "simple", "classify"):
+            tier = "local_hot"
+        elif task_type in ("synthesis", "deep_analysis"):
+            tier = "local_warm"
+        return logical_model_for_tier(tier)
+    except Exception:
+        return "qwen2-5-7b"
+
+
+def _request_needs_tool_passthrough(
+    body: Dict[str, Any],
+    messages: List[Dict[str, Any]],
+) -> bool:
+    if body.get("tools"):
+        return True
+    for msg in messages or []:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("role") == "tool":
+            return True
+        if msg.get("role") == "assistant" and msg.get("tool_calls"):
+            return True
+    return False
+
+
+def dispatch_via_native_router(
+    body: Dict[str, Any],
+    messages: List[Dict[str, Any]],
+    gateway_model: str,
+    routing: Optional[Dict[str, Any]] = None,
+    trim_meta: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Forward full OpenAI chat payload to llama-server on 8090 (tools + messages)."""
+    routing = routing or {}
+    logical = resolve_backend_logical_model(gateway_model, routing)
+    narrative_fast = is_narrative_fast_path(messages, body, routing)
+    tool_passthrough = _request_needs_tool_passthrough(body, messages)
+
+    forward: Dict[str, Any] = {
+        "model": logical,
+        "messages": messages,
+        "max_tokens": int(body.get("max_tokens") or 1024),
+        "temperature": body.get("temperature", 0.7),
+        "stream": False,
+    }
+    if tool_passthrough and not narrative_fast:
+        if body.get("tools"):
+            forward["tools"] = body["tools"]
+        if body.get("tool_choice") is not None:
+            forward["tool_choice"] = body["tool_choice"]
+
+    if narrative_fast:
+        forward["max_tokens"] = min(int(forward.get("max_tokens") or 512), 384)
+        forward["temperature"] = min(float(forward.get("temperature") or 0.85), 0.9)
+        forward.pop("tools", None)
+        forward.pop("tool_choice", None)
+
+    started = time.time()
+    try:
+        payload = json.dumps(forward).encode("utf-8")
+        req = urllib.request.Request(
+            UNIFIED_ROUTER_CHAT,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        return {
+            "success": False,
+            "response": f"[NATIVE ROUTER] dispatch failed: {exc}",
+            "model": logical,
+            "tier": "local_generalist",
+            "provenance": {"selected_backend": "native_8090", "error": str(exc)},
+            "latency_sec": round(time.time() - started, 2),
+        }
+
+    choice = (data.get("choices") or [{}])[0]
+    msg = _normalize_llamacpp_tool_message(choice.get("message") or {})
+    choice = {**choice, "message": msg}
+    data = {**data, "choices": [choice] + list(data.get("choices") or [])[1:]}
+    content = str(msg.get("content") or "")
+    tool_calls = msg.get("tool_calls")
+    if narrative_fast:
+        content = _strip_think_blocks(content)
+
+    prov = {
+        "selected_backend": "native_8090",
+        "logical_model": logical,
+        "native_passthrough": True,
+        "tool_passthrough": bool(tool_calls) or tool_passthrough,
+        "narrative_fast": narrative_fast,
+        "suppress_reasoning": narrative_fast,
+    }
+    if trim_meta:
+        prov["context_trim"] = trim_meta
+
+    return {
+        "success": True,
+        "response": content,
+        "model": logical,
+        "tier": "local_generalist",
+        "provenance": prov,
+        "openai_response": data,
+        "tool_calls": tool_calls,
+        "finish_reason": choice.get("finish_reason"),
+        "latency_sec": round(time.time() - started, 2),
+        "narrative_fast": narrative_fast,
+    }
+
+
+def resolve_roleplay_routing(
+    messages: List[Dict[str, Any]],
+    model: str,
+    body: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Discord/Hermes ingest: detect roleplay and override model + platform."""
+    body = body or {}
+    try:
+        from roleplay_route_guard import extract_phronesis_body
+
+        phronesis = extract_phronesis_body(body)
+    except Exception:
+        phronesis = {}
+    narrative_fast = is_narrative_fast_path(messages, body)
+    routing: Dict[str, Any] = {
+        "request_model": model,
+        "model": "phronesis-sovereign-auto",
+        "platform": str(phronesis.get("platform") or body.get("platform") or "hermes_agent_session"),
+        "force_roleplay": False,
+        "task_type": None,
+        "reasons": ["unified_generalist"],
+        "narrative_fast": narrative_fast,
+        "suppress_reasoning": narrative_fast,
+        "chat_id": str(phronesis.get("chat_id") or ""),
+        "thread_id": str(phronesis.get("thread_id") or ""),
+        "parent_channel_id": str(phronesis.get("parent_channel_id") or ""),
+    }
+    return routing
+
+
+def dispatch_via_bridge(
+    prompt: str,
+    model: str,
+    platform: str = "hermes_agent_session",
+    tool_depth: int = 0,
+    trim_meta: Optional[Dict[str, Any]] = None,
+    routing: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    from router_bridge import bridge_dispatch
+
+    route = routing or {}
+    model = str(route.get("model") or model)
+    platform = str(route.get("platform") or platform)
+    task_type = route.get("task_type") or resolve_task_type(model)
+    model = str(route.get("model") or model or "phronesis-sovereign-auto")
+    result = bridge_dispatch(
+        prompt,
+        task_type=task_type,
+        platform=platform,
+        role="hermes_agent",
+        force_local=True,
+        prefer="vault",
+        context_tokens_estimate=estimate_tokens(prompt) + 4000,
+        modality="text",
+        tool_depth=tool_depth,
+        explicit_grok_flag=False,
+        chat_id=str(route.get("chat_id") or ""),
+        thread_id=str(route.get("thread_id") or ""),
+        parent_channel_id=str(route.get("parent_channel_id") or ""),
+    )
+    if trim_meta:
+        prov = result.setdefault("provenance", {})
+        prov["context_trim"] = trim_meta
+    return result
+
+
+def openai_chat_response(
+    model: str,
+    content: str,
+    finish_reason: str = "stop",
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    resp = {
+        "id": f"chatcmpl-{uuid.uuid4().hex[:24]}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": finish_reason,
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": max(1, len(content) // 4),
+            "total_tokens": max(1, len(content) // 4),
+        },
+    }
+    if extra:
+        resp["phronesis_provenance"] = extra
+    return resp
+
+
+def openai_error(status: int, message: str, err_type: str = "server_error") -> Tuple[int, Dict[str, Any]]:
+    return status, {
+        "error": {
+            "message": message,
+            "type": err_type,
+            "code": status,
+        }
+    }
+
+
+class SovereignProxyHandler(BaseHTTPRequestHandler):
+    server_version = "PhronesisMoEGateway/1.2"
+
+    def log_message(self, fmt: str, *args) -> None:
+        _log_event({"level": "access", "msg": fmt % args})
+
+    def _cors_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+
+    def _read_json(self) -> Dict[str, Any]:
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length) if length else b"{}"
+        return json.loads(raw.decode("utf-8"))
+
+    def _send_json(self, status: int, payload: Dict[str, Any]) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self._cors_headers()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self._cors_headers()
+        self.end_headers()
+
+    def _send_sse_chunk(self, model: str, content: str) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        chunk = {
+            "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
+        }
+        done = {
+            "id": chunk["id"],
+            "object": "chat.completion.chunk",
+            "created": chunk["created"],
+            "model": model,
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        }
+        self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode("utf-8"))
+        self.wfile.write(f"data: {json.dumps(done)}\n\n".encode("utf-8"))
+        self.wfile.write(b"data: [DONE]\n\n")
+
+    def do_GET(self) -> None:
+        path = urlparse(self.path).path
+        if path in ("/health", "/v1/health"):
+            try:
+                from model_resource_manager import tier_matrix
+
+                matrix = tier_matrix()
+                status = "GREEN" if matrix.get("moe_ready") else "YELLOW"
+            except Exception:
+                status = "UNKNOWN"
+            payload: Dict[str, Any] = {
+                "status": status,
+                "service": MOE_GATEWAY_ID,
+                "protocol": "openai-compatible",
+                "owned_by": MOE_OWNER,
+                "default_model": "phronesis-sovereign-auto",
+                "tier_aware_trim": True,
+                "model_count": len(REGISTERED_MODELS),
+                "time": _utc_now(),
+            }
+            try:
+                payload["stack"] = matrix
+                state_path = Path(r"D:\PhronesisVault\Operations\logs\lru-router-state.json")
+                if state_path.is_file():
+                    payload["last_dispatch"] = json.loads(state_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+            self._send_json(200, payload)
+            return
+        if path in ("/v1/models", "/models"):
+            self._send_json(
+                200,
+                {
+                    "object": "list",
+                    "data": REGISTERED_MODELS,
+                    "gateway": MOE_GATEWAY_ID,
+                    "default_model": "phronesis-sovereign-auto",
+                },
+            )
+            return
+        if path.startswith("/v1/models/"):
+            model_id = path.split("/v1/models/", 1)[1].strip("/")
+            for entry in REGISTERED_MODELS:
+                if entry.get("id") == model_id:
+                    self._send_json(200, entry)
+                    return
+            self._send_json(404, {"error": "model_not_found", "id": model_id})
+            return
+        self._send_json(404, {"error": "not_found"})
+
+    def do_POST(self) -> None:
+        path = urlparse(self.path).path
+        if path not in ("/v1/chat/completions", "/chat/completions"):
+            self._send_json(404, {"error": "not_found"})
+            return
+
+        try:
+            body = self._read_json()
+        except Exception as exc:
+            status, err = openai_error(400, f"invalid JSON: {exc}", "invalid_request_error")
+            self._send_json(status, err)
+            return
+
+        model = str(body.get("model") or "phronesis-sovereign-auto")
+        messages = body.get("messages") or []
+        stream = bool(body.get("stream", False))
+        routing = resolve_roleplay_routing(messages, model, body)
+        model = str(routing.get("model") or model)
+
+        try:
+            trimmed_messages, trim_meta = trim_messages_tier_aware(messages, model)
+            prompt = messages_to_prompt(trimmed_messages)
+        except Exception as exc:
+            _log_event({"event": "trim_exception", "error": str(exc), "model": model})
+            status, err = openai_error(400, f"context trim failed: {exc}", "invalid_request_error")
+            self._send_json(status, err)
+            return
+
+        if not prompt.strip():
+            status, err = openai_error(400, "empty messages", "invalid_request_error")
+            self._send_json(status, err)
+            return
+
+        if trim_meta.get("trimmed"):
+            _log_event(
+                {
+                    "event": "context_trim",
+                    "model": model,
+                    "tier": trim_meta.get("tier"),
+                    "original_tokens": trim_meta.get("original_tokens_estimate"),
+                    "final_tokens": trim_meta.get("final_tokens_estimate"),
+                    "dropped_turns": trim_meta.get("dropped_turns"),
+                }
+            )
+
+        started = time.time()
+        use_native = _unified_router_up()
+        try:
+            if use_native:
+                result = dispatch_via_native_router(
+                    body,
+                    trimmed_messages,
+                    model,
+                    routing=routing,
+                    trim_meta=trim_meta,
+                )
+            else:
+                result = dispatch_via_bridge(
+                    prompt, model, trim_meta=trim_meta, routing=routing,
+                )
+        except Exception as exc:
+            _log_event({"event": "dispatch_exception", "error": str(exc), "model": model})
+            status, err = openai_error(503, f"dispatch failed: {exc}")
+            self._send_json(status, err)
+            return
+
+        latency = round(time.time() - started, 2)
+        prov = result.get("provenance") or {}
+
+        if result.get("escalation"):
+            msg = (
+                "[GROK ESCALATION RECOMMENDED] "
+                + str(prov.get("escalation_reason") or result.get("response", ""))
+            )
+            _log_event({"event": "escalation", "model": model, "triggers": prov.get("escalation_triggers")})
+            status, err = openai_error(503, msg, "escalation_required")
+            self._send_json(status, err)
+            return
+
+        if not result.get("success"):
+            msg = result.get("response") or "local dispatch failed"
+            _log_event({"event": "dispatch_fail", "model": model, "attempts": result.get("attempts")})
+            status, err = openai_error(503, msg)
+            self._send_json(status, err)
+            return
+
+        content = str(result.get("response") or "")
+        resolved_model = result.get("model")
+        extra = {
+            "gateway_model": routing.get("request_model") or model,
+            "routing_model": model,
+            "routing_platform": routing.get("platform"),
+            "routing_reasons": routing.get("reasons"),
+            "tier": result.get("tier"),
+            "backend": prov.get("selected_backend"),
+            "port_hint": prov.get("port_hint"),
+            "quality_warning": result.get("quality_warning") or prov.get("quality_warning"),
+            "latency_sec": latency,
+            "resolved_model": resolved_model,
+            "uncensored_route": prov.get("uncensored_route"),
+            "context_trim": trim_meta,
+            "narrative_fast": bool(routing.get("narrative_fast") or result.get("narrative_fast")),
+            "suppress_reasoning": bool(
+                routing.get("suppress_reasoning") or result.get("narrative_fast")
+            ),
+            "native_passthrough": bool(prov.get("native_passthrough")),
+            "tool_passthrough": bool(prov.get("tool_passthrough") or result.get("tool_calls")),
+        }
+        _log_event({"event": "dispatch_ok", "model": model, **{k: v for k, v in extra.items() if k != "context_trim"}})
+        _log_generation_provenance({
+            "event": "proxy_dispatch_ok",
+            "gateway_model": routing.get("request_model") or model,
+            "routing_model": model,
+            "task_type": routing.get("task_type") or resolve_task_type(model),
+            "tier": result.get("tier"),
+            "resolved_model": resolved_model,
+            "backend": prov.get("selected_backend"),
+            "platform": routing.get("platform"),
+            "force_roleplay": routing.get("force_roleplay"),
+            "response_preview": content[:200],
+            "latency_sec": latency,
+            "uncensored_route": prov.get("uncensored_route"),
+        })
+
+        try:
+            is_roleplay = (
+                prov.get("uncensored_route")
+                or str(result.get("tier") or "") == "local_roleplay"
+                or _roleplay_route_requested(model, messages)
+            )
+            if is_roleplay:
+                from roleplay_route_guard import extract_phronesis_body
+                from sovereign_memory_manager import checkpoint_roleplay_turn
+
+                ph = extract_phronesis_body(body)
+                checkpoint_roleplay_turn(
+                    platform=str(routing.get("platform") or "roleplay"),
+                    user_content=messages_to_prompt(messages, max_chars=8000),
+                    assistant_content=content[:8000],
+                    campaign=model,
+                    metadata={"gateway_port": DEFAULT_PORT, "latency_sec": latency},
+                    chat_id=str(ph.get("chat_id") or routing.get("chat_id") or ""),
+                    thread_id=str(ph.get("thread_id") or routing.get("thread_id") or ""),
+                    parent_channel_id=str(
+                        ph.get("parent_channel_id") or routing.get("parent_channel_id") or ""
+                    ),
+                )
+            else:
+                from sovereign_memory_manager import checkpoint_gateway_turn
+
+                checkpoint_gateway_turn(
+                    platform="hermes_agent_session",
+                    messages=messages,
+                    assistant_content=content,
+                    procedural_state={
+                        "active_task": model,
+                        "last_tier": result.get("tier"),
+                        "last_model": result.get("model"),
+                        "tool_depth": int(body.get("tool_depth") or 0),
+                        "pending_delegations": body.get("pending_delegations") or [],
+                    },
+                    metadata={"gateway_port": DEFAULT_PORT, "latency_sec": latency},
+                )
+        except Exception:
+            pass
+
+        if stream:
+            self._send_sse_chunk(model, content)
+            return
+
+        report_model = str(resolved_model or model)
+        native_resp = result.get("openai_response")
+        if isinstance(native_resp, dict):
+            out = dict(native_resp)
+            out["model"] = report_model
+            out["phronesis_provenance"] = extra
+            if result.get("narrative_fast"):
+                msg = (out.get("choices") or [{}])[0].setdefault("message", {})
+                msg["content"] = content
+                for key in ("reasoning", "reasoning_content", "reasoning_details"):
+                    msg.pop(key, None)
+            self._send_json(200, out)
+            return
+
+        self._send_json(200, openai_chat_response(report_model, content, extra=extra))
+
+
+def _self_test_trim() -> Dict[str, Any]:
+    big = "x" * 12000
+    messages = [{"role": "system", "content": "You are Hermes."}]
+    for i in range(30):
+        messages.append({"role": "user", "content": f"Turn {i}: {big}"})
+        messages.append({"role": "assistant", "content": f"Ack {i}"})
+    trimmed, meta = trim_messages_tier_aware(messages, "phronesis-sovereign-code")
+    prompt = messages_to_prompt(trimmed)
+
+    # Regression: oversized single user turn must not crash on non_system.index()
+    skill_blob = "y" * 50_000
+    single_turn = [{"role": "user", "content": skill_blob}]
+    single_trimmed, single_meta = trim_messages_tier_aware(
+        single_turn,
+        "phronesis-sovereign-auto",
+    )
+
+    return {
+        "model": "phronesis-sovereign-code",
+        "meta": meta,
+        "prompt_chars": len(prompt),
+        "prompt_tokens_estimate": estimate_tokens(prompt),
+        "under_cap": meta.get("final_tokens_estimate", 0) <= meta.get("input_cap_tokens", 0),
+        "single_turn_ok": len(single_trimmed) > 0 and single_meta.get("trimmed") is True,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Phronesis MoE gateway (OpenAI-compatible protocol)")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--test-trim", action="store_true", help="Run tier-aware trim self-test and exit")
+    args = parser.parse_args()
+
+    if args.test_trim:
+        print(json.dumps(_self_test_trim(), indent=2))
+        return 0
+
+    try:
+        from ensure_hermes_sovereign_config import ensure_all_configs
+
+        report = ensure_all_configs()
+        if report.get("changed"):
+            _log_event({"event": "config_ensure", "report": report})
+    except Exception as exc:
+        print(f"config ensure skipped: {exc}", file=sys.stderr)
+
+    try:
+        from sovereign_memory_manager import hydrate_boot_state
+
+        boot = hydrate_boot_state(platform="hermes_agent_session")
+        if boot:
+            _log_event(
+                {
+                    "event": "memory_hydrate_boot",
+                    "session_id": boot.get("session_id"),
+                    "hydrated": boot.get("hydrated"),
+                    "turns": len(boot.get("working_memory") or []),
+                }
+            )
+            if boot.get("hydrated"):
+                proc = boot.get("procedural_state") or {}
+                print(
+                    f"Memory hydrated: session={boot.get('session_id')} "
+                    f"task={proc.get('active_task')} tier={proc.get('last_tier')}"
+                )
+    except Exception as exc:
+        print(f"memory hydrate skipped: {exc}", file=sys.stderr)
+
+    server = ThreadingHTTPServer((args.host, args.port), SovereignProxyHandler)
+    print(f"Phronesis MoE gateway listening on http://{args.host}:{args.port}")
+    print("Endpoints: /health /v1/models /v1/chat/completions (tier-aware trim ON)")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

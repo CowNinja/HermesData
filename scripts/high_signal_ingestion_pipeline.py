@@ -1,0 +1,238 @@
+#!/usr/bin/env python3
+"""
+high_signal_ingestion_pipeline.py — Feed → sqlite-vec automation (Milestone 2).
+
+Bridges universal_ingest_monitor probes/distills into the sovereign semantic index.
+Dedupes by content_hash; logs to ingestion-vector.jsonl.
+
+Usage:
+  python high_signal_ingestion_pipeline.py --target brian-roemmele --source path.md
+  python high_signal_ingestion_pipeline.py --feed-html probe.html --url https://... --target karpathy
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from semantic_query_engine import SovereignSemanticEngine
+
+INGEST_LOG = Path(r"D:\PhronesisVault\Operations\logs\ingestion-vector.jsonl")
+DEFAULT_REGISTRY = Path(r"D:\PhronesisVault\Operations\ingestion_targets.yaml")
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _log(event: Dict[str, Any]) -> None:
+    try:
+        INGEST_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(INGEST_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
+    except Exception:
+        pass
+
+
+def content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def html_to_text(html: str, *, max_chars: int = 50000) -> str:
+    """Strip tags/scripts and collapse whitespace from probe HTML."""
+    if not html:
+        return ""
+    text = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", html)
+    text = re.sub(r"(?is)<!--.*?-->", " ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:max_chars]
+
+
+class HighSignalIngestionPipeline:
+    """Automated high-signal content → hierarchical vector index."""
+
+    def __init__(self, engine: Optional[SovereignSemanticEngine] = None):
+        self.engine = engine or SovereignSemanticEngine(enable_rerank=False)
+
+    def index_text_if_new(
+        self,
+        text: str,
+        *,
+        source_path: str,
+        target_id: str = "",
+        category: str = "",
+        feed_url: str = "",
+        trigger: str = "manual",
+        metadata: Optional[Dict[str, Any]] = None,
+        min_chars: int = 200,
+    ) -> Dict[str, Any]:
+        text = (text or "").strip()
+        if len(text) < min_chars:
+            report = {
+                "status": "skipped_short",
+                "target_id": target_id,
+                "source_path": source_path,
+                "chars": len(text),
+                "trigger": trigger,
+            }
+            _log({"event": "index_skip", **report})
+            return report
+
+        ch = content_hash(text)
+        if self.engine.store.has_content_hash(ch):
+            report = {
+                "status": "skipped_duplicate",
+                "target_id": target_id,
+                "source_path": source_path,
+                "content_hash": ch,
+                "trigger": trigger,
+            }
+            _log({"event": "index_skip", **report})
+            return report
+
+        meta = {
+            "target_id": target_id,
+            "category": category,
+            "feed_url": feed_url,
+            "trigger": trigger,
+            "indexed_at": _utc_now(),
+            **(metadata or {}),
+        }
+        index_report = self.engine.index_text(
+            text,
+            source_path=source_path,
+            content_hash=ch,
+            metadata=meta,
+        )
+        report = {
+            "status": "indexed",
+            "target_id": target_id,
+            "source_path": source_path,
+            "content_hash": ch,
+            "trigger": trigger,
+            "chars": len(text),
+            **index_report,
+        }
+        _log({"event": "index_ok", **report})
+        return report
+
+    def index_source_file(
+        self,
+        path: Path,
+        *,
+        target: Dict[str, Any],
+        trigger: str = "distill_success",
+        min_chars: int = 200,
+    ) -> Dict[str, Any]:
+        if not path.is_file():
+            return {"status": "error", "detail": f"missing: {path}"}
+        text = path.read_text(encoding="utf-8", errors="replace")
+        prefix = (target.get("distill") or {}).get("context_prefix", "")
+        if prefix and prefix.strip() not in text[:500]:
+            text = f"{prefix.strip()}\n\n---\n\n{text}"
+        return self.index_text_if_new(
+            text,
+            source_path=str(path),
+            target_id=str(target.get("id", "")),
+            category=str(target.get("category", "")),
+            feed_url=str((target.get("probe") or {}).get("url", "")),
+            trigger=trigger,
+            min_chars=min_chars,
+        )
+
+    def index_feed_probe(
+        self,
+        html: str,
+        *,
+        target: Dict[str, Any],
+        trigger: str = "feed_probe",
+        min_chars: int = 200,
+        max_html_chars: int = 50000,
+    ) -> Dict[str, Any]:
+        probe = target.get("probe") or {}
+        url = str(probe.get("url", ""))
+        text = html_to_text(html, max_chars=max_html_chars)
+        source_path = f"feed://{target.get('id', 'unknown')}/{url}"
+        return self.index_text_if_new(
+            text,
+            source_path=source_path,
+            target_id=str(target.get("id", "")),
+            category=str(target.get("category", "")),
+            feed_url=url,
+            trigger=trigger,
+            min_chars=min_chars,
+        )
+
+    def index_for_target(
+        self,
+        target: Dict[str, Any],
+        *,
+        source_path: Optional[Path] = None,
+        html: str = "",
+        vector_cfg: Optional[Dict[str, Any]] = None,
+        event: str = "distill_success",
+    ) -> List[Dict[str, Any]]:
+        """Index per target config after monitor events."""
+        cfg = vector_cfg or {}
+        if not cfg.get("enabled", True):
+            return [{"status": "disabled", "target_id": target.get("id")}]
+
+        min_chars = int(cfg.get("min_text_chars", 200))
+        reports: List[Dict[str, Any]] = []
+        index_on = set(cfg.get("index_on") or ["distill_success", "feed_probe"])
+
+        if event in ("distill_success",) and "distill_success" in index_on:
+            sp = source_path or Path((target.get("distill") or {}).get("source_file", ""))
+            reports.append(
+                self.index_source_file(sp, target=target, trigger="distill_success", min_chars=min_chars)
+            )
+
+        if html and "feed_probe" in index_on and event in ("distill_success", "feed_probe", "no_new"):
+            reports.append(
+                self.index_feed_probe(html, target=target, trigger="feed_probe", min_chars=min_chars)
+            )
+
+        return reports
+
+
+def load_vector_defaults(registry_path: Path = DEFAULT_REGISTRY) -> Dict[str, Any]:
+    try:
+        import yaml
+
+        if registry_path.is_file():
+            data = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+            monitor = (data or {}).get("monitor") or {}
+            return monitor.get("vector_index") or {}
+    except Exception:
+        pass
+    return {"enabled": True, "index_on": ["distill_success", "feed_probe"], "min_text_chars": 200}
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="High-signal ingestion → vector index")
+    parser.add_argument("--target", required=True)
+    parser.add_argument("--source", type=Path, help="Vault source file to index")
+    parser.add_argument("--feed-html", type=Path, help="Saved probe HTML")
+    parser.add_argument("--url", default="")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    target = {"id": args.target, "probe": {"url": args.url}, "category": "cli"}
+    pipeline = HighSignalIngestionPipeline()
+    if args.dry_run:
+        print(json.dumps({"dry_run": True, "target": args.target}, indent=2))
+        raise SystemExit(0)
+
+    reports = []
+    if args.source:
+        reports.append(pipeline.index_source_file(args.source, target=target))
+    if args.feed_html and args.feed_html.is_file():
+        html = args.feed_html.read_text(encoding="utf-8", errors="replace")
+        reports.append(pipeline.index_feed_probe(html, target=target))
+    print(json.dumps(reports, indent=2))

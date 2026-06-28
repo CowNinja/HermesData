@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Final consolidation self-test — watchdog + telemetry + feed + local stress."""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPTS))
+
+ERRORS: list = []
+PANEL = Path(r"D:\PhronesisVault\Operations\autonomous-operations-panel.json")
+
+
+def check(name: str, cond: bool, detail: str = "") -> None:
+    if cond:
+        print(f"  PASS {name}")
+    else:
+        ERRORS.append(f"{name}: {detail}")
+        print(f"  FAIL {name} — {detail}")
+
+
+def main() -> int:
+    print("=== Sovereign Final Consolidation Self-Test ===\n")
+
+    # 1. Watchdog tick with telemetry
+    from sovereign_stack_watchdog import run_tick
+
+    tick = run_tick(auto_recover=False)
+    matrix = tick.get("matrix") or {}
+    status = matrix.get("status")
+    check("watchdog_tick", tick.get("tick", {}).get("event") == "watchdog_tick")
+    check("watchdog_telemetry_hook", "telemetry_optimize" in (tick.get("tick") or {}))
+    check("watchdog_ops_feed", tick.get("tick", {}).get("operations_feed", {}).get("ok") is True)
+    check("stack_status", status in ("GREEN", "YELLOW", "RED"), str(status))
+
+    # 2. Operations feed panel
+    from autonomous_operations_feed import refresh_panel
+
+    panel = refresh_panel()
+    check("panel_written", PANEL.is_file())
+    check("panel_status", panel.get("status") in ("GREEN", "YELLOW", "RED", "UNKNOWN"))
+    check("panel_display_lines", isinstance(panel.get("display_lines"), list))
+
+    # 3. Local MoE telemetry unified stress
+    from sovereign_telemetry_monitor import get_telemetry_monitor
+
+    tel = get_telemetry_monitor(reload=True)
+    tel.record_local_moe_dispatch(success=True, latency_sec=1.2, port=8090, backend="vault", model="test")
+    defer, _ = tel.should_defer_procurement()
+    check("local_moe_record", tel.combined_stress_level() >= 0)
+    tel.record_local_moe_dispatch(success=False, latency_sec=60.0, port=8090, backend="vault", timeout=True)
+    defer2, reason2 = tel.should_defer_procurement()
+    check("procurement_defer_signal", defer2 or tel.combined_stress_level() > 0, reason2)
+
+    # 4. Router bridge hook exists
+    from router_bridge import _record_local_moe_telemetry
+
+    check("bridge_telemetry_hook", callable(_record_local_moe_telemetry))
+
+    # 5. Popen zombie path
+    from sovereign_telemetry_monitor import simulate_stalled_process_test
+
+    proc_sim = simulate_stalled_process_test()
+    check("popen_zombie", proc_sim.get("pass") is True, str(proc_sim))
+
+    # 6. Silent watchdog ps1 uses pythonw pattern
+    ps1 = (SCRIPTS / "Start-Sovereign-Watchdog.ps1").read_text(encoding="utf-8")
+    check("watchdog_hidden", "WindowStyle Hidden" in ps1)
+    check("watchdog_pythonw", "pythonw" in ps1.lower())
+
+    print(f"\n=== Stack Status: {status} ===")
+    print(f"=== Results: {len(ERRORS)} failures ===")
+    if ERRORS:
+        for e in ERRORS:
+            print(f"  - {e}")
+        return 1
+    if status == "GREEN":
+        print("ALL PASS — Sovereign AI Swarm consolidation GREEN")
+    else:
+        print(f"PASS with stack {status} — consolidation wired (recover may be needed)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

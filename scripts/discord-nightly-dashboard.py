@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Hermes cron: nightly dashboard snapshot + daily distillation one-liner."""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+
+VAULT = Path(r"D:\PhronesisVault")
+DASHBOARD = VAULT / "Discord" / "Hub" / "dashboard.md"
+HYGIENE_JSON = VAULT / "Operations" / "logs" / "daily-distillation-latest.json"
+NIGHTLY_SCRIPT = VAULT / "scripts" / "discord_nightly_dashboard.py"
+PORTS = (8081, 8082, 8642, 9119, 3001)
+
+
+def probe(port: int) -> str:
+    for url in (
+        f"http://127.0.0.1:{port}/health",
+        f"http://127.0.0.1:{port}/v1/models",
+        f"http://127.0.0.1:{port}/",
+    ):
+        try:
+            urllib.request.urlopen(url, timeout=3)
+            return "UP"
+        except Exception:
+            continue
+    return "DOWN"
+
+
+def hygiene_line() -> str:
+    if HYGIENE_JSON.exists():
+        data = json.loads(HYGIENE_JSON.read_text(encoding="utf-8"))
+        total = data.get("total_md", "?")
+        top = data.get("top_priority", "none")
+        return f"- Vault hygiene: **{total}** .md · top proposal **{top}** · [[Operations/logs/daily-distillation-{data.get('date', 'latest')}]]\n"
+    return "- Vault hygiene: audit not run · see [[Operations/Vault-Daily-Distillation-Plan]]\n"
+
+
+def main() -> int:
+    if not VAULT.is_dir():
+        print("VAULT_CONFIRMED FAIL")
+        return 1
+    if NIGHTLY_SCRIPT.exists():
+        subprocess.call([sys.executable, str(NIGHTLY_SCRIPT)])
+    status = {str(p): probe(p) for p in PORTS}
+    line = (
+        f"\n### Nightly triad snapshot ({datetime.now().strftime('%Y-%m-%d %H:%M')})\n"
+        f"- Ports: `{json.dumps(status)}`\n"
+        f"{hygiene_line()}"
+        f"- Coordination: [[docs/agent-coordination/Composer-Handoff-to-Hermes-Daily-A-Prep-2026-06-24]]\n"
+    )
+    text = DASHBOARD.read_text(encoding="utf-8") if DASHBOARD.exists() else "# Dashboard\n"
+    if "## Nightly snapshots" not in text:
+        text += "\n## Nightly snapshots\n"
+    text += line
+    DASHBOARD.write_text(text, encoding="utf-8")
+    print(json.dumps({"ok": True, "ports": status}))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

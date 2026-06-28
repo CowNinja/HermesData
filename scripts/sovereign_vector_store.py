@@ -1,0 +1,367 @@
+#!/usr/bin/env python3
+"""
+sovereign_vector_store.py — SQLite-vec semantic index (multi-million chunk target).
+
+Optimized for ANN retrieval with hierarchical parent-child metadata.
+Embeds on ingestion via local Ollama nomic-embed-text (768d).
+
+Usage:
+  from sovereign_vector_store import SovereignVectorStore
+  store = SovereignVectorStore()
+  store.index_document(text, source_path="...")
+  hits = store.search("query", k=8)
+"""
+from __future__ import annotations
+
+import json
+import sqlite3
+import struct
+import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+HERMES_SCRIPTS = Path(__file__).resolve().parent
+DEFAULT_DB = Path(r"D:\PhronesisVault\Operations\sovereign-semantic-index.sqlite")
+EMBED_DIM = 768
+DEFAULT_EMBED_MODEL = "nomic-embed-text"
+INDEX_LOG = Path(r"D:\PhronesisVault\Operations\logs\sovereign-semantic-index.jsonl")
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def serialize_float32(vector: List[float]) -> bytes:
+    return struct.pack(f"{len(vector)}f", *vector)
+
+
+def _log(event: Dict[str, Any]) -> None:
+    try:
+        INDEX_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(INDEX_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
+    except Exception:
+        pass
+
+
+@dataclass
+class SearchHit:
+    chunk_id: str
+    score: float
+    text: str
+    level: str
+    parent_id: Optional[str]
+    document_id: str
+    source_path: str
+    parent_text: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "chunk_id": self.chunk_id,
+            "score": self.score,
+            "text": self.text,
+            "level": self.level,
+            "parent_id": self.parent_id,
+            "document_id": self.document_id,
+            "source_path": self.source_path,
+            "parent_text": self.parent_text,
+        }
+
+
+class SovereignVectorStore:
+    """Local sqlite-vec store with hierarchical chunk graph."""
+
+    def __init__(
+        self,
+        db_path: Path = DEFAULT_DB,
+        *,
+        embed_dim: int = EMBED_DIM,
+        embed_fn: Optional[Callable[[str], Optional[List[float]]]] = None,
+    ):
+        self.db_path = db_path
+        self.embed_dim = embed_dim
+        self._embed_fn = embed_fn
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = self._connect()
+        self._init_schema()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        conn.enable_load_extension(True)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA mmap_size=268435456")  # 256MB mmap for scale
+        conn.execute("PRAGMA cache_size=-64000")  # 64MB page cache
+        try:
+            import sqlite_vec  # type: ignore
+
+            sqlite_vec.load(conn)
+        except ImportError as exc:
+            raise RuntimeError("sqlite_vec required: pip install sqlite-vec") from exc
+        return conn
+
+    def _init_schema(self) -> None:
+        cur = self._conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chunks (
+                chunk_id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                parent_id TEXT,
+                level TEXT NOT NULL,
+                token_count INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                source_path TEXT,
+                content_hash TEXT,
+                ordinal INTEGER DEFAULT 0,
+                metadata TEXT,
+                indexed_at TEXT NOT NULL
+            )
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(document_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_parent ON chunks(parent_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_level ON chunks(level)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_source ON chunks(source_path)")
+
+        # vec0 virtual table — auxiliary columns without + in DML
+        cur.execute(
+            f"""
+            CREATE VIRTUAL TABLE IF NOT EXISTS chunk_vectors USING vec0(
+                embedding float[{self.embed_dim}],
+                +chunk_id TEXT,
+                +document_id TEXT,
+                +level TEXT,
+                +source_path TEXT,
+                +parent_id TEXT
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS index_stats (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.commit()
+
+    def has_content_hash(self, content_hash: str) -> bool:
+        if not content_hash:
+            return False
+        row = self._conn.execute(
+            "SELECT 1 FROM chunks WHERE content_hash = ? LIMIT 1",
+            (content_hash,),
+        ).fetchone()
+        return row is not None
+
+    def stats(self) -> Dict[str, Any]:
+        cur = self._conn.cursor()
+        total = cur.execute("SELECT COUNT(*) AS c FROM chunks").fetchone()["c"]
+        vec_total = cur.execute("SELECT COUNT(*) AS c FROM chunk_vectors").fetchone()["c"]
+        by_level = {
+            row["level"]: row["c"]
+            for row in cur.execute("SELECT level, COUNT(*) AS c FROM chunks GROUP BY level")
+        }
+        return {
+            "db_path": str(self.db_path),
+            "chunks": total,
+            "vectors": vec_total,
+            "by_level": by_level,
+            "embed_dim": self.embed_dim,
+        }
+
+    def embed_text(self, text: str, *, model: str = DEFAULT_EMBED_MODEL) -> Optional[List[float]]:
+        if self._embed_fn is not None:
+            return self._embed_fn(text)
+        try:
+            import ollama  # type: ignore
+
+            resp = ollama.embeddings(model=model, prompt=text[:4000])
+            emb = resp.get("embedding")
+            if emb and len(emb) == self.embed_dim:
+                return emb
+            if emb:
+                return emb[: self.embed_dim] if len(emb) > self.embed_dim else emb + [0.0] * (self.embed_dim - len(emb))
+        except Exception as exc:
+            _log({"event": "embed_fail", "error": str(exc)})
+        return None
+
+    def index_nodes(
+        self,
+        nodes: List[Dict[str, Any]],
+        *,
+        embed_levels: Tuple[str, ...] = ("paragraph", "section"),
+        batch_size: int = 64,
+    ) -> Dict[str, Any]:
+        """Index hierarchical chunk nodes; embed paragraph+section levels."""
+        started = time.time()
+        inserted = 0
+        embedded = 0
+        cur = self._conn.cursor()
+
+        for i in range(0, len(nodes), batch_size):
+            batch = nodes[i : i + batch_size]
+            for node in batch:
+                cid = str(node.get("chunk_id") or "")
+                if not cid:
+                    continue
+                cur.execute(
+                    """
+                    INSERT OR REPLACE INTO chunks
+                    (chunk_id, document_id, parent_id, level, token_count, text, source_path,
+                     content_hash, ordinal, metadata, indexed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        cid,
+                        node.get("document_id"),
+                        node.get("parent_id"),
+                        node.get("level"),
+                        int(node.get("token_count") or 1),
+                        node.get("text"),
+                        node.get("source_path"),
+                        node.get("content_hash"),
+                        int(node.get("ordinal") or 0),
+                        json.dumps(node.get("metadata") or {}),
+                        _utc_now(),
+                    ),
+                )
+                inserted += 1
+
+                level = str(node.get("level") or "")
+                if level not in embed_levels:
+                    continue
+                text = str(node.get("text") or "").strip()
+                if len(text) < 20:
+                    continue
+                vec = self.embed_text(text)
+                if not vec:
+                    continue
+                cur.execute("DELETE FROM chunk_vectors WHERE chunk_id = ?", (cid,))
+                cur.execute(
+                    """
+                    INSERT INTO chunk_vectors
+                    (embedding, chunk_id, document_id, level, source_path, parent_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        serialize_float32(vec),
+                        cid,
+                        node.get("document_id"),
+                        level,
+                        node.get("source_path"),
+                        node.get("parent_id"),
+                    ),
+                )
+                embedded += 1
+            self._conn.commit()
+
+        elapsed = round(time.time() - started, 2)
+        report = {"inserted": inserted, "embedded": embedded, "elapsed_sec": elapsed}
+        cur.execute(
+            "INSERT OR REPLACE INTO index_stats (key, value) VALUES (?, ?)",
+            ("last_index", json.dumps({**report, "at": _utc_now()})),
+        )
+        self._conn.commit()
+        _log({"event": "index_nodes", **report})
+        return report
+
+    def index_document(
+        self,
+        text: str,
+        *,
+        source_path: str = "",
+        content_hash: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        from hierarchical_chunker import HierarchicalChunker
+
+        chunker = HierarchicalChunker()
+        nodes = [n.to_dict() for n in chunker.chunk_text(text, source_path=source_path, content_hash=content_hash, metadata=metadata)]
+        return self.index_nodes(nodes)
+
+    def search(
+        self,
+        query: str,
+        *,
+        k: int = 8,
+        levels: Optional[Tuple[str, ...]] = ("paragraph", "section"),
+        include_parent: bool = True,
+    ) -> List[SearchHit]:
+        qvec = self.embed_text(query)
+        if not qvec:
+            return []
+        cur = self._conn.cursor()
+        # vec0 forbids auxiliary-column filters inside KNN MATCH — filter in Python.
+        fetch_k = k * 5 if levels else k * 3
+        rows = cur.execute(
+            """
+            SELECT chunk_id, distance, document_id, level, source_path, parent_id
+            FROM chunk_vectors
+            WHERE embedding MATCH ?
+              AND k = ?
+            ORDER BY distance
+            """,
+            (serialize_float32(qvec), fetch_k),
+        ).fetchall()
+
+        allowed_levels = set(levels) if levels else None
+        hits: List[SearchHit] = []
+        seen: set = set()
+        for row in rows:
+            if allowed_levels and row["level"] not in allowed_levels:
+                continue
+            cid = row["chunk_id"]
+            if cid in seen:
+                continue
+            seen.add(cid)
+            chunk = cur.execute("SELECT text FROM chunks WHERE chunk_id = ?", (cid,)).fetchone()
+            if not chunk:
+                continue
+            parent_text = None
+            if include_parent and row["parent_id"]:
+                parent = cur.execute("SELECT text FROM chunks WHERE chunk_id = ?", (row["parent_id"],)).fetchone()
+                parent_text = parent["text"] if parent else None
+            hits.append(
+                SearchHit(
+                    chunk_id=cid,
+                    score=round(1.0 - float(row["distance"]), 4),
+                    text=chunk["text"],
+                    level=row["level"],
+                    parent_id=row["parent_id"],
+                    document_id=row["document_id"],
+                    source_path=row["source_path"] or "",
+                    parent_text=parent_text,
+                )
+            )
+            if len(hits) >= k:
+                break
+        return hits
+
+    def close(self) -> None:
+        self._conn.close()
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Sovereign sqlite-vec store")
+    parser.add_argument("--stats", action="store_true")
+    parser.add_argument("--index-text", type=str)
+    parser.add_argument("--search", type=str)
+    args = parser.parse_args()
+
+    store = SovereignVectorStore()
+    if args.index_text:
+        print(json.dumps(store.index_document(args.index_text, source_path="cli"), indent=2))
+    elif args.search:
+        print(json.dumps([h.to_dict() for h in store.search(args.search)], indent=2))
+    else:
+        print(json.dumps(store.stats(), indent=2))
+    store.close()

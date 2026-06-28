@@ -1,0 +1,49 @@
+=== FIX FOR rclone Google Drive Setup (Session 14) ===
+
+PROBLEM DIAGNOSED:
+Your current [gdrive] remote is configured with:
+  client_credentials = true
+  env_auth = true
+
+This tells rclone to use Google Application Default Credentials (ADC), which requires a service account or gcloud login.
+This does NOT match the personal OAuth flow you started with mr.jeffrey.j.bloom + "Hermes" project.
+
+SOLUTION:
+1. Delete the bad remote (run this):
+   D:\HermesData\rclone_test\rclone.exe config delete gdrive
+
+2. Start a clean config:
+   D:\HermesData\rclone_test\rclone.exe config
+
+Recommended answers for clean personal drive access:
+
+- n) New remote
+- Name: gdrive
+- Storage: drive
+- client_id: Press Enter (leave blank for now, or paste your client ID from the "Hermes" project)
+- client_secret: Press Enter (leave blank for now, or paste secret)
+- scope: drive   (full access)   <-- type "drive" or choose the full option
+- root_folder_id: Press Enter (blank)
+- service_account_file: Press Enter (blank)
+- Edit advanced config? n
+- Use auto config? y   (this will open browser)
+
+3. In the browser that opens:
+   - Log in with mr.jeffrey.j.bloom
+   - Grant access to the Hermes project / rclone
+
+4. After it succeeds, test with:
+   D:\HermesData\rclone_test\rclone.exe ls "gdrive:MemoryCard_Backups/Google Drive/Medical" --max-depth 1 --fast-list
+
+5. Then copy the high-signal slice:
+   mkdir -p D:\HermesData\data\session14_navy_medical
+
+   D:\HermesData\rclone_test\rclone.exe copy \
+     "gdrive:MemoryCard_Backups/Google Drive/Medical" \
+     D:\HermesData\data\session14_navy_medical \
+     --include-from D:\HermesData\data\session14_high_signal_list.txt \
+     --progress --transfers 4 --fast-list
+
+All main data will land under D:\HermesData as required.
+
+Once files are copied, tell Hermes and we will run the walker + manifest + extraction.
