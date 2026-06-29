@@ -24,6 +24,7 @@ STATE_PATH = Path(r"D:\PhronesisVault\Operations\logs\lru-router-state.json")
 ACTIVITY_LOG = Path(r"D:\PhronesisVault\Operations\logs\lru-router-activity.jsonl")
 PIN_CONFIG_PATH = Path(r"D:\PhronesisVault\Operations\lru-pinned-models-v0.1.json")
 PIN_TELEMETRY_LOG = Path(r"D:\PhronesisVault\Operations\logs\vram-pin-telemetry.jsonl")
+NANODB_PATH = Path(r"D:\HermesData\scripts\nanodb.py")
 
 _DEFAULT_PINNED = ("qwen2-5-7b",)
 _KEEPALIVE_THREAD: Optional[threading.Thread] = None
@@ -31,14 +32,18 @@ _KEEPALIVE_STOP = threading.Event()
 
 # Legacy dotted aliases from early pivot configs → models.ini section ids (hyphens)
 _LOGICAL_MODEL_ALIASES: Dict[str, str] = {
-    "llama-3.1-8b-abliterated": "qwen2-5-7b",
+    "llama-3.1-8b-abliterated": "DEFAULT",
     "llama-3.1-8b": "llama-3-1-8b",
-    "qwen2.5-coder-14b-abliterated": "qwen2-5-7b",
+    "qwen2.5-coder-14b-abliterated": "DEFAULT",
+    "qwen2-5-7b": "DEFAULT",      # legacy dotted id → router DEFAULT profile
+    "qwen2-5-14b": "qwen25-14b-q5",
+    "qwen2-5-3b": "qwen25-3b",
 }
 
 # Tier → preset logical model id (models.ini sections)
-_UNIFIED_LOGICAL = "qwen2-5-7b"
-MODELS_INI_PATH = Path(r"D:\PhronesisModels\presets\models.ini")
+# "DEFAULT" = whatever the [DEFAULT] section in models-8090.ini points to (currently qwen25-7b-q4)
+_UNIFIED_LOGICAL = "DEFAULT"
+MODELS_INI_PATH = Path(r"D:\PhronesisVault\Operations\models-8090.ini")
 UNIFIED_GPU_NGL = 99
 UNIFIED_CTX_SIZE = 12288
 
@@ -360,6 +365,9 @@ def record_dispatch(tier: str, logical_model: Optional[str] = None, task_type: O
     _save_state(state)
     _log_event({"event": "dispatch", "tier": tier, "logical_model": new_model})
 
+    # Feed nanoDB for auto-pick learning
+    _nanodb_record_dispatch(model=new_model, task_type=task_type)
+
     # Auto KV-swap: if model changed, attempt to transfer KV cache
     if prev_model and prev_model != new_model:
         swap_result = swap_kv_cache(prev_model, new_model)
@@ -484,6 +492,27 @@ def _log_pin_telemetry(event: str, extra: Optional[Dict[str, Any]] = None) -> No
         PIN_TELEMETRY_LOG.parent.mkdir(parents=True, exist_ok=True)
         with PIN_TELEMETRY_LOG.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(tel, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def _nanodb_record_dispatch(model: str, task_type: Optional[str] = None) -> None:
+    """Fire-and-forget: log dispatch event into nanoDB for auto-pick learning.
+    Uses estimated latency since LRU manager doesn't time the actual inference."""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("nanodb", NANODB_PATH)
+        if spec and spec.loader:
+            ndb = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(ndb)
+            # LRU manager doesn't measure latency directly; log 0 for now.
+            # Bridge path (_nanodb_record_dispatch in router_bridge.py) gets real latency.
+            ndb.record_dispatch(
+                task_type=task_type or "auto",
+                model=model,
+                latency_ms=0.0,
+                tps=0.0,
+            )
     except Exception:
         pass
 

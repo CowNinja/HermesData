@@ -3,7 +3,7 @@
 param(
     [int]$ModelsMax = 0,
     [int]$CtxSize = 0,
-    [string]$PresetsPath = "D:\PhronesisModels\presets\models.ini",
+    [string]$PresetsPath = "D:\PhronesisVault\Operations\models-8090.ini",
     [int]$SleepIdleSeconds = -1
 )
 

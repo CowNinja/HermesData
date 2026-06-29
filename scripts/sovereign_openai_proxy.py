@@ -739,7 +739,7 @@ def resolve_backend_logical_model(
             tier = "local_warm"
         return logical_model_for_tier(tier)
     except Exception:
-        return "qwen2-5-7b"
+        return "DEFAULT"
 
 
 def _request_needs_tool_passthrough(

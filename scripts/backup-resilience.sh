@@ -28,7 +28,7 @@ fi
 
 # 2) Robocopy mirror to K: (only if available)
 if [ -n "$K" ]; then
-    cmd /c "robocopy \"$HERMES_HOME\" \"$K\\mirrors\\HermesData-Current\" /MIR /FFT /R:1 /W:3 /XD\" \"node_modules\" \"venv\" \".venv\" \"Backups\" \"image_cache\" \"ComfyUI\" \"tmp\" \"cache\" \"audio_cache\" \"bootstrap-cache\" \"WisdomBolt\" \"bin\" \"tests\" \"copilot\" \"Revenue\" \"Digital-Twin\" \"analysis\" \"archive\" \"archives\" /XF \"*.zip\" \"*.pyc\" \"*.png\" \"*.jpg\" \"*.tmp\" \"*.log\" /NFL /NDL /NJH /NJS" 2>/dev/null || true
+    cmd /c "robocopy \"$HERMES_HOME\" \"$K\\mirrors\\HermesData-Current\" /MIR /FFT /R:1 /W:3 /XD\" \"node_modules\" \"venv\" \".venv\" \"Backups\" \"image_cache\" \"ComfyUI\" \"tmp\" \"cache\" \"audio_cache\" \"bootstrap-cache\" \"WisdomVault\" \"bin\" \"tests\" \"copilot\" \"Revenue\" \"Digital-Twin\" \"analysis\" \"archive\" \"archives\" /XF \"*.zip\" \"*.pyc\" \"*.png\" \"*.jpg\" \"*.tmp\" \"*.log\" /NFL /NDL /NJH /NJS" 2>/dev/null || true
     echo "Robocopy mirror complete"
 fi
 

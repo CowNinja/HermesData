@@ -44,7 +44,7 @@ bootstrap-cache/
 *.log
 
 # Large untracked project dirs (local-only, not for GitHub)
-WisdomBolt/
+WisdomVault/
 analysis/
 archive/
 archives/
