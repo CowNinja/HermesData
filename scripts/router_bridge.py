@@ -224,6 +224,7 @@ def _port_matrix() -> Dict[str, bool]:
         "8082": _port_open("127.0.0.1", 8082),
         "8083": _port_open("127.0.0.1", 8083),
         "8090": _port_open("127.0.0.1", 8090),
+        "8091": _port_open("127.0.0.1", 8091),
     }
 
 
@@ -897,9 +898,9 @@ def assess_local_stack(
         "classifier_probe": classifier_probe,
         "relay_preview_chars": len(relay_preview or ""),
         "recommendation": (
-            "MoE stack ready for local-first dispatch"
+            "Local stack ready (phronesis-sovereign or MoE)"
             if moe_ready
-            else "Start Start-MoE-Stack.ps1 before cron/relay"
+            else "Start Start-MoE-Stack.ps1 or phronesis-sovereign before cron/relay"
         ),
     }
 
