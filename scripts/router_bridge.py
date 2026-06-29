@@ -566,9 +566,11 @@ def bridge_dispatch(
             res["attempts"] = attempts
             res["latency_sec"] = round(time.time() - started, 2)
             _record_local_moe_telemetry(res, started=started, backend="ollama", port=11434)
+            _nanodb_record_dispatch(res, "ollama", task_type)
             return res
         res["latency_sec"] = round(time.time() - started, 2)
         _record_local_moe_telemetry(res, started=started, backend="ollama", port=11434)
+        _nanodb_record_dispatch(res, "ollama", task_type)
         return None
 
     def _try_vault() -> Optional[Dict[str, Any]]:
@@ -595,9 +597,11 @@ def bridge_dispatch(
                 out = _attach_quality_warning(res)
                 port = 8090 if _unified_router_up() else int((out.get("provenance") or {}).get("port_hint") or 8090)
                 _record_local_moe_telemetry(out, started=started, backend="vault", port=port)
+                _nanodb_record_dispatch(out, "vault", task_type)
                 return out
             res["latency_sec"] = round(time.time() - started, 2)
             _record_local_moe_telemetry(res, started=started, backend="vault", port=8090 if _unified_router_up() else 8081)
+            _nanodb_record_dispatch(res, "vault", task_type)
         except Exception as exc:
             attempts.append({"backend": "vault", "status": "error", "error": str(exc)})
             _record_local_moe_telemetry(
@@ -653,6 +657,7 @@ def bridge_dispatch(
                     "tokens_saved_estimate": "high (free fleet, not paid Grok)",
                 }
                 _log_token_usage(prompt, out, platform, task_type)
+                _nanodb_record_dispatch(out, "fleet", task_type)
                 return out
         except Exception as exc:
             attempts.append({"backend": "opportunistic_fleet", "status": "error", "error": str(exc)})
@@ -774,6 +779,30 @@ def _checkpoint_bridge_dispatch(
             working_memory=working,
             procedural_state=procedural,
             metadata={"source": "router_bridge"},
+        )
+    except Exception:
+        pass
+
+
+def _nanodb_record_dispatch(result: Dict[str, Any], backend: str, task_type: str = None) -> None:
+    """Append dispatch metrics to nanodb (JSON-backed nanoscale DB)."""
+    try:
+        import nanodb as ndb
+        model = str(result.get("model") or "")
+        latency_ms = float(result.get("latency_sec", 0)) * 1000
+        # Estimate TPS from response token count if available
+        tps = 0.0
+        tokens = 0
+        resp_text = str(result.get("response") or "")
+        if resp_text and latency_ms > 0:
+            # rough estimate: ~4 chars per token, tokens / seconds
+            tokens = len(resp_text) // 4
+            tps = tokens / (latency_ms / 1000) if latency_ms > 0 else 0
+        ndb.record_dispatch(
+            task_type=task_type or "auto",
+            model=model,
+            latency_ms=round(latency_ms, 1),
+            tps=round(tps, 1),
         )
     except Exception:
         pass

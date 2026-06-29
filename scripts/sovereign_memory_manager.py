@@ -486,6 +486,25 @@ class SovereignMemoryManager:
             "last_checkpoint_at": self._get_meta("last_checkpoint_at"),
         }
 
+    def purge_stale_sessions(self, max_age_hours: int = 24) -> int:
+        """Archive + remove concluded sessions older than max_age_hours. Returns count purged."""
+        cutoff = datetime.now(timezone.utc).timestamp() - (max_age_hours * 3600)
+        cutoff_iso = datetime.fromtimestamp(cutoff, tz=timezone.utc).isoformat()
+        stale = self._conn.execute(
+            "SELECT session_id FROM sessions WHERE status = 'concluded' AND updated_at < ?",
+            (cutoff_iso,),
+        ).fetchall()
+        purged = 0
+        for row in stale:
+            sid = row["session_id"]
+            self._conn.execute("DELETE FROM checkpoints WHERE session_id = ?", (sid,))
+            self._conn.execute("DELETE FROM sessions WHERE session_id = ?", (sid,))
+            purged += 1
+        if purged:
+            self._conn.commit()
+            _log({"event": "purge_stale_sessions", "purged": purged, "max_age_hours": max_age_hours})
+        return purged
+
 
 def make_memory_scope(
     platform: str = "roleplay",

@@ -13,12 +13,15 @@ venv/
 # Hermes internal
 .hermes/sessions/
 .hermes/cache/
+.hermes_history
+.restart_last_processed.json
 cron/output/
 cron/.jobs.lock
 cron/.tick.lock
 cron/ticker_heartbeat
 _success
 *.backup-*
+state-snapshots/
 
 # Sub-projects with their own repos (MemoryTools/* all have .git)
 MemoryTools/
@@ -32,11 +35,35 @@ lsp/
 # Backups (already on K:)
 Backups/
 
-# Temp
+# Temp + caches
 tmp/
 cache/
+audio_cache/
+bootstrap-cache/
 *.tmp
 *.log
+
+# Large untracked project dirs (local-only, not for GitHub)
+WisdomBolt/
+analysis/
+archive/
+archives/
+bin/
+copilot/
+tests/
+Revenue/
+Digital-Twin/
+config/
+config.yaml.bak*
+config.yaml.corrupt*
+auth.json
+auth.lock
+backend-probes.cjs
+channel_directory.json
+benchmark_*.py
+benchmark_*.json
+benchmark_*.md
+update_check
 
 # OS
 Thumbs.db

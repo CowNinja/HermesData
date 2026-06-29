@@ -53,18 +53,40 @@ def _pick_model(tier: str) -> str:
     # fast or default
     return FAST_MODEL
 
-def _call_ollama(prompt: str, model: str, timeout: int = 120) -> dict:
-    """Call Ollama. Prefers non-streaming."""
+def _call_ollama(prompt: str, model: str, timeout: int = 120, stream: bool = False) -> dict:
+    """Call Ollama. Stream=False for sync, stream=True yields tokens as they arrive (lower perceived latency)."""
     payload = {
         "model": model,
         "prompt": prompt,
-        "stream": False,
+        "stream": stream,
         "options": {
             "num_predict": 1024,
             "temperature": 0.2,
         }
     }
     try:
+        if stream:
+            # Streaming path: assemble tokens as they arrive
+            resp = requests.post(OLLAMA_API, json=payload, timeout=timeout, stream=True)
+            resp.raise_for_status()
+            chunks = []
+            for line in resp.iter_lines():
+                if line:
+                    try:
+                        chunk = json.loads(line)
+                        if chunk.get("done"):
+                            duration = chunk.get("total_duration")
+                        if "response" in chunk:
+                            chunks.append(chunk["response"])
+                    except json.JSONDecodeError:
+                        continue
+            return {
+                "success": True,
+                "response": "".join(chunks).strip(),
+                "model": model,
+                "done": True,
+                "streamed": True,
+            }
         resp = requests.post(OLLAMA_API, json=payload, timeout=timeout)
         resp.raise_for_status()
         data = resp.json()
@@ -74,11 +96,12 @@ def _call_ollama(prompt: str, model: str, timeout: int = 120) -> dict:
             "model": model,
             "done": data.get("done", True),
             "total_duration": data.get("total_duration"),
+            "streamed": False,
         }
     except Exception as e:
         return {"success": False, "error": str(e), "model": model}
 
-def dispatch(prompt: str, task_type: str = None, force_local: bool = True) -> dict:
+def dispatch(prompt: str, task_type: str = None, force_local: bool = True, stream: bool = False) -> dict:
     """
     Main Sovereign Router entrypoint.
     Returns structured dict with full provenance for token/cost tracking.
@@ -128,11 +151,14 @@ def dispatch(prompt: str, task_type: str = None, force_local: bool = True) -> di
     }
 
     # Always try local first (core of the token-saving mission)
-    result = _call_ollama(prompt, model)
+    # Use streaming for fast tier (lower perceived latency on simple tasks)
+    use_stream = stream or (tier == "fast")
+    result = _call_ollama(prompt, model, stream=use_stream)
 
     if result.get("success"):
         provenance["source"] = "local_ollama"
         provenance["tokens_saved_estimate"] = "high (avoided Grok/cloud call)"
+        provenance["streamed"] = result.get("streamed", False)
         provenance["latency_sec"] = round(time.time() - started, 2)
         return {
             "response": result["response"],

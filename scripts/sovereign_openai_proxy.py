@@ -15,15 +15,18 @@ trims/compresses to per-tier safe budgets before llama-server dispatch.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import socket
 import sys
+import threading
 import time
 import uuid
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from http.client import HTTPConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -119,9 +122,227 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+_LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB per log file
+_LOG_BACKUP_COUNT = 3
+
+# ──────────────────────────────────────────────────────────────────────
+# Batch 5 (2026-06-29): Connection pool, prompt cache, circuit breaker
+# Research: iunera.com middleware pattern, Vercel AI SDK connection reuse,
+#           Gravitee semantic caching, circuit breaker standard pattern.
+# ──────────────────────────────────────────────────────────────────────
+
+class _ConnectionPool:
+    """Reusable HTTP connections to upstream llama-server (avoids TCP handshake per request)."""
+
+    def __init__(self, max_per_host: int = 4, keep_alive_sec: int = 30):
+        self._pool: Dict[str, List[HTTPConnection]] = {}
+        self._lock = threading.Lock()
+        self._max = max_per_host
+        self._keep_alive = keep_alive_sec
+        self._last_used: Dict[HTTPConnection, float] = {}
+
+    def _key(self, host: str, port: int) -> str:
+        return f"{host}:{port}"
+
+    def get(self, host: str, port: int) -> HTTPConnection:
+        k = self._key(host, port)
+        with self._lock:
+            conns = self._pool.get(k, [])
+            now = time.time()
+            # Evict stale connections
+            while conns and (now - self._last_used.get(conns[-1], 0)) > self._keep_alive:
+                try:
+                    conns[-1].close()
+                except Exception:
+                    pass
+                conns.pop()
+            if conns:
+                conn = conns.pop()
+                self._last_used[conn] = now
+                return conn
+        conn = HTTPConnection(host, port, timeout=300)
+        self._last_used[conn] = time.time()
+        return conn
+
+    def put(self, host: str, port: int, conn: HTTPConnection) -> None:
+        k = self._key(host, port)
+        with self._lock:
+            conns = self._pool.setdefault(k, [])
+            if len(conns) < self._max:
+                conns.append(conn)
+            else:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    def request(self, method: str, url: str, body: bytes = None,
+                headers: Optional[Dict[str, str]] = None) -> Tuple[int, bytes]:
+        """Make a request via a pooled connection. Returns (status, response_body)."""
+        from urllib.parse import urlparse as _up
+        parsed = _up(url)
+        host, port = parsed.hostname, parsed.port or 80
+        path = parsed.path or "/"
+        if parsed.query:
+            path += "?" + parsed.query
+        conn = None
+        try:
+            conn = self.get(host, port)
+            conn.request(method, path, body=body, headers=headers or {})
+            resp = conn.getresponse()
+            data = resp.read()
+            status = resp.status
+            self.put(host, port, conn)
+            conn = None
+            return status, data
+        except Exception:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            raise
+
+
+_upstream_pool = _ConnectionPool(max_per_host=4, keep_alive_sec=30)
+
+
+class _PromptCache:
+    """Tiny LRU cache for identical prompt → response (stdinference save for repeated tool schemas)."""
+
+    def __init__(self, max_items: int = 64, ttl_sec: int = 120):
+        self._cache: Dict[str, Tuple[float, str]] = {}
+        self._lock = threading.Lock()
+        self._max = max_items
+        self._ttl = ttl_sec
+        self._hits = 0
+        self._misses = 0
+
+    def _key(self, model: str, body_json: str) -> str:
+        return hashlib.sha256(f"{model}:{body_json}".encode()).hexdigest()
+
+    def get(self, model: str, body_json: str) -> Optional[str]:
+        k = self._key(model, body_json)
+        with self._lock:
+            if k in self._cache:
+                ts, resp = self._cache[k]
+                if time.time() - ts < self._ttl:
+                    self._hits += 1
+                    # Move-to-front: re-insert to maintain LRU order
+                    del self._cache[k]
+                    self._cache[k] = (ts, resp)
+                    return resp
+                del self._cache[k]
+            self._misses += 1
+            return None
+
+    def put(self, model: str, body_json: str, response: str) -> None:
+        k = self._key(model, body_json)
+        with self._lock:
+            if len(self._cache) >= self._max:
+                oldest = next(iter(self._cache))
+                del self._cache[oldest]
+            self._cache[k] = (time.time(), response)
+
+    @property
+    def stats(self) -> Dict[str, int]:
+        return {"hits": self._hits, "misses": self._misses, "size": len(self._cache)}
+
+
+_prompt_cache = _PromptCache(max_items=64, ttl_sec=120)
+
+
+class _CircuitBreaker:
+    """Prevent hammering a down upstream — half-open after cooldown."""
+
+    def __init__(self, failure_threshold: int = 5, cooldown_sec: float = 30.0):
+        self._failures = 0
+        self._threshold = failure_threshold
+        self._cooldown = cooldown_sec
+        self._opened_at: float = 0.0
+        self._lock = threading.Lock()
+        self._state = "closed"  # closed | open | half-open
+
+    def record_success(self):
+        with self._lock:
+            self._failures = 0
+            self._state = "closed"
+
+    def record_failure(self):
+        with self._lock:
+            self._failures += 1
+            if self._failures >= self._threshold:
+                self._state = "open"
+                self._opened_at = time.time()
+
+    @property
+    def allow_request(self) -> bool:
+        with self._lock:
+            if self._state == "closed":
+                return True
+            if self._state == "open":
+                if time.time() - self._opened_at > self._cooldown:
+                    self._state = "half-open"
+                    return True
+                return False
+            return True  # half-open: allow one probe
+
+    @property
+    def state(self) -> str:
+        return self._state
+
+
+# Per-upstream circuit breakers keyed by port
+_breakers: Dict[int, _CircuitBreaker] = {}
+_breakers_lock = threading.Lock()
+
+
+def _get_breaker(port: int) -> _CircuitBreaker:
+    with _breakers_lock:
+        if port not in _breakers:
+            _breakers[port] = _CircuitBreaker(failure_threshold=5, cooldown_sec=30)
+        return _breakers[port]
+
+
+def _dispatch_upstream_with_pool(url: str, payload: bytes,
+                                content_type: str = "application/json") -> Dict[str, Any]:
+    """Serialize an upstream call through the circuit breaker + connection pool."""
+    from urllib.parse import urlparse as _up
+    parsed = _up(url)
+    port = parsed.port or 80
+    breaker = _get_breaker(port)
+    if not breaker.allow_request:
+        raise ConnectionError(f"Circuit breaker OPEN for port {port} — upstream appears down")
+    headers = {"Content-Type": content_type}
+    try:
+        status, data = _upstream_pool.request("POST", url, body=payload, headers=headers)
+        breaker.record_success()
+        return {"status": status, "body": data}
+    except Exception:
+        breaker.record_failure()
+        raise
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Batch 5 END
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _rotate_if_needed(path: Path) -> None:
+    if path.exists() and path.stat().st_size > _LOG_MAX_BYTES:
+        for i in range(_LOG_BACKUP_COUNT - 1, 0, -1):
+            older = path.with_suffix(f".log.{i}")
+            newer = path.with_suffix(f".log.{i - 1}" if i > 1 else path)
+            if older.exists():
+                older.unlink()
+            if newer.exists():
+                newer.rename(older)
+        path.rename(path.withsuffix(".log.1"))
+
+
 def _log_event(event: Dict[str, Any]) -> None:
     try:
-        PROXY_LOG.parent.mkdir(parents=True, exist_ok=True)
+        _rotate_if_needed(PROXY_LOG)
         with open(PROXY_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
     except Exception:
@@ -130,7 +351,7 @@ def _log_event(event: Dict[str, Any]) -> None:
 
 def _log_generation_provenance(event: Dict[str, Any]) -> None:
     try:
-        GENERATION_PROVENANCE_LOG.parent.mkdir(parents=True, exist_ok=True)
+        _rotate_if_needed(GENERATION_PROVENANCE_LOG)
         with open(GENERATION_PROVENANCE_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
     except Exception:
@@ -457,7 +678,7 @@ def _strip_think_blocks(text: str) -> str:
 
 
 _TOOL_XML_PATTERNS = (
-    re.compile(r"<tools>\s*(\{.*?\})\s*</tools>", re.DOTALL | re.IGNORECASE),
+    re.compile(r"<tools>\s*(\[.*?\]|\{.*?\})\s*</tools>", re.DOTALL | re.IGNORECASE),
     re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL | re.IGNORECASE),
     re.compile(r"<response>\s*(\{.*?\})\s*</response>", re.DOTALL | re.IGNORECASE),
 )
@@ -571,15 +792,46 @@ def dispatch_via_native_router(
 
     started = time.time()
     try:
-        payload = json.dumps(forward).encode("utf-8")
-        req = urllib.request.Request(
-            UNIFIED_ROUTER_CHAT,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        payload_bytes = json.dumps(forward).encode("utf-8")
+        # Check prompt cache first (only for non-streaming, non-tool requests)
+        use_cache = not forward.get("stream") and not forward.get("tools") and not narrative_fast
+        cache_key_for_body = json.dumps(forward, sort_keys=True)
+        if use_cache:
+            cached = _prompt_cache.get(logical, cache_key_for_body)
+            if cached is not None:
+                data = json.loads(cached)
+                _log_event({"event": "prompt_cache_hit", "model": logical, "port": UNIFIED_ROUTER_PORT})
+                # Skip upstream call — go straight to response parsing
+                choice = (data.get("choices") or [{}])[0]
+                raw_msg = choice.get("message") or {}
+                content = str(raw_msg.get("content") or "")
+                prov = {
+                    "selected_backend": "native_8090_cached",
+                    "logical_model": logical,
+                    "native_passthrough": True,
+                    "cached": True,
+                }
+                return {
+                    "success": True,
+                    "response": content,
+                    "model": logical,
+                    "tier": "local_generalist",
+                    "provenance": prov,
+                    "openai_response": data,
+                    "finish_reason": choice.get("finish_reason"),
+                    "latency_sec": round(time.time() - started, 2),
+                    "cache_hit": True,
+                }
+
+        # Dispatch through circuit breaker + connection pool
+        result = _dispatch_upstream_with_pool(UNIFIED_ROUTER_CHAT, payload_bytes)
+        if result["status"] != 200:
+            raise RuntimeError(f"upstream returned HTTP {result['status']}: {result['body'][:200]}")
+        data = json.loads(result["body"].decode("utf-8"))
+
+        # Cache the response
+        if use_cache and data:
+            _prompt_cache.put(logical, cache_key_for_body, result["body"].decode("utf-8"))
     except Exception as exc:
         return {
             "success": False,
@@ -591,7 +843,19 @@ def dispatch_via_native_router(
         }
 
     choice = (data.get("choices") or [{}])[0]
-    msg = _normalize_llamacpp_tool_message(choice.get("message") or {})
+    raw_msg = choice.get("message") or {}
+    msg = _normalize_llamacpp_tool_message(raw_msg)
+    # Chain ToolCallFixer for abliterated model repair (markdown-fenced JSON, multi-tool blocks)
+    try:
+        from tool_call_fixer import ToolCallFixer
+        _tc_fixer = getattr(dispatch_via_native_router, "_tc_fixer", None)
+        if _tc_fixer is None:
+            _tc_fixer = ToolCallFixer()
+            dispatch_via_native_router._tc_fixer = _tc_fixer
+        available_tools = body.get("tools")
+        msg = _tc_fixer.fix_message(msg, available_tools=available_tools)
+    except Exception:
+        pass  # Fixer is best-effort; fall through to existing behavior
     choice = {**choice, "message": msg}
     data = {**data, "choices": [choice] + list(data.get("choices") or [])[1:]}
     content = str(msg.get("content") or "")
@@ -658,28 +922,23 @@ def dispatch_via_bridge(
     prompt: str,
     model: str,
     platform: str = "hermes_agent_session",
-    tool_depth: int = 0,
     trim_meta: Optional[Dict[str, Any]] = None,
     routing: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     from router_bridge import bridge_dispatch
 
     route = routing or {}
-    model = str(route.get("model") or model)
-    platform = str(route.get("platform") or platform)
     task_type = route.get("task_type") or resolve_task_type(model)
-    model = str(route.get("model") or model or "phronesis-sovereign-auto")
+    resolved_model = str(route.get("model") or model or "phronesis-sovereign-auto")
     result = bridge_dispatch(
         prompt,
         task_type=task_type,
-        platform=platform,
+        platform=str(route.get("platform") or platform),
         role="hermes_agent",
         force_local=True,
         prefer="vault",
         context_tokens_estimate=estimate_tokens(prompt) + 4000,
         modality="text",
-        tool_depth=tool_depth,
-        explicit_grok_flag=False,
         chat_id=str(route.get("chat_id") or ""),
         thread_id=str(route.get("thread_id") or ""),
         parent_channel_id=str(route.get("parent_channel_id") or ""),
@@ -741,9 +1000,23 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
 
     def _read_json(self) -> Dict[str, Any]:
-        length = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(length) if length else b"{}"
-        return json.loads(raw.decode("utf-8"))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except (ValueError, TypeError):
+            self._send_json(400, {"error": {"message": "invalid Content-Length", "type": "invalid_request_error"}})
+            return {"__error__": True}
+        if length <= 0:
+            self._send_json(400, {"error": {"message": "empty body", "type": "invalid_request_error"}})
+            return {"__error__": True}
+        if length > 2_000_000:  # 2 MB max body size
+            self._send_json(413, {"error": {"message": "request body too large (max 2MB)", "type": "payload_too_large"}})
+            return {"__error__": True}
+        raw = self.rfile.read(length)
+        try:
+            return json.loads(raw.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            self._send_json(400, {"error": {"message": f"invalid JSON: {exc}", "type": "invalid_request_error"}})
+            return {"__error__": True}
 
     def _send_json(self, status: int, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -759,28 +1032,34 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         self._cors_headers()
         self.end_headers()
 
-    def _send_sse_chunk(self, model: str, content: str) -> None:
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-cache")
-        self.end_headers()
-        chunk = {
-            "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
-            "object": "chat.completion.chunk",
-            "created": int(time.time()),
-            "model": model,
-            "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
-        }
-        done = {
-            "id": chunk["id"],
-            "object": "chat.completion.chunk",
-            "created": chunk["created"],
-            "model": model,
-            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-        }
-        self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode("utf-8"))
-        self.wfile.write(f"data: {json.dumps(done)}\n\n".encode("utf-8"))
-        self.wfile.write(b"data: [DONE]\n\n")
+    def _send_sse_chunk(self, model: str, content: str) -> bool:
+        """Send SSE stream to client. Returns False if client disconnected."""
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            chunk = {
+                "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": model,
+                "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
+            }
+            done = {
+                "id": chunk["id"],
+                "object": "chat.completion.chunk",
+                "created": chunk["created"],
+                "model": model,
+                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+            }
+            self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode("utf-8"))
+            self.wfile.write(f"data: {json.dumps(done)}\n\n".encode("utf-8"))
+            self.wfile.write(b"data: [DONE]\n\n")
+            self.wfile.flush()
+            return True
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return False
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
@@ -792,6 +1071,11 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 status = "GREEN" if matrix.get("moe_ready") else "YELLOW"
             except Exception:
                 status = "UNKNOWN"
+            # Gather per-port circuit breaker states
+            breaker_states: Dict[str, str] = {}
+            with _breakers_lock:
+                for port, br in _breakers.items():
+                    breaker_states[str(port)] = br.state
             payload: Dict[str, Any] = {
                 "status": status,
                 "service": MOE_GATEWAY_ID,
@@ -801,6 +1085,9 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 "tier_aware_trim": True,
                 "model_count": len(REGISTERED_MODELS),
                 "time": _utc_now(),
+                "prompt_cache": _prompt_cache.stats,
+                "circuit_breakers": breaker_states,
+                "connection_pool_hosts": list(_upstream_pool._pool.keys()),
             }
             try:
                 payload["stack"] = matrix
@@ -844,6 +1131,8 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             status, err = openai_error(400, f"invalid JSON: {exc}", "invalid_request_error")
             self._send_json(status, err)
             return
+        if body.get("__error__"):
+            return  # _read_json already sent the response
 
         model = str(body.get("model") or "phronesis-sovereign-auto")
         messages = body.get("messages") or []
@@ -999,7 +1288,9 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             pass
 
         if stream:
-            self._send_sse_chunk(model, content)
+            sse_ok = self._send_sse_chunk(model, content)
+            if not sse_ok:
+                pass  # Client disconnected; nothing more to do
             return
 
         report_model = str(resolved_model or model)

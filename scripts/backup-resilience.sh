@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Quick wrapper for resilience backups. Run via cron or manually.
 # Usage: bash scripts/backup-resilience.sh (from D:/HermesData)
-set -euo pipefail
+#
+# v2 — selective git operations with timeouts to prevent cron hangs
+set -uo pipefail
 TS=$(date +%Y%m%d-%H%M%S)
 HERMES_HOME="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -26,17 +28,38 @@ fi
 
 # 2) Robocopy mirror to K: (only if available)
 if [ -n "$K" ]; then
-    cmd /c "robocopy \"$HERMES_HOME\" \"$K\\mirrors\\HermesData-Current\" /MIR /FFT /R:1 /W:3 /XD__\" \"node_modules\" \"venv\" \".venv\" \"Backups\" \"image_cache\" \"ComfyUI\" \"tmp\" \"cache\" /XF \"*.zip\" \"*.pyc\" \"*.png\" \"*.jpg\" /NFL /NDL /NJH /NJS" 2>/dev/null || true
+    cmd /c "robocopy \"$HERMES_HOME\" \"$K\\mirrors\\HermesData-Current\" /MIR /FFT /R:1 /W:3 /XD\" \"node_modules\" \"venv\" \".venv\" \"Backups\" \"image_cache\" \"ComfyUI\" \"tmp\" \"cache\" \"audio_cache\" \"bootstrap-cache\" \"WisdomBolt\" \"bin\" \"tests\" \"copilot\" \"Revenue\" \"Digital-Twin\" \"analysis\" \"archive\" \"archives\" /XF \"*.zip\" \"*.pyc\" \"*.png\" \"*.jpg\" \"*.tmp\" \"*.log\" /NFL /NDL /NJH /NJS" 2>/dev/null || true
     echo "Robocopy mirror complete"
 fi
 
-# 3) Vault git push (GitHub backup)
+# Helper: git push with timeout (seconds)
+git_push_with_timeout() {
+    local dir="$1"
+    local remote="$2"
+    local branch="$3"
+    local timeout_sec="${4:-30}"
+    (
+        cd "$dir"
+        timeout "$timeout_sec" git push "$remote" "$branch" 2>&1 && return 0
+        local rc=$?
+        if [ $rc -eq 124 ]; then
+            echo "WARN: push timed out after ${timeout_sec}s — will retry next cycle"
+        else
+            echo "WARN: push failed (exit $rc) — will retry next cycle"
+        fi
+    ) || true
+}
+
+# 3) Vault git push (GitHub backup) — selective, only if there are real changes
 if [ -d "$HERMES_HOME/../PhronesisVault/.git" ]; then
     (
         cd "$HERMES_HOME/../PhronesisVault"
-        git add -A
-        git commit -m "auto-resilience backup $TS" || true
-        git push 2>&1 || echo "WARN: vault push failed — will retry next cycle"
+        # Only commit if there are tracked-file changes (not untracked)
+        if ! git diff --quiet HEAD 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+            git add -u  # only tracked files, not untracked
+            git commit -m "auto-resilience backup $TS" 2>/dev/null || true
+        fi
+        git_push_with_timeout "$HERMES_HOME/../PhronesisVault" origin master 45
     ) || true
     echo "Vault push attempted"
 fi
@@ -45,9 +68,12 @@ fi
 if [ -d "$HERMES_HOME/.git" ]; then
     (
         cd "$HERMES_HOME"
-        git add -A
-        git commit -m "auto-resilience backup $TS" || true
-        git push 2>&1 || echo "WARN: HermesData push failed — remote may not be configured"
+        # Only commit tracked-file changes (respects .gitignore)
+        if ! git diff --quiet HEAD 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+            git add -u  # only tracked files
+            git commit -m "auto-resilience backup $TS" 2>/dev/null || true
+        fi
+        git_push_with_timeout "$HERMES_HOME" origin main 45
     ) || true
     echo "HermesData push attempted"
 fi

@@ -249,7 +249,8 @@ def activity_profile() -> str:
 
 
 def recommended_models_max() -> int:
-    """LRU slot count — pinned models are never evicted below models_max_floor."""
+    """LRU slot count — pinned models are never evicted below models_max_floor.
+    Also factors in GPU memory pressure (KV-cache-aware eviction)."""
     cfg = load_pin_config()
     pinned = get_pinned_logical_models()
     floor = max(int(cfg.get("models_max_floor") or 2), len(pinned) or 1)
@@ -260,6 +261,16 @@ def recommended_models_max() -> int:
             return max(floor, int(explicit))
         except ValueError:
             pass
+
+    # KV-cache-aware: check GPU memory pressure
+    gpu_pressure = _gpu_memory_pressure()
+    if gpu_pressure == "critical":
+        # Under KV cache pressure: drop to floor (only pinned models)
+        _log_event({"event": "kv_cache_pressure", "action": "cap_at_floor", "floor": floor})
+        return floor
+    if gpu_pressure == "high":
+        # High pressure: allow one slot above floor
+        return max(floor, floor + 1)
 
     # Dual-pin on 12GB: cap at floor so a third model cannot evict residents.
     vram_gb = int(cfg.get("vram_gb") or 12)
@@ -272,6 +283,31 @@ def recommended_models_max() -> int:
     if profile == "idle_soft":
         return max(floor, 3)
     return max(floor, 2)
+
+
+def _gpu_memory_pressure() -> str:
+    """Check nvidia-smi for GPU memory utilization. Returns 'ok', 'high', or 'critical'.
+    Used for KV-cache-aware LRU eviction decisions."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode != 0:
+            return "ok"
+        line = result.stdout.strip().split("\n")[0]
+        used_str, total_str = line.split(",")
+        used_mb = float(used_str.strip())
+        total_mb = float(total_str.strip())
+        ratio = used_mb / total_mb if total_mb > 0 else 0
+        if ratio >= 0.95:
+            return "critical"
+        if ratio >= 0.85:
+            return "high"
+        return "ok"
+    except Exception:
+        return "ok"
 
 
 def recommended_sleep_idle_seconds() -> int:
@@ -311,16 +347,23 @@ def list_loaded_models(port: int = UNIFIED_PORT) -> List[str]:
 
 def record_dispatch(tier: str, logical_model: Optional[str] = None, task_type: Optional[str] = None) -> None:
     state = _load_state()
-    state["last_dispatch"] = _utc_now()
-    state["last_tier"] = tier
-    state["last_logical_model"] = normalize_logical_model_id(
+    prev_model = state.get("last_logical_model")
+    new_model = normalize_logical_model_id(
         logical_model or logical_model_for_tier(tier)
     )
+    state["last_dispatch"] = _utc_now()
+    state["last_tier"] = tier
+    state["last_logical_model"] = new_model
     state["last_task_type"] = task_type
     state["session_active"] = True
     state["activity_profile"] = activity_profile()
     _save_state(state)
-    _log_event({"event": "dispatch", "tier": tier, "logical_model": state["last_logical_model"]})
+    _log_event({"event": "dispatch", "tier": tier, "logical_model": new_model})
+
+    # Auto KV-swap: if model changed, attempt to transfer KV cache
+    if prev_model and prev_model != new_model:
+        swap_result = swap_kv_cache(prev_model, new_model)
+        _log_event({"event": "auto_kv_swap", "result": swap_result})
 
 
 def preload_candidates_for_route(route_preview: Dict[str, Any]) -> List[str]:
@@ -495,6 +538,78 @@ def ensure_pinned_resident(*, port: int = UNIFIED_PORT) -> Dict[str, Any]:
     return {"ok": True, "rewarmed": missing, "result": result, "telemetry": vram_pin_telemetry(port)}
 
 
+def swap_kv_cache(from_model: str, to_model: str, *, port: int = UNIFIED_PORT) -> Dict[str, Any]:
+    """Hot-swap KV cache between models to preserve context continuity.
+    
+    When rotating models (e.g. 7B → 14B), this attempts to transfer
+    the KV cache so the new model inherits the conversation context
+    without a cold-start penalty. Requires llama-server with --cache-save enabled.
+    """
+    from_model = normalize_logical_model_id(from_model)
+    to_model = normalize_logical_model_id(to_model)
+    
+    if from_model == to_model:
+        return {"ok": True, "skipped": True, "reason": "same_model"}
+    
+    if not unified_router_up():
+        return {"ok": False, "reason": "8090_down"}
+    
+    # Check if KV cache save/restore is supported
+    cache_dir = Path(r"D:\PhronesisModels\kv-cache")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    from_cache = cache_dir / f"{from_model.replace('/', '_')}.safetensors"
+    to_cache = cache_dir / f"{to_model.replace('/', '_')}.safetensors"
+    
+    result = {
+        "from": from_model,
+        "to": to_model,
+        "timestamp": _utc_now(),
+        "cache_dir": str(cache_dir),
+    }
+    
+    try:
+        # Save current KV cache from the outgoing model
+        save_url = f"http://127.0.0.1:{port}/v1/cache/save"
+        save_resp = urllib.request.urlopen(
+            urllib.request.Request(
+                save_url,
+                data=json.dumps({"model": from_model, "path": str(from_cache)}).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            ),
+            timeout=30,
+        )
+        result["save_ok"] = True
+        result["saved_to"] = str(from_cache)
+    except Exception as e:
+        result["save_ok"] = False
+        result["save_error"] = str(e)
+    
+    try:
+        # Load KV cache into the incoming model
+        load_url = f"http://127.0.0.1:{port}/v1/cache/load"
+        load_resp = urllib.request.urlopen(
+            urllib.request.Request(
+                load_url,
+                data=json.dumps({"model": to_model, "path": str(to_cache)}).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            ),
+            timeout=30,
+        )
+        result["load_ok"] = True
+        result["loaded_from"] = str(to_cache)
+    except Exception as e:
+        result["load_ok"] = False
+        result["load_error"] = str(e)
+    
+    result["ok"] = result.get("save_ok", False) and result.get("load_ok", False)
+    _log_event({"event": "kv_cache_swap", **result})
+    _log_pin_telemetry("kv_swap", result)
+    return result
+
+
 def start_pin_keepalive(*, interval_sec: Optional[int] = None, port: int = UNIFIED_PORT) -> Dict[str, Any]:
     """Background daemon — periodic pinned-model residency checks."""
     global _KEEPALIVE_THREAD
@@ -550,6 +665,7 @@ if __name__ == "__main__":
     parser.add_argument("--telemetry", action="store_true", help="VRAM pin verification telemetry")
     parser.add_argument("--pin-startup", action="store_true", help="Warm all pinned models (sync)")
     parser.add_argument("--ensure-pinned", action="store_true", help="Re-warm missing pinned models")
+    parser.add_argument("--swap-kv", nargs=2, metavar=("FROM", "TO"), help="Hot-swap KV cache between models")
     parser.add_argument("--keepalive", action="store_true", help="Start pinned-model keepalive daemon")
     parser.add_argument("--preload", metavar="MODEL", nargs="*", help="Logical model ids to warm")
     parser.add_argument("--tier", help="Preload from tier (local_hot, local_warm, ...)")
@@ -562,6 +678,8 @@ if __name__ == "__main__":
         print(json.dumps(pin_startup_warm(async_mode=False), indent=2))
     elif args.ensure_pinned:
         print(json.dumps(ensure_pinned_resident(), indent=2))
+    elif args.swap_kv:
+        print(json.dumps(swap_kv_cache(args.swap_kv[0], args.swap_kv[1]), indent=2))
     elif args.keepalive:
         print(json.dumps(start_pin_keepalive(), indent=2))
         try:
