@@ -14,7 +14,9 @@ $proxyScript  = "D:\HermesData\scripts\sovereign_openai_proxy.py"
 
 Write-Host "`n=== PHASE 0: Kill zombies ===" -ForegroundColor Yellow
 Stop-Process -Name "llama-server" -Force -ErrorAction SilentlyContinue
-Stop-Process -Name "python" -Force -ErrorAction SilentlyContinue
+# Kill only our proxy python via WMI (not all python)
+$zombieProxies = Get-CimInstance Win32_Process -Filter "Name='python.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
+if ($zombieProxies) { $zombieProxies | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
 Start-Sleep -Seconds 2
 Write-Host "Processes killed." -ForegroundColor Green
 
@@ -40,7 +42,7 @@ Write-Host "  llama-server launched." -ForegroundColor Green
 
 Write-Host "`n=== PHASE 3: Waiting for llama.cpp readiness (max 120s) ===" -ForegroundColor Yellow
 $ready = $false
-for ($i = 1; $le -le 120; $i++) {
+for ($i = 1; $i -le 120; $i++) {
     try {
         $r = Invoke-RestMethod -Uri "http://127.0.0.1:8090/v1/models" -TimeoutSec 2 -ErrorAction Stop
         if ($r.data) {
@@ -70,6 +72,6 @@ try {
 }
 
 Write-Host "`n=== RECOVERY COMPLETE ===" -ForegroundColor Green
-Write-Host "  llama.cpp  → http://127.0.0.1:8090" -ForegroundColor Cyan
-Write-Host "  proxy      → http://127.0.0.1:8091" -ForegroundColor Cyan
+Write-Host "  llama.cpp  -> http://127.0.0.1:8090" -ForegroundColor Cyan
+Write-Host "  proxy      -> http://127.0.0.1:8091" -ForegroundColor Cyan
 Write-Host ""

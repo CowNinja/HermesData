@@ -11,8 +11,14 @@ $proxyScript = "D:\HermesData\scripts\sovereign_openai_proxy.py"
 
 if (-not (Test-Path $proxyScript)) { Write-Host "FATAL: $proxyScript not found" -ForegroundColor Red; exit 1 }
 
-# Kill existing proxy on this port
-Stop-Process -Name "python" -Force -ErrorAction SilentlyContinue
+# Kill existing proxy (python processes running our proxy script) via WMI
+$proxyProcs = Get-CimInstance Win32_Process -Filter "Name='python.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
+if ($proxyProcs) {
+    Write-Host "  Killing existing proxy process(es)..." -ForegroundColor Cyan
+    $proxyProcs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+} else {
+    Write-Host "  No existing proxy found." -ForegroundColor DarkGray
+}
 Start-Sleep -Seconds 1
 
 Write-Host "Starting proxy on ${Host}:${Port}..." -ForegroundColor Yellow

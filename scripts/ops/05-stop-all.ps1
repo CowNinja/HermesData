@@ -9,16 +9,22 @@ $ErrorActionPreference = "SilentlyContinue"
 
 Write-Host "Stopping all Phoenix Sovereign services..." -ForegroundColor Yellow
 
-$targets = @("llama-server", "python")
+# Kill llama-server
+$llamaProcs = Get-Process -Name "llama-server" -ErrorAction SilentlyContinue
+if ($llamaProcs) {
+    Write-Host "  Killing llama-server (PID: $($llamaProcs.Id -join ', '))..." -ForegroundColor Cyan
+    Stop-Process -Name "llama-server" -Force
+} else {
+    Write-Host "  llama-server not running." -ForegroundColor DarkGray
+}
 
-foreach ($proc in $targets) {
-    $existing = Get-Process -Name $proc -ErrorAction SilentlyContinue
-    if ($existing) {
-        Write-Host "  Killing $proc (PID: $($existing.Id -join ', '))..." -ForegroundColor Cyan
-        Stop-Process -Name $proc -Force
-    } else {
-        Write-Host "  $proc not running." -ForegroundColor DarkGray
-    }
+# Kill only our proxy python via WMI (not all python)
+$proxyProcs = Get-CimInstance Win32_Process -Filter "Name='python.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
+if ($proxyProcs) {
+    Write-Host "  Killing proxy python (PID: $($proxyProcs.ProcessId -join ', '))..." -ForegroundColor Cyan
+    $proxyProcs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+} else {
+    Write-Host "  proxy python not running." -ForegroundColor DarkGray
 }
 
 Start-Sleep -Seconds 3

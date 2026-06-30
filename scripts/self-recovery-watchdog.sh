@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Self-recovery watchdog for sovereign cron infrastructure
 # Runs via no_agent cron every 30min
-# Detects and recovers from: cron errors, stuck jobs, gateway down, missed GitHub pushes
+# Detects AND RECOVERS from: gateway down, llama down, gallery down, git push staleness
 #
-# v2 — robust cd, git timeouts, better error handling
+# v3 — ACTUAL RESTART LOGIC (not just detection)
 set -uo pipefail
 TS=$(date +%Y%m%d-%H%M%S)
 LOGFILE="D:/HermesData/cron/output/self-recovery-${TS}.md"
@@ -13,32 +13,71 @@ ACTIONS=""
 log() { echo "$1"; echo "$1" >> "$LOGFILE" 2>/dev/null || true; }
 section() { log ""; log "## $1"; }
 
-# ---- Check 1: Hermes gateway on 8091 ----
+# ---- Check 1: Hermes gateway on 8642 ----
 section "Gateway Health"
-if curl -s --max-time 5 http://127.0.0.1:8091/v1/models > /dev/null 2>&1; then
-    log "✓ Gateway 8091 responding"
+if curl -s --max-time 5 http://127.0.0.1:8642/health > /dev/null 2>&1; then
+    log "✓ Gateway 8642 responding"
 else
-    log "⚠ Gateway 8091 NOT responding"
+    log "⚠ Gateway 8642 NOT responding — attempting restart"
     ISSUES=$((ISSUES+1))
-    ACTIONS="${ACTIONS}\n- Gateway down: would restart phronesis-sovereign service"
+    # Try Hermes scheduled task restart
+    cmd //c "schtasks /run /tn Hermes_Gateway" 2>/dev/null
+    sleep 5
+    if curl -s --max-time 5 http://127.0.0.1:8642/health > /dev/null 2>&1; then
+        log "✓ Gateway restarted successfully via scheduled task"
+        ACTIONS="${ACTIONS}\n- Gateway: restarted via Hermes_Gateway task"
+    else
+        # Fallback: try direct start
+        log "⚠ Scheduled task restart failed — trying direct start"
+        cmd //c "start /min cmd /c \"D:\\HermesData\\hermes-agent\\venv\\Scripts\\pythonw.exe -m hermes_cli.main gateway run\"" 2>/dev/null || true
+        sleep 8
+        if curl -s --max-time 5 http://127.0.0.1:8642/health > /dev/null 2>&1; then
+            log "✓ Gateway restarted via direct start"
+            ACTIONS="${ACTIONS}\n- Gateway: restarted via direct start"
+        else
+            log "� Gateway restart FAILED — manual intervention needed"
+            ACTIONS="${ACTIONS}\n- Gateway: RESTART FAILED"
+        fi
+    fi
 fi
 
-# ---- Check 2: Ollama ----
-if curl -s --max-time 3 http://127.0.0.1:11434/api/tags > /dev/null 2>&1; then
-    log "✓ Ollama 11434 responding"
-else
-    log "⚠ Ollama 11434 not responding (non-critical)"
-fi
-
-# ---- Check 3: llama-server on 8090 ----
-section "llama.cpp Router"
+# ---- Check 2: llama.cpp server on 8090 ----
+section "llama.cpp Router (8090)"
 if curl -s --max-time 3 http://127.0.0.1:8090/health > /dev/null 2>&1; then
     log "✓ llama-server 8090 responding"
 else
-    log "⚠ llama-server 8090 not responding (non-critical — may be idle)"
+    log "⚠ llama-server 8090 not responding"
+    # Try the stack boot script
+    cmd //c "start /min powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\\PhronesisVault\\Operations\\Start-FullSovereignStack.ps1" 2>/dev/null || true
+    sleep 10
+    if curl -s --max-time 5 http://127.0.0.1:8090/health > /dev/null 2>&1; then
+        log "✓ llama-server restarted via stack boot"
+        ACTIONS="${ACTIONS}\n- llama-server: restarted via stack boot script"
+        ISSUES=$((ISSUES+1))
+    else
+        log "⚠ llama-server restart non-critical (proxy may handle routing)"
+    fi
 fi
 
-# ---- Check 4: PhronesisVault push staleness ----
+# ---- Check 3: ComfyUI Gallery on 8189 ----
+section "ComfyUI Gallery (8189)"
+if curl -s --max-time 3 http://127.0.0.1:8189/ > /dev/null 2>&1; then
+    log "✓ Gallery 8189 responding"
+else
+    log "⚠ Gallery 8189 NOT responding — attempting restart"
+    ISSUES=$((ISSUES+1))
+    cmd //c "start /min pythonw.exe D:\\ComfyUI\\gallery_server.py" 2>/dev/null || true
+    sleep 5
+    if curl -s --max-time 3 http://127.0.0.1:8189/ > /dev/null 2>&1; then
+        log "✓ Gallery restarted"
+        ACTIONS="${ACTIONS}\n- Gallery 8189: restarted"
+    else
+        log "✗ Gallery restart FAILED"
+        ACTIONS="${ACTIONS}\n- Gallery 8189: RESTART FAILED"
+    fi
+fi
+
+# ---- Check 4: GitHub push staleness (PhronesisVault) ----
 section "GitHub Backup Freshness"
 if cd /d/PhronesisVault 2>/dev/null; then
     V_LAST_PUSH=$(git log --format='%ct' -1 2>/dev/null || echo "0")
@@ -62,6 +101,7 @@ else
 fi
 
 # ---- Check 5: HermesData push staleness ----
+section "HermesData Backup Freshness"
 if cd /d/HermesData 2>/dev/null; then
     H_LAST_PUSH=$(git log --format='%ct' -1 2>/dev/null || echo "0")
     H_REMOTE=$(git log --format='%ct' origin/main -1 2>/dev/null || echo "0")
@@ -83,15 +123,6 @@ else
     ISSUES=$((ISSUES+1))
 fi
 
-# ---- Check 6: K: drive accessible ----
-section "Local Backup Drive (K:)"
-if [ -d "/k/Hermes-Resilience" ] || [ -d "K:/Hermes-Resilience" ]; then
-    log "✓ K: drive accessible"
-else
-    log "⚠ K: drive NOT accessible — local mirror backup will fail"
-    ISSUES=$((ISSUES+1))
-fi
-
 # ---- Summary ----
 section "Summary"
 log "Issues found: $ISSUES"
@@ -101,7 +132,6 @@ fi
 
 if [ "$ISSUES" -eq 0 ]; then
     log "✓ All systems nominal"
-    # Silent exit for cron — no need to report when healthy
     echo ""
     echo "[HEALTHY]"
 else

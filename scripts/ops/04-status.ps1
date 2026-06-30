@@ -21,7 +21,7 @@ foreach ($svc in $services) {
             # Try to extract backend info from proxy health
             $detail = ""
         }
-        if ($r.data -and $r.data[0].id) { $detail = " -> $($r.data[0].id)" }
+        if ($r.data -and $r.data.Count -gt 0 -and $r.data[0].id) { $detail = " -> $($r.data[0].id)" }
         Write-Host "[$($svc.Port)] $($svc.Name) -> $status$detail" -ForegroundColor Green
     } catch {
         Write-Host "[$($svc.Port)] $($svc.Name) -> DOWN" -ForegroundColor Red

@@ -47,16 +47,16 @@ if ($Url) {
 
     if (-not (Test-Path $OutputDir)) { New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null }
 
-    # Check huggingface-cli is available
-    $hfCli = Get-Command "huggingface-cli" -ErrorAction SilentlyContinue
+    # Check hf CLI is available
+    $hfCli = Get-Command "hf" -ErrorAction SilentlyContinue
     if (-not $hfCli) {
-        Write-Host "`nhuggingface-cli not found. Install with:" -ForegroundColor Yellow
+        Write-Host "`nhf CLI not found. Install with:" -ForegroundColor Yellow
         Write-Host "  pip install -U huggingface_hub" -ForegroundColor Cyan
         exit 1
     }
 
-    $env:HF_HUB_ENABLE_HF_TRANSFER = "1"
-    huggingface-cli download $Repo $File --local-dir $OutputDir --local-dir-use-symlinks False
+    $env:HF_XET_HIGH_PERFORMANCE = "1"
+    hf download $Repo $File --local-dir $OutputDir
 
     if (Test-Path $outFile) {
         $sizeMB = [math]::Round((Get-Item $outFile).Length / 1MB, 0)
