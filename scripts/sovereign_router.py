@@ -155,6 +155,21 @@ def dispatch(prompt: str, task_type: str = None, force_local: bool = True, strea
     use_stream = stream or (tier == "fast")
     result = _call_ollama(prompt, model, stream=use_stream)
 
+    # Record dispatch to nanoDB for auto-pick learning
+    if result.get("success"):
+        try:
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+            from scripts.nanodb import record_dispatch as _ndb_record
+            resp_text = str(result.get("response") or "")
+            tokens = max(1, len(resp_text) // 4)
+            latency_sec = time.time() - started
+            tps = tokens / latency_sec if latency_sec > 0 else 0
+            _ndb_record(task_type=tt or "auto", model=model,
+                        latency_ms=round(latency_sec * 1000, 1), tps=round(tps, 1))
+        except Exception:
+            pass  # Never block dispatch on metrics
+
     if result.get("success"):
         provenance["source"] = "local_ollama"
         provenance["tokens_saved_estimate"] = "high (avoided Grok/cloud call)"
