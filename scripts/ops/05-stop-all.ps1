@@ -19,7 +19,10 @@ if ($llamaProcs) {
 }
 
 # Kill only our proxy python via WMI (not all python)
-$proxyProcs = Get-CimInstance Win32_Process -Filter "Name='python.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
+$proxyProcs = @(
+    Get-CimInstance Win32_Process -Filter "Name='python.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
+    Get-CimInstance Win32_Process -Filter "Name='pythonw.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
+) | Where-Object { $_ }
 if ($proxyProcs) {
     Write-Host "  Killing proxy python (PID: $($proxyProcs.ProcessId -join ', '))..." -ForegroundColor Cyan
     $proxyProcs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }

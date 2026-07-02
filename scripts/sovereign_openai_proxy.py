@@ -382,7 +382,37 @@ def estimate_tokens(text: str) -> int:
 
 
 def _message_tokens(msg: Dict[str, Any]) -> int:
-    return estimate_tokens(_extract_content(msg.get("content")))
+    tokens = estimate_tokens(_extract_content(msg.get("content")))
+    tool_calls = msg.get("tool_calls")
+    if tool_calls:
+        try:
+            tokens += estimate_tokens(json.dumps(tool_calls))
+        except Exception:
+            tokens += 256
+    return max(1, tokens)
+
+
+def _estimate_tools_tokens(tools: Any) -> int:
+    if not tools:
+        return 0
+    try:
+        return estimate_tokens(json.dumps(tools))
+    except Exception:
+        return 4096
+
+
+def _assistant_visible_content(message: Dict[str, Any], *, allow_reasoning_fallback: bool = True) -> str:
+    """Extract user-visible text; thinking models may leave content empty."""
+    content = str(message.get("content") or "").strip()
+    if content:
+        return content
+    if not allow_reasoning_fallback:
+        return ""
+    for key in ("reasoning_content", "reasoning"):
+        alt = str(message.get(key) or "").strip()
+        if alt:
+            return _strip_think_blocks(alt)
+    return ""
 
 
 def _truncate_text(text: str, max_tokens: int) -> str:
@@ -495,6 +525,7 @@ def _roleplay_route_requested(model: str, messages: List[Dict[str, Any]], body: 
 def trim_messages_tier_aware(
     messages: List[Dict[str, Any]],
     model: str,
+    extra_reserve_tokens: int = 0,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Trim chat history to the safe input budget for the resolved MoE tier.
@@ -522,7 +553,7 @@ def trim_messages_tier_aware(
     route = preview_route_for_request(model, messages)
     tier = str(route.get("tier") or "local_hot")
     tier_budget = context_budget_for_tier(tier)
-    input_cap = input_budget_for_tier(tier)
+    input_cap = input_budget_for_tier(tier, extra_reserve_tokens=extra_reserve_tokens)
 
     original_tokens = sum(_message_tokens(m) for m in messages)
     meta: Dict[str, Any] = {
@@ -771,10 +802,25 @@ def dispatch_via_native_router(
     narrative_fast = is_narrative_fast_path(messages, body, routing)
     tool_passthrough = _request_needs_tool_passthrough(body, messages)
 
+    try:
+        from model_resource_manager import completion_reserve_for_ctx, live_llama_ctx_budget
+
+        live_ctx = live_llama_ctx_budget()
+        completion_reserve = completion_reserve_for_ctx(live_ctx)
+    except Exception:
+        live_ctx = 8192
+        completion_reserve = 2048
+
+    prompt_tokens = sum(_message_tokens(m) for m in messages)
+    tools_tokens = _estimate_tools_tokens(body.get("tools")) if tool_passthrough else 0
+    requested_max = int(body.get("max_tokens") or 1024)
+    safe_max = max(128, live_ctx - prompt_tokens - tools_tokens - 256)
+    max_tokens = min(requested_max, safe_max, 4096 if tool_passthrough else 2048)
+
     forward: Dict[str, Any] = {
         "model": logical,
         "messages": messages,
-        "max_tokens": int(body.get("max_tokens") or 1024),
+        "max_tokens": max_tokens,
         "temperature": body.get("temperature", 0.7),
         "stream": False,
     }
@@ -783,6 +829,10 @@ def dispatch_via_native_router(
             forward["tools"] = body["tools"]
         if body.get("tool_choice") is not None:
             forward["tool_choice"] = body["tool_choice"]
+
+    # Thinking models (Qwythos/Qwen3) consume max_tokens in reasoning_content unless disabled.
+    if not narrative_fast:
+        forward["chat_template_kwargs"] = {"enable_thinking": False}
 
     if narrative_fast:
         forward["max_tokens"] = min(int(forward.get("max_tokens") or 512), 384)
@@ -804,7 +854,7 @@ def dispatch_via_native_router(
                 # Skip upstream call — go straight to response parsing
                 choice = (data.get("choices") or [{}])[0]
                 raw_msg = choice.get("message") or {}
-                content = str(raw_msg.get("content") or "")
+                content = _assistant_visible_content(raw_msg, allow_reasoning_fallback=True)
                 prov = {
                     "selected_backend": "native_8090_cached",
                     "logical_model": logical,
@@ -858,10 +908,12 @@ def dispatch_via_native_router(
         pass  # Fixer is best-effort; fall through to existing behavior
     choice = {**choice, "message": msg}
     data = {**data, "choices": [choice] + list(data.get("choices") or [])[1:]}
-    content = str(msg.get("content") or "")
+    content = _assistant_visible_content(msg, allow_reasoning_fallback=not narrative_fast)
     tool_calls = msg.get("tool_calls")
     if narrative_fast:
         content = _strip_think_blocks(content)
+    elif not content and not tool_calls:
+        content = _assistant_visible_content(msg, allow_reasoning_fallback=True)
 
     prov = {
         "selected_backend": "native_8090",
@@ -1140,8 +1192,13 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         routing = resolve_roleplay_routing(messages, model, body)
         model = str(routing.get("model") or model)
 
+        tools_reserve = _estimate_tools_tokens(body.get("tools")) if body.get("tools") else 0
         try:
-            trimmed_messages, trim_meta = trim_messages_tier_aware(messages, model)
+            trimmed_messages, trim_meta = trim_messages_tier_aware(
+                messages,
+                model,
+                extra_reserve_tokens=tools_reserve,
+            )
             prompt = messages_to_prompt(trimmed_messages)
         except Exception as exc:
             _log_event({"event": "trim_exception", "error": str(exc), "model": model})
@@ -1299,9 +1356,11 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             out = dict(native_resp)
             out["model"] = report_model
             out["phronesis_provenance"] = extra
-            if result.get("narrative_fast"):
-                msg = (out.get("choices") or [{}])[0].setdefault("message", {})
-                msg["content"] = content
+            msg = (out.get("choices") or [{}])[0].setdefault("message", {})
+            visible = content or _assistant_visible_content(msg, allow_reasoning_fallback=True)
+            if visible:
+                msg["content"] = visible
+            if result.get("narrative_fast") or visible:
                 for key in ("reasoning", "reasoning_content", "reasoning_details"):
                     msg.pop(key, None)
             self._send_json(200, out)

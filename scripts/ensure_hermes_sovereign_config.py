@@ -45,6 +45,26 @@ COMPRESSION_DEFAULTS = {
     "timeout": 360,
 }
 
+MODEL_DEFAULTS = {
+    "default": "phronesis-sovereign-auto",
+    "provider": "custom:phronesis-sovereign",
+    "base_url": MOE_GATEWAY_URL,
+    "context_length": MIN_CONTEXT,
+}
+
+FALLBACK_SOVEREIGN_ONLY = [
+    {
+        "provider": f"custom:{SOVEREIGN_PROVIDER}",
+        "model": "phronesis-sovereign-auto",
+        "base_url": MOE_GATEWAY_URL,
+        "api_key": "local",
+    },
+]
+
+_CLOUD_FALLBACK_PROVIDERS = frozenset(
+    {"openrouter", "xai-oauth", "xai", "nous", "anthropic", "openai", "gemini", "copilot"}
+)
+
 LOCAL_SOVEREIGN_DEFAULTS = {
     "gateway_name": "phronesis-moe-gateway",
     "subagent_default_model": "phronesis-sovereign-code",
@@ -106,6 +126,23 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     if not isinstance(model, dict):
         model = {}
         patched["model"] = model
+    local_sovereign = patched.get("local_sovereign") or {}
+    force_local = isinstance(local_sovereign, dict) and local_sovereign.get("force_local") is not False
+    current_provider = str(model.get("provider") or "").strip().lower()
+    leaked_cloud = current_provider in {
+        "xai-oauth",
+        "xai",
+        "nous",
+        "openrouter",
+        "anthropic",
+        "openai",
+        "gemini",
+    } or current_provider.startswith("custom:") and "phronesis-sovereign" not in current_provider
+    if force_local and (leaked_cloud or not str(model.get("default") or "").startswith("phronesis-sovereign")):
+        for key, value in MODEL_DEFAULTS.items():
+            if model.get(key) != value:
+                model[key] = value
+                changes.append(f"model.{key}")
     if int(model.get("context_length") or 0) < MIN_CONTEXT:
         model["context_length"] = MIN_CONTEXT
         changes.append("model.context_length")
@@ -156,12 +193,42 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         if isinstance(compression, dict):
             old_url = str(compression.get("base_url") or "")
             old_model = str(compression.get("model") or "")
-            if "11434" in old_url or "ollama" in old_model.lower() or not old_model:
+            old_provider = str(compression.get("provider") or "").strip().lower()
+            if (
+                "11434" in old_url
+                or "ollama" in old_model.lower()
+                or not old_model
+                or old_provider in ("auto", "")
+                or "phronesis-sovereign" not in old_model
+            ):
                 compression.update(COMPRESSION_DEFAULTS)
+                compression["provider"] = f"custom:{SOVEREIGN_PROVIDER}"
                 changes.append("auxiliary.compression→8091-synthesis")
+
+    if force_local:
+        fallback = patched.get("fallback_model")
+        entries: List[Dict[str, Any]] = []
+        if isinstance(fallback, list):
+            entries = [e for e in fallback if isinstance(e, dict)]
+        elif isinstance(fallback, dict) and fallback.get("provider") and fallback.get("model"):
+            entries = [fallback]
+        has_cloud = any(
+            str(e.get("provider") or "").strip().lower() in _CLOUD_FALLBACK_PROVIDERS
+            or str(e.get("provider") or "").strip().lower().startswith("custom:")
+            and "phronesis-sovereign" not in str(e.get("provider") or "").lower()
+            for e in entries
+        )
+        if has_cloud or len(entries) != 1 or entries[0].get("provider") != f"custom:{SOVEREIGN_PROVIDER}":
+            patched["fallback_model"] = deepcopy(FALLBACK_SOVEREIGN_ONLY)
+            changes.append("fallback_model→sovereign-only")
 
     local_sovereign = patched.setdefault("local_sovereign", {})
     if isinstance(local_sovereign, dict):
+        if local_sovereign.get("opportunistic_fleet", {}).get("enabled") is True:
+            fleet = local_sovereign.setdefault("opportunistic_fleet", {})
+            if isinstance(fleet, dict):
+                fleet["enabled"] = False
+                changes.append("local_sovereign.opportunistic_fleet.enabled→false")
         for key, value in LOCAL_SOVEREIGN_DEFAULTS.items():
             if key == "tiers" and isinstance(value, dict):
                 tiers = local_sovereign.setdefault("tiers", {})

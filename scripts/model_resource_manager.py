@@ -41,8 +41,34 @@ TIER_CONTEXT_BUDGET = {
     "local_warm": 32768,
     "local_cold": 65536,
     "local_roleplay": 12288,
+    "local_generalist": 12288,
     "ollama": 32768,
 }
+
+MODELS_8090_INI = VAULT / "Operations" / "models-8090.ini"
+
+
+def live_llama_ctx_budget() -> int:
+    """Read the active DEFAULT ctx-size from models-8090.ini (falls back to 8192)."""
+    try:
+        if MODELS_8090_INI.is_file():
+            in_default = False
+            for line in MODELS_8090_INI.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if stripped.startswith("[") and stripped.endswith("]"):
+                    in_default = stripped.lower() == "[default]"
+                    continue
+                if in_default and stripped.lower().startswith("ctx-size"):
+                    val = stripped.split("=", 1)[1].strip()
+                    return max(2048, int(val))
+    except Exception:
+        pass
+    return 8192
+
+
+def completion_reserve_for_ctx(ctx: int) -> int:
+    """Leave headroom for completion + tool schemas inside the live llama ctx."""
+    return min(4096, max(768, int(ctx) // 4))
 
 
 def _port_open(port: int, timeout: float = 0.5) -> bool:
@@ -84,7 +110,8 @@ def tier_matrix() -> Dict[str, Any]:
 
 
 def context_budget_for_tier(tier: str) -> int:
-    return TIER_CONTEXT_BUDGET.get(tier, 12288)
+    live = live_llama_ctx_budget()
+    return min(TIER_CONTEXT_BUDGET.get(tier, 12288), live)
 
 
 # Hermes agent gateway advertises this window; proxy trims to per-tier safe input.
@@ -95,12 +122,15 @@ TIER_INPUT_SAFETY_RATIO = 0.85
 
 def input_budget_for_tier(
     tier: str,
-    completion_reserve: int = COMPLETION_RESERVE_TOKENS,
+    completion_reserve: Optional[int] = None,
     safety_ratio: float = TIER_INPUT_SAFETY_RATIO,
+    extra_reserve_tokens: int = 0,
 ) -> int:
     """Safe prompt token cap for a MoE tier (leaves room for KV cache + completion)."""
     gross = context_budget_for_tier(tier)
-    return max(2048, int((gross - completion_reserve) * safety_ratio))
+    reserve = completion_reserve if completion_reserve is not None else completion_reserve_for_ctx(gross)
+    reserve += max(0, int(extra_reserve_tokens))
+    return max(1024, int((gross - reserve) * safety_ratio))
 
 
 def effective_tier_for_trim(planned_tier: str) -> str:

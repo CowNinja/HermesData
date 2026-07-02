@@ -15,7 +15,10 @@ $proxyScript  = "D:\HermesData\scripts\sovereign_openai_proxy.py"
 Write-Host "`n=== PHASE 0: Kill zombies ===" -ForegroundColor Yellow
 Stop-Process -Name "llama-server" -Force -ErrorAction SilentlyContinue
 # Kill only our proxy python via WMI (not all python)
-$zombieProxies = Get-CimInstance Win32_Process -Filter "Name='python.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
+$zombieProxies = @(
+    Get-CimInstance Win32_Process -Filter "Name='python.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
+    Get-CimInstance Win32_Process -Filter "Name='pythonw.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
+) | Where-Object { $_ }
 if ($zombieProxies) { $zombieProxies | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
 Start-Sleep -Seconds 2
 Write-Host "Processes killed." -ForegroundColor Green
@@ -58,7 +61,7 @@ for ($i = 1; $i -le 120; $i++) {
 if (-not $ready) { Write-Host "TIMEOUT: llama.cpp did not respond after 120s" -ForegroundColor Red; exit 1 }
 
 Write-Host "`n=== PHASE 4: Starting proxy on port 8091 ===" -ForegroundColor Yellow
-Start-Process -FilePath "python" -ArgumentList $proxyScript, "--host", "127.0.0.1", "--port", "8091" -NoNewWindow
+& powershell -NoProfile -ExecutionPolicy Bypass -File "D:\HermesData\scripts\Start-Sovereign-Proxy-8091.ps1"
 Start-Sleep -Seconds 3
 Write-Host "  Proxy launched." -ForegroundColor Green
 
