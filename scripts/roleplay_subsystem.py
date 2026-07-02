@@ -129,18 +129,7 @@ def detect_roleplay_intent(
 ) -> Dict[str, Any]:
     """Return whether to route to uncensored local_roleplay tier.
 
-    DISABLED: Unified sovereign generalist pivot — all traffic uses
-    phronesis-sovereign-auto; no separate roleplay silo or tier.
     """
-    return {
-        "should_route": False,
-        "reason": "subsystem_disabled_unified_generalist",
-        "matched_triggers": [],
-        "task_type": "general",
-        "tier": "local_generalist",
-        "logical_model": "qwen2-5-7b",
-        "policy_version": "unified_v1",
-    }
     cfg = load_config()
     if not cfg.get("enabled", True):
         return {"should_route": False, "reason": "subsystem_disabled"}

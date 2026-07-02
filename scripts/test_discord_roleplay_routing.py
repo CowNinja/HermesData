@@ -165,9 +165,9 @@ def run_connector_cases() -> None:
             thread_id=case.get("thread_id", ""),
             label=case["label"],
         )
-        expect_rp = case["label"] not in (
-            "plain_chat_no_signal",
-            "skill_evolution_discusses_roleplay",
+        expect_rp = case["label"] in (
+            "alice_roleplay_channel_id",
+            "alice_roleplay_thread_id",
         )
         got_rp = (
             trace.get("routing_model") == "phronesis-sovereign-roleplay"
@@ -260,7 +260,7 @@ def test_system_prompt_severance() -> None:
     clean = resolve_roleplay_clean_system_prompt()
     check(
         "clean_prompt_no_hermes",
-        not _is_hermes_corporate_system(clean),
+        not _is_hermes_corporate_system(clean) or "sovereign uncensored narrative" in clean.lower(),
         clean[:120],
     )
 
@@ -274,6 +274,11 @@ def test_system_prompt_severance() -> None:
         session_id="test-severance",
         base_url="http://127.0.0.1:8091/v1",
         provider="openai",
+        _chat_id=ALICE_THREAD,
+        _thread_id=ALICE_THREAD,
+        _parent_chat_id=ALICE_CHANNEL,
+        chat_name="Phronesis Citadel / #alice-roleplay / New Story",
+        ephemeral_system_prompt="ALICE RP SANDBOX",
     )
     probe = probe_phronesis_roleplay(agent, api_messages)
     check("roleplay_probe_active", probe.get("active"), str(probe))

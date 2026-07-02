@@ -586,8 +586,9 @@ def bridge_dispatch(
             except Exception:
                 pass
         try:
+            force_rp = (task_type or "").lower().replace("-", "_") == "roleplay"
             res = _dispatch_vault(
-                prompt, task_type, platform, role, force_roleplay=False,
+                prompt, task_type, platform, role, force_roleplay=force_rp,
             )
             attempts.append({"backend": "vault", "status": "ok" if res.get("success") else "fail"})
             if res.get("success"):

@@ -709,14 +709,21 @@ def is_narrative_fast_path(
         or body.get("platform")
         or ""
     ).lower()
-    if plat in ("alice-roleplay", "dnd", "dungeon", "citadel", "narrative"):
+    if routing.get("force_roleplay") or plat == "alice-roleplay":
+        return True
+    if plat in ("dnd", "dungeon", "citadel", "narrative"):
         return True
     if phronesis.get("narrative_fast") or phronesis.get("suppress_reasoning"):
+        return True
+    if routing.get("force_roleplay"):
         return True
     blob = _message_blob(messages).lower()
     if any(marker in blob for marker in FACTUAL_TOOL_MARKERS):
         return False
-    return any(marker in blob for marker in NARRATIVE_FAST_MARKERS)
+    if not any(marker in blob for marker in NARRATIVE_FAST_MARKERS):
+        return False
+    # Narrative fast path is sandbox-bound — alice-roleplay channel context only.
+    return "alice-roleplay" in blob or "#alice-roleplay" in blob
 
 
 def _requires_factual_tool_use(messages: List[Dict[str, Any]]) -> bool:
@@ -843,6 +850,11 @@ def resolve_backend_logical_model(
 ) -> str:
     try:
         from lru_router_manager import load_pin_config, logical_model_for_tier, normalize_logical_model_id
+
+        route = routing or {}
+        task_type = route.get("task_type") or resolve_task_type(gateway_model)
+        if route.get("force_roleplay") or task_type == "roleplay" or "roleplay" in (gateway_model or "").lower():
+            return normalize_logical_model_id(logical_model_for_tier("local_roleplay"))
 
         cfg = load_pin_config()
         pinned = cfg.get("generalist_logical")
@@ -1056,15 +1068,55 @@ def resolve_roleplay_routing(
     except Exception:
         phronesis = {}
     narrative_fast = is_narrative_fast_path(messages, body)
+
+    roleplay_default = "phronesis-sovereign-roleplay"
+    try:
+        import yaml
+
+        cfg_path = Path(r"D:\HermesData\config.yaml")
+        if cfg_path.is_file():
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+            roleplay_default = str(
+                (cfg.get("local_sovereign") or {}).get("roleplay_model")
+                or roleplay_default
+            )
+    except Exception:
+        pass
+
+    scan: Dict[str, Any] = {}
+    try:
+        from discord_roleplay_connector import scan_messages_for_roleplay
+
+        scan = scan_messages_for_roleplay(
+            messages,
+            default_model=model or "phronesis-sovereign-auto",
+            body=body,
+            chat_id=str(phronesis.get("chat_id") or ""),
+            thread_id=str(phronesis.get("thread_id") or ""),
+            parent_channel_id=str(phronesis.get("parent_channel_id") or ""),
+        )
+    except Exception:
+        scan = {}
+
+    force_roleplay = bool(scan.get("force_roleplay"))
+    resolved_model = str(scan.get("model") or model or "phronesis-sovereign-auto")
+    if force_roleplay and resolved_model.endswith("-auto"):
+        resolved_model = roleplay_default
+
     routing: Dict[str, Any] = {
         "request_model": model,
-        "model": "phronesis-sovereign-auto",
-        "platform": str(phronesis.get("platform") or body.get("platform") or "hermes_agent_session"),
-        "force_roleplay": False,
-        "task_type": None,
-        "reasons": ["unified_generalist"],
-        "narrative_fast": narrative_fast,
-        "suppress_reasoning": narrative_fast,
+        "model": resolved_model,
+        "platform": str(
+            scan.get("platform")
+            or phronesis.get("platform")
+            or body.get("platform")
+            or "hermes_agent_session"
+        ),
+        "force_roleplay": force_roleplay,
+        "task_type": "roleplay" if force_roleplay else resolve_task_type(resolved_model),
+        "reasons": list(scan.get("reasons") or (["unified_generalist"] if not force_roleplay else [])),
+        "narrative_fast": narrative_fast or force_roleplay,
+        "suppress_reasoning": narrative_fast or force_roleplay,
         "chat_id": str(phronesis.get("chat_id") or ""),
         "thread_id": str(phronesis.get("thread_id") or ""),
         "parent_channel_id": str(phronesis.get("parent_channel_id") or ""),

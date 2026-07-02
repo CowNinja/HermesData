@@ -90,7 +90,7 @@ def is_uncensored_roleplay_route(
         return True
     if ph.get("force_roleplay") and in_alice:
         return True
-    if in_alice or plat == "alice-roleplay":
+    if in_alice:
         return True
 
     blobs = collect_message_blobs(messages or [])

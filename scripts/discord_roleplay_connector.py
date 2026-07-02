@@ -33,6 +33,7 @@ ALICE_ROLEPLAY_THREAD_IDS = frozenset({
     "1519512763863666810",
     "1519522216851673190",
     "1519529411056242779",
+    "1522330326733422713",
 })
 
 
@@ -42,9 +43,15 @@ def is_alice_roleplay_discord_location(
     parent_channel_id: str = "",
     thread_id: str = "",
 ) -> bool:
-    """True only for the dedicated #alice-roleplay channel and its known threads."""
+    """True only for #alice-roleplay (1519509288286949466) and threads under it.
+
+    Location-bound sandbox — never true for other Discord channels even if the
+    user pastes ROLEPLAY_MODE: or [platform: alice-roleplay] elsewhere.
+    """
     ids = {str(x) for x in (chat_id, parent_channel_id, thread_id) if x}
     if ALICE_ROLEPLAY_CHANNEL_ID in ids:
+        return True
+    if parent_channel_id == ALICE_ROLEPLAY_CHANNEL_ID:
         return True
     return bool(ids & ALICE_ROLEPLAY_THREAD_IDS)
 
@@ -170,9 +177,9 @@ def normalize_discord_inbound_text(
         parent_channel_id=parent_channel_id,
         thread_id=thread_id,
     )
-    explicit = meta["rewrote_slash"] or meta["colon_trigger"]
-    if in_alice or explicit or platform_tag == "alice-roleplay":
+    if in_alice:
         meta["force_roleplay_model"] = True
+        meta["sandbox"] = "alice-roleplay"
 
     return normalized, meta
 
@@ -244,17 +251,18 @@ def scan_messages_for_roleplay(
         thread_id=thread_id,
     )
     platform_tag = extract_platform_tag(last_user)
-    if in_alice:
-        platform = "alice-roleplay"
-    elif platform_tag == "alice-roleplay":
-        platform = "alice-roleplay"
-    else:
-        platform = str(ph.get("platform") or "discord")
-
     chat_name = ""
     m = re.search(r"channel:\s*([^\n]+)", system_blob, re.IGNORECASE)
     if m:
         chat_name = m.group(1).strip()
+
+    if not in_alice and chat_name and "alice-roleplay" in chat_name.lower():
+        in_alice = True
+
+    if in_alice:
+        platform = "alice-roleplay"
+    else:
+        platform = str(ph.get("platform") or "discord")
 
     model = default_model
     force_roleplay = False
@@ -262,24 +270,20 @@ def scan_messages_for_roleplay(
 
     if in_alice:
         force_roleplay = True
-        reasons.append("channel_id=alice-roleplay")
-
-    if platform_tag == "alice-roleplay":
-        force_roleplay = True
-        reasons.append("platform_tag=alice-roleplay")
-
-    if ph.get("force_roleplay") and (in_alice or platform_tag == "alice-roleplay"):
-        force_roleplay = True
-        reasons.append("phronesis_body")
-
-    for idx, text in enumerate(reversed(user_texts)):
-        if has_explicit_roleplay_user_trigger(text):
-            force_roleplay = True
-            reasons.append(f"explicit_user_trigger:turn-{idx}")
-            break
-
-    if force_roleplay:
+        reasons.append("sandbox=alice-roleplay")
+        if platform_tag == "alice-roleplay":
+            reasons.append("platform_tag=alice-roleplay")
+        if ph.get("force_roleplay"):
+            reasons.append("phronesis_body")
+        for idx, text in enumerate(reversed(user_texts)):
+            if has_explicit_roleplay_user_trigger(text):
+                reasons.append(f"explicit_user_trigger:turn-{idx}")
+                break
         model = str(ph.get("model") or ROLEPLAY_MODEL)
+    elif platform_tag == "alice-roleplay":
+        # Tag pasted outside sandbox — do not route to roleplay tier.
+        platform = "discord"
+        reasons.append("platform_tag_ignored_outside_sandbox")
 
     probe_text = last_user
     return {
