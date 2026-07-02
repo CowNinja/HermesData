@@ -33,7 +33,7 @@ if (-not (Test-Path $PresetsPath)) {
 
 $buildLabel = if ($prebuiltDir -eq $cudaPrebuilt) { "CUDA" } else { "CPU (WARN: ngl ignored)" }
 Write-Host "Binary: $buildLabel ($prebuiltDir)" -ForegroundColor Cyan
-Write-Host "Enforcing unified generalist GPU preset (ngl=99, ctx=12288)..." -ForegroundColor Cyan
+Write-Host "Enforcing unified generalist GPU preset (ngl=99)..." -ForegroundColor Cyan
 $gpuPreset = python (Join-Path $hermesScripts "lru_router_manager.py") --ensure-gpu-preset 2>$null
 if ($gpuPreset) { Write-Host $gpuPreset }
 
@@ -49,7 +49,18 @@ if ($ModelsMax -le 0) {
     }
 }
 
-# Default ctx-size for single-pin unified generalist unless caller overrides
+# Default ctx-size: phronesis-core.json (locked model) beats LRU VRAM heuristic
+if ($CtxSize -le 0) {
+    $corePath = Join-Path $hermesScripts "phronesis-core.json"
+    if (Test-Path $corePath) {
+        try {
+            $core = Get-Content $corePath -Raw | ConvertFrom-Json
+            if ($core.model_locked -and $core.ctx_size -gt 0) {
+                $CtxSize = [int]$core.ctx_size
+            }
+        } catch { }
+    }
+}
 if ($CtxSize -le 0) {
     try {
         $statusJson = python (Join-Path $hermesScripts "lru_router_manager.py") --status 2>$null

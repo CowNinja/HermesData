@@ -65,6 +65,14 @@ _CLOUD_FALLBACK_PROVIDERS = frozenset(
     {"openrouter", "xai-oauth", "xai", "nous", "anthropic", "openai", "gemini", "copilot"}
 )
 
+SOVEREIGN_ENVIRONMENT_HINT = (
+    "Phronesis Sovereign Stack: Qwythos-9B Q6_K @ 65536 ctx on llama-server:8090 "
+    "via phronesis-sovereign proxy:8091. Model rotation is LOCKED — 9B only, no 14B "
+    "fallback. ALWAYS invoke terminal/file tools for factual queries (disk space, "
+    "file listings, system state) — never hallucinate command output. Deliver clean "
+    "final answers only; no scratch reasoning in replies."
+)
+
 LOCAL_SOVEREIGN_DEFAULTS = {
     "gateway_name": "phronesis-moe-gateway",
     "subagent_default_model": "phronesis-sovereign-code",
@@ -221,6 +229,39 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         if has_cloud or len(entries) != 1 or entries[0].get("provider") != f"custom:{SOVEREIGN_PROVIDER}":
             patched["fallback_model"] = deepcopy(FALLBACK_SOVEREIGN_ONLY)
             changes.append("fallback_model→sovereign-only")
+
+    agent = patched.setdefault("agent", {})
+    if isinstance(agent, dict):
+        if agent.get("environment_hint") != SOVEREIGN_ENVIRONMENT_HINT:
+            agent["environment_hint"] = SOVEREIGN_ENVIRONMENT_HINT
+            changes.append("agent.environment_hint→9B-locked")
+        if agent.get("reasoning_effort") not in (None, "", "low", "none"):
+            agent["reasoning_effort"] = "low"
+            changes.append("agent.reasoning_effort→low")
+        if str(agent.get("tool_use_enforcement") or "").lower() not in (
+            "true", "always", "yes", "on",
+        ):
+            agent["tool_use_enforcement"] = "always"
+            changes.append("agent.tool_use_enforcement→always")
+
+    display = patched.setdefault("display", {})
+    if isinstance(display, dict):
+        if display.get("show_reasoning") is not False:
+            display["show_reasoning"] = False
+            changes.append("display.show_reasoning→false")
+        if display.get("reasoning_full") is not False:
+            display["reasoning_full"] = False
+            changes.append("display.reasoning_full→false")
+        platforms = display.setdefault("platforms", {})
+        if isinstance(platforms, dict):
+            discord = platforms.setdefault("discord", {})
+            if isinstance(discord, dict):
+                if discord.get("show_reasoning") is not False:
+                    discord["show_reasoning"] = False
+                    changes.append("display.platforms.discord.show_reasoning→false")
+                if discord.get("streaming") is not False:
+                    discord["streaming"] = False
+                    changes.append("display.platforms.discord.streaming→false")
 
     local_sovereign = patched.setdefault("local_sovereign", {})
     if isinstance(local_sovereign, dict):

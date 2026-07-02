@@ -17,7 +17,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import platform
 import re
+import shutil
 import socket
 import sys
 import threading
@@ -48,6 +51,23 @@ NARRATIVE_FAST_MARKERS = (
     "uncensored_roleplay:",
     "[platform: alice-roleplay]",
     "roleplay:",
+)
+
+# Factual/system queries must keep tools enabled and adequate completion budget.
+FACTUAL_TOOL_MARKERS = (
+    "disk space",
+    "free space",
+    "free gb",
+    "used gb",
+    "get-psdrive",
+    "df -",
+    "terminal tool",
+    "run terminal",
+    "attached drives",
+    "drive letter",
+    "image_gen",
+    "generate an image",
+    "golden toaster",
 )
 
 _THINK_BLOCK_RE = re.compile(
@@ -694,7 +714,73 @@ def is_narrative_fast_path(
     if phronesis.get("narrative_fast") or phronesis.get("suppress_reasoning"):
         return True
     blob = _message_blob(messages).lower()
+    if any(marker in blob for marker in FACTUAL_TOOL_MARKERS):
+        return False
     return any(marker in blob for marker in NARRATIVE_FAST_MARKERS)
+
+
+def _requires_factual_tool_use(messages: List[Dict[str, Any]]) -> bool:
+    blob = _message_blob(messages).lower()
+    return any(marker in blob for marker in FACTUAL_TOOL_MARKERS)
+
+
+def _windows_powershell_wrap(command: str) -> str:
+    """Route native PowerShell cmdlets through powershell.exe on Windows hosts."""
+    if platform.system() != "Windows":
+        return command
+    stripped = (command or "").strip()
+    if not stripped:
+        return command
+    if re.search(r"\b(?:powershell|pwsh)(?:\.exe)?\b", stripped, re.IGNORECASE):
+        return command
+    needs_ps = bool(re.search(r"\bGet-PSDrive\b", stripped, re.IGNORECASE))
+    if not needs_ps:
+        return command
+    system_root = os.environ.get("SystemRoot", r"C:\Windows")
+    candidates = (
+        os.path.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+        shutil.which("powershell.exe") or "",
+        shutil.which("pwsh.exe") or "",
+    )
+    ps_exe = next((c for c in candidates if c and os.path.isfile(c)), None)
+    if not ps_exe:
+        return command
+    escaped = stripped.replace('"', '\\"')
+    return f'"{ps_exe}" -NoProfile -NonInteractive -Command "{escaped}"'
+
+
+def _build_terminal_tool_call(command: str) -> Dict[str, Any]:
+    return {
+        "id": f"call_{uuid.uuid4().hex[:12]}",
+        "type": "function",
+        "function": {
+            "name": "terminal",
+            "arguments": json.dumps({"command": _windows_powershell_wrap(command)}),
+        },
+    }
+
+
+def _synthesize_factual_terminal_call(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Last-resort: derive a terminal tool_call from explicit user instructions."""
+    blob = _message_blob(messages)
+    lower = blob.lower()
+    if "get-psdrive" in lower:
+        return _build_terminal_tool_call("Get-PSDrive -PSProvider FileSystem")
+    for msg in reversed(messages or []):
+        if not isinstance(msg, dict) or msg.get("role") != "user":
+            continue
+        content = _extract_content(msg.get("content"))
+        m = re.search(
+            r"(?:run|execute)\s+(.+?)(?:\s+right\s+now)?(?:\.|\s+return\b|\s+in\s+terminal\b|$)",
+            content,
+            re.IGNORECASE,
+        )
+        if m:
+            cmd = m.group(1).strip().strip("`\"'")
+            if len(cmd) >= 3:
+                return _build_terminal_tool_call(cmd)
+        break
+    return None
 
 
 def _strip_think_blocks(text: str) -> str:
@@ -813,9 +899,13 @@ def dispatch_via_native_router(
 
     prompt_tokens = sum(_message_tokens(m) for m in messages)
     tools_tokens = _estimate_tools_tokens(body.get("tools")) if tool_passthrough else 0
-    requested_max = int(body.get("max_tokens") or 1024)
-    safe_max = max(128, live_ctx - prompt_tokens - tools_tokens - 256)
-    max_tokens = min(requested_max, safe_max, 4096 if tool_passthrough else 2048)
+    factual_tools = _requires_factual_tool_use(messages)
+    requested_max = int(body.get("max_tokens") or 2048)
+    safe_max = max(512, live_ctx - prompt_tokens - tools_tokens - 256)
+    cap = 4096 if (tool_passthrough or factual_tools) else 2048
+    max_tokens = min(requested_max, safe_max, cap)
+    if tool_passthrough or factual_tools:
+        max_tokens = max(max_tokens, min(2048, safe_max))
 
     forward: Dict[str, Any] = {
         "model": logical,
@@ -824,15 +914,16 @@ def dispatch_via_native_router(
         "temperature": body.get("temperature", 0.7),
         "stream": False,
     }
-    if tool_passthrough and not narrative_fast:
+    if (tool_passthrough or factual_tools) and not narrative_fast:
         if body.get("tools"):
             forward["tools"] = body["tools"]
-        if body.get("tool_choice") is not None:
+        if factual_tools and body.get("tools"):
+            forward["tool_choice"] = "required"
+        elif body.get("tool_choice") is not None:
             forward["tool_choice"] = body["tool_choice"]
 
     # Thinking models (Qwythos/Qwen3) consume max_tokens in reasoning_content unless disabled.
-    if not narrative_fast:
-        forward["chat_template_kwargs"] = {"enable_thinking": False}
+    forward["chat_template_kwargs"] = {"enable_thinking": False}
 
     if narrative_fast:
         forward["max_tokens"] = min(int(forward.get("max_tokens") or 512), 384)
@@ -906,7 +997,18 @@ def dispatch_via_native_router(
         msg = _tc_fixer.fix_message(msg, available_tools=available_tools)
     except Exception:
         pass  # Fixer is best-effort; fall through to existing behavior
+
+    factual_tools = _requires_factual_tool_use(messages)
+    if factual_tools and body.get("tools") and not msg.get("tool_calls"):
+        synthesized = _synthesize_factual_terminal_call(messages)
+        if synthesized:
+            msg = {**msg, "tool_calls": [synthesized], "content": None}
+            for key in ("reasoning", "reasoning_content", "reasoning_details"):
+                msg.pop(key, None)
+
     choice = {**choice, "message": msg}
+    if msg.get("tool_calls") and choice.get("finish_reason") in (None, "stop"):
+        choice["finish_reason"] = "tool_calls"
     data = {**data, "choices": [choice] + list(data.get("choices") or [])[1:]}
     content = _assistant_visible_content(msg, allow_reasoning_fallback=not narrative_fast)
     tool_calls = msg.get("tool_calls")
@@ -1084,26 +1186,70 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         self._cors_headers()
         self.end_headers()
 
-    def _send_sse_chunk(self, model: str, content: str) -> bool:
+    def _send_sse_chunk(
+        self,
+        model: str,
+        content: str,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        finish_reason: str = "stop",
+    ) -> bool:
         """Send SSE stream to client. Returns False if client disconnected."""
         try:
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            chunk = {
-                "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
-                "object": "chat.completion.chunk",
-                "created": int(time.time()),
-                "model": model,
-                "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
-            }
+            chunk_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
+            created = int(time.time())
+            if tool_calls:
+                deltas: List[Dict[str, Any]] = []
+                for idx, tc in enumerate(tool_calls):
+                    fn = tc.get("function") or {}
+                    deltas.append({
+                        "index": idx,
+                        "id": tc.get("id") or f"call_{uuid.uuid4().hex[:12]}",
+                        "type": tc.get("type") or "function",
+                        "function": {
+                            "name": fn.get("name") or "",
+                            "arguments": fn.get("arguments") or "{}",
+                        },
+                    })
+                chunk = {
+                    "id": chunk_id,
+                    "object": "chat.completion.chunk",
+                    "created": created,
+                    "model": model,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {"tool_calls": deltas},
+                        "finish_reason": None,
+                    }],
+                }
+                done_reason = "tool_calls"
+            elif content:
+                chunk = {
+                    "id": chunk_id,
+                    "object": "chat.completion.chunk",
+                    "created": created,
+                    "model": model,
+                    "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
+                }
+                done_reason = finish_reason or "stop"
+            else:
+                chunk = {
+                    "id": chunk_id,
+                    "object": "chat.completion.chunk",
+                    "created": created,
+                    "model": model,
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": None}],
+                }
+                done_reason = finish_reason or "stop"
             done = {
-                "id": chunk["id"],
+                "id": chunk_id,
                 "object": "chat.completion.chunk",
-                "created": chunk["created"],
+                "created": created,
                 "model": model,
-                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                "choices": [{"index": 0, "delta": {}, "finish_reason": done_reason}],
             }
             self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode("utf-8"))
             self.wfile.write(f"data: {json.dumps(done)}\n\n".encode("utf-8"))
@@ -1345,7 +1491,22 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             pass
 
         if stream:
-            sse_ok = self._send_sse_chunk(model, content)
+            openai_resp = result.get("openai_response") or {}
+            choice_msg = ((openai_resp.get("choices") or [{}])[0].get("message") or {})
+            stream_tool_calls = result.get("tool_calls") or choice_msg.get("tool_calls")
+            stream_finish = result.get("finish_reason") or (
+                (openai_resp.get("choices") or [{}])[0].get("finish_reason")
+            )
+            if stream_tool_calls:
+                stream_content = ""
+            else:
+                stream_content = content
+            sse_ok = self._send_sse_chunk(
+                model,
+                stream_content,
+                tool_calls=stream_tool_calls,
+                finish_reason=str(stream_finish or "stop"),
+            )
             if not sse_ok:
                 pass  # Client disconnected; nothing more to do
             return

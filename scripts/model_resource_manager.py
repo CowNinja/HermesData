@@ -49,7 +49,16 @@ MODELS_8090_INI = VAULT / "Operations" / "models-8090.ini"
 
 
 def live_llama_ctx_budget() -> int:
-    """Read the active DEFAULT ctx-size from models-8090.ini (falls back to 8192)."""
+    """Read active ctx-size from phronesis-core.json, then models-8090.ini."""
+    try:
+        core_path = HERMES_SCRIPTS / "phronesis-core.json"
+        if core_path.is_file():
+            core = json.loads(core_path.read_text(encoding="utf-8"))
+            ctx = int(core.get("ctx_size") or 0)
+            if ctx >= 2048:
+                return ctx
+    except Exception:
+        pass
     try:
         if MODELS_8090_INI.is_file():
             in_default = False
