@@ -1,0 +1,16 @@
+{
+  "name": "puppeteer_hover",
+  "description": "Hover an element on the page",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "selector": {
+        "type": "string",
+        "description": "CSS selector for element to hover"
+      }
+    },
+    "required": [
+      "selector"
+    ]
+  }
+}

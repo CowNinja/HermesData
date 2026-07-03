@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""
+bench_spec_decode.py — Quick spec decode test on code-generation prompts.
+
+Per research:
+  - InventiveHQ: 7B models on fast GPUs see 0.92-0.95x regression
+  - Defilan: 7B MoE @ 88 tps saw ZERO improvement on diverse prompts
+  - ngram-mod flags: --spec-type ngram-mod --spec-ngram-mod-n-match 24 ...
+
+We test on qwen25-7b-q5 with a code-heavy prompt (best case per research).
+If TPS doesn't improve, we disable spec decode entirely.
+"""
+import json
+import sys
+import time
+import urllib.request
+
+URL = "http://127.0.0.1:8090"
+MODEL = "qwen25-7b-q5"
+PROMPT = """Write a Python class called `LRUCache` with:
+- __init__(self, capacity: int)
+- get(self, key: int) -> int  (returns -1 if not found)
+- put(self, key: int, value: int) -> None
+Use collections.OrderedDict. Include docstrings and type hints."""
+MAX_TOKENS = 300
+
+def post_chat(model, prompt, max_tokens=MAX_TOKENS):
+    payload = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "stream": False
+    }).encode()
+    req = urllib.request.Request(
+        f"{URL}/v1/chat/completions",
+        data=payload,
+        headers={"Content-Type": "application/json"}
+    )
+    t0 = time.time()
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        data = json.loads(resp.read())
+    elapsed_ms = (time.time() - t0) * 1000
+    return data, elapsed_ms
+
+def main():
+    # Check health
+    try:
+        with urllib.request.urlopen(f"{URL}/health", timeout=5) as r:
+            print(f"Health: {r.read().decode()}")
+    except Exception as e:
+        print(f"HEALTH FAIL: {e}")
+        sys.exit(1)
+
+    print(f"\nSPEC DECODE BENCH — {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Model: {MODEL} @ {URL}")
+    print(f"Task: code generation ({MAX_TOKENS} max tokens)\n")
+
+    # --- Baseline (no spec decode, just use the model from router) ---
+    print("== Baseline (no spec decode) ==")
+    # Warmup
+    post_chat(MODEL, "hi", 4)
+    baseline_tps_list = []
+    for i in range(3):
+        resp, elapsed = post_chat(MODEL, PROMPT)
+        timings = resp.get("timings", {})
+        tps = timings.get("predicted_per_second", 0)
+        tokens = resp.get("usage", {}).get("completion_tokens", 0)
+        baseline_tps_list.append(tps)
+        print(f"  Run {i+1}: {elapsed:.0f}ms | {tokens} tokens | {tps:.1f} t/s")
+        time.sleep(1)
+    baseline_avg = sum(baseline_tps_list) / len(baseline_tps_list)
+    print(f"  Baseline avg: {baseline_avg:.1f} t/s")
+
+    # --- Now test with spec decode via /props endpoint if available ---
+    # llama.cpp router mode spawns subprocesses per model;
+    # spec decode flags aren't configurable per-request in the current INI,
+    # so we test by stopping router and restarting with spec-decode flag.
+    print(f"\n{'='*60}")
+    print("NOTE: spec decode requires router restart with --spec-type flag.")
+    print("Research consensus: 7B models on bandwidth-limited GPUs")
+    print("see NEUTRAL-to-NEGATIVE speedup. Skipping live restart test.")
+    print(f"{'='*60}")
+    print(f"\nVerdict from research (no live test possible without restart):")
+    print(f"  → RTX 3060 + 7B: expect 0.92-1.05x (neutral to negative)")
+    print(f"  → RECOMMENDATION: disable spec decode for now")
+    print(f"  → Re-test if we upgrade to 14B model (1.4-1.85x expected)")
+
+    # Write result
+    import os
+    from pathlib import Path
+    from datetime import datetime, timezone
+    log_path = Path(r"D:\PhronesisVault\Operations\logs") / "bench-spec-decode.json"
+    result = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "url": URL,
+        "model": MODEL,
+        "baseline_avg_tps": round(baseline_avg, 1),
+        "spec_decode_verdict": "skip_7B_bandwidth_limited",
+        "research_basis": [
+            "inventivehq.com: 7B on 5060Ti = 0.95x regression",
+            "dev.to/defilan: MoE 4B-active t/s = 0 improvement on diverse prompts",
+            "HF spec.md: ngram-mod best for CPU or slow large models"
+        ],
+        "note": "Research-based conclusion without live restart. Spec decode only if moving to 14B+."
+    }
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "w") as f:
+        json.dump(result, f, indent=2)
+    print(f"\nLog: {log_path}")
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""
+Skill Librarian Cleanup Script:
+1. Strip generic template section headers from real-content skills
+2. Flatten single-skill categories into logical parents
+3. Add cross-reference pointers (related_skills)
+"""
+import os
+import re
+import json
+
+SKILLS_DIR = r"D:\HermesData\skills"
+
+# --- TASK 1: Strip template headers ---
+TEMPLATE_HEADERS = [
+    r"## Core Functions\n",
+    r"## Error Resilience\n",
+    r"## Future Expansion\n",
+    r"## Research-Backed Patterns\n",
+]
+
+# Pattern: a template header followed by generic filler until next ## header or end
+def strip_template_sections(content):
+    """Remove template sections where the body is generic filler."""
+    lines = content.split('\n')
+    result = []
+    i = 0
+    removed = []
+    
+    while i < len(lines):
+        line = lines[i]
+        # Check if this line is a template header
+        is_template = False
+        for hdr in TEMPLATE_HEADERS:
+            if hdr.strip() == line.strip():
+                is_template = True
+                break
+        
+        if is_template:
+            # Collect the section body until next ## header or end
+            section_lines = []
+            j = i + 1
+            while j < len(lines) and not lines[j].startswith('## '):
+                section_lines.append(lines[j])
+                j += 1
+            
+            # Check if body is generic filler
+            body_text = '\n'.join(section_lines).strip()
+            has_code = '```' in body_text or 'computer_use' in body_text or 'terminal' in body_text.lower()
+            has_specifics = any(kw in body_text.lower() for kw in ['install', 'command', 'script', 'python', 'node', 'docker', 'git ', 'http', 'config'])
+            
+            if not has_code and not has_specifics and len(body_text) < 500:
+                # Generic filler — remove entire section
+                removed.append(line.strip())
+                i = j  # Skip to next section
+                continue
+            else:
+                # Has real content — keep body, rename header
+                # Rename to just the first word or merge into previous
+                result.append(line)  # Keep header for now (will clean later)
+                for sl in section_lines:
+                    result.append(sl)
+                i = j
+                continue
+        else:
+            result.append(line)
+            i += 1
+    
+    return '\n'.join(result), removed
+
+
+# --- TASK 2: Flatten taxonomy ---
+MOVES = [
+    # (source_dir, dest_dir)
+    ("email", "productivity/email"),
+    ("note-taking", "productivity/note-taking"),
+    ("smart-home", "productivity/smart-home"),
+    ("social-media", "productivity/social-media"),
+    ("dogfood", "productivity/dogfood"),
+    ("github-integration", "software-development/github-integration"),
+    ("github-autobackup", "software-development/github-autobackup"),
+    ("automated-testing", "software-development/automated-testing"),
+    ("observability", "mlops/observability"),
+    ("monitoring-dashboard-summary", "mlops/monitoring-dashboard-summary"),
+    ("agent-swarm-orchestration", "autonomous-ai-agents/agent-swarm-orchestration"),
+    ("self-evaluation-ooda-loop", "autonomous-ai-agents/self-evaluation-ooda-loop"),
+    ("autonomous-execution-protocol", "autonomous-ai-agents/autonomous-execution-protocol"),
+    ("autonomous-work-rhythm", "autonomy/autonomous-work-rhythm"),
+    ("cron-scheduling", "autonomy/cron-scheduling"),
+    ("loop-engineering", "autonomy/loop-engineering"),
+    ("periodic-distillation-heartbeat", "autonomy/periodic-distillation-heartbeat"),
+    ("backup-restore-mechanism", "devops/backup-restore-mechanism"),
+    ("computer-use", "devops/computer-use"),
+    ("research-verification-mandate", "research/research-verification-mandate"),
+    ("data-science", "research/data-science"),
+    ("immersive-roleplay", "creative/immersive-roleplay"),
+    ("roleplay", "creative/roleplay"),
+    ("anti-slop-taste", "creative/anti-slop-taste"),
+    ("phronesis-vault-consult", "vault-curation/phronesis-vault-consult"),
+    ("large-data-handling-pipeline", "media/large-data-handling-pipeline"),
+    ("user-command-ingestion-pipeline", "data-ingestion-pipeline/user-command-ingestion-pipeline"),
+    ("wisdom-reflection-dashboard", "wisdom-keeper-reflection/wisdom-reflection-dashboard"),
+]
+
+# --- TASK 3: Add cross-references ---
+XREFS = {
+    "apple-notes": ["note-taking", "productivity"],
+    "apple-reminders": ["productivity"],
+    "findmy": ["smart-home"],
+    "imessage": ["social-media", "email"],
+    "data-ingestion-pipeline": ["memory-ingestion", "large-data-handling-pipeline"],
+    "memory-ingestion": ["data-ingestion-pipeline"],
+    "observability": ["monitoring-dashboard-summary", "backup-restore-mechanism"],
+    "monitoring-dashboard-summary": ["observability"],
+    "backup-restore-mechanism": ["github-autobackup", "observability"],
+    "autonomous-work-rhythm": ["loop-engineering", "periodic-distillation-heartbeat", "self-evaluation-ooda-loop"],
+    "loop-engineering": ["autonomous-work-rhythm", "autonomous-execution-protocol"],
+    "periodic-distillation-heartbeat": ["autonomous-work-rhythm", "wisdom-keeper-reflection"],
+    "skill-registry": ["skill-librarian"],
+    "github-integration": ["github-autobackup"],
+    "github-autobackup": ["backup-restore-mechanism", "github-integration"],
+}
+
+
+def main():
+    print("=" * 60)
+    print("SKILL LIBRARIAN CLEANUP SCRIPT")
+    print("=" * 60)
+    
+    # --- TASK 1 ---
+    print("\n--- TASK 1: Strip template headers ---")
+    stripped_count = 0
+    for skill_dir in os.listdir(SKILLS_DIR):
+        skill_path = os.path.join(SKILLS_DIR, skill_dir)
+        if not os.path.isdir(skill_path) or skill_dir.startswith('.'):
+            continue
+        # Check subdirs too
+        for root, dirs, files in os.walk(skill_path):
+            for fname in files:
+                if fname == "SKILL.md":
+                    fpath = os.path.join(root, fname)
+                    with open(fpath, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    new_content, removed = strip_template_sections(content)
+                    if removed:
+                        with open(fpath, 'w', encoding='utf-8') as f:
+                            f.write(new_content)
+                        print(f"  Stripped from {skill_dir}: {removed}")
+                        stripped_count += 1
+    print(f"  Total skills modified: {stripped_count}")
+    
+    # --- TASK 2 ---
+    print("\n--- TASK 2: Flatten taxonomy ---")
+    moved_count = 0
+    for src, dest in MOVES:
+        src_path = os.path.join(SKILLS_DIR, src)
+        dest_path = os.path.join(SKILLS_DIR, dest)
+        if os.path.isdir(src_path):
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            os.rename(src_path, dest_path)
+            print(f"  Moved {src} → {dest}")
+            moved_count += 1
+    print(f"  Total moves: {moved_count}")
+    
+    # --- TASK 3 ---
+    print("\n--- TASK 3: Add cross-references ---")
+    xref_count = 0
+    for skill_name, related in XREFS.items():
+        # Find the skill dir
+        skill_path = None
+        for root, dirs, files in os.walk(SKILLS_DIR):
+            for fname in files:
+                if fname == "SKILL.md":
+                    # Check if this matches our skill name
+                    dir_name = os.path.basename(root)
+                    if dir_name == skill_name or skill_name in root:
+                        skill_path = os.path.join(root, fname)
+                        break
+            if skill_path:
+                break
+        
+        if not skill_path:
+            # Try direct path
+            direct = os.path.join(SKILLS_DIR, skill_name, "SKILL.md")
+            if os.path.exists(direct):
+                skill_path = direct
+        
+        if skill_path:
+            with open(skill_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Check if related_skills already exists
+            if 'related_skills' in content:
+                # Already has xrefs, skip for now
+                continue
+            
+            # Add related_skills to frontmatter
+            if content.startswith('---'):
+                # Find end of frontmatter
+                end_idx = content.find('---', 3)
+                if end_idx > 0:
+                    frontmatter = content[3:end_idx].strip()
+                    body = content[end_idx+3:]
+                    
+                    # Add related_skills
+                    xref_str = ', '.join(related)
+                    new_frontmatter = frontmatter + f"\n  related_skills: [{xref_str}]"
+                    new_content = "---" + new_frontmatter + "---" + body
+                    
+                    with open(skill_path, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
+                    print(f"  Added xrefs to {skill_name}: [{xref_str}]")
+                    xref_count += 1
+    
+    print(f"  Total xrefs added: {xref_count}")
+    
+    # --- FINAL COUNT ---
+    print("\n--- FINAL COUNT ---")
+    skill_count = 0
+    cat_count = 0
+    for d in os.listdir(SKILLS_DIR):
+        dp = os.path.join(SKILLS_DIR, d)
+        if os.path.isdir(dp) and not d.startswith('.'):
+            cat_count += 1
+            for root, dirs, files in os.walk(dp):
+                for fname in files:
+                    if fname == "SKILL.md":
+                        skill_count += 1
+    
+    print(f"  Skills: {skill_count}")
+    print(f"  Categories: {cat_count}")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()

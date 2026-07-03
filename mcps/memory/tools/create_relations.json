@@ -1,0 +1,38 @@
+{
+  "name": "create_relations",
+  "description": "Create multiple new relations between entities in the knowledge graph. Relations should be in active voice",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "relations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "description": "The name of the entity where the relation starts"
+            },
+            "to": {
+              "type": "string",
+              "description": "The name of the entity where the relation ends"
+            },
+            "relationType": {
+              "type": "string",
+              "description": "The type of the relation"
+            }
+          },
+          "required": [
+            "from",
+            "to",
+            "relationType"
+          ]
+        }
+      }
+    },
+    "required": [
+      "relations"
+    ]
+  }
+}

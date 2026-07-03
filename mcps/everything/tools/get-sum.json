@@ -1,0 +1,23 @@
+{
+  "name": "get-sum",
+  "description": "Returns the sum of two numbers",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "number",
+        "description": "First number"
+      },
+      "b": {
+        "type": "number",
+        "description": "Second number"
+      }
+    },
+    "required": [
+      "a",
+      "b"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+"""fieldy_hourly_pull.py — No-agent Fieldy pull.
+
+Reads the Fieldy RecentPull script from the standard path and runs it via
+powershell.  Emits the output directly — no LLM step, no agent overhead.
+
+Called by cron with `no_agent: True`.  Silent on code 0, emits errors on fail.
+"""
+
+import subprocess, sys, os
+
+FIELDY_SCRIPT = r"C:\Users\CowNi\fieldy\Fieldy-RecentPull.ps1"
+POWERSHELL = "powershell.exe"
+
+def main():
+    if not os.path.exists(FIELDY_SCRIPT):
+        print(f"CRITICAL: Fieldy script not found at {FIELDY_SCRIPT}")
+        sys.exit(1)
+
+    result = subprocess.run(
+        [POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", FIELDY_SCRIPT],
+        capture_output=True, text=True, timeout=120, cwd=r"C:\Users\CowNi\fieldy"
+    )
+
+    if result.returncode == 0:
+        stdout = result.stdout.strip()
+        if stdout:
+            print(stdout)
+        # silent on empty success — watchdog pattern
+    else:
+        print(f"FIELDY PULL FAILED (exit {result.returncode})")
+        if result.stdout.strip():
+            print(result.stdout.strip())
+        if result.stderr.strip():
+            print(result.stderr.strip())
+        sys.exit(result.returncode)
+
+if __name__ == "__main__":
+    main()

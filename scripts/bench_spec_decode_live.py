@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""
+bench_spec_decode_live.py — Real A/B test: same model, spec decode ON vs OFF.
+
+Port 8090 = Q5_K_M no spec (our production router)
+Port 8092 = Q5_K_M + ngram-mod (test server)
+
+Runs diverse prompts (per Defilan's methodology) to avoid cache-memorization artifact.
+"""
+import json
+import sys
+import time
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+SPEC_ON = "http://127.0.0.1:8092"
+SPEC_OFF = "http://127.0.0.1:8090"
+MODEL_NAME = "qwen25-7b-q5"
+MAX_TOKENS = 200
+
+# Diverse prompts (NOT repeated — avoids n-gram cache memorization artifact)
+PROMPTS = [
+    ("binary_tree", "Write a Python function `max_depth(root)` that returns the maximum depth of a binary tree. TreeNode has .left and .right."),
+    ("async_fetch", "Write a JavaScript async function that fetches JSON from a URL and handles errors with try/catch."),
+    ("sql_query", "Write a SQL query that finds the top 5 customers by total order amount from tables: customers(id,name), orders(id,customer_id,amount)."),
+    ("regex", "Write a Python regex that validates email addresses. Return just the regex string."),
+    ("sort_algo", "Explain how quicksort works in 3 sentences, then write the partition function in C."),
+    ("api_design", "What are 3 best practices for designing REST API endpoints?"),
+    ("data_structure", "Compare hash and balanced BSTs for lookup, insert, and range query operations."),
+    ("docker", "Write a Dockerfile for a Python 3.11 Flask app with-stage build."),
+]
+
+def post(url, prompt, max_tokens=MAX_TOKENS):
+    payload = json.dumps({
+        "model": MODEL_NAME if ":8090" in url else "",
+        "messages": [{"role": "user", "content": "Write a brief technical overview explaining the key architectural differences between microservices and monolithic web application architectures. Cover deployment, scaling, and team organization implications."}],
+        "max_tokens": max_tokens,
+        "stream": False
+    }).encode()
+    # For 8090 (router), we need to specify model; for 8092, model is implicit
+    payload = json.dumps({
+        "model": MODEL_NAME,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "stream": False
+    }).encode()
+    req = urllib.request.Request(
+        f"{url}/v1/chat/completions",
+        data=payload,
+        headers={"Content-Type": "application/json"}
+    )
+    t0 = time.time()
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            data = json.loads(resp.read())
+        elapsed_ms = (time.time() - t0) * 1000
+        return data, elapsed_ms
+    except Exception as e:
+        return {"error": str(e)}, 0
+
+def main():
+    # Health checks
+    for label, url in [("SPEC_OFF", SPEC_OFF), ("SPEC_ON", SPEC_ON)]:
+        try:
+            with urllib.request.urlopen(f"{url}/health", timeout=5) as r:
+                print(f"  {label} health: ok")
+        except Exception as e:
+            print(f"  {label} FAIL: {e}")
+            sys.exit(1)
+
+    # Warmup both servers
+    print("\nWarming up...")
+    for url in [SPEC_OFF, SPEC_ON]:
+        post(url, "Hello.", 8)
+
+    results = {"spec_off": [], "spec_on": [], "timestamp": datetime.now(timezone.utc).isoformat()}
+
+    print(f"\n{'='*80}")
+    print(f"SPEC DECODE A/B — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Model: Qwen2.5-7B Q5_K_M | Max tokens: {MAX_TOKENS}")
+    print(f"SPEC_OFF={SPEC_OFF} | SPEC_ON={SPEC_ON}")
+    print(f"{'='*80}\n")
+
+    for name, prompt in PROMPTS:
+        print(f"  {name:20s}: ", end="", flush=True)
+
+        # Run spec OFF (3x) and spec ON (3x), interleaved to avoid thermal bias
+        off_tps = []
+        on_tps = []
+        for _ in range(3):
+            resp, ms = post(SPEC_OFF, prompt)
+            if "error" not in resp:
+                off_tps.append(resp.get("timings", {}).get("predicted_per_second", 0))
+            time.sleep(0.5)
+
+            resp, ms = post(SPEC_ON, prompt)
+            if "error" not in resp:
+                on_tps.append(resp.get("timings", {}).get("predicted_per_second", 0))
+            time.sleep(0.5)
+
+        off_avg = sum(off_tps) / len(off_tps) if off_tps else 0
+        on_avg = sum(on_tps) / len(on_tps) if on_tps else 0
+        ratio = on_avg / off_avg if off_avg > 0 else 0
+        symbol = "↑" if ratio > 1.02 else ("↓" if ratio < 0.98 else "=")
+        print(f"{off_avg:5.1f} t/s  →  {on_avg:5.1f} t/s  {symbol} {ratio:.2f}x")
+
+        results["spec_off"].append({"prompt": name, "avg_tps": round(off_avg, 1), "runs": len(off_tps)})
+        results["spec_on"].append({"prompt": name, "avg_tps": round(on_avg, 1), "runs": len(on_tps)})
+
+    # Summary
+    all_off = [r["avg_tps"] for r in results["spec_off"]]
+    all_on = [r["avg_tps"] for r in results["spec_on"]]
+    off_mean = sum(all_off) / len(all_off) if all_off else 0
+    on_mean = sum(all_on) / len(all_on) if all_on else 0
+    overall = on_mean / off_mean if off_mean > 0 else 0
+
+    print(f"\n{'='*80}")
+    print(f"OVERALL: SPEC_OFF={off_mean:.1f} t/s →_ON={on_mean:.1f} t/s = {overall:.2f}x")
+    if overall > 1.05:
+        print(f"Verdict: POSITIVE — spec decode improves throughput by {(overall-1)*100:.0f}%")
+    elif overall < 0.95:
+        print(f"Verdict: NEGATIVE — spec decode reduces throughput by {(1-overall)*100:.0f}%")
+    else:
+        print(f"Verdict: NEUTRAL — spec decode has no meaningful impact ({(overall-1)*100:+.1f}%)")
+    print(f"{'='*80}")
+
+    # Write log
+    results["summary"] = {
+        "off_mean_tps": round(off_mean, 1),
+        "on_mean_tps": round(on_mean, 1),
+        "ratio": round(overall, 3),
+        "verdict": "positive" if overall > 1.05 else ("negative" if overall < 0.95 else "neutral")
+    }
+    log_path = Path(r"D:\PhronesisVault\Operations\logs") / "bench-spec-decode-live.json"
+    with open(log_path, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"\nLog: {log_path}")
+
+if __name__ == "__main__":
+    main()

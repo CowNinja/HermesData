@@ -1,0 +1,31 @@
+{
+  "name": "gzip-file-as-resource",
+  "description": "Compresses a single file using gzip compression. Depending upon the selected output type, returns either the compressed data as a gzipped resource or a resource link, allowing it to be downloaded in a subsequent request during the current session.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the output file",
+        "default": "README.md.gz"
+      },
+      "data": {
+        "type": "string",
+        "format": "uri",
+        "description": "URL or data URI of the file content to compress",
+        "default": "https://raw.githubusercontent.com/modelcontextprotocol/servers/refs/heads/main/README.md"
+      },
+      "outputType": {
+        "type": "string",
+        "enum": [
+          "resourceLink",
+          "resource"
+        ],
+        "default": "resourceLink",
+        "description": "How the resulting gzipped file should be returned. 'resourceLink' returns a link to a resource that can be read later, 'resource' returns a full resource object."
+      }
+    },
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

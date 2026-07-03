@@ -1,0 +1,9 @@
+{
+  "name": "toggle-subscriber-updates",
+  "description": "Toggles simulated resource subscription updates on or off.",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {}
+  }
+}

@@ -10,5 +10,6 @@
 | `04-status.ps1` | `Phronesis.ps1 status` |
 | `Phronesis-Dashboard.ps1` | `Phronesis.ps1 dashboard` |
 | `Phronesis-Hygiene-Cycle3.ps1` | `Phronesis.ps1 heal` |
+| `Phronesis-Secrets-Git-Autonomy.ps1` | Interactive secrets consolidation + Git backup audit (log: `scripts/ops/secrets-git-log.txt`) |
 
 See `D:\HermesData\scripts\SCRIPTS-MANIFEST.md` for the full guide.

@@ -1,0 +1,41 @@
+{
+  "name": "create_entities",
+  "description": "Create multiple new entities in the knowledge graph",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "entities": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The name of the entity"
+            },
+            "entityType": {
+              "type": "string",
+              "description": "The type of the entity"
+            },
+            "observations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "An array of observation contents associated with the entity"
+            }
+          },
+          "required": [
+            "name",
+            "entityType",
+            "observations"
+          ]
+        }
+      }
+    },
+    "required": [
+      "entities"
+    ]
+  }
+}

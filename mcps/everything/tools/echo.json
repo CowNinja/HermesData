@@ -1,0 +1,18 @@
+{
+  "name": "echo",
+  "description": "Echoes back the input string",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "message": {
+        "type": "string",
+        "description": "Message to echo"
+      }
+    },
+    "required": [
+      "message"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

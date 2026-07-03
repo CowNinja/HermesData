@@ -51,14 +51,28 @@ TIER_CONTEXT_BUDGET = {
 MODELS_8090_INI = VAULT / "Operations" / "models-8090.ini"
 
 
+_CTX_BUDGET_CACHE: Optional[int] = None
+_CTX_BUDGET_CACHE_AT: float = 0.0
+_CTX_BUDGET_TTL_SEC = 45.0
+
+
 def live_llama_ctx_budget() -> int:
-    """Read active ctx-size from phronesis-core.json, then models-8090.ini."""
+    """Read runtime ctx-size from phronesis-core.json (split from advertised), then models-8090.ini."""
+    global _CTX_BUDGET_CACHE, _CTX_BUDGET_CACHE_AT
+    now = time.time()
+    if _CTX_BUDGET_CACHE is not None and (now - _CTX_BUDGET_CACHE_AT) < _CTX_BUDGET_TTL_SEC:
+        return _CTX_BUDGET_CACHE
     try:
         core_path = HERMES_SCRIPTS / "phronesis-core.json"
         if core_path.is_file():
             core = json.loads(core_path.read_text(encoding="utf-8"))
-            ctx = int(core.get("ctx_size") or 0)
+            if core.get("use_runtime_ctx_split") and core.get("runtime_ctx_size"):
+                ctx = int(core.get("runtime_ctx_size") or 0)
+            else:
+                ctx = int(core.get("ctx_size") or 0)
             if ctx >= 2048:
+                _CTX_BUDGET_CACHE = ctx
+                _CTX_BUDGET_CACHE_AT = now
                 return ctx
     except Exception:
         pass

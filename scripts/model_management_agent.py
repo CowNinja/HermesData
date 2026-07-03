@@ -1,0 +1,1066 @@
+#!/usr/bin/env python3
+"""
+model_management_agent.py — Swiss-army-knife autonomous model management orchestrator.
+
+Assesses local GPU models, free cloud fleet, and paid fallbacks; benchmarks health;
+applies bounded self-healing via existing scripts; updates priority rankings.
+
+Does NOT auto-promote GGUF while model_rotation_locked is true.
+Does NOT enable opportunistic_fleet without config change.
+
+Usage:
+  python model_management_agent.py --tick              # light: stack + rank + safe fixes
+  python model_management_agent.py --full-tick         # + cloud health + degradation scan
+  python model_management_agent.py --remediate         # fix only (no full re-rank)
+  python model_management_agent.py --dry-run           # report fixes without applying
+  python model_management_agent.py --benchmark-active  # smoke benchmark active local model
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+HERMES_ROOT = Path(r"D:\HermesData")
+VAULT = Path(r"D:\PhronesisVault")
+
+try:
+    from phronesis_env import bootstrap_env as _bootstrap_env
+except ImportError:
+    def _bootstrap_env() -> None:
+        pass
+
+_bootstrap_env()
+PHM = Path(r"D:\PhronesisModels")
+SCRIPTS = HERMES_ROOT / "scripts"
+VAULT_SCRIPTS = VAULT / "scripts"
+CORE_PATH = SCRIPTS / "phronesis-core.json"
+CONFIG_PATH = HERMES_ROOT / "config.yaml"
+FLEET_REGISTRY = HERMES_ROOT / "config" / "fleet_registry.yaml"
+INVENTORY_PATH = PHM / "model_inventory.json"
+MODELS_ROOT = PHM / "models"
+MODEL_DIRS = ("current", "candidates", "archive")
+BENCHMARK_DIR = VAULT / "Operations" / "benchmark-results"
+# RTX 3060 12GB — reserve for OS/ComfyUI + KV headroom
+VRAM_RESERVE_MB = 2500
+DUAL_MODEL_MIN_FREE_MB = 3500
+SMALL_MODEL_MAX_GB = 4.0
+
+AGENT_STATE_OUT = VAULT / "Operations" / "model-management-agent-state.json"
+PRIORITY_STATE_OUT = VAULT / "Operations" / "model-priority-state.json"
+LOG_PATH = VAULT / "Operations" / "logs" / "model-management-agent.jsonl"
+DIAGNOSTICS_PS1 = VAULT / "Operations" / "Invoke-SovereignStackDiagnostics.ps1"
+SESSION_HEALTH_LOG = VAULT / "Session-Health-Log.md"
+REFLECTION_LOG = VAULT / "Operations" / "logs" / "model-management-agent-reflection.jsonl"
+
+BENCHMARK_STALE_DAYS = 14
+BENCHMARK_PASS_RATE_MIN = 70.0
+BENCHMARK_COMPOSITE_MIN = 55.0
+MAX_REMEDIATION_ACTIONS_PER_TICK = 4
+
+# Script toolbox (existing — orchestrated, not duplicated)
+TOOLBOX = {
+    "heal_stack": SCRIPTS / "Phronesis-Heal.ps1",
+    "start_llama": SCRIPTS / "ops" / "02-start-llama.ps1",
+    "start_proxy": SCRIPTS / "ops" / "03-start-proxy.ps1",
+    "warm_actions": VAULT_SCRIPTS / "warm_tier_actions.py",
+    "fleet_health": SCRIPTS / "external_fleet_manager.py",
+    "fleet_curator": SCRIPTS / "opportunistic_fleet_agent.py",
+    "resource_mgr": SCRIPTS / "model_resource_manager.py",
+    "priority_curator": SCRIPTS / "model_priority_curator.py",
+    "benchmark_harness": SCRIPTS / "model_benchmark_harness.py",
+    "fleetctl": VAULT_SCRIPTS / "fleetctl.py",
+}
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _log(event: Dict[str, Any]) -> None:
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
+
+
+def _load_json(path: Path) -> Dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return {}
+
+
+def _operator_commands(issue_codes: List[str]) -> Dict[str, str]:
+    """Reliable CLI one-liners — PS-pipe-safe."""
+    py = str(_resolve_venv_python())
+    cmds = {
+        "tick": r"D:\HermesData\scripts\run-model-management-agent.ps1 -Tick",
+        "full_tick": r"D:\HermesData\scripts\run-model-management-agent.ps1 -FullTick",
+        "cron_light": r"D:\HermesData\scripts\model_management_cron.ps1 -Mode light",
+        "cron_full": r"D:\HermesData\scripts\model_management_cron.ps1 -Mode full",
+        "summary": f'"{py}" D:\\HermesData\\scripts\\model_management_agent.py --tick --summary',
+        "panel": f'"{py}" D:\\PhronesisVault\\scripts\\app_hooks.py',
+        "ps_pipe_warning": "Never pipe full agent JSON through Select-Object -First N — use --summary",
+    }
+    if "L09" in issue_codes:
+        cmds["reconcile_drift"] = (
+            f'"{py}" D:\\PhronesisVault\\scripts\\fleetctl.py reconcile'
+        )
+        cmds["drift_inspect"] = (
+            f'"{py}" D:\\PhronesisVault\\scripts\\fleetctl.py drift --json'
+        )
+    return cmds
+
+
+def _parse_session_health_patterns() -> List[str]:
+    """Extract recurring failure patterns from Session-Health-Log for agent reflection."""
+    if not SESSION_HEALTH_LOG.is_file():
+        return []
+    try:
+        text = SESSION_HEALTH_LOG.read_text(encoding="utf-8", errors="replace").lower()
+    except Exception:
+        return []
+    patterns: List[str] = []
+    checks = (
+        ("proxy", "8091", "proxy flapping or down"),
+        ("gateway", "8642", "gateway timeout or restart"),
+        ("8081", "8082", "legacy 808x reference — purge from ops"),
+        ("fork", "duplicate", "fork guard / duplicate pythonw"),
+        ("vram", "oom", "VRAM pressure or OOM"),
+        ("drift", "ini", "inventory or ini drift"),
+    )
+    for a, b, label in checks:
+        if a in text and (b in text or label.split()[0] in text):
+            patterns.append(label)
+    return list(dict.fromkeys(patterns))[:6]
+
+
+def _run_diagnostics_preflight(*, repair: bool = False) -> Dict[str, Any]:
+    """Invoke-SovereignStackDiagnostics.ps1 — read-only on amber, optional -Repair."""
+    if not DIAGNOSTICS_PS1.is_file():
+        return {"ok": False, "skipped": True, "reason": "diagnostics_script_missing"}
+    args = [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(DIAGNOSTICS_PS1),
+    ]
+    if repair:
+        args.append("-Repair")
+    try:
+        proc = subprocess.run(args, capture_output=True, text=True, timeout=90, cwd=str(VAULT / "Operations"))
+        return {
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "repair": repair,
+            "stdout_tail": (proc.stdout or "").strip()[-600:],
+            "stderr_tail": (proc.stderr or "").strip()[-400:],
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "diagnostics_timeout"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _self_reflection(
+    *,
+    status: str,
+    issues: List[Dict[str, Any]],
+    stack: Dict[str, Any],
+    constellation: Dict[str, Any],
+    remediations: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Agent reflection loop — lessons for next tick and vault ingest."""
+    codes = [str(i.get("code") or "") for i in issues if i.get("code")]
+    patterns = _parse_session_health_patterns()
+    recommendation = constellation.get("recommendation") or (
+        "Stack healthy — maintain single Qwythos primary."
+        if stack.get("stack_ready")
+        else stack.get("overall", {}).get("recommended_action", "Heal stack")
+    )
+    reflection = {
+        "timestamp": _utc_now(),
+        "status": status,
+        "stack_ready": bool(stack.get("stack_ready")),
+        "issue_codes": codes[:12],
+        "session_log_patterns": patterns,
+        "constellation_mode": constellation.get("mode"),
+        "recommendation": recommendation,
+        "remediation_actions": [r.get("action") for r in remediations if r.get("action")],
+        "next_tick_hints": [],
+        "ps_pipe_artifact_note": (
+            "PowerShell Select-Object -First N on agent JSON can report exit 1 — "
+            "use run-model-management-agent.ps1 or --summary; amber = non-blocking operator flags"
+        ),
+        "operator_commands": _operator_commands(codes),
+    }
+    if "proxy flapping" in " ".join(patterns) or not (stack.get("8091") or {}).get("up"):
+        reflection["next_tick_hints"].append("Prioritize proxy stability — ForkGuard + heal")
+    if codes and status == "amber":
+        reflection["next_tick_hints"].append("Review issue codes — operator reconcile if L09 ini drift")
+    if constellation.get("mode") == "dual_feasible":
+        reflection["next_tick_hints"].append("VRAM headroom — benchmark small candidate before dual-load")
+    REFLECTION_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with open(REFLECTION_LOG, "a", encoding="utf-8") as f:
+        f.write(json.dumps(reflection) + "\n")
+    return reflection
+
+
+def _resolve_venv_python() -> Path:
+    """Hermes venv from phronesis-core.json — never system Python313."""
+    core = _load_json(CORE_PATH)
+    configured = str(core.get("venv_python") or "").strip()
+    if configured:
+        candidate = Path(configured)
+        if candidate.is_file():
+            return candidate
+    fallback = HERMES_ROOT / "hermes-agent" / "venv" / "Scripts" / "python.exe"
+    return fallback if fallback.is_file() else Path(sys.executable)
+
+
+def _import_stack():
+    if str(VAULT_SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(VAULT_SCRIPTS))
+    from sovereign_router_panel import verify_unified_stack, get_gpu_snapshot, load_phronesis_core  # type: ignore
+
+    return verify_unified_stack, get_gpu_snapshot, load_phronesis_core
+
+
+def _import_curator():
+    if str(SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS))
+    from model_priority_curator import build_priority_state, write_state  # type: ignore
+
+    return build_priority_state, write_state
+
+
+def _run_python(script: Path, args: List[str], timeout: int = 120) -> Dict[str, Any]:
+    if not script.is_file():
+        return {"ok": False, "error": "script_missing", "path": str(script)}
+    py = _resolve_venv_python()
+    try:
+        proc = subprocess.run(
+            [str(py), str(script), *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(script.parent),
+        )
+        stdout = (proc.stdout or "").strip()
+        parsed: Dict[str, Any] = {}
+        if stdout:
+            try:
+                parsed = json.loads(stdout)
+            except Exception:
+                parsed = {"raw": stdout[-1200:]}
+        return {
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "script": str(script.name),
+            **parsed,
+        }
+    except subprocess.TimeoutExpired as exc:
+        return {"ok": False, "error": "timeout", "message": str(exc)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _run_warm_action(action: str) -> Dict[str, Any]:
+    return _run_python(TOOLBOX["warm_actions"], [action], timeout=180)
+
+
+def _parse_benchmark_file(data: Dict[str, Any], fname: str) -> Dict[str, Any]:
+    """Normalize heterogeneous benchmark JSON formats."""
+    tests = data.get("tests") or []
+    if tests:
+        passed = sum(1 for t in tests if t.get("pass"))
+        total = len(tests)
+        pass_rate = round(100.0 * passed / total, 1) if total else None
+        latencies = [float(t["latency"]) for t in tests if isinstance(t.get("latency"), (int, float))]
+        avg_lat = round(sum(latencies) / len(latencies), 2) if latencies else None
+        composite = data.get("composite") or data.get("composite_score")
+        if composite is None and pass_rate is not None:
+            composite = round(pass_rate * 0.85 + (min(30, data.get("speed_tps") or 0)), 1)
+        return {
+            "composite": float(composite) if composite is not None else None,
+            "pass_rate": pass_rate,
+            "avg_latency_s": avg_lat,
+            "tps": data.get("speed_tps") or data.get("tokens_per_sec") or data.get("tps"),
+            "source": fname,
+            "tested_at": data.get("timestamp") or data.get("tested_at"),
+            "test_count": total,
+        }
+    composite = data.get("composite") or data.get("composite_score")
+    return {
+        "composite": float(composite) if composite is not None else None,
+        "pass_rate": data.get("pass_rate") or data.get("pass_pct"),
+        "tps": data.get("tokens_per_sec") or data.get("tps"),
+        "source": fname,
+        "tested_at": data.get("timestamp") or data.get("tested_at"),
+    }
+
+
+def _benchmark_age_days(meta: Optional[Dict[str, Any]]) -> Optional[float]:
+    if not meta or not meta.get("tested_at"):
+        return None
+    try:
+        ts = str(meta["tested_at"]).replace("Z", "+00:00")
+        tested = datetime.fromisoformat(ts)
+        if tested.tzinfo is None:
+            tested = tested.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - tested).total_seconds() / 86400
+    except Exception:
+        return None
+
+
+def _local_smoke_probe(port: int = 8090, timeout: float = 8.0) -> Dict[str, Any]:
+    """Lightweight inference smoke — not full harness."""
+    url = f"http://127.0.0.1:{port}/v1/chat/completions"
+    payload = {
+        "model": "smoke",
+        "messages": [{"role": "user", "content": "Reply with exactly: OK"}],
+        "max_tokens": 8,
+        "temperature": 0,
+        "stream": False,
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    start = time.perf_counter()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8", errors="replace"))
+            elapsed = int((time.perf_counter() - start) * 1000)
+            text = (
+                (body.get("choices") or [{}])[0]
+                .get("message", {})
+                .get("content", "")
+            )
+            ok = bool(str(text).strip())
+            return {"ok": ok, "latency_ms": elapsed, "preview": str(text)[:80]}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "latency_ms": int((time.perf_counter() - start) * 1000)}
+
+
+def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str, Any]:
+    """Inventory integrity, active model match, benchmark staleness, smoke health."""
+    issues: List[Dict[str, Any]] = []
+    active_path = str(core.get("model") or "")
+    active_file = Path(active_path).name if active_path else ""
+    expected = Path(active_path).name if active_path else ""
+    node = stack.get("8090") or {}
+    loaded = str(node.get("loaded") or "")
+    locked = bool(core.get("model_rotation_locked", True))
+
+    if active_path and not Path(active_path).is_file():
+        issues.append(
+            {
+                "code": "L01",
+                "severity": "critical",
+                "message": f"Active model file missing: {active_path}",
+                "fix": "manual",
+            }
+        )
+
+    if node.get("up") and not node.get("match"):
+        issues.append(
+            {
+                "code": "L02",
+                "severity": "high",
+                "message": f"Wrong model on :8090 — loaded {loaded[-60:]} expected {expected}",
+                "fix": "start-llama",
+            }
+        )
+
+    if not node.get("up"):
+        issues.append(
+            {
+                "code": "L03",
+                "severity": "critical",
+                "message": "llama-server :8090 not responding",
+                "fix": "start-llama",
+            }
+        )
+
+    inv = _load_json(INVENTORY_PATH)
+    gguf_count = len(inv.get("gguf_truth") or {})
+    split_gguf = [f for f in (inv.get("gguf_truth") or {}) if "00001-of" in f]
+    if split_gguf:
+        issues.append(
+            {
+                "code": "L04",
+                "severity": "medium",
+                "message": f"{len(split_gguf)} split GGUF file(s) need merge before load",
+                "fix": "manual",
+            }
+        )
+
+    bench_meta: Optional[Dict[str, Any]] = None
+    if BENCHMARK_DIR.is_dir():
+        for path in BENCHMARK_DIR.glob("*.json"):
+            data = _load_json(path)
+            model_key = str(data.get("model") or "").lower()
+            if active_file.lower() in model_key or (
+                "qwythos" in model_key and "qwythos" in active_file.lower()
+            ):
+                bench_meta = _parse_benchmark_file(data, path.name)
+                break
+
+    age = _benchmark_age_days(bench_meta)
+    if bench_meta is None:
+        issues.append(
+            {
+                "code": "L05",
+                "severity": "low",
+                "message": f"No benchmark on file for active model {active_file or core.get('model_label')}",
+                "fix": "benchmark-active",
+            }
+        )
+    elif age is not None and age > BENCHMARK_STALE_DAYS:
+        issues.append(
+            {
+                "code": "L06",
+                "severity": "medium",
+                "message": f"Benchmark stale ({age:.0f}d old) — re-run harness",
+                "fix": "benchmark-active",
+            }
+        )
+
+    if bench_meta:
+        pass_rate = bench_meta.get("pass_rate")
+        composite = bench_meta.get("composite")
+        if pass_rate is not None and float(pass_rate) < BENCHMARK_PASS_RATE_MIN:
+            issues.append(
+                {
+                    "code": "L08",
+                    "severity": "high",
+                    "message": f"Benchmark pass rate degraded ({pass_rate}% < {BENCHMARK_PASS_RATE_MIN}%)",
+                    "fix": "benchmark-active",
+                }
+            )
+        elif composite is not None and float(composite) < BENCHMARK_COMPOSITE_MIN:
+            issues.append(
+                {
+                    "code": "L08",
+                    "severity": "medium",
+                    "message": f"Benchmark composite low ({composite} < {BENCHMARK_COMPOSITE_MIN})",
+                    "fix": "benchmark-active",
+                }
+            )
+
+    smoke = _local_smoke_probe() if node.get("up") else {"ok": False, "skipped": True}
+    if node.get("up") and not smoke.get("ok"):
+        issues.append(
+            {
+                "code": "L07",
+                "severity": "high",
+                "message": f"Local smoke inference failed: {smoke.get('error', smoke.get('preview', 'bad response'))}",
+                "fix": "start-llama",
+            }
+        )
+
+    return {
+        "active_file": active_file,
+        "loaded": loaded,
+        "match": bool(node.get("match")),
+        "rotation_locked": locked,
+        "inventory_count": gguf_count,
+        "benchmark": bench_meta,
+        "benchmark_age_days": age,
+        "smoke": smoke,
+        "issues": issues,
+    }
+
+
+def assess_stack(stack: Dict[str, Any]) -> Dict[str, Any]:
+    issues: List[Dict[str, Any]] = []
+    if not (stack.get("8091") or {}).get("up"):
+        issues.append({"code": "S01", "severity": "high", "message": "Proxy :8091 down", "fix": "start-proxy"})
+    if not (stack.get("8642") or {}).get("up"):
+        issues.append({"code": "S02", "severity": "medium", "message": "Gateway :8642 down", "fix": "restart-gateway"})
+    if not stack.get("stack_ready"):
+        issues.append({"code": "S03", "severity": "high", "message": "Stack incomplete", "fix": "heal"})
+    return {"stack_ready": stack.get("stack_ready"), "issues": issues}
+
+
+def assess_cloud_fleet(*, probe: bool) -> Dict[str, Any]:
+    try:
+        import yaml  # type: ignore
+
+        registry = yaml.safe_load(FLEET_REGISTRY.read_text(encoding="utf-8")) or {}
+    except Exception:
+        registry = {}
+    config = _load_yaml_simple()
+    fleet_config_on = bool((config.get("local_sovereign") or {}).get("opportunistic_fleet", {}).get("enabled"))
+    registry_on = bool((registry.get("policy") or {}).get("enabled"))
+    enabled = fleet_config_on and registry_on
+
+    compute = [p for p in registry.get("compute_providers") or [] if isinstance(p, dict)]
+    free = [p for p in compute if ":free" in str(p.get("model", "")).lower() or "free" in str(p.get("id", "")).lower()]
+    paid_reg = [p for p in compute if p not in free]
+
+    issues: List[Dict[str, Any]] = []
+    health_summary: Optional[Dict[str, Any]] = None
+    disabled_providers: List[str] = []
+
+    shadow_mode = not enabled
+    if not enabled:
+        issues.append(
+            {
+                "code": "C00",
+                "severity": "info",
+                "message": "Opportunistic fleet OFF — Phase B0 shadow health only (no routing)",
+                "fix": "none",
+            }
+        )
+    if probe:
+        health_args = ["--health", "--shadow"] if shadow_mode else ["--health"]
+        health_summary = _run_python(TOOLBOX["fleet_health"], health_args, timeout=180)
+        for row in (health_summary.get("results") or []):
+            if row.get("status") == "missing_env":
+                continue
+            if not row.get("ok"):
+                pid = row.get("provider_id") or row.get("id") or "unknown"
+                issue = {
+                    "code": "C01",
+                    "severity": "medium" if enabled else "info",
+                    "message": f"Cloud provider degraded: {pid}",
+                    "fix": "auto-disable-cloud" if enabled else "none",
+                    "provider_id": pid,
+                }
+                issues.append(issue)
+        if enabled:
+            fix_result = _run_python(TOOLBOX["fleet_curator"], ["--auto-fix"], timeout=90)
+            disabled_providers = list(fix_result.get("disabled") or [])
+
+    missing_keys = []
+    for p in free + paid_reg:
+        if p.get("enabled") and p.get("api_key_env"):
+            import os
+
+            if not os.environ.get(str(p["api_key_env"]), "").strip():
+                missing_keys.append(str(p.get("id")))
+    ctx_providers = [p for p in registry.get("context_providers") or [] if isinstance(p, dict)]
+    for p in ctx_providers:
+        if p.get("enabled") and p.get("api_key_env"):
+            import os
+
+            if not os.environ.get(str(p["api_key_env"]), "").strip():
+                missing_keys.append(str(p.get("id")))
+
+    if missing_keys:
+        issues.append(
+            {
+                "code": "C02",
+                "severity": "low",
+                "message": f"Providers missing API keys: {', '.join(missing_keys[:5])}",
+                "fix": "manual",
+            }
+        )
+
+    return {
+        "fleet_enabled": enabled,
+        "shadow_mode": shadow_mode,
+        "free_count": len(free),
+        "paid_registry_count": len(paid_reg),
+        "health": health_summary,
+        "disabled_providers": disabled_providers,
+        "issues": issues,
+    }
+
+
+def _load_yaml_simple() -> Dict[str, Any]:
+    try:
+        import yaml  # type: ignore
+
+        return yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+
+
+def _scan_models_dirs() -> Dict[str, List[Dict[str, Any]]]:
+    """Walk D:\\PhronesisModels\\models\\{current,candidates,archive}."""
+    out: Dict[str, List[Dict[str, Any]]] = {d: [] for d in MODEL_DIRS}
+    inv = _load_json(INVENTORY_PATH)
+    gguf = inv.get("gguf_truth") or {}
+    for sub in MODEL_DIRS:
+        root = MODELS_ROOT / sub
+        if not root.is_dir():
+            continue
+        for path in sorted(root.glob("*.gguf")):
+            if "00001-of" in path.name or "part-" in path.name:
+                continue
+            meta = gguf.get(path.name) or {}
+            size_b = path.stat().st_size if path.is_file() else int(meta.get("size_bytes") or 0)
+            out[sub].append(
+                {
+                    "file": path.name,
+                    "path": str(path),
+                    "size_gb": round(size_b / (1024**3), 2),
+                    "dir": sub,
+                }
+            )
+    return out
+
+
+def assess_constellation(
+    core: Dict[str, Any],
+    gpu: Dict[str, Any],
+    stack: Dict[str, Any],
+) -> Dict[str, Any]:
+    """VRAM-aware model constellation — single primary vs dual-load feasibility."""
+    issues: List[Dict[str, Any]] = []
+    dirs = _scan_models_dirs()
+    vram_total = float(gpu.get("vram_total_mb") or 12288)
+    vram_used = float(gpu.get("vram_used_mb") or 0)
+    vram_free = float(gpu.get("vram_free_mb") or max(0, vram_total - vram_used))
+    active_path = str(core.get("model") or "")
+    active_name = Path(active_path).name if active_path else ""
+    active_size_gb = 0.0
+    if active_path and Path(active_path).is_file():
+        active_size_gb = round(Path(active_path).stat().st_size / (1024**3), 2)
+
+    candidates = dirs.get("candidates") or []
+    small_candidates = [c for c in candidates if float(c.get("size_gb") or 99) <= SMALL_MODEL_MAX_GB]
+    headroom_after_primary = vram_free
+    if (stack.get("8090") or {}).get("up"):
+        headroom_after_primary = max(0, vram_total - vram_used - VRAM_RESERVE_MB)
+
+    mode = "single_primary"
+    dual_pair: Optional[Dict[str, Any]] = None
+    if headroom_after_primary >= DUAL_MODEL_MIN_FREE_MB and small_candidates:
+        best_small = min(small_candidates, key=lambda c: c.get("size_gb") or 99)
+        if float(best_small.get("size_gb") or 99) * 1024 + active_size_gb * 1024 < vram_total - VRAM_RESERVE_MB:
+            mode = "dual_feasible"
+            dual_pair = {
+                "primary": active_name or core.get("model_label"),
+                "secondary": best_small["file"],
+                "secondary_role": "classifier_or_fast",
+                "note": "Theoretical — llama.cpp single-server today loads one GGUF on :8090",
+            }
+    elif vram_used / max(vram_total, 1) > 0.9:
+        issues.append(
+            {
+                "code": "V01",
+                "severity": "medium",
+                "message": f"VRAM tight ({gpu.get('pct_used', 0):.0f}% used) — dual-model not recommended",
+                "fix": "manual",
+            }
+        )
+
+    locked = bool(core.get("model_rotation_locked", True))
+    recommendation = (
+        "Keep Qwythos as sole GPU model — maximum ctx and KV efficiency on RTX 3060 12GB"
+        if mode == "single_primary" or locked
+        else f"Dual-load theoretically possible; benchmark {dual_pair['secondary']} before promoting"
+    )
+
+    return {
+        "mode": mode,
+        "vram_total_mb": vram_total,
+        "vram_free_mb": vram_free,
+        "vram_pct_used": gpu.get("pct_used"),
+        "active_size_gb": active_size_gb,
+        "headroom_mb": headroom_after_primary,
+        "models_dirs": {k: len(v) for k, v in dirs.items()},
+        "candidates_on_disk": len(candidates),
+        "small_candidates": len(small_candidates),
+        "dual_pair": dual_pair,
+        "recommendation": recommendation,
+        "inventory_roots": [str(MODELS_ROOT / d) for d in MODEL_DIRS],
+        "issues": issues,
+    }
+
+
+def assess_inventory(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str, Any]:
+    """Inventory ↔ disk ↔ models.ini drift via fleetctl (read-only)."""
+    loaded = str((stack.get("8090") or {}).get("loaded") or "")
+    drift = _run_python(TOOLBOX["fleetctl"], ["drift", "--json", "--loaded", loaded], timeout=60)
+    issues: List[Dict[str, Any]] = []
+    for problem in (drift.get("problems") or []):
+        if not isinstance(problem, dict):
+            continue
+        sev = str(problem.get("severity") or "medium")
+        issues.append(
+            {
+                "code": "L09",
+                "severity": sev,
+                "message": f"Inventory drift: {problem.get('code')} — {problem}",
+                "fix": "manual",
+                "hint": "fleetctl reconcile (operator) or fleetctl drift --json",
+            }
+        )
+    return {"drift": drift, "issues": issues}
+
+
+def assess_fleet_recommendations(*, locked: bool) -> Dict[str, Any]:
+    """Benchmark-driven promotion suggestion (recommend only, never auto-promote)."""
+    suggest = _run_python(TOOLBOX["fleetctl"], ["suggest", "--json"], timeout=90)
+    issues: List[Dict[str, Any]] = []
+    rec = suggest.get("recommend") or {}
+    if not locked and rec.get("action") == "promote":
+        issues.append(
+            {
+                "code": "F01",
+                "severity": "info",
+                "message": f"Promotion candidate: {rec.get('model')} (+{rec.get('gain', '?')} score)",
+                "fix": "manual",
+                "hint": rec.get("command"),
+            }
+        )
+    elif not locked and rec.get("action") == "benchmark":
+        issues.append(
+            {
+                "code": "F02",
+                "severity": "low",
+                "message": f"Unbenchmarked top candidate: {rec.get('model')}",
+                "fix": "benchmark-active",
+                "hint": rec.get("command"),
+            }
+        )
+    unbench = int(suggest.get("unbenchmarked_count") or 0)
+    if unbench > 3:
+        issues.append(
+            {
+                "code": "F03",
+                "severity": "low",
+                "message": f"{unbench} local candidates lack benchmarks",
+                "fix": "manual",
+                "hint": "model_benchmark_harness.py --tier warm --candidate <file>",
+            }
+        )
+    return {"suggest": suggest, "issues": issues}
+
+
+def assess_paid_fallbacks() -> Dict[str, Any]:
+    config = _load_yaml_simple()
+    issues: List[Dict[str, Any]] = []
+    entries = []
+    moa = config.get("moa") or {}
+    if moa.get("enabled"):
+        agg = moa.get("aggregator") or {}
+        entries.append({"id": "moa", "provider": agg.get("provider"), "model": agg.get("model")})
+    if config.get("nous"):
+        entries.append({"id": "nous", "provider": "nous", "model": "portal"})
+    xs = config.get("x_search") or {}
+    if xs.get("model"):
+        entries.append({"id": "xai", "provider": "xai", "model": xs["model"]})
+    fb = config.get("fallback_model") or []
+    if isinstance(fb, list) and fb:
+        e = fb[0] if isinstance(fb[0], dict) else {}
+        if "phronesis-sovereign" in str(e.get("provider", "")):
+            entries.append({"id": "local_fallback", "provider": e.get("provider"), "model": e.get("model"), "note": "local retry"})
+    if not entries:
+        issues.append({"code": "P01", "severity": "medium", "message": "No paid/escalation fallbacks configured", "fix": "manual"})
+    return {"entries": entries, "issues": issues}
+
+
+def remediate(
+    all_issues: List[Dict[str, Any]],
+    *,
+    dry_run: bool = False,
+    allow_benchmark: bool = False,
+) -> List[Dict[str, Any]]:
+    """Apply bounded fixes using existing scripts. Priority: stack → model → cloud."""
+    fix_order = ["heal", "start-llama", "start-proxy", "restart-gateway", "auto-disable-cloud", "benchmark-active"]
+    actions_taken: List[Dict[str, Any]] = []
+    seen_fixes: set = set()
+
+    for fix_id in fix_order:
+        if len(actions_taken) >= MAX_REMEDIATION_ACTIONS_PER_TICK:
+            break
+        matching = [i for i in all_issues if i.get("fix") == fix_id or (fix_id == "heal" and i.get("fix") == "heal")]
+        if fix_id == "heal":
+            if not any(i.get("fix") == "heal" for i in all_issues):
+                continue
+        elif fix_id == "start-llama":
+            if not any(i.get("fix") == "start-llama" for i in all_issues):
+                continue
+        elif fix_id == "start-proxy":
+            if not any(i.get("fix") == "start-proxy" for i in all_issues):
+                continue
+        elif fix_id == "restart-gateway":
+            if not any(i.get("fix") == "restart-gateway" for i in all_issues):
+                continue
+        elif fix_id == "auto-disable-cloud":
+            if not any(i.get("fix") == "auto-disable-cloud" for i in all_issues):
+                continue
+        elif fix_id == "benchmark-active":
+            if not allow_benchmark or not any(i.get("fix") == "benchmark-active" for i in all_issues):
+                continue
+
+        if fix_id in seen_fixes:
+            continue
+        seen_fixes.add(fix_id)
+
+        if dry_run:
+            actions_taken.append({"action": fix_id, "dry_run": True, "ok": True})
+            continue
+
+        if fix_id == "heal":
+            result = _run_warm_action("heal")
+        elif fix_id == "start-llama":
+            result = _run_warm_action("start-llama")
+        elif fix_id == "start-proxy":
+            result = _run_warm_action("start-proxy")
+        elif fix_id == "restart-gateway":
+            result = _run_warm_action("restart-gateway")
+        elif fix_id == "auto-disable-cloud":
+            result = _run_python(TOOLBOX["fleet_curator"], ["--auto-fix"], timeout=90)
+        elif fix_id == "benchmark-active":
+            result = _run_python(TOOLBOX["benchmark_harness"], ["--tier", "hot"], timeout=600)
+        else:
+            continue
+
+        actions_taken.append({"action": fix_id, **result})
+        if result.get("ok"):
+            time.sleep(2)
+
+    # Unified resource manager preflight as final pass
+    if not dry_run and any(i.get("fix") in ("heal", "start-llama", "start-proxy") for i in all_issues):
+        preflight = _run_python(TOOLBOX["resource_mgr"], ["--preflight", "--auto-recover"], timeout=120)
+        actions_taken.append({"action": "resource_preflight", **preflight})
+
+    return actions_taken
+
+
+def run_tick(
+    *,
+    mode: str = "tick",
+    dry_run: bool = False,
+    remediate_flag: bool = True,
+) -> Dict[str, Any]:
+    verify_stack, get_gpu, load_core = _import_stack()
+    build_priority, write_priority = _import_curator()
+
+    core = load_core()
+    stack = verify_stack()
+    gpu = get_gpu()
+
+    local = assess_local_models(core, stack)
+    stack_assess = assess_stack(stack)
+    cloud = assess_cloud_fleet(probe=(mode == "full"))
+    paid = assess_paid_fallbacks()
+    inventory = assess_inventory(core, stack)
+    constellation = assess_constellation(core, gpu, stack)
+    fleet = assess_fleet_recommendations(locked=bool(core.get("model_rotation_locked", True))) if mode == "full" else {
+        "suggest": None,
+        "issues": [],
+    }
+
+    all_issues: List[Dict[str, Any]] = []
+    for block in (stack_assess, local, inventory, constellation, cloud, paid, fleet):
+        all_issues.extend(block.get("issues") or [])
+
+    # Deduplicate heal vs specific fixes — prefer specific
+    if any(i.get("fix") in ("start-llama", "start-proxy", "restart-gateway") for i in all_issues):
+        all_issues = [i for i in all_issues if i.get("fix") != "heal"]
+
+    remediations: List[Dict[str, Any]] = []
+    if remediate_flag and not dry_run:
+        remediations = remediate(
+            all_issues,
+            dry_run=False,
+            allow_benchmark=(mode == "full"),
+        )
+        if remediations:
+            stack = verify_stack()
+            local = assess_local_models(core, stack)
+            stack_assess = assess_stack(stack)
+            # Re-assess loop: drop issues fixed by remediation
+            fixed_fixes = {r.get("action") for r in remediations if r.get("ok")}
+            if fixed_fixes:
+                all_issues = [
+                    i
+                    for i in all_issues
+                    if i.get("fix") not in fixed_fixes or i.get("severity") == "low"
+                ]
+            if any(r.get("ok") for r in remediations):
+                local = assess_local_models(core, stack)
+
+    priority = build_priority(refresh_cloud=(mode == "full"))
+    priority["agent"] = {
+        "name": "model_management_agent",
+        "mode": mode,
+        "issue_count": len(all_issues),
+        "remediation_count": len(remediations),
+        "capabilities": CAPABILITIES,
+        "limitations": LIMITATIONS,
+    }
+    write_priority(priority)
+
+    status = "green"
+    if any(i.get("severity") == "critical" for i in all_issues):
+        status = "red"
+    elif any(i.get("severity") in ("high", "medium") for i in all_issues):
+        status = "amber"
+    elif not stack.get("stack_ready"):
+        status = "amber"
+
+    diagnostics: Dict[str, Any] = {"skipped": True}
+    if status in ("amber", "red") and remediate_flag and not dry_run:
+        diagnostics = _run_diagnostics_preflight(repair=(status == "red" and not stack.get("stack_ready")))
+        if diagnostics.get("ok") and status == "red":
+            stack = verify_stack()
+            local = assess_local_models(core, stack)
+            if stack.get("stack_ready"):
+                status = "amber" if all_issues else "green"
+
+    reflection = _self_reflection(
+        status=status,
+        issues=all_issues,
+        stack=stack,
+        constellation=constellation,
+        remediations=remediations,
+    )
+
+    state = {
+        "panel_type": "model_management_agent",
+        "version": "1.3",
+        "updated_at": _utc_now(),
+        "status": status,
+        "mode": mode,
+        "dry_run": dry_run,
+        "stack": stack,
+        "gpu": gpu,
+        "assessments": {
+            "stack": stack_assess,
+            "local": local,
+            "inventory": inventory,
+            "constellation": constellation,
+            "cloud": cloud,
+            "paid": paid,
+            "fleet": fleet,
+        },
+        "issues": all_issues,
+        "remediations": remediations,
+        "diagnostics": diagnostics,
+        "reflection": reflection,
+        "operator_commands": reflection.get("operator_commands"),
+        "feedback_loops_active": [
+            x
+            for x in (
+                "re_smoke" if remediations else None,
+                "diagnostics_preflight" if not diagnostics.get("skipped") else None,
+                "reflection_ingest",
+                "priority_curator_rank",
+                "watchdog_60s",
+            )
+            if x
+        ],
+        "toolbox": {k: str(v) for k, v in TOOLBOX.items()},
+        "priority_snapshot": {
+            "rotation_locked": priority.get("rotation_locked"),
+            "fleet_enabled": priority.get("fleet_enabled"),
+            "fallback_chain": priority.get("fallback_chain"),
+            "tier_counts": {t["id"]: len(t.get("models") or []) for t in priority.get("tiers") or []},
+        },
+        "capabilities": CAPABILITIES,
+        "limitations": LIMITATIONS,
+    }
+
+    AGENT_STATE_OUT.parent.mkdir(parents=True, exist_ok=True)
+    AGENT_STATE_OUT.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    _log({"event": "tick_complete", "mode": mode, "status": status, "issues": len(all_issues), "fixes": len(remediations)})
+    return state
+
+
+CAPABILITIES = [
+    "Probe unified stack (:8090 / :8091 / :8642) via sovereign_router_panel",
+    "Validate active GGUF file exists and matches phronesis-core.json",
+    "Local smoke inference test on :8090",
+    "Benchmark staleness (14d), pass-rate, and composite degradation checks",
+    "Scans D:\\PhronesisModels\\models\\{current,candidates,archive} for constellation planning",
+    "VRAM-aware single-primary vs dual-model feasibility (RTX 3060 tuned)",
+    "Inventory drift detection via fleetctl drift --json (read-only)",
+    "Promotion recommendations via fleetctl suggest --json (--full-tick)",
+    "Rank local + free + paid models (model_priority_curator)",
+    "Cloud provider health probes when fleet enabled (--full-tick)",
+    "Auto-disable repeatedly failing cloud providers (opportunistic_fleet_agent)",
+    "Bounded self-heal: heal / start-llama / start-proxy / restart-gateway (warm_tier_actions)",
+    "Resource manager preflight with auto-recover (model_resource_manager)",
+    "Optional harness benchmark on --full-tick or --benchmark-active",
+    "Writes agent + priority state for dashboard panel and cron consumers",
+    "Diagnostics preflight on amber/red ticks (Invoke-SovereignStackDiagnostics.ps1)",
+    "Self-reflection loop with Session-Health-Log pattern ingest",
+]
+
+LIMITATIONS = [
+    "Will NOT auto-promote or swap GGUF while model_rotation_locked is true",
+    "Will NOT run fleetctl reconcile automatically — drift flagged for operator",
+    "Will NOT enable opportunistic_fleet — requires config.yaml change by operator",
+    "Will NOT download or delete models — inventory changes need fleetctl/manual",
+    "Heavy benchmark harness can take 5–15 min — only on --full-tick or --benchmark-active",
+    "Paid API probes require env API keys — missing keys flagged, not auto-fixed",
+    "Max 4 remediation actions per tick to avoid restart storms",
+    "Split/multi-part GGUF files flagged manual — no auto-merge",
+    "Does not manage :9119 CLI dashboard or ComfyUI VRAM contention",
+    "Light --tick skips cloud probes, fleet suggest, and harness auto-run",
+]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Autonomous model management agent")
+    parser.add_argument("--tick", action="store_true", help="Light assess + rank + safe remediate")
+    parser.add_argument("--full-tick", action="store_true", help="Full assess incl. cloud probes")
+    parser.add_argument("--remediate", action="store_true", help="Remediate only")
+    parser.add_argument("--dry-run", action="store_true", help="Report fixes without applying")
+    parser.add_argument("--benchmark-active", action="store_true", help="Run harness on active tier")
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="PS-safe compact JSON (avoid pipe truncation false exit 1)",
+    )
+    args = parser.parse_args()
+
+    if args.benchmark_active:
+        result = _run_python(TOOLBOX["benchmark_harness"], ["--tier", "hot"], timeout=900)
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    mode = "full" if args.full_tick else "tick"
+    remediate_flag = not args.dry_run
+    if args.remediate:
+        remediate_flag = True
+
+    state = run_tick(mode=mode, dry_run=args.dry_run, remediate_flag=remediate_flag)
+    if args.summary:
+        stack = state.get("stack") or {}
+        print(
+            json.dumps(
+                {
+                    "status": state.get("status"),
+                    "stack_ready": stack.get("stack_ready"),
+                    "stack_color": stack.get("status"),
+                    "issue_count": len(state.get("issues") or []),
+                    "remediation_count": len(state.get("remediations") or []),
+                    "mode": state.get("mode"),
+                    "amber_means": "non-blocking operator flags (drift/ini/fleet keys)",
+                    "ps_pipe_note": state.get("reflection", {}).get("ps_pipe_artifact_note"),
+                    "operator_commands": state.get("operator_commands"),
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(json.dumps(state, indent=2))
+    return 0 if state.get("status") != "red" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

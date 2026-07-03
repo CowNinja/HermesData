@@ -1,0 +1,36 @@
+{
+  "name": "add_observations",
+  "description": "Add new observations to existing entities in the knowledge graph",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "observations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "entityName": {
+              "type": "string",
+              "description": "The name of the entity to add the observations to"
+            },
+            "contents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "An array of observation contents to add"
+            }
+          },
+          "required": [
+            "entityName",
+            "contents"
+          ]
+        }
+      }
+    },
+    "required": [
+      "observations"
+    ]
+  }
+}

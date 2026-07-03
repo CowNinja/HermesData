@@ -1,0 +1,23 @@
+{
+  "name": "simulate-research-query",
+  "description": "Simulates a deep research operation that gathers, analyzes, and synthesizes information. Demonstrates MCP task-based operations with progress through multiple stages. If 'ambiguous' is true and client supports elicitation, sends an elicitation request for clarification.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "topic": {
+        "type": "string",
+        "description": "The research topic to investigate"
+      },
+      "ambiguous": {
+        "type": "boolean",
+        "default": false,
+        "description": "Simulate an ambiguous query that requires clarification (triggers input_required status)"
+      }
+    },
+    "required": [
+      "topic"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

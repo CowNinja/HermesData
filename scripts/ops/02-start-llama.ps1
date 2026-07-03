@@ -14,7 +14,14 @@ $core = Get-Content $corePath -Raw | ConvertFrom-Json
 $llamaServer = $core.llama_exe
 $Model    = if ($Model) { $Model } else { $core.model }
 $Port     = if ($Port) { $Port } else { [int]$core.ports.router }
-$CtxSize  = if ($CtxSize) { $CtxSize } else { [int]$core.ctx_size }
+if ($CtxSize) {
+    # explicit param wins
+} elseif ($core.use_runtime_ctx_split -and $core.runtime_ctx_size) {
+    $CtxSize = [int]$core.runtime_ctx_size
+} else {
+    $CtxSize = [int]$core.ctx_size
+}
+$AdvertisedCtx = [int]$core.ctx_size
 $Ngl      = if ($Ngl) { $Ngl } else { [int]$core.n_gpu_layers }
 
 if (-not (Test-Path $llamaServer)) { Write-Host "FATAL: $llamaServer not found" -ForegroundColor Red; exit 1 }
@@ -34,7 +41,7 @@ $args = @(
 )
 if ($ContBatching) { $args += "--cont-batching" }
 
-Write-Host "Starting llama-server on ${Port}: $(Split-Path $Model -Leaf)" -ForegroundColor Yellow
+Write-Host "Starting llama-server on ${Port}: $(Split-Path $Model -Leaf) (runtime ctx $CtxSize, advertised $AdvertisedCtx)" -ForegroundColor Yellow
 Start-Process -FilePath $llamaServer -ArgumentList $args -WindowStyle Hidden
 
 for ($i = 1; $i -le 120; $i++) {

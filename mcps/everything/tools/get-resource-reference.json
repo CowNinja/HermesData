@@ -1,0 +1,24 @@
+{
+  "name": "get-resource-reference",
+  "description": "Returns a resource reference that can be used by MCP clients",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "resourceType": {
+        "type": "string",
+        "enum": [
+          "Text",
+          "Blob"
+        ],
+        "default": "Text"
+      },
+      "resourceId": {
+        "type": "number",
+        "default": 1,
+        "description": "ID of the text resource to fetch"
+      }
+    },
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

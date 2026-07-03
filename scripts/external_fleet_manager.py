@@ -36,6 +36,14 @@ HEALTH_LOG = Path(r"D:\PhronesisVault\Operations\logs\fleet-health.jsonl")
 DISPATCH_LOG = Path(r"D:\PhronesisVault\Operations\logs\fleet-dispatch.jsonl")
 HEALTH_STATE = Path(r"D:\PhronesisVault\Operations\logs\fleet-health-state.json")
 
+try:
+    from phronesis_env import bootstrap_env as _bootstrap_env
+except ImportError:
+    def _bootstrap_env() -> None:
+        pass
+
+_bootstrap_env()
+
 TIER_NAME = "opportunistic_fleet"
 
 
@@ -168,6 +176,35 @@ class FleetManager:
                     eff_priority = tel.effective_priority(pid, eff_priority)
                 out.append({**p, "_kind": pkind, "_health": health, "_effective_priority": eff_priority})
         out.sort(key=lambda x: (-int(x.get("_effective_priority") or x.get("priority") or 0), str(x.get("id"))))
+        return out
+
+    def list_shadow_providers(
+        self,
+        kind: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Phase B0: all enabled registry providers for health probes (no routing)."""
+        out: List[Dict[str, Any]] = []
+        kinds: List[Tuple[str, str]] = []
+        if kind in (None, "compute"):
+            kinds.append(("compute", "compute_providers"))
+        if kind in (None, "context"):
+            kinds.append(("context", "context_providers"))
+        for pkind, section in kinds:
+            for p in self._registry.get(section) or []:
+                if not isinstance(p, dict) or not p.get("enabled", True):
+                    continue
+                pid = str(p.get("id") or "")
+                health = (self._health_state.get("providers") or {}).get(pid, {})
+                missing_key = bool(p.get("api_key_env") and not _resolve_api_key(p))
+                out.append(
+                    {
+                        **p,
+                        "_kind": pkind,
+                        "_health": health,
+                        "_missing_key": missing_key,
+                    }
+                )
+        out.sort(key=lambda x: (-int(x.get("priority") or 0), str(x.get("id"))))
         return out
 
     def select_provider(
@@ -579,20 +616,45 @@ class FleetManager:
         compute["triggers"] = triggers
         return compute
 
-    def run_health_cycle(self, *, kinds: Optional[List[str]] = None) -> Dict[str, Any]:
+    def run_health_cycle(
+        self,
+        *,
+        kinds: Optional[List[str]] = None,
+        shadow: bool = False,
+    ) -> Dict[str, Any]:
         kinds = kinds or ["compute", "context"]
-        results = []
+        results: List[Dict[str, Any]] = []
         for kind in kinds:
-            for p in self.list_providers(kind=kind, healthy_only=False):
+            providers = (
+                self.list_shadow_providers(kind=kind)
+                if shadow
+                else self.list_providers(kind=kind, healthy_only=False)
+            )
+            for p in providers:
                 pid = str(p.get("id") or "")
-                if pid:
-                    results.append(self.health_check(pid))
+                if not pid:
+                    continue
+                if p.get("_missing_key"):
+                    entry = {
+                        "ok": False,
+                        "id": pid,
+                        "status": "missing_env",
+                        "last_check": _utc_now(),
+                        "detail": {"reason": "missing_api_key", "env": p.get("api_key_env")},
+                    }
+                    self._health_state.setdefault("providers", {})[pid] = entry
+                    results.append(entry)
+                    continue
+                results.append(self.health_check(pid))
+        self._save_health_state()
         up = sum(1 for r in results if r.get("ok"))
         summary = {
             "timestamp": _utc_now(),
+            "mode": "shadow" if shadow else "production",
             "checked": len(results),
             "up": up,
             "down": len(results) - up,
+            "missing_env": sum(1 for r in results if r.get("status") == "missing_env"),
             "results": results,
         }
         _log(HEALTH_LOG, {"event": "health_cycle", **summary})
@@ -652,13 +714,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Opportunistic Fleet Manager")
     parser.add_argument("--status", action="store_true")
     parser.add_argument("--health", action="store_true")
+    parser.add_argument(
+        "--shadow",
+        action="store_true",
+        help="Probe all enabled registry providers without routing (Phase B0)",
+    )
     parser.add_argument("--compute", metavar="PROMPT")
     parser.add_argument("--context", metavar="QUERY")
     args = parser.parse_args()
 
     fm = FleetManager()
     if args.health:
-        print(json.dumps(fm.run_health_cycle(), indent=2))
+        print(json.dumps(fm.run_health_cycle(shadow=args.shadow), indent=2))
     elif args.compute:
         print(json.dumps(fm.dispatch_compute(args.compute), indent=2))
     elif args.context:
