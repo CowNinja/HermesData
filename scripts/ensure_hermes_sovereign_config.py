@@ -28,7 +28,8 @@ HERMES_USER_CONFIG = Path.home() / ".hermes" / "config.yaml"
 SOVEREIGN_PROVIDER = "phronesis-sovereign"
 MOE_GATEWAY_URL = "http://127.0.0.1:8091/v1"
 CORE_CONFIG = Path(r"D:\HermesData\scripts\phronesis-core.json")
-DEFAULT_CONTEXT = 16384
+DEFAULT_CONTEXT = 65536
+HERMES_MIN_CONTEXT = 64000
 
 
 def _target_context_length() -> int:
@@ -37,10 +38,10 @@ def _target_context_length() -> int:
             core = json.loads(CORE_CONFIG.read_text(encoding="utf-8"))
             ctx = int(core.get("ctx_size") or 0)
             if ctx >= 4096:
-                return ctx
+                return max(ctx, HERMES_MIN_CONTEXT)
     except Exception:
         pass
-    return DEFAULT_CONTEXT
+    return max(DEFAULT_CONTEXT, HERMES_MIN_CONTEXT)
 
 
 MIN_CONTEXT = _target_context_length()
@@ -398,15 +399,71 @@ def ensure_config(path: Path, dry_run: bool = False) -> Dict[str, Any]:
     return result
 
 
+SOVEREIGN_MODEL_IDS = (
+    "phronesis-sovereign-auto",
+    "phronesis-sovereign-code",
+    "phronesis-sovereign-synthesis",
+    "phronesis-sovereign-classify",
+    "phronesis-sovereign-metadata",
+    "phronesis-sovereign-roleplay",
+    "phronesis-sovereign-hot",
+    "phronesis-sovereign-warm",
+    "phronesis-sovereign-deep",
+)
+
+
+def _write_context_length_cache_yaml(path: Path, entries: Dict[str, int], dry_run: bool) -> None:
+    if dry_run or not entries:
+        return
+    existing: Dict[str, int] = {}
+    if path.is_file():
+        try:
+            if yaml is not None:
+                data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+                raw = data.get("context_lengths") or {}
+                if isinstance(raw, dict):
+                    existing = {str(k): int(v) for k, v in raw.items() if v}
+        except Exception:
+            pass
+    merged = {**existing, **entries}
+    lines = ["context_lengths:"]
+    for key in sorted(merged):
+        lines.append(f"  {key}: {merged[key]}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def seed_context_length_cache(dry_run: bool = False) -> Dict[str, Any]:
+    """Persist 64K context for every phronesis-sovereign model @ 8091."""
+    cache_paths = [
+        HERMES_USER_CONFIG.parent / "context_length_cache.yaml",
+        HERMES_DATA_CONFIG.parent / "context_length_cache.yaml",
+    ]
+    entries = {
+        f"{model_id}@{MOE_GATEWAY_URL.rstrip('/')}": MIN_CONTEXT
+        for model_id in SOVEREIGN_MODEL_IDS
+    }
+    for cache_path in cache_paths:
+        _write_context_length_cache_yaml(cache_path, entries, dry_run)
+    return {
+        "ok": True,
+        "context": MIN_CONTEXT,
+        "models": list(SOVEREIGN_MODEL_IDS),
+        "cache_paths": [str(p) for p in cache_paths],
+    }
+
+
 def ensure_all_configs(dry_run: bool = False) -> Dict[str, Any]:
     paths = [HERMES_DATA_CONFIG, HERMES_USER_CONFIG]
     reports = [ensure_config(p, dry_run=dry_run) for p in paths]
+    cache_report = seed_context_length_cache(dry_run=dry_run)
     return {
         "timestamp": _utc_now(),
         "min_context": MIN_CONTEXT,
         "provider": SOVEREIGN_PROVIDER,
         "changed": any(r.get("changed") for r in reports),
         "configs": reports,
+        "context_cache": cache_report,
     }
 
 

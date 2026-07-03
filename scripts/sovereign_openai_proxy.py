@@ -91,7 +91,8 @@ MODEL_TASK_MAP = {
 }
 
 MOE_CATALOG_CREATED = 1719446400
-DEFAULT_CONTEXT_LENGTH = 16384
+# Hermes Agent requires >= 64K advertised context; proxy still trims per-tier before 8090 dispatch.
+DEFAULT_CONTEXT_LENGTH = 65536
 MOE_GATEWAY_ID = "phronesis-moe-gateway"
 MOE_OWNER = "phronesis-moe"
 

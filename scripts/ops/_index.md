@@ -1,14 +1,19 @@
-# Phronesis Operations — Crash Recovery & Ops Scripts
-# Directory: D:\HermesData\scripts\ops\
-#
-# Quick reference:
-#   01-recovery.ps1    — Full stack crash recovery (kill zombies + all services)
-#   02-start-llama.ps1 — Start llama.cpp backend only (port 8090)
-#   03-start-proxy.ps1 — Start MoE gateway proxy only (port 8091)
-#   04-status.ps1      — Health-check all running services
-#   05-stop-all.ps1    — Kill all managed processes
-#   06-smoke-test.ps1  — End-to-end test: proxy → llama.cpp → response
-#   07-switch-model.ps1 — Swap which GGUF the llama.cpp backend serves (no proxy restart)
-#   08-download-model.ps1 — Download a GGUF from HuggingFace or direct URL
-#
-# For full details, environment variables, and troubleshooting see README.md
+# Phronesis ops — active scripts only
+
+Archived originals: `D:\HermesData\scripts\archive\`
+
+| Script | Purpose |
+|--------|---------|
+| `phronesis-start.bat` | Desktop launcher: Guardian → OneButton → Dashboard |
+| `01-recovery.ps1` | Full recovery (wraps OneButton Stop + Start) |
+| `02-start-llama.ps1` | llama-server only (defaults from phronesis-core.json) |
+| `03-start-proxy.ps1` | sovereign proxy only |
+| `04-status.ps1` | Port + venv health |
+| `05-stop-all.ps1` | Stop stack (wraps OneButton-Stop) |
+| `06-smoke-test.ps1` | End-to-end inference test |
+| `07-switch-model.ps1` | Model swap (blocked when rotation locked) |
+| `08-download-model.ps1` | Download GGUF |
+| `Phronesis-Dashboard.ps1` | Human-readable health dashboard |
+| `Phronesis-Recovery.ps1` | Elevated admin recovery (WiFi + boot tasks + restart) |
+| `Phronesis-Fix.ps1` | Wrapper → Phronesis-Recovery.ps1 |
+| `Phronesis-Hygiene-Cycle3.ps1` | **Stub** → Guardian + Dashboard (full script in archive) |
