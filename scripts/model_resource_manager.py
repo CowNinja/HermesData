@@ -22,7 +22,9 @@ STATE_PATH = VAULT / "Operations" / "logs" / "model-resource-state.json"
 MOE_MAP = VAULT / "Operations" / "MoE-Task-Type-Map-v0.1.json"
 START_MOE_PS1 = HERMES_SCRIPTS / "Start-MoE-Stack.ps1"
 START_UNIFIED_PS1 = HERMES_SCRIPTS / "Start-Unified-Router-8090.ps1"
-START_PROXY_PS1 = HERMES_SCRIPTS / "Start-Sovereign-Proxy-8091.ps1"
+START_LLAMA_PS1 = HERMES_SCRIPTS / "ops" / "02-start-llama.ps1"
+START_PROXY_PS1 = HERMES_SCRIPTS / "ops" / "03-start-proxy.ps1"
+START_PROXY_LEGACY_PS1 = HERMES_SCRIPTS / "Start-Sovereign-Proxy-8091.ps1"
 WATCHDOG_LOG = VAULT / "Operations" / "logs" / "sovereign-stack-watchdog.jsonl"
 MAX_RECOVERY_ATTEMPTS = 3
 
@@ -223,12 +225,13 @@ def attempt_proxy_recovery(dry_run: bool = False) -> Dict[str, Any]:
     if dry_run:
         return {"ok": True, "dry_run": True, "would_run": str(START_PROXY_PS1)}
 
-    if not START_PROXY_PS1.is_file():
+    proxy_script = START_PROXY_PS1 if START_PROXY_PS1.is_file() else START_PROXY_LEGACY_PS1
+    if not proxy_script.is_file():
         return {"ok": False, "reason": "start_script_missing"}
 
     try:
         proc = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(START_PROXY_PS1)],
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(proxy_script)],
             cwd=str(HERMES_SCRIPTS),
             capture_output=True,
             text=True,
@@ -248,32 +251,42 @@ def attempt_proxy_recovery(dry_run: bool = False) -> Dict[str, Any]:
         return {"ok": False, "reason": str(exc)}
 
 
+def _llama_start_script() -> Path:
+    if _unified_mode_enabled() and START_LLAMA_PS1.is_file():
+        return START_LLAMA_PS1
+    if START_UNIFIED_PS1.is_file():
+        return START_UNIFIED_PS1
+    return START_MOE_PS1
+
+
 def attempt_moe_recovery(dry_run: bool = False) -> Dict[str, Any]:
-    """Try to bring MoE stack up via Start-MoE-Stack.ps1 (bounded retries)."""
+    """Bring llama :8090 up — unified mode uses 02-start-llama.ps1."""
     state = load_state()
     if not _recovery_allowed(state, "moe") and not dry_run:
         return {"ok": False, "reason": "max_recovery_attempts", "attempts": state["recovery_attempts"]["moe"]}
 
+    script = _llama_start_script()
     if dry_run:
-        return {"ok": True, "dry_run": True, "would_run": str(START_MOE_PS1)}
+        return {"ok": True, "dry_run": True, "would_run": str(script)}
 
-    if not START_MOE_PS1.is_file():
-        return {"ok": False, "reason": "start_script_missing"}
+    if not script.is_file():
+        return {"ok": False, "reason": "start_script_missing", "path": str(script)}
 
     try:
         proc = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(START_MOE_PS1)],
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)],
             cwd=str(HERMES_SCRIPTS),
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=180,
         )
         state.setdefault("recovery_attempts", {})["moe"] = int(state["recovery_attempts"].get("moe", 0)) + 1
         state["last_recovery"] = datetime.now(timezone.utc).isoformat()
         save_state(state)
-        matrix = tier_matrix()
+        matrix = tier_matrix(force_refresh=True)
         return {
             "ok": matrix.get("moe_ready", False),
+            "script": script.name,
             "exit_code": proc.returncode,
             "stdout_tail": (proc.stdout or "")[-500:],
             "matrix": matrix,

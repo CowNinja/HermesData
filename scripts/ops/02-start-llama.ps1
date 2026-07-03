@@ -34,7 +34,7 @@ $args = @(
 )
 if ($ContBatching) { $args += "--cont-batching" }
 
-Write-Host "Starting llama-server on $Port: $(Split-Path $Model -Leaf)" -ForegroundColor Yellow
+Write-Host "Starting llama-server on ${Port}: $(Split-Path $Model -Leaf)" -ForegroundColor Yellow
 Start-Process -FilePath $llamaServer -ArgumentList $args -WindowStyle Hidden
 
 for ($i = 1; $i -le 120; $i++) {

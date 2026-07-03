@@ -49,8 +49,24 @@ load_lifecycle_manifest = _vault_mi.load_lifecycle_manifest
 promote_gguf = _vault_mi.promote_gguf
 
 BENCHMARK_LOG = Path(r"D:\PhronesisVault\Operations\logs\model-benchmark.jsonl")
-LLAMA_SERVER = Path(r"D:\PhronesisModels\binaries\test-prebuilts\2026-06-19-b9731-cpu\llama-server.exe")
+CORE_PATH = Path(r"D:\HermesData\scripts\phronesis-core.json")
 BENCH_PORT = 8098
+
+
+def _llama_server_exe() -> Path:
+    if CORE_PATH.is_file():
+        try:
+            core = json.loads(CORE_PATH.read_text(encoding="utf-8-sig"))
+            exe = Path(str(core.get("llama_exe") or ""))
+            if exe.is_file():
+                return exe
+        except Exception:
+            pass
+    fallback = Path(r"D:\PhronesisModels\binaries\test-prebuilts\2026-06-28-b9828-cuda13\llama-server.exe")
+    return fallback
+
+
+LLAMA_SERVER = _llama_server_exe()
 
 # task_type-aligned smoke prompts (short for fast iteration)
 SMOKE_PROMPTS: Dict[str, Dict[str, Any]] = {
