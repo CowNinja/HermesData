@@ -4,7 +4,7 @@
   Phronesis Secrets + Git autonomy — interactive operator script with full logging.
 
 .DESCRIPTION
-  Consolidates scattered secrets into ~/.hermes/.env (names-only audit in log),
+  Consolidates scattered secrets into D:\HermesData\.env (names-only audit in log),
   optionally exports Infisical, enables Bitwarden in config.yaml, audits Git drift,
   runs backup-resilience v3 + self-recovery-watchdog, and writes a review log for Composer.
 
@@ -36,9 +36,8 @@ $HermesRoot    = Split-Path $ScriptsRoot -Parent
 $VaultRoot     = 'D:\PhronesisVault'
 $LogFile       = Join-Path $OpsDir 'secrets-git-log.txt'
 $SessionStamp  = Get-Date -Format 'yyyyMMdd-HHmmss'
-$HermesHome    = Join-Path $env:USERPROFILE '.hermes'
-$CanonicalEnv  = Join-Path $HermesHome '.env'
-$WorkspaceEnv  = Join-Path $HermesRoot 'hermes-workspace\.env'
+$CanonicalEnv  = Join-Path $HermesRoot '.env'
+$WorkspaceEnv  = Join-Path $HermesRoot 'hermes-workspace\.env'  # retired stub
 $SecretsDir    = Join-Path $HermesRoot 'secrets'
 $InfisicalDir  = 'D:\PhronesisInfisical'
 $InfisicalCli  = Join-Path $env:APPDATA 'npm\infisical.cmd'
@@ -99,9 +98,7 @@ function Invoke-SecretsLane {
     Write-Log '=== SECRETS LANE ==='
 
     $sources = @{
-        'canonical_hermes' = $CanonicalEnv
-        'workspace'        = $WorkspaceEnv
-        'ops_watch'        = Join-Path $HermesRoot 'profiles\ops-watch\.env'
+        'canonical'        = $CanonicalEnv
         'infisical_export' = Join-Path $SecretsDir 'infisical-export.env'
     }
     $allKeys = @{}
@@ -167,12 +164,10 @@ function Invoke-SecretsLane {
     }
 
     $mergeSources = @(
-        (Join-Path $SecretsDir 'infisical-export.env'),
-        $WorkspaceEnv,
-        (Join-Path $HermesRoot 'profiles\ops-watch\.env')
+        (Join-Path $SecretsDir 'infisical-export.env')
     )
     if (-not (Test-Path $CanonicalEnv)) {
-        New-Item -ItemType Directory -Force -Path $HermesHome | Out-Null
+        New-Item -ItemType Directory -Force -Path $HermesRoot | Out-Null
         "# Hermes canonical secrets - managed by Phronesis-Secrets-Git-Autonomy`n" | Set-Content $CanonicalEnv -Encoding UTF8
         Write-Log "Created new canonical env: $CanonicalEnv" 'OK'
     }
@@ -205,10 +200,10 @@ function Invoke-SecretsLane {
     }
 
     $finalKeys = Get-EnvKeyNames -Path $CanonicalEnv
-    Write-Log "Canonical ~/.hermes/.env now has $($finalKeys.Count) keys" 'OK'
+    Write-Log "Canonical D:\HermesData\.env now has $($finalKeys.Count) keys" 'OK'
 
     if (-not $NonInteractive) {
-        $bw = Read-Host 'Enable Bitwarden in config.yaml? (y/N) - requires BWS_ACCESS_TOKEN in ~/.hermes/.env'
+        $bw = Read-Host 'Enable Bitwarden in config.yaml? (y/N) - requires BWS_ACCESS_TOKEN in D:\HermesData\.env'
         if ($bw -match '^[Yy]') {
             $hasBws = 'BWS_ACCESS_TOKEN' -in $finalKeys
             if (-not $hasBws) {
@@ -325,9 +320,7 @@ function Invoke-GitLane {
 function Invoke-SecretsAudit {
     Write-Log '=== SECRETS AUDIT (read-only, key names only) ==='
     $sources = @{
-        'canonical_hermes' = $CanonicalEnv
-        'workspace'        = $WorkspaceEnv
-        'ops_watch'        = Join-Path $HermesRoot 'profiles\ops-watch\.env'
+        'canonical'        = $CanonicalEnv
         'infisical_export' = Join-Path $SecretsDir 'infisical-export.env'
     }
     foreach ($label in $sources.Keys) {

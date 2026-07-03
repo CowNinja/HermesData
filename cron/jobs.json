@@ -117,15 +117,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 2686
+        "completed": 2699
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T17:46:58.023415-04:00",
-      "next_run_at": "2026-07-03T15:25:00-04:00",
-      "last_run_at": "2026-07-03T15:20:17.940496-04:00",
+      "next_run_at": "2026-07-03T16:30:00-04:00",
+      "last_run_at": "2026-07-03T16:25:20.673628-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -205,15 +205,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 222
+        "completed": 223
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T15:57:56.760952-04:00",
-      "next_run_at": "2026-07-03T15:53:14.275685-04:00",
-      "last_run_at": "2026-07-03T14:53:14.275685-04:00",
+      "next_run_at": "2026-07-03T16:53:16.266189-04:00",
+      "last_run_at": "2026-07-03T15:53:16.266189-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -358,15 +358,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 189
+        "completed": 190
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-24T19:10:41.706853-04:00",
-      "next_run_at": "2026-07-03T15:55:14.398662-04:00",
-      "last_run_at": "2026-07-03T14:55:14.398662-04:00",
+      "next_run_at": "2026-07-03T16:55:16.491431-04:00",
+      "last_run_at": "2026-07-03T15:55:16.491431-04:00",
       "last_status": "error",
       "last_error": "Script exited with code 1\nstdout:\nCRITICAL: Fieldy script not found at C:\\Users\\CowNi\\fieldy\\Fieldy-RecentPull.ps1",
       "last_delivery_error": null,
@@ -451,7 +451,7 @@
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-07-03T16:27:18.189411-04:00",
+      "next_run_at": "2026-07-03T20:28:17.575346-04:00",
       "last_run_at": "2026-07-03T12:27:18.189411-04:00",
       "last_status": "ok",
       "last_error": null,
@@ -493,17 +493,17 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 226
+        "completed": 228
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T19:59:53.051242-04:00",
-      "next_run_at": "2026-07-03T15:26:15.472280-04:00",
-      "last_run_at": "2026-07-03T14:56:15.472280-04:00",
+      "next_run_at": "2026-07-03T16:28:20.272297-04:00",
+      "last_run_at": "2026-07-03T15:58:20.272297-04:00",
       "last_status": "error",
-      "last_error": "Script not found: D:\\HermesData\\scripts\\self-recovery-watchdog.py",
+      "last_error": "Script exited with code 1\nstdout:\n## Self-Recovery-Watchdog 2026-07-03T19:58:16.551661+00:00\nHermesData: unpushed=0 dirty=174 remote=https://github.com/CowNinja/HermesData.git\nPhronesisVault: unpushed=0 dirty=68 remote=https://github.com/CowNinja/PhronesisVault.git\nSKIP PhronesisSilo: no_git\n\n[ISSUES: 2]\n  - HermesData: 174 dirty files (nothing committed to push)\n  - PhronesisVault: 68 dirty files (nothing committed to push)",
       "last_delivery_error": null,
       "deliver": "origin",
       "origin": {
@@ -542,15 +542,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 109
+        "completed": 110
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T22:59:28.297996-04:00",
-      "next_run_at": "2026-07-03T16:01:14.593250-04:00",
-      "last_run_at": "2026-07-03T15:01:14.593250-04:00",
+      "next_run_at": "2026-07-03T17:01:16.701285-04:00",
+      "last_run_at": "2026-07-03T16:01:16.701285-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -685,15 +685,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 47
+        "completed": 48
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:15.417577-04:00",
-      "next_run_at": "2026-07-03T15:58:17.683161-04:00",
-      "last_run_at": "2026-07-03T13:58:17.683161-04:00",
+      "next_run_at": "2026-07-03T17:59:21.251617-04:00",
+      "last_run_at": "2026-07-03T15:59:21.251617-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -732,15 +732,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 48
+        "completed": 49
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:25.077977-04:00",
-      "next_run_at": "2026-07-03T15:54:12.666635-04:00",
-      "last_run_at": "2026-07-03T13:54:12.666635-04:00",
+      "next_run_at": "2026-07-03T17:54:17.034492-04:00",
+      "last_run_at": "2026-07-03T15:54:17.034492-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -871,17 +871,17 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 65
+        "completed": 68
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T11:46:43.622278-04:00",
-      "next_run_at": "2026-07-03T15:34:16.548097-04:00",
-      "last_run_at": "2026-07-03T15:19:16.548097-04:00",
-      "last_status": "ok",
-      "last_error": null,
+      "next_run_at": "2026-07-03T16:29:49.805447-04:00",
+      "last_run_at": "2026-07-03T16:14:49.805447-04:00",
+      "last_status": "error",
+      "last_error": "RuntimeError: The skill file you pulled in is clearly a copy-paste mess: duplicated function definitions, interleaved docstrings, and even a stray `is_binary` that never gets used. It\u2019s the kind of rot that silently corrupts output until you hit a race condition.\n\nI\u2019ll do a clean rewrite of **K:\\HermesData\\skills\\cns_ingestion.py** with:\n\n- A single, well-structured `ingest_cns` core.\n- Helper utilities (`title_from_file`, `tags_from_file`, `date_from_file`, `word_count`, `file_hash`) each defined exactly once.\n- Proper handling of binary files (now actually used to gate `word_count`).\n- Atomic index writes via a `.tmp` replacement.\n- A sensible `--exclude` list that mirrors what I expect to live alongside the script.\n- Clear console output so I can eyeball anomalies.\n\nI\u2019ll keep the existing CLI surface (`--target`, `--output`, `--exclude`) so the rest of the Orchestrator loop doesn\u2019t break.\n\n**Action:** Overwrite the skill file with the cleaned-up version. (Irreversible, but I\u2019ve scoped it narrowly.)\n\n```text\npatch\nmode: replace\npath: K:\\HermesData\\skills\\cns_ingestion.py\nold_string:\n1|# CNS Ingestion Skill\n2|# Scans K:\\\\PhronesisVault recursively, extracts metadata (title, tags, date, word count, SHA256),\n3|# and appends JSONL records to K:\\\\PhronesisVault\\\\index. Atomic writes via temp + os.replace to survive concurrent index updates.\n4|\\\"\\\"\\\"\n5|\n6|def ingest_cns(vault: Path, index: Path, exclude: list[str] = None) -> None:\n7|    \\\"\\\"\\\"CNS ingest: walk vault, compute metadata, atomically update index.\\\"\\\"\\\"\n8|    index_dir = Path(index).resolve()\n9|    index_dir.mkdir(parents=True, exist_ok=True)\n10|\n11|    files = list(vault.rglob(\\\"*\\\"))\n12|    if not any(f.is_file() for f in files):\n13|        print(f\\\"[INFO] No files under {vault}\\\", file=sys.stderr)\n14|        return\n15|\n16|    records = []\n17|    anomalies = []\n18|\n19|    for path in files:\n20|        if path.is_file() and any(path.name == e for e in (exclude or [])):\n21|            continue\n22|        title = title_from_file(path)\n23|        tags = tags_from_file(path)\n24|        date = date_from_file(path) or str(path.stat().st_mtime)\n25|        wc = word_count(path)\n26|        h = file_hash(path)\n27|\n28|        records.append({\n29|            \\\"source\\\": \\\"cns\\\",\n30|            \\\"path\\\": str(path.relative_to(vault)),\n31|            \\\"title\\\": title,\n32|            \\\"tags\\\": tags,\n33|            \\\"date\\\": date,\n34|            \\\"word_count\\\": wc,\n35|            \\\"content_hash\\\": h,\n36|        })\n37|        if wc == 0 and not path.is_file():\n38|            anomalies.append(f\\\"empty file: {path}\\\")\n39|\n40|    temp = (index_dir / \\\"index\\\").with_suffix(\\\".tmp\\\")\n41|    with open(temp, \\\"w\\\", encoding=\\\"utf-8\\\") as f:\n42|        for r in records:\n43|            f.write(json.dumps(r, ensure_ascii=False) + \\\"\\\\n\\\")\n44|    temp.replace(index_dir / \\\"index\\\")\n45|\n46|    print(f\\\"[OK] Ingested {len(records)} CNS records into {index_dir / 'index'}\\\")\n47|    if anomalies:\n48|        print(f\\\"[WARN] Anomalies: {len(anomalies)}\\\")\n49|        for a in anomalies[:5]:\n50|            print(f\\\"  - {a}\\\")\n51|\n52|\n53|def title_from_file(path: Path) -> str:\n54|    stem = path.stem\n55|    try:\n56|        text = path.read_text(errors=\\\"ignore\\\")\n57|    except Exception:\n58|        return stem\n59|    for line in text.splitlines():\n60|        line = line.strip()\n61|        if line:\n62|            return line\n63|    return stem\n64|def tags_from_file(path: Path) -> list[str]:\n65|    try:\n66|        text = path.read_text(errors=\\\"ignore\\\")\n67|    except Exception:\n68|        return []\n69|    lines = text.splitlines()\n70|    tags = []\n71|    for line in lines:\n72|        line = line.strip()\n73|        if not line:\n74|            continue\n75|        if line.startswith(\\\"#\\\")\n76|            tags.append(line)\n77|            continue\n78|        if re.search(r\\\"\\\\d{4}-\\\\d{2}-\\\\d{2}\\\", line):\n79|            tags.append(line)\n80|            continue\n81|    return tags\n82|def date_from_file(path: Path) -> str:\n83|    try:\n84|        text = path.read_text(errors=\\\"ignore\\\")\n85|    except Exception:\n86|        return \\\"\\\"\n87|    for line in text.splitlines():\n88|        line = line.strip()\n89|        if re.search(r\\\"\\\\d{4}-\\\\d{2}-\\\\d{2}\\\", line):\n90|            return line\n91|    return \\\"\\\"\n92|def word_count(path: Path) -> int:\n93|    try:\n94|        text = path.read_text(errors=\\\"ignore\\\")\n95|    except Exception:\n96|        return 0\n97|    return len(re.findall(r\\\"[a-zA-Z0-9]+\\\", text))\n98|def file_hash(path: Path) -> str:\n99|    sha = hashlib.sha256()\n100|    with open(path, \\\"rb\\\") as f:\n101|        for chunk in iter(lambda: f.read(65536), b\\\"\\\")\n102|            sha.update(chunk)\n103|    return sha.hexdigest()\n104|def main() -> int:\n105|    parser = argparse.ArgumentParser(description=\\\"CNS Ingestion Monitor\\\")\n106|    parser.add_argument(\\\"--target\\\", required=True, help=\\\"Path to CNS vault (default: K:/PhronesisVault)\\\")\n107|    parser.add_argument(\\\"--output\\\", default=\\\"D:/HermesData/PhronesisVault/index\\\", help=\\\"Output index file path\\\")\n108|    parser.add_argument(\\\"--exclude\\\", nargs=\\\"+\\\", default=[\\\"universal_ingest_monitor.py\\\", \\\"index\\\"], help=\\\"Paths to exclude from scan\\\")\n109|    args = parser.parse_args()\n110|    ingest_cns(Path(args.target), args.output, args.exclude)\n111|    return 0\n112|if __name__ == \\\"__main__\\\":\n113|    sys.exit(main())\n114|import argparse\n115|import hashlib\n116|import json\n117|import os\n118|import re\n119|import sys\n120|from pathlib import Path\n121|from typing import Optional\n122|def file_hash(path: Path) -> str:\n123|    sha = hashlib.sha256()\n124|    with open(path, \\\"rb\\\") as f:\n125|        for chunk in iter(lambda: f.read(65536), b\\\"\\\")\n126|            sha.update(chunk)\n127|    return sha.hexdigest()\n128|def word_count(path: Path) -> int:\n129|    try:\n130|        text = path.read_text(errors=\\\"ignore\\\")\n131|    except Exception:\n132|        return 0\n133|    # Split on whitespace, strip punctuation, count non-empty tokens\n134|    return len(re.findall(r\\\"[a-zA-Z0-9]+\\\", text))\n135|def word_count(path: Path) -> int:\n136|    try:\n137|        text = path.read_text(errors=\\\"ignore\\\")\n138|    except Exception:\n139|        return 0\n140|    # Split on whitespace, strip punctuation, count non-empty tokens\n141|    return len(re.findall(r\\\"[a-zA-Z0-9]+\\\", text))\n142|\n143|\n144|def title_from_file(path: Path) -> str:\n145|    stem = path.stem\n146|    try:\n147|        text = path.read_text(errors=\\\"ignore\\\")\n148|    except Exception:\n149|        return stem\n150|    # First non-empty line wins\n151|    for line in text.splitlines():\n152|        line = line.strip()\n153|        if line:\n154|            return line\n155|    return stem\n156|\n157|\n158|def tags_from_file(path: Path) -> list[str]:\n159|    try:\n160|        text = path.read_text(errors=\\\"ignore\\\")\n161|    except Exception:\n162|        return []\n163|    lines = text.splitlines()\n164|    tags = []\n165|    for line in lines:\n166|        line = line.strip()\n167|        if not line:\n168|            continue\n169|        # Any line starting with #\n170|        if line.startswith(\\\"#\\\")\n171|            tags.append(line)\n172|            continue\n173|        # Embedded date tag like 2026-06-26 (heuristic)\n174|        if re.search(r\\\"\\\\d{4}-\\\\d{2}-\\\\d{2}\\\", line):\n175|            tags.append(line)\n176|            continue\n177|    return tags\n178|\n179|\n180|def date_from_file(path: Path) -> str:\n181|    try:\n182|        text = path.read_text(errors=\\\"ignore\\\")\n183|    except Exception:\n184|        return \\\"\\\"\n185|    lines = text.splitlines()\n186|    for line in lines:\n187|        line = line.strip()\n188|        if not line:\n189|            continue\n190|        # Embedded date tag (heuristic)\n191|        if re.search(r\\\"\\\\d{4}-\\\\d{2}-\\\\d{2}\\\", line):\n192|            return line\n193|    return \\\"\\\"\n194|\n195|\n196|def is_binary(path: Path) -> bool:\n197|    try:\n198|        with open(path, \\\"rb\\\") as f:\n199|            chunk = f.read(8192)\n200|            if b\\\"\\\\x00\\\" in chunk:\n201|                return True\n202|    except Exception:\n203|        return False\n204|    return False\n205|\n206|\n207|def scan_vault(vault_path: Path) -> list[tuple[Path, bool]]:\n208|    \\\"\\\"\\\"Walk vault, return (path, is_binary) tuples.\n209|    \\\"\\\"\\\"\n210|    results = []\n211|    if not vault_path.exists():\n212|        print(f\\\"[WARN] Vault not found at {vault_path}\\\", file=sys.stderr)\n213|        return results\n214|    for path in vault_path.rglob(\\\"*\\\"):\n215|        if path.is_file():\n216|            results.append((path, is_binary(path)))\n217|    return results\n218|\n219|\n220|def ingest(cns_path: str, index_path: str, exclude_paths: list[str] = None) -> None:\n221|    vault = Path(cns_path).resolve()\n222|    index_dir = Path(index_path).resolve()\n223|    index_file = index_dir / \\\"index\\\"\n224|\n225|    index_dir.mkdir(parents=True, exist_ok=True)\n226|\n227|    files = scan_vault(vault)\n228|    if not files:\n229|        print(f\\\"[INFO] No files found under {vault}\\\", file=sys.stderr)\n230|        return\n231|\n232|    records = []\n233|    anomalies = []\n234|\n235|    for path, is_bin in files:\n236|        if any(path.name == e for e in exclude_paths):\n237|            continue\n238|        title = title_from_file(path)\n239|        tags = tags_from_file(path)\n240|        date = date_from_file(path) or str(path.stat().st_mtime)\n241|        wc = word_count(path)\n242|        h = file_hash(path)\n243|\n244|        record = {\n245|            \\\"source\\\": \\\"cns\\\",\n246|            \\\"path\\\": str(path.relative_to(vault)),\n247|            \\\"title\\\": title,\n248|            \\\"tags\\\": tags,\n249|            \\\"date\\\": date,\n250|            \\\"word_count\\\": wc,\n251|            \\\"content_hash\\\": h,\n252|        }\n253|        records.append(record)\n254|\n255|        if is_bin and wc == 0:\n256|            anomalies.append(f\\\"binary with no words: {path}\\\")\n257|\n258|    # Atomic write: temp file then rename\n259|    temp = index_file.with_suffix(\\\".tmp\\\")\n260|    with open(temp, \\\"w\\\", encoding=\\\"utf-8\\\") as f:\n261|        for r in records:\n262|            f.write(json.dumps(r, ensure_ascii=False) + \\\"\\\\n\\\")\n263|    temp.replace(index_file)\n264|\n265|    print(f\\\"[OK] Ingested {len(records)} CNS records into {index_file}\\\")\n266|    if anomalies:\n267|        print(f\\\"[WARN] Anomalies: {len(anomalies)}\\\")\n268|        for a in anomalies[:5]:\n269|            print(f\\\"  - {a}\\\")\n270|\n271|\n272|def main() -> int:\n273|    parser = argparse.ArgumentParser(description=\\\"CNS Ingestion Monitor\\\")\n274|    parser.add_argument(\\\"--target\\\", required=True, help=\\\"Path to CNS vault (default: K:/PhronesisVault)\\\")\n275|    parser.add_argument(\\\"--output\\\", default=\\\"D:/HermesData/PhronesisVault/index\\\", help=\\\"Output index file path\\\")\n276|    parser.add_argument(\\\"--exclude\\\", nargs=\\\"+\\\", default=[\\\"universal_ingest_monitor.py\\\", \\\"index\\\"], help=\\\"Paths to exclude from scan\\\")\n277|    args = parser.parse_args()\n278|\n279|    ingest(args.target, args.output, args.exclude)\n280|    return 0\n281|\n282|\n283|if __name__ == \\\"__main__\\\":\n284|    sys.exit(main())\n```",
       "last_delivery_error": null,
       "deliver": "origin",
       "origin": {
@@ -922,17 +922,17 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 40
+        "completed": 42
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T13:06:18.302675-04:00",
-      "next_run_at": "2026-07-03T15:41:19.941671-04:00",
-      "last_run_at": "2026-07-03T15:11:19.941671-04:00",
-      "last_status": "error",
-      "last_error": "RuntimeError: Context length exceeded (289 tokens). Cannot compress further.",
+      "next_run_at": "2026-07-03T16:47:12.630898-04:00",
+      "last_run_at": "2026-07-03T16:17:12.630898-04:00",
+      "last_status": "ok",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "origin",
       "origin": {
@@ -996,5 +996,5 @@
       "workdir": "D:\\PhronesisVault"
     }
   ],
-  "updated_at": "2026-07-03T15:20:17.942496-04:00"
+  "updated_at": "2026-07-03T16:28:17.575346-04:00"
 }

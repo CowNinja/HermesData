@@ -15,6 +15,9 @@ if (Test-Path $corePath) {
     $script:HermesRoot = "D:\HermesData"
 }
 
+$env:HERMES_HOME = $HermesRoot
+$env:HERMES_CONFIG_PATH = Join-Path $HermesRoot "config.yaml"
+
 $script:VenvPythonw = $VenvPython -replace 'python\.exe$', 'pythonw.exe'
 
 function Get-PortListenerPid {

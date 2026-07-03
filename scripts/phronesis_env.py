@@ -1,27 +1,29 @@
-"""Load Hermes + workspace .env for standalone scripts (fleet, agent, panel)."""
+"""Load canonical Hermes .env for standalone scripts (fleet, agent, panel)."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 HERMES_ROOT = Path(r"D:\HermesData")
-WORKSPACE_ENV = HERMES_ROOT / "hermes-workspace" / ".env"
+CANONICAL_ENV = HERMES_ROOT / ".env"
 _AGENT_ROOT = HERMES_ROOT / "hermes-agent"
 
 _bootstrapped = False
 
 
 def bootstrap_env() -> None:
-    """Load ~/.hermes/.env then hermes-workspace/.env (fills missing keys)."""
+    """Load D:\\HermesData\\.env via HERMES_HOME (also ~/.hermes junction)."""
     global _bootstrapped
     if _bootstrapped:
         return
     _bootstrapped = True
+    os.environ.setdefault("HERMES_HOME", str(HERMES_ROOT))
     try:
         if _AGENT_ROOT.is_dir() and str(_AGENT_ROOT) not in sys.path:
             sys.path.insert(0, str(_AGENT_ROOT))
         from hermes_cli.env_loader import load_hermes_dotenv
 
-        load_hermes_dotenv(project_env=WORKSPACE_ENV)
+        load_hermes_dotenv(hermes_home=HERMES_ROOT, project_env=None)
     except Exception:
         pass

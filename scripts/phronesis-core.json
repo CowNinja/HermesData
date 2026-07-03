@@ -7,6 +7,7 @@
     "hub": "http://127.0.0.1:3001/dashboard"
   },
   "hermes_root": "D:\\HermesData",
+  "canonical_env": "D:\\HermesData\\.env",
   "venv_python": "D:\\HermesData\\hermes-agent\\venv\\Scripts\\python.exe",
   "node_exe": "D:\\Program Files\\nodejs\\node.exe",
   "workspace_dir": "D:\\HermesData\\hermes-workspace",
