@@ -2,18 +2,18 @@
 # Quick wrapper for resilience backups. Run via cron or manually.
 # Usage: bash scripts/backup-resilience.sh (from D:/HermesData)
 #
-# v2 — selective git operations with timeouts to prevent cron hangs
+# v2 - selective git operations with timeouts to prevent cron hangs
 set -uo pipefail
 TS=$(date +%Y%m%d-%H%M%S)
 HERMES_HOME="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Resolve K: drive — try /k/ (MSYS) first, fall back to native
+# Resolve K: drive - try /k/ (MSYS) first, fall back to native
 if [ -d "/k/Hermes-Resilience" ]; then
     K="/k/Hermes-Resilience"
 elif [ -d "K:/Hermes-Resilience" ]; then
     K="K:/Hermes-Resilience"
 else
-    echo "K: drive not accessible — skipping local backup"
+    echo "K: drive not accessible - skipping local backup"
     K=""
 fi
 
@@ -43,14 +43,14 @@ git_push_with_timeout() {
         timeout "$timeout_sec" git push "$remote" "$branch" 2>&1 && return 0
         local rc=$?
         if [ $rc -eq 124 ]; then
-            echo "WARN: push timed out after ${timeout_sec}s — will retry next cycle"
+            echo "WARN: push timed out after ${timeout_sec}s - will retry next cycle"
         else
-            echo "WARN: push failed (exit $rc) — will retry next cycle"
+            echo "WARN: push failed (exit $rc) - will retry next cycle"
         fi
     ) || true
 }
 
-# 3) Vault git push (GitHub backup) — selective, only if there are real changes
+# 3) Vault git push (GitHub backup) - selective, only if there are real changes
 if [ -d "$HERMES_HOME/../PhronesisVault/.git" ]; then
     (
         cd "$HERMES_HOME/../PhronesisVault"
@@ -64,7 +64,7 @@ if [ -d "$HERMES_HOME/../PhronesisVault/.git" ]; then
     echo "Vault push attempted"
 fi
 
-# 4) HermesData self-backup — push scripts/configs to GitHub
+# 4) HermesData self-backup - push scripts/configs to GitHub
 if [ -d "$HERMES_HOME/.git" ]; then
     (
         cd "$HERMES_HOME"

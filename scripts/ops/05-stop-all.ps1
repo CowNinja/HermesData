@@ -1,4 +1,4 @@
-# 05-stop-all.ps1 — Kill all managed processes
+# 05-stop-all.ps1 - Kill all managed processes
 # Usage:  D:\HermesData\scripts\ops\05-stop-all.ps1
 
 param(

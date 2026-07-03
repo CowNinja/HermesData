@@ -91,7 +91,7 @@ MODEL_TASK_MAP = {
 }
 
 MOE_CATALOG_CREATED = 1719446400
-DEFAULT_CONTEXT_LENGTH = 65536
+DEFAULT_CONTEXT_LENGTH = 16384
 MOE_GATEWAY_ID = "phronesis-moe-gateway"
 MOE_OWNER = "phronesis-moe"
 
@@ -500,12 +500,42 @@ def resolve_task_type(model: str) -> Optional[str]:
     return None
 
 
-def preview_route_for_request(model: str, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
-    from router_bridge import preview_route
+_FAST_ROUTE_BY_TASK: Dict[Optional[str], Dict[str, Any]] = {
+    "roleplay": {"task_type": "roleplay", "tier": "local_roleplay", "port": UNIFIED_ROUTER_PORT},
+    "code": {"task_type": "code", "tier": "local_hot", "port": UNIFIED_ROUTER_PORT},
+    "simple": {"task_type": "simple", "tier": "local_hot", "port": UNIFIED_ROUTER_PORT},
+    "classify": {"task_type": "classify", "tier": "local_hot", "port": UNIFIED_ROUTER_PORT},
+    "metadata_extraction": {"task_type": "metadata_extraction", "tier": "local_hot", "port": UNIFIED_ROUTER_PORT},
+    "synthesis": {"task_type": "synthesis", "tier": "local_warm", "port": UNIFIED_ROUTER_PORT},
+    "deep_analysis": {"task_type": "deep_analysis", "tier": "local_cold", "port": UNIFIED_ROUTER_PORT},
+}
 
+
+def _single_model_unified_lock() -> bool:
+    try:
+        core_path = HERMES_SCRIPTS / "phronesis-core.json"
+        if core_path.is_file():
+            core = json.loads(core_path.read_text(encoding="utf-8"))
+            return bool(core.get("model_rotation_locked") or core.get("model_locked"))
+    except Exception:
+        pass
+    return True
+
+
+def preview_route_for_request(model: str, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     task_type = resolve_task_type(model)
-    infer_prompt = messages_to_prompt(messages, max_chars=12000)
-    route = preview_route(task_type, infer_prompt)
+    if task_type in _FAST_ROUTE_BY_TASK and _unified_router_up():
+        route = {
+            **_FAST_ROUTE_BY_TASK[task_type],
+            "unified_router": True,
+            "inferred": False,
+            "fast_path": True,
+        }
+    else:
+        from router_bridge import preview_route
+
+        infer_prompt = messages_to_prompt(messages, max_chars=4000)
+        route = preview_route(task_type, infer_prompt)
     try:
         from model_resource_manager import effective_tier_for_trim
 
@@ -517,12 +547,14 @@ def preview_route_for_request(model: str, messages: List[Dict[str, Any]]) -> Dic
             route["tier_downgraded"] = True
     except Exception:
         pass
-    if route.get("unified_router"):
+    if route.get("unified_router") and not _single_model_unified_lock():
         try:
             from lru_router_manager import preload_from_route_preview
             route["preload"] = preload_from_route_preview(route)
         except Exception as exc:
             route["preload"] = {"ok": False, "error": str(exc)}
+    elif route.get("unified_router"):
+        route["preload"] = {"ok": True, "skipped": True, "reason": "single_model_lock"}
     return route
 
 
@@ -557,17 +589,63 @@ def trim_messages_tier_aware(
     if _roleplay_route_requested(model, messages):
         original_tokens = sum(_message_tokens(m) for m in messages)
         route = preview_route_for_request(model, messages)
-        return list(messages), {
+        input_cap = input_budget_for_tier("local_roleplay")
+        if original_tokens <= input_cap:
+            return list(messages), {
+                "tier": "local_roleplay",
+                "tier_budget_tokens": context_budget_for_tier("local_roleplay"),
+                "input_cap_tokens": input_cap,
+                "original_tokens_estimate": original_tokens,
+                "original_message_count": len(messages),
+                "trimmed": False,
+                "roleplay_bounded": False,
+                "route_preview": route,
+                "final_tokens_estimate": original_tokens,
+                "final_message_count": len(messages),
+            }
+        # Bounded roleplay trim: keep system + recent turns; never ship 20k+ tokens to 8090.
+        system_msgs = [m for m in messages if str(m.get("role")) == "system"]
+        non_system = [m for m in messages if str(m.get("role")) != "system"]
+        system_cap = max(1024, int(input_cap * 0.2))
+        trimmed_system = _truncate_messages(system_msgs, system_cap)
+        system_used = sum(_message_tokens(m) for m in trimmed_system)
+        remaining = max(0, input_cap - system_used)
+        kept_tail: List[Dict[str, Any]] = []
+        first_kept_idx: Optional[int] = None
+        for rev_i, msg in enumerate(reversed(non_system)):
+            orig_idx = len(non_system) - 1 - rev_i
+            need = _message_tokens(msg)
+            if need <= remaining:
+                if first_kept_idx is None:
+                    first_kept_idx = orig_idx
+                kept_tail.insert(0, msg)
+                remaining -= need
+                continue
+            if not kept_tail and remaining > 64:
+                first_kept_idx = orig_idx
+                kept_tail.insert(0, _truncate_message(msg, remaining))
+                remaining = 0
+            break
+        dropped_middle = non_system[:first_kept_idx] if first_kept_idx is not None else list(non_system)
+        result = list(trimmed_system)
+        if dropped_middle:
+            result.append({"role": "user", "content": _compress_history_stub(dropped_middle)})
+        result.extend(kept_tail)
+        final_tokens = sum(_message_tokens(m) for m in result)
+        return result, {
             "tier": "local_roleplay",
             "tier_budget_tokens": context_budget_for_tier("local_roleplay"),
-            "input_cap_tokens": input_budget_for_tier("local_roleplay"),
+            "input_cap_tokens": input_cap,
             "original_tokens_estimate": original_tokens,
             "original_message_count": len(messages),
-            "trimmed": False,
-            "unfiltered": True,
+            "trimmed": True,
+            "roleplay_bounded": True,
+            "dropped_turns": len(dropped_middle),
+            "kept_tail_turns": len(kept_tail),
             "route_preview": route,
-            "final_tokens_estimate": original_tokens,
-            "final_message_count": len(messages),
+            "final_tokens_estimate": final_tokens,
+            "final_message_count": len(result),
+            "compression": "roleplay_tail_preserve",
         }
 
     route = preview_route_for_request(model, messages)
@@ -1500,47 +1578,50 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             "uncensored_route": prov.get("uncensored_route"),
         })
 
-        try:
-            is_roleplay = (
-                prov.get("uncensored_route")
-                or str(result.get("tier") or "") == "local_roleplay"
-                or _roleplay_route_requested(model, messages)
-            )
-            if is_roleplay:
-                from roleplay_route_guard import extract_phronesis_body
-                from sovereign_memory_manager import checkpoint_roleplay_turn
-
-                ph = extract_phronesis_body(body)
-                checkpoint_roleplay_turn(
-                    platform=str(routing.get("platform") or "roleplay"),
-                    user_content=messages_to_prompt(messages, max_chars=8000),
-                    assistant_content=content[:8000],
-                    campaign=model,
-                    metadata={"gateway_port": DEFAULT_PORT, "latency_sec": latency},
-                    chat_id=str(ph.get("chat_id") or routing.get("chat_id") or ""),
-                    thread_id=str(ph.get("thread_id") or routing.get("thread_id") or ""),
-                    parent_channel_id=str(
-                        ph.get("parent_channel_id") or routing.get("parent_channel_id") or ""
-                    ),
+        def _async_checkpoint() -> None:
+            try:
+                is_roleplay = (
+                    prov.get("uncensored_route")
+                    or str(result.get("tier") or "") == "local_roleplay"
+                    or _roleplay_route_requested(model, messages)
                 )
-            else:
-                from sovereign_memory_manager import checkpoint_gateway_turn
+                if is_roleplay:
+                    from roleplay_route_guard import extract_phronesis_body
+                    from sovereign_memory_manager import checkpoint_roleplay_turn
 
-                checkpoint_gateway_turn(
-                    platform="hermes_agent_session",
-                    messages=messages,
-                    assistant_content=content,
-                    procedural_state={
-                        "active_task": model,
-                        "last_tier": result.get("tier"),
-                        "last_model": result.get("model"),
-                        "tool_depth": int(body.get("tool_depth") or 0),
-                        "pending_delegations": body.get("pending_delegations") or [],
-                    },
-                    metadata={"gateway_port": DEFAULT_PORT, "latency_sec": latency},
-                )
-        except Exception:
-            pass
+                    ph = extract_phronesis_body(body)
+                    checkpoint_roleplay_turn(
+                        platform=str(routing.get("platform") or "roleplay"),
+                        user_content=messages_to_prompt(messages, max_chars=8000),
+                        assistant_content=content[:8000],
+                        campaign=model,
+                        metadata={"gateway_port": DEFAULT_PORT, "latency_sec": latency},
+                        chat_id=str(ph.get("chat_id") or routing.get("chat_id") or ""),
+                        thread_id=str(ph.get("thread_id") or routing.get("thread_id") or ""),
+                        parent_channel_id=str(
+                            ph.get("parent_channel_id") or routing.get("parent_channel_id") or ""
+                        ),
+                    )
+                else:
+                    from sovereign_memory_manager import checkpoint_gateway_turn
+
+                    checkpoint_gateway_turn(
+                        platform="hermes_agent_session",
+                        messages=messages,
+                        assistant_content=content,
+                        procedural_state={
+                            "active_task": model,
+                            "last_tier": result.get("tier"),
+                            "last_model": result.get("model"),
+                            "tool_depth": int(body.get("tool_depth") or 0),
+                            "pending_delegations": body.get("pending_delegations") or [],
+                        },
+                        metadata={"gateway_port": DEFAULT_PORT, "latency_sec": latency},
+                    )
+            except Exception:
+                pass
+
+        threading.Thread(target=_async_checkpoint, daemon=True, name="sovereign-checkpoint").start()
 
         if stream:
             openai_resp = result.get("openai_response") or {}

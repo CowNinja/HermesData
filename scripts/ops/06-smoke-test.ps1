@@ -1,4 +1,4 @@
-# 06-smoke-test.ps1 — End-to-end test: proxy -> llama.cpp -> response (bulletproof v1)
+# 06-smoke-test.ps1 - End-to-end test: proxy -> llama.cpp -> response (bulletproof v1)
 # Usage:  D:\HermesData\scripts\ops\06-smoke-test.ps1 [-LongTest]
 
 param(

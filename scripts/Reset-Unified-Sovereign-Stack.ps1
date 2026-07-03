@@ -1,5 +1,5 @@
 # Reset unified sovereign stack after config pivot.
-# Cycles: MoE router (8090) -> sovereign proxy (8091) -> Hermes_Gateway scheduled task.
+# Delegates to Phronesis-OneButton-Start (8090 + 8091 + 8642 gateway).
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
@@ -21,29 +21,14 @@ function Wait-PortHealth($port, [int]$maxSec = 60) {
 
 Write-Host "=== Unified Sovereign Stack Reset ===" -ForegroundColor Cyan
 
-# Stop Hermes gateway scheduled task
-Write-Host "Stopping Hermes_Gateway scheduled task..." -ForegroundColor Yellow
-schtasks /End /TN "Hermes_Gateway" 2>$null | Out-Null
+& powershell -NoProfile -ExecutionPolicy Bypass -File "$scriptDir\Phronesis-OneButton-Stop.ps1"
 Start-Sleep -Seconds 3
 
-# Kill stray listeners on 8090/8091 if health fails after script restarts
-foreach ($port in @(8090, 8091)) {
-    if (-not (Test-PortHealth $port)) {
-        Write-Host "Port $port not healthy - will restart via scripts" -ForegroundColor DarkYellow
-    }
-}
-
-Write-Host "Restarting unified router (8090)..." -ForegroundColor Cyan
-& "$scriptDir\Start-Unified-Router-8090.ps1"
+Write-Host "Starting full stack via OneButton..." -ForegroundColor Cyan
+& powershell -NoProfile -ExecutionPolicy Bypass -File "$scriptDir\Phronesis-OneButton-Start.ps1"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "Restarting sovereign proxy (8091)..." -ForegroundColor Cyan
-& "$scriptDir\Start-Sovereign-Proxy-8091.ps1"
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-Write-Host "Starting Hermes_Gateway scheduled task..." -ForegroundColor Cyan
-schtasks /Run /TN "Hermes_Gateway" | Out-Null
-Write-Host "Waiting for Hermes Gateway (8642) to become healthy..." -ForegroundColor DarkCyan
+Write-Host "Waiting for Hermes Gateway (8642)..." -ForegroundColor DarkCyan
 $gatewayUp = Wait-PortHealth 8642 60
 
 $checks = @{

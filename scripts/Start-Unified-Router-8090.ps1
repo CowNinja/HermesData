@@ -37,7 +37,7 @@ Write-Host "Enforcing unified generalist GPU preset (ngl=99)..." -ForegroundColo
 $gpuPreset = python (Join-Path $hermesScripts "lru_router_manager.py") --ensure-gpu-preset 2>$null
 if ($gpuPreset) { Write-Host $gpuPreset }
 
-# Fuzzy models-max — single-pin unified generalist on 12GB VRAM
+# Fuzzy models-max - single-pin unified generalist on 12GB VRAM
 if ($ModelsMax -le 0) {
     try {
         $statusJson = python (Join-Path $hermesScripts "lru_router_manager.py") --status 2>$null
@@ -136,7 +136,7 @@ try {
             Write-Host "VRAM PIN PARTIAL - resident: $resident missing: $missing" -ForegroundColor Yellow
         }
     }
-    # Background keepalive — re-warm pinned models if LRU evicts them
+    # Background keepalive - re-warm pinned models if LRU evicts them
     Start-Process -FilePath "python" `
         -ArgumentList (Join-Path $hermesScripts "lru_router_manager.py"), "--keepalive" `
         -WindowStyle Hidden -WorkingDirectory $hermesScripts | Out-Null

@@ -1,4 +1,4 @@
-# 08-download-model.ps1 — Download a GGUF from HuggingFace or direct URL
+# 08-download-model.ps1 - Download a GGUF from HuggingFace or direct URL
 # Usage (HuggingFace):
 #   D:\HermesData\scripts\ops\08-download-model.ps1 -Repo "empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF" -File "Qwythos-9B-Claude-Mythos-5-1M-Q5_K_M.gguf"
 #
@@ -62,7 +62,7 @@ if ($Url) {
         $sizeMB = [math]::Round((Get-Item $outFile).Length / 1MB, 0)
         Write-Host "Download complete: $sizeMB MB" -ForegroundColor Green
     } else {
-        Write-Host "Download may have failed — file not found at expected path." -ForegroundColor Red
+        Write-Host "Download may have failed - file not found at expected path." -ForegroundColor Red
         exit 1
     }
 }

@@ -1,4 +1,4 @@
-# 01-recovery.ps1 — Full Stack Crash Recovery
+# 01-recovery.ps1 - Full Stack Crash Recovery
 # Kills zombies, starts llama.cpp (8090) + proxy (8091), waits for readiness.
 # Usage:  D:\HermesData\scripts\ops\01-recovery.ps1
 
@@ -71,7 +71,7 @@ try {
     Write-Host "  Proxy health:" -ForegroundColor Cyan
     $health | ConvertTo-Json -Depth 5 | Write-Host
 } catch {
-    Write-Host "  Proxy health check failed — it may still be warming up." -ForegroundColor DarkYellow
+    Write-Host "  Proxy health check failed - it may still be warming up." -ForegroundColor DarkYellow
 }
 
 Write-Host "`n=== RECOVERY COMPLETE ===" -ForegroundColor Green

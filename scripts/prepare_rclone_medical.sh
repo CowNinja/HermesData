@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # prepare_rclone_medical.sh
-# Session 14+ helper — safe rclone setup and filtered Medical pull
+# Session 14+ helper - safe rclone setup and filtered Medical pull
 # Always targets D:\HermesData for main working data (C: only for temps/config if needed)
 #
 # NOTE: For multi-account use the Python orchestrator:
@@ -52,7 +52,7 @@ echo "    --remote-name gdrive --output $MANIFEST_DIR/session14_navy_medical_man
 # 4. Safety notes
 echo ""
 echo "Safety:"
-echo "- All main data → D:\HermesData"
+echo "- All main data -> D:\HermesData"
 echo "- Use --dry-run first"
 echo "- rclone crypt recommended for medical data at rest"
 echo "- Check disk before large pulls (C: ~14GB free is ok for temps)"

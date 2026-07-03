@@ -1,4 +1,4 @@
-# 02-start-llama.ps1 — Start llama.cpp backend only (port 8090)
+# 02-start-llama.ps1 - Start llama.cpp backend only (port 8090)
 # Usage:  D:\HermesData\scripts\ops\02-start-llama.ps1 [-Model <path>] [-Port 8090] [-CtxSize 8192] [-Ngl 99]
 
 param(

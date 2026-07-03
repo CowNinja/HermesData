@@ -27,7 +27,23 @@ HERMES_DATA_CONFIG = Path(r"D:\HermesData\config.yaml")
 HERMES_USER_CONFIG = Path.home() / ".hermes" / "config.yaml"
 SOVEREIGN_PROVIDER = "phronesis-sovereign"
 MOE_GATEWAY_URL = "http://127.0.0.1:8091/v1"
-MIN_CONTEXT = 65536
+CORE_CONFIG = Path(r"D:\HermesData\scripts\phronesis-core.json")
+DEFAULT_CONTEXT = 16384
+
+
+def _target_context_length() -> int:
+    try:
+        if CORE_CONFIG.is_file():
+            core = json.loads(CORE_CONFIG.read_text(encoding="utf-8"))
+            ctx = int(core.get("ctx_size") or 0)
+            if ctx >= 4096:
+                return ctx
+    except Exception:
+        pass
+    return DEFAULT_CONTEXT
+
+
+MIN_CONTEXT = _target_context_length()
 
 DELEGATION_DEFAULTS = {
     "model": "phronesis-sovereign-code",
@@ -66,7 +82,7 @@ _CLOUD_FALLBACK_PROVIDERS = frozenset(
 )
 
 SOVEREIGN_ENVIRONMENT_HINT = (
-    "Phronesis Sovereign Stack: Qwythos-9B Q6_K @ 65536 ctx on llama-server:8090 "
+    f"Phronesis Sovereign Stack: Qwythos-9B Q6_K @ {MIN_CONTEXT} ctx on llama-server:8090 "
     "via phronesis-sovereign proxy:8091. Model rotation is LOCKED — 9B only, no 14B "
     "fallback. ALWAYS invoke terminal/file tools for factual queries (disk space, "
     "file listings, system state) — never hallucinate command output. Deliver clean "
@@ -151,7 +167,7 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
             if model.get(key) != value:
                 model[key] = value
                 changes.append(f"model.{key}")
-    if int(model.get("context_length") or 0) < MIN_CONTEXT:
+    if int(model.get("context_length") or 0) != MIN_CONTEXT:
         model["context_length"] = MIN_CONTEXT
         changes.append("model.context_length")
 
@@ -165,7 +181,7 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
             continue
         if prov.get("name") != SOVEREIGN_PROVIDER:
             continue
-        if int(prov.get("context_length") or 0) < MIN_CONTEXT:
+        if int(prov.get("context_length") or 0) != MIN_CONTEXT:
             prov["context_length"] = MIN_CONTEXT
             changes.append(f"{SOVEREIGN_PROVIDER}.context_length")
         models = prov.get("models") or {}
@@ -174,7 +190,7 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
                 if not isinstance(model_cfg, dict):
                     model_cfg = {}
                     models[model_id] = model_cfg
-                if int(model_cfg.get("context_length") or 0) < MIN_CONTEXT:
+                if int(model_cfg.get("context_length") or 0) != MIN_CONTEXT:
                     model_cfg["context_length"] = MIN_CONTEXT
                     changes.append(f"{SOVEREIGN_PROVIDER}.models.{model_id}.context_length")
         for model_id in EXTRA_SOVEREIGN_MODELS:
@@ -182,7 +198,7 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
             if not isinstance(block, dict):
                 block = {}
                 models[model_id] = block
-            if int(block.get("context_length") or 0) < MIN_CONTEXT:
+            if int(block.get("context_length") or 0) != MIN_CONTEXT:
                 block["context_length"] = MIN_CONTEXT
                 changes.append(f"{SOVEREIGN_PROVIDER}.models.{model_id}.context_length")
         prov["models"] = models
@@ -238,11 +254,11 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         if agent.get("reasoning_effort") not in (None, "", "low", "none"):
             agent["reasoning_effort"] = "low"
             changes.append("agent.reasoning_effort→low")
-        if str(agent.get("tool_use_enforcement") or "").lower() not in (
+        if str(agent.get("tool_use_enforcement") or "").lower() in (
             "true", "always", "yes", "on",
         ):
-            agent["tool_use_enforcement"] = "always"
-            changes.append("agent.tool_use_enforcement→always")
+            agent["tool_use_enforcement"] = "auto"
+            changes.append("agent.tool_use_enforcement→auto")
 
     display = patched.setdefault("display", {})
     if isinstance(display, dict):

@@ -1,4 +1,4 @@
-# Start Phronesis MoE stack — unified LRU router (8090) or legacy static 808x
+# Start Phronesis MoE stack - unified LRU router (8090) or legacy static 808x
 # Usage:
 #   D:\HermesData\scripts\Start-MoE-Stack.ps1                 # unified 8090 (default P2)
 #   D:\HermesData\scripts\Start-MoE-Stack.ps1 -Legacy808x   # rollback to static ports
@@ -55,7 +55,7 @@ if ($Unified8090) {
     Start-Sleep -Seconds 10
 }
 
-# Agent gateway (Hermes primary loop → bridge_dispatch)
+# Agent gateway (Hermes primary loop -> bridge_dispatch)
 $proxyScript = Join-Path $scriptDir "Start-Sovereign-Proxy-8091.ps1"
 if (Test-Path $proxyScript) {
     & $proxyScript
@@ -72,10 +72,7 @@ foreach ($p in $checkPorts) {
     }
 }
 
-$watchdogScript = Join-Path $scriptDir "Start-Sovereign-Watchdog.ps1"
-if (Test-Path $watchdogScript) {
-    & $watchdogScript
-}
+# Watchdog retired — Phronesis-Guardian scheduled task handles heal (every 5 min).
 
 if ($Unified8090) {
     Write-Host ""

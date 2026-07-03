@@ -11,6 +11,7 @@ import json
 import socket
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -80,12 +81,24 @@ def completion_reserve_for_ctx(ctx: int) -> int:
     return min(4096, max(768, int(ctx) // 4))
 
 
-def _port_open(port: int, timeout: float = 0.5) -> bool:
+def _port_open(port: int, timeout: float = 0.3) -> bool:
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=timeout):
             return True
     except OSError:
         return False
+
+
+_MATRIX_CACHE: Optional[Dict[str, Any]] = None
+_MATRIX_CACHE_AT: float = 0.0
+_MATRIX_TTL_SEC = 1.0
+
+
+def _ports_to_probe() -> List[int]:
+    """Unified mode only needs live router + proxy; skip dead legacy/aux ports."""
+    if _unified_mode_enabled():
+        return [8090, 8091]
+    return [int(p) for p in DEFAULT_PORTS]
 
 
 def _unified_mode_enabled() -> bool:
@@ -98,8 +111,16 @@ def _unified_mode_enabled() -> bool:
     return False
 
 
-def tier_matrix() -> Dict[str, Any]:
-    ports = {p: _port_open(int(p)) for p in DEFAULT_PORTS}
+def tier_matrix(*, force_refresh: bool = False) -> Dict[str, Any]:
+    global _MATRIX_CACHE, _MATRIX_CACHE_AT
+    now = time.time()
+    if not force_refresh and _MATRIX_CACHE and (now - _MATRIX_CACHE_AT) < _MATRIX_TTL_SEC:
+        return dict(_MATRIX_CACHE)
+
+    probed = {p: _port_open(p) for p in _ports_to_probe()}
+    ports = {str(p): probed.get(p, False) for p in DEFAULT_PORTS}
+    for p, up in probed.items():
+        ports[str(p)] = up
     unified_up = ports.get("8090", False)
     legacy_up = ports.get("8081") and (ports.get("8082") or ports.get("8083"))
     moe_ready = unified_up or legacy_up
@@ -107,7 +128,7 @@ def tier_matrix() -> Dict[str, Any]:
         "legacy_808x" if legacy_up else "down"
     )
     proxy_ready = ports.get("8091", False)
-    return {
+    result = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "ports": ports,
         "router_mode": router_mode,
@@ -116,6 +137,9 @@ def tier_matrix() -> Dict[str, Any]:
         "agent_local_ready": moe_ready and proxy_ready,
         "status": "GREEN" if moe_ready and proxy_ready else ("YELLOW" if moe_ready else "RED"),
     }
+    _MATRIX_CACHE = result
+    _MATRIX_CACHE_AT = now
+    return result
 
 
 def context_budget_for_tier(tier: str) -> int:

@@ -1,4 +1,4 @@
-# 04-status.ps1 — Health-check all managed services
+# 04-status.ps1 - Health-check all managed services
 # Usage:  D:\HermesData\scripts\ops\04-status.ps1
 
 $ErrorActionPreference = "SilentlyContinue"

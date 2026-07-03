@@ -1,4 +1,4 @@
-# 03-start-proxy.ps1 — Start MoE gateway proxy only (port 8091)
+# 03-start-proxy.ps1 - Start MoE gateway proxy only (port 8091)
 # Usage:  D:\HermesData\scripts\ops\03-start-proxy.ps1 [-Port 8091] [-Host 127.0.0.1]
 
 param(
@@ -33,7 +33,7 @@ try {
     Write-Host "Proxy is UP!" -ForegroundColor Green
     $h | ConvertTo-Json -Depth 3 | Write-Host
 } catch {
-    Write-Host "Proxy launched but health check pending — give it a few more seconds." -ForegroundColor DarkYellow
+    Write-Host "Proxy launched but health check pending - give it a few more seconds." -ForegroundColor DarkYellow
 }
 
 Write-Host "Proxy URL: http://${BindHost}:${Port}" -ForegroundColor Cyan

@@ -1,5 +1,5 @@
-# Start Phronesis MoE gateway — venv python.exe ONLY (Session 4 hardened).
-# Port 8091 — never system Python311, never pythonw fallback.
+# Start Phronesis MoE gateway - venv python.exe ONLY (Session 4 hardened).
+# Port 8091 - never system Python311, never pythonw fallback.
 
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -16,7 +16,7 @@ if (-not (Test-Path $venvPython)) {
 . $forkGuard
 
 if (Test-Path $ensurePy) {
-    Write-Host "Ensuring Hermes sovereign context_length >= 65536..." -ForegroundColor Cyan
+    Write-Host "Ensuring Hermes sovereign context_length matches phronesis-core..." -ForegroundColor Cyan
     & $venvPython $ensurePy --json | Out-Null
 }
 

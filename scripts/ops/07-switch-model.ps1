@@ -1,4 +1,4 @@
-# 07-switch-model.ps1 — Swap which GGUF the llama.cpp backend serves
+# 07-switch-model.ps1 - Swap which GGUF the llama.cpp backend serves
 # Usage:  D:\HermesData\scripts\ops\07-switch-model.ps1 -Model <path> [-CtxSize 8192] [-Ngl 99]
 
 param(
