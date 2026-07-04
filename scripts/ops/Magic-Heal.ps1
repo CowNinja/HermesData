@@ -1,8 +1,9 @@
-# Magic Heal — one-click: full heal + hybrid warm + solo RP bridge test + health report.
+# Magic Heal - one-click: full heal + hybrid warm + solo RP bridge test + health report.
 param(
     [string]$Channel = "1521146755985576116",
     [string]$TestPrompt = "OOC: nude alternate portrait alice, artistic, solo, full body, highly detailed nude, bare skin, no clothing, explicit",
-    [switch]$SkipTest,
+    [switch]$SkipTest = $true,
+    [switch]$RunTest,
     [switch]$Quiet
 )
 
@@ -43,20 +44,20 @@ function Health-Score {
 
 Log "=== Magic Heal start ==="
 
-# Dedupe Comfy main.py (keep newest listener)
-$comfyProcs = Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
-    Where-Object { $_.CommandLine -match 'ComfyUI\\main\.py' }
-if ($comfyProcs.Count -gt 1) {
-    $sorted = $comfyProcs | Sort-Object ProcessId -Descending
-    $sorted | Select-Object -Skip 1 | ForEach-Object {
-        Log "stop duplicate Comfy pid=$($_.ProcessId)"
-        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
-    }
-    Start-Sleep -Seconds 3
-}
+& "$root\scripts\ops\Repair-ComfyInference.ps1" -Quiet:$Quiet | Out-Null
 
 & "$root\scripts\ops\Rp-Full-Heal.ps1" -Channel $Channel -Quiet:$Quiet
 Start-Sleep -Seconds 2
+
+& "$root\scripts\ops\Ensure-RP-Watchers.ps1" -Channel $Channel -Quiet:$Quiet
+
+if (Test-Path "$root\scripts\ops\rp_bottleneck_scanner.py") {
+    $scanOut = & $py "$root\scripts\ops\rp_bottleneck_scanner.py" --fix --channel $Channel --json-only 2>&1
+    try {
+        $scanLine = ($scanOut | Where-Object { $_ -match '^\{' } | Select-Object -Last 1)
+        if ($scanLine) { $script:scanReport = $scanLine | ConvertFrom-Json }
+    } catch {}
+}
 
 & "$root\scripts\Phronesis-Hybrid-Warm-Mode.ps1" -Mode On -Quiet:$Quiet
 Start-Sleep -Seconds 5
@@ -65,7 +66,7 @@ $before = Health-Score
 Log "Health before test: $($before.score)/100"
 
 $testResult = $null
-if (-not $SkipTest) {
+if ($RunTest -or -not $SkipTest) {
     Log "RP bridge solo test..."
     $bridge = & $py "$root\scripts\ops\rp_bridge.py" $TestPrompt --channel $Channel 2>&1
     if (-not $Quiet) { $bridge | ForEach-Object { Log $_ } }
@@ -76,16 +77,38 @@ if (-not $SkipTest) {
 }
 
 $after = Health-Score
+
+# Internal simulator (parse canaries, no Discord) - dry validation before live bridge test
+$simReport = $null
+if (Test-Path "$root\scripts\ops\rp_simulator.py") {
+    $simOut = & $py "$root\scripts\ops\rp_simulator.py" --json-only 2>&1
+    try {
+        $simLine = ($simOut | Where-Object { $_ -match '^\{' } | Select-Object -Last 1)
+        if ($simLine) { $simReport = $simLine | ConvertFrom-Json }
+    } catch {}
+}
+
 $latestPng = Get-ChildItem "D:\ComfyUI\output\standard__*.png" -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+$pipelineMetrics = $null
+if (Test-Path "$root\scripts\ops\watch_comfy_pipeline.py") {
+    $pipeOut = & $py "$root\scripts\ops\watch_comfy_pipeline.py" --once --json-only 2>&1
+    try {
+        $pipeLine = ($pipeOut | Where-Object { $_ -match '^\{' } | Select-Object -Last 1)
+        if ($pipeLine) { $pipelineMetrics = $pipeLine | ConvertFrom-Json }
+    } catch {}
+}
 
 $reportObj = @{
     timestamp = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
     channel   = $Channel
     health    = $after
     test      = $testResult
+    simulator = $simReport
     latest_png = if ($latestPng) { $latestPng.Name } else { $null }
     latest_png_mtime = if ($latestPng) { $latestPng.LastWriteTime.ToString("s") } else { $null }
+    pipeline_metrics = $pipelineMetrics
 }
 $reportObj | ConvertTo-Json -Depth 6 | Set-Content -Path $report -Encoding UTF8
 

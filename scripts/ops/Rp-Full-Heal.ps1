@@ -47,20 +47,9 @@ while ((Get-Date) -lt $deadline) {
 & "$root\scripts\Phronesis.ps1" gateway restart
 Start-Sleep -Seconds 5
 
-# Start singleton rider daemon (hidden)
-$rider = "D:\PhronesisVault\Roleplay-Sandbox\sandbox\roleplay-image-rider.py"
-$pyw = "D:\HermesData\hermes-agent\venv\Scripts\pythonw.exe"
-if (Test-Path $pyw) {
-    Start-Process -FilePath $pyw -ArgumentList $rider, "--daemon" -WindowStyle Hidden
-    Log "rider daemon started"
-}
-
-# Start delivery watcher
-$daemon = Join-Path $root "scripts\comfy_delivery_daemon.py"
-if (Test-Path $daemon) {
-    Start-Process -FilePath $pyw -ArgumentList $daemon, "--daemon", "--channel", $Channel -WindowStyle Hidden
-    Log "delivery daemon started channel=$Channel"
-}
+# Singleton delivery + rider daemons (no duplicate spawns)
+& "$root\scripts\ops\Ensure-RP-Watchers.ps1" -Channel $Channel -Quiet:$Quiet
+Log "RP watchers ensured channel=$Channel"
 
 Log "Rp-Full-Heal complete"
 if (-not $Quiet) {

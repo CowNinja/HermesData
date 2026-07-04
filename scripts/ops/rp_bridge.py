@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RP Bridge — OOC prompt → visual_registry → Comfy render → Discord post (no LLM)."""
+"""RP Bridge - OOC prompt to visual_registry to Comfy render to Discord (no LLM)."""
 from __future__ import annotations
 
 import argparse
@@ -11,7 +11,6 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
 SANDBOX_LIB = Path(r"D:\PhronesisVault\Roleplay-Sandbox\sandbox\lib")
 RENDER = Path(r"D:\PhronesisVault\Roleplay-Sandbox\sandbox\render-roleplay-image.py")
-POST = ROOT / "temp" / "post_discord_image.py"
 DEFAULT_CHANNEL = "1521146755985576116"
 
 if str(SCRIPTS) not in sys.path:
@@ -24,7 +23,8 @@ from visual_registry import detect_image_intent  # noqa: E402
 
 
 def build_render_cmd(spec: dict) -> list[str]:
-    cmd = [prefer_pythonw(sys.executable), str(RENDER), "--json", "--standard", "--discord-delivery", "--fresh"]
+    # No --discord-delivery: comfy_delivery_daemon is the sole Discord poster.
+    cmd = [prefer_pythonw(sys.executable), str(RENDER), "--json", "--standard", "--fresh", "--new-seed"]
     mode = str(spec.get("mode") or "portrait")
     chars = list(spec.get("characters") or [])
     if len(chars) >= 2 and mode == "portrait":
@@ -43,14 +43,32 @@ def build_render_cmd(spec: dict) -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Direct OOC → Comfy → Discord bridge")
+    parser = argparse.ArgumentParser(description="Direct OOC to Comfy to Discord bridge")
     parser.add_argument("prompt", nargs="?", default="")
     parser.add_argument("--channel", default=DEFAULT_CHANNEL)
+    parser.add_argument("--series", type=int, default=0, help="Delegate series-of-N to batch orchestrator")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     prompt = (args.prompt or "").strip()
     if not prompt:
         print(json.dumps({"ok": False, "error": "prompt required"}))
+        return 1
+
+    if args.series >= 2:
+        orch = ROOT / "scripts" / "ops" / "rp_batch_orchestrator.py"
+        spec = detect_image_intent(prompt, "", "") or {}
+        spec["batch_count"] = args.series
+        proc = run_hidden(
+            [prefer_pythonw(sys.executable), str(orch), prompt, "--spec-json", json.dumps(spec)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        for line in (proc.stdout or "").splitlines():
+            if line.strip().startswith("{"):
+                print(line.strip())
+                return 0 if json.loads(line).get("ok") else 1
+        print(json.dumps({"ok": False, "error": "orchestrator_failed", "stderr": (proc.stderr or "")[:300]}))
         return 1
 
     spec = detect_image_intent(prompt, "", "")
@@ -79,22 +97,13 @@ def main() -> int:
         print(json.dumps({"ok": False, "error": "no_image_path", "result": result}))
         return 1
 
-    caption = f"*Look — just as you imagined.*\n`{Path(image).name}`"
-    post = run_hidden(
-        [prefer_pythonw(sys.executable), str(POST), args.channel, image, caption],
-        capture_output=True,
-        text=True,
-        timeout=90,
-    )
-    if post.returncode != 0:
-        print(json.dumps({"ok": False, "error": post.stderr or post.stdout, "image": image}))
-        return post.returncode
-
-    out = {"ok": True, "spec": spec, "image": image, "png": Path(image).name}
-    try:
-        out["discord"] = json.loads((post.stdout or "").strip())
-    except Exception:
-        pass
+    out = {
+        "ok": True,
+        "spec": spec,
+        "image": image,
+        "png": Path(image).name,
+        "delivery": {"action": "deferred", "reason": "comfy_delivery_daemon_only"},
+    }
     print(json.dumps(out))
     return 0
 

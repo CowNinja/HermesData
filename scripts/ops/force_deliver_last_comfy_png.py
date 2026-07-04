@@ -67,7 +67,7 @@ def main() -> int:
         sys.path.insert(0, str(scripts))
     from windows_subprocess import prefer_pythonw, run_hidden
 
-    caption = f"Force-deliver fallback — {png.name}"
+    caption = f"Force-deliver fallback - {png.name}"
     proc = run_hidden(
         [prefer_pythonw(sys.executable), str(POST_SCRIPT), channel, str(png), caption],
         capture_output=True,
