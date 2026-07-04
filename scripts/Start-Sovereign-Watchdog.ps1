@@ -1,4 +1,4 @@
-# Start-Sovereign-Watchdog.ps1 — silent 60s stack watchdog (pythonw)
+# Start-Sovereign-Watchdog.ps1 - silent 60s stack watchdog (pythonw)
 $ErrorActionPreference = "Stop"
 $Scripts = "D:\HermesData\scripts"
 $PythonW = "D:\HermesData\hermes-agent\venv\Scripts\pythonw.exe"

@@ -94,6 +94,7 @@ def detect_grok_escalation_triggers(
     modality: str = None,          # 'text', 'vision', 'multimodal'
     tool_depth: int = None,        # number of planned/sequential tool calls
     explicit_flag: bool = False,
+    tool_fail_count: int = 0,
 ) -> dict:
     """
     Returns {
@@ -142,13 +143,46 @@ def detect_grok_escalation_triggers(
         matched.append('explicit_grok_request')
         reasons.append('explicit paid Grok escalation requested')
 
+    # T2 — Grok 4.20 Heavy: repeated local tool failures or explicit heavy reasoning
+    heavy_reasoning = any(
+        k in prompt_lower
+        for k in ('heavy reasoning', 'grok heavy', 'tier 2', 't2 escalate', 'deep reasoning')
+    )
+    if heavy_reasoning or explicit_flag:
+        matched.append('heavy_reasoning')
+        reasons.append('explicit heavy-reasoning / T2 request')
+    fails = int(tool_fail_count or 0)
+    image_timeout = any(
+        k in prompt_lower
+        for k in ('image_gen_timeout', 'image timeout', 'comfy timeout', 'generation timed out')
+    )
+    multi_tool = int(tool_depth or 0) >= 3
+    if fails > 1:
+        matched.append('tool_fail_threshold')
+        reasons.append(f'tool_fail_count={fails} exceeds T1 tolerance')
+    if image_timeout:
+        matched.append('image_gen_timeout')
+        reasons.append('image generation timeout - escalate for tool recovery')
+    if multi_tool:
+        matched.append('multi_tool_chain')
+        reasons.append(f'tool_depth={tool_depth} multi-step chain')
+
     should = bool(matched)
+    tier = None
+    if should:
+        if fails > 2 or image_timeout or multi_tool:
+            tier = 'T3_grok_heavy'
+        elif fails > 1 or heavy_reasoning:
+            tier = 'T2_grok_heavy'
+        else:
+            tier = 'grok_escalation'
     return {
         'should_escalate': should,
         'matched_triggers': matched,
         'reason': '; '.join(reasons) if reasons else 'no grok triggers matched',
-        'recommended_tier': 'grok_escalation' if should else None,
-        'policy_version': 'v0.2'
+        'recommended_tier': tier,
+        'policy_version': 'v0.4_t2_t3',
+        'tool_fail_count': fails,
     }
 
 import json
@@ -467,6 +501,7 @@ def bridge_dispatch(
     modality: str = None,
     tool_depth: int = None,
     explicit_grok_flag: bool = False,
+    tool_fail_count: int = 0,
     memory_scope: str = "",
     chat_id: str = "",
     thread_id: str = "",
@@ -517,6 +552,7 @@ def bridge_dispatch(
         modality=modality,
         tool_depth=tool_depth,
         explicit_flag=explicit_grok_flag,
+        tool_fail_count=int(tool_fail_count or 0),
     )
 
     provenance: Dict[str, Any] = {

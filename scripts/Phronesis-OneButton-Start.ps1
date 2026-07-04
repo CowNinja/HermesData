@@ -2,6 +2,12 @@
 # Starts: 8090 (brain) + 8091 (translator) + 8642 (Hermes gateway, optional).
 # Usage:  powershell -File D:\HermesData\scripts\Phronesis-OneButton-Start.ps1
 #         powershell -File ... -SkipGateway   (inference only)
+#
+# UPDATE GUARD (do NOT auto-update here):
+#   Before any Hermes update or Desktop Update button:
+#     D:\HermesData\scripts\Phronesis-Hermes-StopAll.ps1
+#     D:\HermesData\scripts\Phronesis-Safe-Hermes-Update.ps1
+#   See D:\PhronesisVault\docs\agent-coordination\hermes-maintenance.md
 
 param(
     [switch]$SkipGateway = $false,
@@ -165,8 +171,13 @@ if (-not $SkipDashboard -and $core.start_dashboard) {
         Log "Starting Hermes dashboard on $dashPort (venv)..."
         Stop-HermesProcesses -RolePattern 'hermes_cli\.main dashboard' | Out-Null
         Start-VenvDashboard
-        if (Wait-PortUp -Port $dashPort -MaxSeconds 20) { Log "$dashPort UP (venv-owned)" }
-        else { Log "WARN: $dashPort not listening" }
+        if (Wait-PortUp -Port $dashPort -MaxSeconds 45) { Log "$dashPort UP (venv-owned)" }
+        else {
+            Log "WARN: $dashPort not listening - running heal-dashboard fallback"
+            & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "ops\05-heal-dashboard.ps1") 2>&1 | ForEach-Object { Log "  $_" }
+            if (Wait-PortUp -Port $dashPort -MaxSeconds 20) { Log "$dashPort UP (heal fallback)" }
+            else { Log "WARN: $dashPort still not listening" }
+        }
     } else { Log "$dashPort already UP (venv-owned)" }
 }
 
@@ -182,10 +193,27 @@ if (-not $SkipWorkspace -and $core.start_workspace) {
     } else { Log "$wsPort already UP" }
 }
 
+# --- Roleplay image rider (Discord Pony sidecar) ---
+$riderScript = "D:\PhronesisVault\Roleplay-Sandbox\scripts\Start-Image-Rider.ps1"
+if (Test-Path $riderScript) {
+    Log "Starting roleplay-image-rider daemon..."
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $riderScript
+    Log "Image rider launch invoked"
+} else {
+    Log "WARN: Start-Image-Rider.ps1 not found - skip rider"
+}
+
 # --- Verify ---
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "ops\04-status.ps1")
 if (-not $SkipSmoke) {
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "ops\06-smoke-test.ps1")
     if ($LASTEXITCODE -ne 0) { Log "Smoke test FAILED"; exit 1 }
 }
+# Optional daily confidence (non-blocking)
+$healthPs1 = Join-Path $PSScriptRoot "Phronesis-Full-Health-Check.ps1"
+if (Test-Path $healthPs1) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $healthPs1 -Quiet 2>&1 | Out-Null
+    Log "Health check log written (see logs/health-check-*.log)"
+}
+
 Log "=== DONE - Phronesis is ready ==="

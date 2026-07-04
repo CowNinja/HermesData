@@ -1,4 +1,4 @@
-# 05-heal-dashboard.ps1 — restart Hermes CLI dashboard on :9119 (optional ops surface)
+# 05-heal-dashboard.ps1 - restart Hermes CLI dashboard on :9119 (optional ops surface)
 $ErrorActionPreference = "SilentlyContinue"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptRoot "..\Phronesis-ForkGuard.ps1")
@@ -16,6 +16,15 @@ if (Test-Path $corePath) {
 
 Stop-HermesProcesses -RolePattern 'hermes_cli.main dashboard' | Out-Null
 Start-Sleep -Seconds 2
+
+$agentRoot = Join-Path $HermesRoot "hermes-agent"
+$webDist = Join-Path $agentRoot "hermes_cli\web_dist\index.html"
+if (-not (Test-Path $webDist)) {
+    Write-Host "Building Hermes web UI (web_dist missing)..."
+    Push-Location $agentRoot
+    npm.cmd run build -w web 2>&1 | ForEach-Object { Write-Host $_ }
+    Pop-Location
+}
 
 # pythonw hidden first (ForkGuard default); python.exe hidden fallback if port slow
 Start-VenvDashboard

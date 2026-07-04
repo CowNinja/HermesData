@@ -105,7 +105,23 @@ def main() -> int:
     errors: list[str] = []
     need_write = False
 
+    existing: set[str] = set()
+    list_r = subprocess.run(
+        [str(BWS), "secret", "list", project_id],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if list_r.returncode == 0:
+        try:
+            existing = {s["key"] for s in json.loads(list_r.stdout) if s.get("key")}
+        except json.JSONDecodeError:
+            pass
+
     for key in sorted(to_push):
+        if key in existing:
+            skipped.append(key)
+            continue
         r = subprocess.run(
             [str(BWS), "secret", "create", key, to_push[key], project_id],
             capture_output=True,
@@ -145,7 +161,7 @@ def main() -> int:
         ),
     }
     print(json.dumps(report, indent=2))
-    return 0 if created or import_path else 1
+    return 0 if created or skipped or import_path else 1
 
 
 if __name__ == "__main__":

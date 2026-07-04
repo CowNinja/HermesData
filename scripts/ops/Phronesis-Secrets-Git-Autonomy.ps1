@@ -1,20 +1,20 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Phronesis Secrets + Git autonomy — interactive operator script with full logging.
+  Phronesis Secrets + Git autonomy - interactive operator script with full logging.
 
 .DESCRIPTION
   Consolidates scattered secrets into D:\HermesData\.env (names-only audit in log),
   optionally exports Infisical, enables Bitwarden in config.yaml, audits Git drift,
   runs backup-resilience v3 + self-recovery-watchdog, and writes a review log for Composer.
 
-  SAFE: Never writes secret VALUES to the log file — key names and status only.
+  SAFE: Never writes secret VALUES to the log file - key names and status only.
 
 .PARAMETER Lane
-  secrets | git | both | audit — skip menu when set.
+  secrets | git | both | audit - skip menu when set.
 
 .PARAMETER NonInteractive
-  Run defaults without prompts (lane=audit only — safe read-only audit).
+  Run defaults without prompts (lane=audit only - safe read-only audit).
 
 .EXAMPLE
   # Run as Administrator (recommended for Docker Infisical retire):

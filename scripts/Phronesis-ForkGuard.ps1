@@ -255,9 +255,15 @@ function Restart-VenvGateway {
 
 function Start-VenvDashboard {
     $pyw = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
+    $agentRoot = Join-Path $HermesRoot "hermes-agent"
+    $webDist = Join-Path $agentRoot "hermes_cli\web_dist"
+    $dashArgs = @("-m", "hermes_cli.main", "dashboard", "--port", "9119", "--host", "127.0.0.1", "--no-open")
+    if (Test-Path (Join-Path $webDist "index.html")) {
+        $dashArgs += "--skip-build"
+    }
     Start-Process -FilePath $pyw `
-        -ArgumentList "-m", "hermes_cli.main", "dashboard", "--port", "9119", "--host", "127.0.0.1", "--skip-build", "--no-open" `
-        -WorkingDirectory $HermesRoot `
+        -ArgumentList $dashArgs `
+        -WorkingDirectory $agentRoot `
         -WindowStyle Hidden
 }
 

@@ -846,6 +846,82 @@ def _build_terminal_tool_call(command: str) -> Dict[str, Any]:
     }
 
 
+def _build_image_generate_tool_call(prompt: str, aspect_ratio: str = "portrait") -> Dict[str, Any]:
+    return {
+        "id": f"call_{uuid.uuid4().hex[:12]}",
+        "type": "function",
+        "function": {
+            "name": "image_generate",
+            "arguments": json.dumps({"prompt": prompt, "aspect_ratio": aspect_ratio}),
+        },
+    }
+
+
+def _count_recent_tool_failures(messages: List[Dict[str, Any]], *, window: int = 12) -> int:
+    """Count recent tool results that look like failures (for T2 escalation)."""
+    fails = 0
+    for msg in (messages or [])[-window:]:
+        if not isinstance(msg, dict) or msg.get("role") != "tool":
+            continue
+        blob = str(msg.get("content") or "").lower()
+        if any(
+            sig in blob
+            for sig in (
+                '"success": false',
+                '"success":false',
+                "error",
+                "failed",
+                "provider_not_registered",
+                "tool error",
+            )
+        ):
+            fails += 1
+    return fails
+
+
+def _synthesize_image_generate_call(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Derive image_generate from OOC portrait/scene/picture-mode user triggers."""
+    for msg in reversed(messages or []):
+        if not isinstance(msg, dict) or msg.get("role") != "user":
+            continue
+        content = _extract_content(msg.get("content"))
+        lower = content.lower()
+        if not any(
+            k in lower
+            for k in (
+                "ooc:",
+                "picture mode",
+                "portrait ",
+                "scene:",
+                "generate image",
+                "image_generate",
+            )
+        ):
+            break
+        prompt = content
+        if "ooc:" in lower:
+            prompt = re.sub(r"(?i)^\s*ooc:\s*", "", content).strip()
+        if not prompt:
+            break
+        aspect = "portrait" if "portrait" in lower or "picture" in lower else "landscape"
+        return _build_image_generate_tool_call(prompt, aspect_ratio=aspect)
+    return None
+
+
+def _inject_tool_optimised_mode(
+    messages: List[Dict[str, Any]],
+    *,
+    tier: str = "T1",
+) -> List[Dict[str, Any]]:
+    note = (
+        f"You are now in tool-optimised mode ({tier}). "
+        "Emit real tool_calls with exact JSON arguments; do not narrate tools in prose."
+    )
+    out = list(messages or [])
+    out.insert(0, {"role": "system", "content": note})
+    return out
+
+
 def _synthesize_factual_terminal_call(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """Last-resort: derive a terminal tool_call from explicit user instructions."""
     blob = _message_blob(messages)
@@ -1090,8 +1166,12 @@ def dispatch_via_native_router(
         pass  # Fixer is best-effort; fall through to existing behavior
 
     factual_tools = _requires_factual_tool_use(messages)
-    if factual_tools and body.get("tools") and not msg.get("tool_calls"):
-        synthesized = _synthesize_factual_terminal_call(messages)
+    if body.get("tools") and not msg.get("tool_calls"):
+        synthesized = None
+        if factual_tools:
+            synthesized = _synthesize_factual_terminal_call(messages)
+        if synthesized is None:
+            synthesized = _synthesize_image_generate_call(messages)
         if synthesized:
             msg = {**msg, "tool_calls": [synthesized], "content": None}
             for key in ("reasoning", "reasoning_content", "reasoning_details"):
@@ -1200,6 +1280,30 @@ def resolve_roleplay_routing(
         "thread_id": str(phronesis.get("thread_id") or ""),
         "parent_channel_id": str(phronesis.get("parent_channel_id") or ""),
     }
+    tool_fails = _count_recent_tool_failures(messages)
+    routing["tool_fail_count"] = tool_fails
+    blob = _message_blob(messages).lower()
+    image_timeout = any(
+        k in blob for k in ("image_gen_timeout", "image timeout", "comfy timeout", "generation timed out")
+    )
+    if tool_fails > 2 or image_timeout:
+        routing["escalation_tier"] = "T3"
+        routing["tool_optimised_mode"] = True
+        reasons = list(routing.get("reasons") or [])
+        if tool_fails > 2:
+            reasons.append(f"tool_fail_count={tool_fails}")
+        if image_timeout:
+            reasons.append("image_gen_timeout")
+        routing["reasons"] = reasons
+    elif tool_fails > 1:
+        routing["escalation_tier"] = "T2"
+        routing["tool_optimised_mode"] = True
+        reasons = list(routing.get("reasons") or [])
+        reasons.append(f"tool_fail_count={tool_fails}")
+        routing["reasons"] = reasons
+    elif any(k in blob for k in ("heavy reasoning", "grok heavy", "tier 3", "t3 escalate")):
+        routing["escalation_tier"] = "T3"
+        routing["tool_optimised_mode"] = True
     return routing
 
 
@@ -1224,6 +1328,8 @@ def dispatch_via_bridge(
         prefer="vault",
         context_tokens_estimate=estimate_tokens(prompt) + 4000,
         modality="text",
+        tool_fail_count=int(route.get("tool_fail_count") or 0),
+        explicit_grok_flag=bool(route.get("escalation_tier") in ("T2", "T3")),
         chat_id=str(route.get("chat_id") or ""),
         thread_id=str(route.get("thread_id") or ""),
         parent_channel_id=str(route.get("parent_channel_id") or ""),
@@ -1468,6 +1574,9 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         stream = bool(body.get("stream", False))
         routing = resolve_roleplay_routing(messages, model, body)
         model = str(routing.get("model") or model)
+        if routing.get("tool_optimised_mode"):
+            tier = str(routing.get("escalation_tier") or "T2")
+            messages = _inject_tool_optimised_mode(messages, tier=tier)
 
         tools_reserve = _estimate_tools_tokens(body.get("tools")) if body.get("tools") else 0
         try:

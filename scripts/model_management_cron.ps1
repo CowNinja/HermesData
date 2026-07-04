@@ -1,4 +1,4 @@
-# model_management_cron.ps1 — scheduled agent ticks (6h light / 24h full)
+# model_management_cron.ps1 - scheduled agent ticks (6h light / 24h full)
 param(
     [ValidateSet("light", "full")]
     [string]$Mode = "light"
