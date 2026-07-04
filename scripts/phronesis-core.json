@@ -1,143 +1,150 @@
-{
-  "version": "1.6",
-  "description": "Single source of truth for Phronesis minimal stack — sovereign router + model manager v1.0 sealed (Session 10)",
-  "foundation_seal": {
-    "router_model_manager": "v1.0",
-    "sealed_at": "2026-07-03",
-    "hub": "http://127.0.0.1:3001/dashboard"
-  },
-  "hermes_root": "D:\\HermesData",
-  "canonical_env": "D:\\HermesData\\.env",
-  "venv_python": "D:\\HermesData\\hermes-agent\\venv\\Scripts\\python.exe",
-  "node_exe": "D:\\Program Files\\nodejs\\node.exe",
-  "workspace_dir": "D:\\HermesData\\hermes-workspace",
-  "llama_exe": "D:\\PhronesisModels\\binaries\\test-prebuilts\\2026-06-28-b9828-cuda13\\llama-server.exe",
-  "model": "D:\\PhronesisModels\\models\\current\\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q6_K.gguf",
-  "model_label": "Qwythos-9B-Q6_K",
-  "model_locked": true,
-  "model_rotation_locked": true,
-  "model_swap_success": true,
-  "allowed_models": ["Qwythos-9B-Q6_K"],
-  "ctx_size": 65536,
-  "runtime_ctx_size": 16384,
-  "use_runtime_ctx_split": true,
-  "n_gpu_layers": 99,
-  "proxy_script": "D:\\HermesData\\scripts\\sovereign_openai_proxy.py",
-  "ports": {
-    "router": 8090,
-    "proxy": 8091,
-    "gateway": 8642,
-    "dashboard": 9119,
-    "workspace": 3001
-  },
-  "start_gateway": true,
-  "start_dashboard": true,
-  "start_workspace": true,
-  "log_dir": "D:\\PhronesisVault\\Operations\\logs",
-  "_notes": {
-    "inference_engine": "llama-server @ 8090 (llama.cpp). Ollama num_ctx on 11434 is IRRELEVANT to Phronesis inference — do not tune Ollama for agent chat.",
-    "ollama_port_11434": "embeddings/vision aux only — not the sovereign brain",
-    "venv_rule": "ONLY hermes-agent\\venv may run gateway, dashboard, proxy. System Python311 forks are killed by ForkGuard."
-  },
-  "desktop": {
-    "hidden_child_processes": true,
-    "gateway_launcher": "venv pythonw.exe",
-    "env_flags": [
-      "HERMES_CHILD_PROCESS_HIDDEN=1",
-      "HERMES_DESKTOP_QUIET_PLUGIN_LOAD=1",
-      "HERMES_GATEWAY_RESPONSE_TRUNCATION_GUARD=1",
-      "HERMES_GATEWAY_FORCE_FINISH_REASON=1"
-    ],
-    "launch_script": "D:\\HermesData\\scripts\\Phronesis-Desktop-Hidden.ps1"
-  },
-  "vram": {
-    "min_free_mb": 2500,
-    "warn_only": true,
-    "fallback_model": null,
-    "fallback_ctx_size": null,
-    "fallback_n_gpu_layers": null
-  },
-  "fork_guard": {
-    "enabled": true,
-    "venv_marker": "hermes-agent\\venv",
-    "venv_python_only": true,
-    "parent_chain_accept": true,
-    "proxy_ready_max_sec": 15,
-    "gateway_health_max_sec": 4,
-    "ui_ready_max_sec": 20
-  },
-  "monitoring": {
-    "guardian_log": "D:\\PhronesisVault\\Operations\\logs\\guardian.log",
-    "session_health_log": "D:\\PhronesisVault\\Session-Health-Log.md",
-    "auto_append_on_heal": true
-  },
-  "plugins": [],
-  "future_models": [
-    {
-      "label": "Qwythos-9B-Q6_K",
-      "path": "D:\\PhronesisModels\\models\\current\\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q6_K.gguf",
-      "ctx_size": 65536,
-      "n_gpu_layers": 99,
-      "active": true
-    },
-    {
-      "label": "Qwen14B-Q5_K_M",
-      "path": "D:\\PhronesisModels\\models\\candidates\\Qwen2.5-Coder-14B-Instruct-abliterated-Q5_K_M.gguf",
-      "ctx_size": 16384,
-      "n_gpu_layers": 28,
-      "active": false,
-      "permanently_disabled": true,
-      "disabled_reason": "Session 7 rotation lock — 9B Q6_K @ 65536 only"
-    }
-  ],
-  "custom_crons": [
-    {
-      "id": "model-mgmt-light",
-      "schedule": "0 */6 * * *",
-      "description": "Light agent tick — stack + rank + safe remediate",
-      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File D:\\HermesData\\scripts\\model_management_cron.ps1 -Mode light",
-      "enabled": true
-    },
-    {
-      "id": "model-mgmt-full",
-      "schedule": "0 3 * * *",
-      "description": "Full agent tick — cloud health + harness + fleet suggest",
-      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File D:\\HermesData\\scripts\\model_management_cron.ps1 -Mode full",
-      "enabled": true
-    }
-  ],
-  "wisdom_extensions": [
-    {
-      "id": "voice_constellation",
-      "enabled": true,
-      "script": "D:\\PhronesisVault\\scripts\\voice_constellation_stub.py",
-      "api": "/api/sovereign-stack/voice-constellation"
-    },
-    {
-      "id": "heal_cli_dashboard",
-      "enabled": true,
-      "port": 9119,
-      "action": "heal-dashboard"
-    },
-    {
-      "id": "semantic_routing",
-      "enabled": false,
-      "note": "RouteLLM-style — YAML flag only until benchmark proof"
-    },
-    {
-      "id": "ab_sandbox",
-      "enabled": false,
-      "note": "Dual-model A/B when dual_feasible + lock off"
-    },
-    {
-      "id": "metrics_export",
-      "enabled": false,
-      "note": "Prometheus sidecar — not in hot path"
-    },
-    {
-      "id": "agent_swarm",
-      "enabled": false,
-      "note": "Multi-Hermes on same stack — fleet registry extension"
-    }
-  ]
+﻿{
+    "version":  "1.6",
+    "description":  "Single source of truth for Phronesis minimal stack â€” sovereign router + model manager v1.0 sealed (Session 10)",
+    "foundation_seal":  {
+                            "router_model_manager":  "v1.0",
+                            "sealed_at":  "2026-07-03",
+                            "hub":  "http://127.0.0.1:3001/dashboard"
+                        },
+    "hermes_root":  "D:\\HermesData",
+    "canonical_env":  "D:\\HermesData\\.env",
+    "venv_python":  "D:\\HermesData\\hermes-agent\\venv\\Scripts\\python.exe",
+    "node_exe":  "D:\\Program Files\\nodejs\\node.exe",
+    "workspace_dir":  "D:\\HermesData\\hermes-workspace",
+    "llama_exe":  "D:\\PhronesisModels\\binaries\\test-prebuilts\\2026-06-28-b9828-cuda13\\llama-server.exe",
+    "model":  "D:\\PhronesisModels\\models\\current\\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q6_K.gguf",
+    "model_label":  "Qwythos-9B-Q6_K",
+    "model_locked":  true,
+    "model_rotation_locked":  true,
+    "model_swap_success":  true,
+    "allowed_models":  [
+                           "Qwythos-9B-Q6_K"
+                       ],
+    "ctx_size":  65536,
+    "runtime_ctx_size":  16384,
+    "use_runtime_ctx_split":  true,
+    "n_gpu_layers":  38,
+    "proxy_script":  "D:\\HermesData\\scripts\\sovereign_openai_proxy.py",
+    "ports":  {
+                  "router":  8090,
+                  "proxy":  8091,
+                  "gateway":  8642,
+                  "dashboard":  9119,
+                  "workspace":  3001
+              },
+    "dashboard_host":  "0.0.0.0",
+    "start_gateway":  true,
+    "start_dashboard":  true,
+    "start_workspace":  true,
+    "log_dir":  "D:\\PhronesisVault\\Operations\\logs",
+    "_notes":  {
+                   "inference_engine":  "llama-server @ 8090 (llama.cpp). Ollama num_ctx on 11434 is IRRELEVANT to Phronesis inference â€” do not tune Ollama for agent chat.",
+                   "ollama_port_11434":  "embeddings/vision aux only â€” not the sovereign brain",
+                   "venv_rule":  "ONLY hermes-agent\\venv may run gateway, dashboard, proxy. System Python311 forks are killed by ForkGuard."
+               },
+    "desktop":  {
+                    "hidden_child_processes":  true,
+                    "gateway_launcher":  "venv pythonw.exe",
+                    "env_flags":  [
+                                      "HERMES_CHILD_PROCESS_HIDDEN=1",
+                                      "HERMES_DESKTOP_QUIET_PLUGIN_LOAD=1",
+                                      "HERMES_GATEWAY_RESPONSE_TRUNCATION_GUARD=1",
+                                      "HERMES_GATEWAY_FORCE_FINISH_REASON=1"
+                                  ],
+                    "launch_script":  "D:\\HermesData\\scripts\\Phronesis-Desktop-Hidden.ps1"
+                },
+    "vram":  {
+                 "min_free_mb":  2500,
+                 "warn_only":  true,
+                 "fallback_model":  null,
+                 "fallback_ctx_size":  null,
+                 "fallback_n_gpu_layers":  null,
+                 "hybrid_n_gpu_layers":  38,
+                 "hybrid_notes":  "38 layers leaves ~4-5GB VRAM for Comfy novram on RTX 3060 12GB + 128GB RAM"
+             },
+    "fork_guard":  {
+                       "enabled":  true,
+                       "venv_marker":  "hermes-agent\\venv",
+                       "venv_python_only":  true,
+                       "parent_chain_accept":  true,
+                       "proxy_ready_max_sec":  15,
+                       "gateway_health_max_sec":  4,
+                       "ui_ready_max_sec":  20
+                   },
+    "monitoring":  {
+                       "guardian_log":  "D:\\PhronesisVault\\Operations\\logs\\guardian.log",
+                       "session_health_log":  "D:\\PhronesisVault\\Session-Health-Log.md",
+                       "auto_append_on_heal":  true
+                   },
+    "plugins":  [
+
+                ],
+    "future_models":  [
+                          {
+                              "label":  "Qwythos-9B-Q6_K",
+                              "path":  "D:\\PhronesisModels\\models\\current\\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q6_K.gguf",
+                              "ctx_size":  65536,
+                              "n_gpu_layers":  99,
+                              "active":  true
+                          },
+                          {
+                              "label":  "Qwen14B-Q5_K_M",
+                              "path":  "D:\\PhronesisModels\\models\\candidates\\Qwen2.5-Coder-14B-Instruct-abliterated-Q5_K_M.gguf",
+                              "ctx_size":  16384,
+                              "n_gpu_layers":  28,
+                              "active":  false,
+                              "permanently_disabled":  true,
+                              "disabled_reason":  "Session 7 rotation lock â€” 9B Q6_K @ 65536 only"
+                          }
+                      ],
+    "custom_crons":  [
+                         {
+                             "id":  "model-mgmt-light",
+                             "schedule":  "0 */6 * * *",
+                             "description":  "Light agent tick â€” stack + rank + safe remediate",
+                             "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File D:\\HermesData\\scripts\\model_management_cron.ps1 -Mode light",
+                             "enabled":  true
+                         },
+                         {
+                             "id":  "model-mgmt-full",
+                             "schedule":  "0 3 * * *",
+                             "description":  "Full agent tick â€” cloud health + harness + fleet suggest",
+                             "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File D:\\HermesData\\scripts\\model_management_cron.ps1 -Mode full",
+                             "enabled":  true
+                         }
+                     ],
+    "wisdom_extensions":  [
+                              {
+                                  "id":  "voice_constellation",
+                                  "enabled":  true,
+                                  "script":  "D:\\PhronesisVault\\scripts\\voice_constellation_stub.py",
+                                  "api":  "/api/sovereign-stack/voice-constellation"
+                              },
+                              {
+                                  "id":  "heal_cli_dashboard",
+                                  "enabled":  true,
+                                  "port":  9119,
+                                  "action":  "heal-dashboard"
+                              },
+                              {
+                                  "id":  "semantic_routing",
+                                  "enabled":  false,
+                                  "note":  "RouteLLM-style â€” YAML flag only until benchmark proof"
+                              },
+                              {
+                                  "id":  "ab_sandbox",
+                                  "enabled":  false,
+                                  "note":  "Dual-model A/B when dual_feasible + lock off"
+                              },
+                              {
+                                  "id":  "metrics_export",
+                                  "enabled":  false,
+                                  "note":  "Prometheus sidecar â€” not in hot path"
+                              },
+                              {
+                                  "id":  "agent_swarm",
+                                  "enabled":  false,
+                                  "note":  "Multi-Hermes on same stack â€” fleet registry extension"
+                              }
+                          ]
 }

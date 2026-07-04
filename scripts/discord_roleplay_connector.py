@@ -259,6 +259,30 @@ def scan_messages_for_roleplay(
 
     if not in_alice and chat_name and "alice-roleplay" in chat_name.lower():
         in_alice = True
+    if not in_alice and system_blob:
+        sys_l = system_blob.lower()
+        if any(
+            token in sys_l
+            for token in (
+                "#alice-roleplay",
+                "alice rp sandbox",
+                "alice narrator thread",
+                "platform alice-roleplay",
+            )
+        ):
+            in_alice = True
+
+    if not chat_id:
+        for pattern in (
+            r"channel_id[:\s]+(\d{15,25})",
+            r"chat_id[:\s]+(\d{15,25})",
+            r"thread[:\s]+(\d{15,25})",
+        ):
+            m_id = re.search(pattern, system_blob, re.IGNORECASE)
+            if m_id and is_alice_roleplay_discord_location(chat_id=m_id.group(1)):
+                chat_id = m_id.group(1)
+                in_alice = True
+                break
 
     if in_alice:
         platform = "alice-roleplay"
@@ -268,6 +292,11 @@ def scan_messages_for_roleplay(
     model = default_model
     force_roleplay = False
     reasons: List[str] = []
+
+    if "roleplay" in (default_model or "").lower():
+        force_roleplay = True
+        model = default_model
+        reasons.append("channel_model=roleplay")
 
     if in_alice:
         force_roleplay = True

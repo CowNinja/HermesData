@@ -768,6 +768,47 @@ def _message_blob(messages: List[Dict[str, Any]]) -> str:
     return "\n".join(parts)
 
 
+def _roleplay_route_active(
+    routing: Optional[Dict[str, Any]] = None,
+    model: str = "",
+    messages: Optional[List[Dict[str, Any]]] = None,
+) -> bool:
+    """True when this turn must use narrative-fast (no llama tool grammar)."""
+    routing = routing or {}
+    model_l = (model or routing.get("model") or "").lower()
+    if routing.get("force_roleplay"):
+        return True
+    if routing.get("task_type") == "roleplay":
+        return True
+    if "roleplay" in model_l:
+        return True
+    blob = _message_blob(messages or []).lower()
+    if any(
+        token in blob
+        for token in (
+            "#alice-roleplay",
+            "alice rp sandbox",
+            "alice narrator thread",
+            "platform alice-roleplay",
+        )
+    ):
+        return True
+    return False
+
+
+def _blob_has_factual_tool_intent(blob: str) -> bool:
+    """Match factual tool intent without false positives from image_generate policy text."""
+    lower = (blob or "").lower()
+    for marker in FACTUAL_TOOL_MARKERS:
+        if marker == "image_gen":
+            if re.search(r"\bimage_gen\b", lower):
+                return True
+            continue
+        if marker in lower:
+            return True
+    return False
+
+
 def is_narrative_fast_path(
     messages: List[Dict[str, Any]],
     body: Optional[Dict[str, Any]] = None,
@@ -776,6 +817,9 @@ def is_narrative_fast_path(
     """Detect creative/narrative turns that must skip reasoning traces."""
     body = body or {}
     routing = routing or {}
+    model = str(routing.get("model") or body.get("model") or "")
+    if _roleplay_route_active(routing, model, messages):
+        return True
     try:
         from roleplay_route_guard import extract_phronesis_body
 
@@ -794,20 +838,27 @@ def is_narrative_fast_path(
         return True
     if phronesis.get("narrative_fast") or phronesis.get("suppress_reasoning"):
         return True
-    if routing.get("force_roleplay"):
-        return True
     blob = _message_blob(messages).lower()
-    if any(marker in blob for marker in FACTUAL_TOOL_MARKERS):
+    if _blob_has_factual_tool_intent(blob):
         return False
     if not any(marker in blob for marker in NARRATIVE_FAST_MARKERS):
         return False
-    # Narrative fast path is sandbox-bound — alice-roleplay channel context only.
     return "alice-roleplay" in blob or "#alice-roleplay" in blob
 
 
-def _requires_factual_tool_use(messages: List[Dict[str, Any]]) -> bool:
-    blob = _message_blob(messages).lower()
-    return any(marker in blob for marker in FACTUAL_TOOL_MARKERS)
+def _requires_factual_tool_use(
+    messages: List[Dict[str, Any]],
+    routing: Optional[Dict[str, Any]] = None,
+    model: str = "",
+) -> bool:
+    if _roleplay_route_active(routing, model, messages):
+        return False
+    last_user = ""
+    for msg in reversed(messages or []):
+        if isinstance(msg, dict) and str(msg.get("role") or "").lower() == "user":
+            last_user = _extract_content(msg.get("content")).lower()
+            break
+    return _blob_has_factual_tool_intent(last_user)
 
 
 def _windows_powershell_wrap(command: str) -> str:
@@ -1052,6 +1103,7 @@ def dispatch_via_native_router(
     """Forward full OpenAI chat payload to llama-server on 8090 (tools + messages)."""
     routing = routing or {}
     logical = resolve_backend_logical_model(gateway_model, routing)
+    gateway_model = str(routing.get("model") or gateway_model or "")
     narrative_fast = is_narrative_fast_path(messages, body, routing)
     tool_passthrough = _request_needs_tool_passthrough(body, messages)
 
@@ -1066,7 +1118,7 @@ def dispatch_via_native_router(
 
     prompt_tokens = sum(_message_tokens(m) for m in messages)
     tools_tokens = _estimate_tools_tokens(body.get("tools")) if tool_passthrough else 0
-    factual_tools = _requires_factual_tool_use(messages)
+    factual_tools = _requires_factual_tool_use(messages, routing=routing, model=gateway_model)
     requested_max = int(body.get("max_tokens") or 2048)
     safe_max = max(512, live_ctx - prompt_tokens - tools_tokens - 256)
     cap = 4096 if (tool_passthrough or factual_tools) else 2048
@@ -1131,10 +1183,34 @@ def dispatch_via_native_router(
                     "cache_hit": True,
                 }
 
-        # Dispatch through circuit breaker + connection pool
-        result = _dispatch_upstream_with_pool(UNIFIED_ROUTER_CHAT, payload_bytes)
+        def _dispatch_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+            raw = json.dumps(payload).encode("utf-8")
+            return _dispatch_upstream_with_pool(UNIFIED_ROUTER_CHAT, raw)
+
+        result = _dispatch_payload(forward)
         if result["status"] != 200:
-            raise RuntimeError(f"upstream returned HTTP {result['status']}: {result['body'][:200]}")
+            err_body = result.get("body") or b""
+            err_text = err_body.decode("utf-8", errors="replace") if isinstance(err_body, (bytes, bytearray)) else str(err_body)
+            grammar_fail = (
+                result["status"] == 400
+                and "unable to generate parser" in err_text.lower()
+            )
+            if grammar_fail and forward.get("tools"):
+                _log_event({"event": "grammar_retry_no_tools", "model": logical})
+                retry_forward = dict(forward)
+                retry_forward.pop("tools", None)
+                retry_forward.pop("tool_choice", None)
+                result = _dispatch_payload(retry_forward)
+                if result["status"] == 200:
+                    forward = retry_forward
+                    narrative_fast = True
+                else:
+                    rb = result.get("body") or b""
+                    raise RuntimeError(
+                        f"upstream returned HTTP {result['status']}: {rb[:200]!r}"
+                    )
+            else:
+                raise RuntimeError(f"upstream returned HTTP {result['status']}: {err_text[:200]}")
         data = json.loads(result["body"].decode("utf-8"))
 
         # Cache the response
@@ -1165,7 +1241,7 @@ def dispatch_via_native_router(
     except Exception:
         pass  # Fixer is best-effort; fall through to existing behavior
 
-    factual_tools = _requires_factual_tool_use(messages)
+    factual_tools = _requires_factual_tool_use(messages, routing=routing, model=gateway_model)
     if body.get("tools") and not msg.get("tool_calls"):
         synthesized = None
         if factual_tools:
@@ -1226,8 +1302,6 @@ def resolve_roleplay_routing(
         phronesis = extract_phronesis_body(body)
     except Exception:
         phronesis = {}
-    narrative_fast = is_narrative_fast_path(messages, body)
-
     roleplay_default = "phronesis-sovereign-roleplay"
     try:
         import yaml
@@ -1261,6 +1335,8 @@ def resolve_roleplay_routing(
     resolved_model = str(scan.get("model") or model or "phronesis-sovereign-auto")
     if force_roleplay and resolved_model.endswith("-auto"):
         resolved_model = roleplay_default
+    if "roleplay" in resolved_model.lower():
+        force_roleplay = True
 
     routing: Dict[str, Any] = {
         "request_model": model,
@@ -1274,36 +1350,41 @@ def resolve_roleplay_routing(
         "force_roleplay": force_roleplay,
         "task_type": "roleplay" if force_roleplay else resolve_task_type(resolved_model),
         "reasons": list(scan.get("reasons") or (["unified_generalist"] if not force_roleplay else [])),
-        "narrative_fast": narrative_fast or force_roleplay,
-        "suppress_reasoning": narrative_fast or force_roleplay,
+        "narrative_fast": False,
+        "suppress_reasoning": False,
         "chat_id": str(phronesis.get("chat_id") or ""),
         "thread_id": str(phronesis.get("thread_id") or ""),
         "parent_channel_id": str(phronesis.get("parent_channel_id") or ""),
     }
     tool_fails = _count_recent_tool_failures(messages)
     routing["tool_fail_count"] = tool_fails
-    blob = _message_blob(messages).lower()
-    image_timeout = any(
-        k in blob for k in ("image_gen_timeout", "image timeout", "comfy timeout", "generation timed out")
-    )
-    if tool_fails > 2 or image_timeout:
-        routing["escalation_tier"] = "T3"
-        routing["tool_optimised_mode"] = True
-        reasons = list(routing.get("reasons") or [])
-        if tool_fails > 2:
+    # Roleplay / alice sandbox: never Grok-escalate on tool_fail or image keywords.
+    if not force_roleplay:
+        blob = _message_blob(messages).lower()
+        image_timeout = any(
+            k in blob for k in ("image_gen_timeout", "image timeout", "comfy timeout", "generation timed out")
+        )
+        if tool_fails > 2 or image_timeout:
+            routing["escalation_tier"] = "T3"
+            routing["tool_optimised_mode"] = True
+            reasons = list(routing.get("reasons") or [])
+            if tool_fails > 2:
+                reasons.append(f"tool_fail_count={tool_fails}")
+            if image_timeout:
+                reasons.append("image_gen_timeout")
+            routing["reasons"] = reasons
+        elif tool_fails > 1:
+            routing["escalation_tier"] = "T2"
+            routing["tool_optimised_mode"] = True
+            reasons = list(routing.get("reasons") or [])
             reasons.append(f"tool_fail_count={tool_fails}")
-        if image_timeout:
-            reasons.append("image_gen_timeout")
-        routing["reasons"] = reasons
-    elif tool_fails > 1:
-        routing["escalation_tier"] = "T2"
-        routing["tool_optimised_mode"] = True
-        reasons = list(routing.get("reasons") or [])
-        reasons.append(f"tool_fail_count={tool_fails}")
-        routing["reasons"] = reasons
-    elif any(k in blob for k in ("heavy reasoning", "grok heavy", "tier 3", "t3 escalate")):
-        routing["escalation_tier"] = "T3"
-        routing["tool_optimised_mode"] = True
+            routing["reasons"] = reasons
+        elif any(k in blob for k in ("heavy reasoning", "grok heavy", "tier 3", "t3 escalate")):
+            routing["escalation_tier"] = "T3"
+            routing["tool_optimised_mode"] = True
+    nf = is_narrative_fast_path(messages, body, routing)
+    routing["narrative_fast"] = nf
+    routing["suppress_reasoning"] = nf
     return routing
 
 
@@ -1610,6 +1691,14 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             )
 
         started = time.time()
+        try:
+            from sovereign_preflight import ensure_sovereign_router
+
+            if not ensure_sovereign_router():
+                _log_event({"event": "router_preflight_failed", "model": model})
+        except Exception as pre_exc:
+            _log_event({"event": "router_preflight_exception", "error": str(pre_exc)})
+
         use_native = _unified_router_up()
         try:
             if use_native:

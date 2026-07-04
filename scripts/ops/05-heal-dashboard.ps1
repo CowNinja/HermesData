@@ -5,10 +5,12 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $corePath = Join-Path $scriptRoot "..\phronesis-core.json"
 $dashPort = 9119
+$dashHost = "127.0.0.1"
 if (Test-Path $corePath) {
     try {
         $core = Get-Content $corePath -Raw | ConvertFrom-Json
         if ($core.ports.dashboard) { $dashPort = [int]$core.ports.dashboard }
+        if ($core.dashboard_host) { $dashHost = [string]$core.dashboard_host }
     } catch {
         # keep default
     }
@@ -32,7 +34,7 @@ $up = Wait-PortUp -Port $dashPort -MaxSeconds 30
 if (-not $up) {
     $py = if (Test-Path $VenvPython) { $VenvPython } else { $VenvPythonw }
     Start-Process -FilePath $py `
-        -ArgumentList "-m", "hermes_cli.main", "dashboard", "--port", "$dashPort", "--host", "127.0.0.1", "--skip-build", "--no-open" `
+        -ArgumentList "-m", "hermes_cli.main", "dashboard", "--port", "$dashPort", "--host", $dashHost, "--skip-build", "--no-open" `
         -WorkingDirectory $HermesRoot `
         -WindowStyle Hidden
     $up = Wait-PortUp -Port $dashPort -MaxSeconds 35

@@ -18,6 +18,9 @@ from typing import Any, Dict, List, Optional
 
 VAULT = Path(r"D:\PhronesisVault")
 HERMES_SCRIPTS = Path(r"D:\HermesData\scripts")
+if str(HERMES_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(HERMES_SCRIPTS))
+from windows_subprocess import hidden_powershell_args, run_hidden  # noqa: E402
 STATE_PATH = VAULT / "Operations" / "logs" / "model-resource-state.json"
 MOE_MAP = VAULT / "Operations" / "MoE-Task-Type-Map-v0.1.json"
 START_MOE_PS1 = HERMES_SCRIPTS / "Start-MoE-Stack.ps1"
@@ -244,8 +247,8 @@ def attempt_proxy_recovery(dry_run: bool = False) -> Dict[str, Any]:
         return {"ok": False, "reason": "start_script_missing"}
 
     try:
-        proc = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(proxy_script)],
+        proc = run_hidden(
+            hidden_powershell_args(str(proxy_script)),
             cwd=str(HERMES_SCRIPTS),
             capture_output=True,
             text=True,
@@ -287,8 +290,8 @@ def attempt_moe_recovery(dry_run: bool = False) -> Dict[str, Any]:
         return {"ok": False, "reason": "start_script_missing", "path": str(script)}
 
     try:
-        proc = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+        proc = run_hidden(
+            hidden_powershell_args(str(script)),
             cwd=str(HERMES_SCRIPTS),
             capture_output=True,
             text=True,

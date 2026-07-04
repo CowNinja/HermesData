@@ -5,11 +5,14 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('go','start','stop','restart','heal','status','dashboard','smoke','recover','boot','desktop','gateway','llama','proxy','doctor','help')]
+    [ValidateSet('go','start','stop','restart','heal','status','verify','dashboard','smoke','recover','boot','desktop','gateway','llama','proxy','vram','doctor','help')]
     [string]$Command = 'help',
 
     [Parameter(Position = 1)]
     [string]$SubCommand,
+
+    [Parameter(Position = 2)]
+    [string]$ThirdArg,
 
     [switch]$SkipGateway,
     [switch]$SkipDashboard,
@@ -25,7 +28,7 @@ $scriptRoot = $PSScriptRoot
 $ops = Join-Path $scriptRoot "ops"
 
 function Invoke-PhronesisScript([string]$path, [string[]]$extra = @()) {
-    $psArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $path)
+    $psArgs = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $path)
     if ($extra.Count -gt 0) { $psArgs += $extra }
     & powershell @psArgs
     return $LASTEXITCODE
@@ -43,6 +46,11 @@ function Show-Help {
     stop        Stop full stack
     heal        Fix broken ports/processes (-ForceGateway if Discord stuck)
     status      Quick port check
+    verify      Full health check (ports, vram, venv, inference)
+    vram text   !textmode  - free GPU for Qwythos chat (stops Comfy)
+    vram image  !imagefree - free GPU for Comfy renders (stops llama)
+    vram hybrid on|off     - both stacks warm in RAM (reduced n_gpu_layers + Comfy novram)
+    vram ramprefer on|off  - Comfy RAM staging experiment (--novram vs --lowvram)
     dashboard   Pretty health report
 
   WHEN THINGS ARE REALLY BROKEN:
@@ -68,7 +76,7 @@ function Invoke-Heal([switch]$Force, [switch]$Quiet) {
     $healArgs = @()
     if ($Force) { $healArgs += '-ForceGateway' }
     if ($Quiet) { $healArgs += '-Quiet' }
-    $result = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scriptRoot "Phronesis-Heal.ps1") @healArgs
+    $result = & powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File (Join-Path $scriptRoot "Phronesis-Heal.ps1") @healArgs
     return $(if ($result -and $result.ExitCode -ne $null) { [int]$result.ExitCode } else { 0 })
 }
 
@@ -118,6 +126,33 @@ switch ($Command) {
     'status' {
         exit (Invoke-PhronesisScript (Join-Path $ops "04-status.ps1"))
     }
+    'verify' {
+        exit (Invoke-PhronesisScript (Join-Path $scriptRoot "Phronesis-Full-Health-Check.ps1"))
+    }
+    'vram' {
+        $sub = if ($SubCommand) { $SubCommand.ToLower() } else { 'status' }
+        if ($sub -eq 'hybrid') {
+            $toggle = if ($ThirdArg) { $ThirdArg.ToLower() } else { 'status' }
+            $hybridMode = switch ($toggle) {
+                'on'  { 'On' }
+                'off' { 'Off' }
+                default { 'Status' }
+            }
+            exit (Invoke-PhronesisScript (Join-Path $scriptRoot "Phronesis-Hybrid-Warm-Mode.ps1") @('-Mode', $hybridMode))
+        }
+        if ($sub -eq 'ramprefer') {
+            $toggle = if ($ThirdArg) { $ThirdArg.ToLower() } else { '' }
+            $ramMode = switch ($toggle) {
+                'on'  { 'RamPreferOn' }
+                'off' { 'RamPreferOff' }
+                default { 'RamPreferStatus' }
+            }
+            exit (Invoke-PhronesisScript (Join-Path $scriptRoot "Phronesis-VRAM-Guardian.ps1") @('-Mode', $ramMode))
+        }
+        $vramMode = if ($sub -match '^(text|image|status)$') { $sub } else { 'status' }
+        $vramMode = (Get-Culture).TextInfo.ToTitleCase($vramMode)
+        exit (Invoke-PhronesisScript (Join-Path $scriptRoot "Phronesis-VRAM-Guardian.ps1") @('-Mode', $vramMode))
+    }
     'dashboard' {
         exit (Invoke-PhronesisScript (Join-Path $ops "Phronesis-Dashboard.ps1"))
     }
@@ -163,6 +198,7 @@ switch ($Command) {
     }
     'gateway' {
         . (Join-Path $scriptRoot "Phronesis-ForkGuard.ps1")
+        . (Join-Path $scriptRoot "Phronesis-Maintenance-Lock.ps1")
         $sub = if ($SubCommand) { $SubCommand.ToLower() } else { 'status' }
         $core = Get-Content (Join-Path $scriptRoot "phronesis-core.json") -Raw | ConvertFrom-Json
         $py = $core.venv_python
@@ -176,6 +212,11 @@ switch ($Command) {
                 Write-Host "Gateway failed to become ready" -ForegroundColor Red; exit 1
             }
             'stop' {
+                $block = Test-PhronesisMaintenanceBlocked -Action gateway_stop
+                if ($block.blocked) {
+                    Write-Host "Gateway stop blocked: $($block.reason)" -ForegroundColor Yellow
+                    exit 2
+                }
                 Push-Location $core.hermes_root
                 try {
                     $job = Start-Job { param($p) & $p -m hermes_cli.main gateway stop 2>&1 } -ArgumentList $py
@@ -189,6 +230,11 @@ switch ($Command) {
                 exit 0
             }
             'restart' {
+                $block = Test-PhronesisMaintenanceBlocked -Action gateway_restart
+                if ($block.blocked) {
+                    Write-Host "Gateway restart blocked: $($block.reason)" -ForegroundColor Yellow
+                    exit 2
+                }
                 Restart-VenvGateway
                 if (Wait-GatewayReady -MaxSeconds 45) { Write-Host "Gateway restarted on $gwPort" -ForegroundColor Green; exit 0 }
                 Write-Host "Gateway restart failed" -ForegroundColor Red; exit 1

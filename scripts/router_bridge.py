@@ -105,9 +105,23 @@ def detect_grok_escalation_triggers(
     }
     """
     prompt_lower = (prompt or '').lower()
-    task_lower = (task_type or '').lower()
+    task_lower = (task_type or '').lower().replace('-', '_')
+    is_roleplay = task_lower in (
+        'roleplay', 'narrative', 'immersive_roleplay', 'dnd', 'd_and_d', 'rp',
+    )
     matched = []
     reasons = []
+
+    # Private RP sandboxes stay on local Qwythos — never Grok-escalate on tool noise.
+    if is_roleplay:
+        return {
+            'should_escalate': False,
+            'matched_triggers': [],
+            'reason': 'roleplay sandbox — local sovereign only',
+            'recommended_tier': None,
+            'policy_version': 'v0.4_t2_t3',
+            'tool_fail_count': int(tool_fail_count or 0),
+        }
 
     # 1. Complex architectural / systems reasoning
     arch_keywords = ['architecture', 'system design', 'multi-hour', 'cross-document', 'novel design', 'high-level design', 'deep synthesis']
@@ -570,8 +584,8 @@ def bridge_dispatch(
     }
     provenance["unified_generalist"] = True
 
-    # Paid Grok (Tier 2) — high-stakes / explicit only
-    if escalation_info.get("should_escalate") and not (force_local and not explicit_grok_flag):
+    # Paid Grok (Tier 2) — never block force_local sovereign dispatch (log only).
+    if escalation_info.get("should_escalate") and not force_local:
         provenance["escalation_recommended"] = True
         provenance["escalation_triggers"] = escalation_info["matched_triggers"]
         provenance["escalation_reason"] = escalation_info["reason"]

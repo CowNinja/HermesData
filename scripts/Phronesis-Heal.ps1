@@ -9,6 +9,7 @@ $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $My
 
 . (Join-Path $scriptRoot "Phronesis-Session.ps1")
 . (Join-Path $scriptRoot "Phronesis-ForkGuard.ps1")
+. (Join-Path $scriptRoot "Phronesis-Maintenance-Lock.ps1")
 
 $corePath = Join-Path $scriptRoot "phronesis-core.json"
 $core = Get-Content $corePath -Raw | ConvertFrom-Json
@@ -71,7 +72,8 @@ if ($core.start_gateway) {
         if (((Get-Date) - $lastHeal).TotalSeconds -lt $healCooldownSec) { $inCooldown = $true }
     }
 
-    if (($gwDown -or $gwBadOwner -or $gwUnhealthy) -and -not $inCooldown) {
+    $gwBlock = Test-PhronesisMaintenanceBlocked -Action gateway_heal
+    if (($gwDown -or $gwBadOwner -or $gwUnhealthy) -and -not $inCooldown -and -not $gwBlock.blocked) {
         Write-Heal "Healing gateway ($gwPort)..." "Cyan"
         $zombies = @(Remove-StaleGatewayZombies)
         if ($zombies.Count -gt 0) { $actions += "gw_zombies:$($zombies.Count)" }
@@ -84,8 +86,10 @@ if ($core.start_gateway) {
 
         & $core.venv_python (Join-Path $scriptRoot "sovereign_preflight.py") 2>$null
 
+        $restartBlock = Test-PhronesisMaintenanceBlocked -Action gateway_restart
         if ($gwDown) { Start-VenvGateway; $actions += "gateway_start" }
-        else { Restart-VenvGateway; $actions += "gateway_restart" }
+        elseif (-not $restartBlock.blocked) { Restart-VenvGateway; $actions += "gateway_restart" }
+        else { $actions += "gateway_restart:LOCKED"; Write-Heal "Gateway restart skipped (maintenance lock / in-flight Discord)" "DarkYellow" }
 
         New-Item -ItemType Directory -Force -Path (Split-Path $healMarker) | Out-Null
         Set-Content -Path $healMarker -Value (Get-Date -Format 'o') -NoNewline
@@ -95,6 +99,9 @@ if ($core.start_gateway) {
         } else {
             $actions += "gateway_heal:FAIL"
         }
+    } elseif (($gwDown -or $gwBadOwner -or $gwUnhealthy) -and $gwBlock.blocked) {
+        $actions += "gateway_heal:LOCKED"
+        Write-Heal "Gateway heal skipped ($($gwBlock.reason))" "DarkYellow"
     } elseif (($gwDown -or $gwBadOwner -or $gwUnhealthy) -and $inCooldown) {
         $actions += "gateway_heal:COOLDOWN"
         Write-Heal "Gateway heal skipped (90s cooldown - use 'heal -ForceGateway')" "DarkYellow"

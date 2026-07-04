@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Post the newest Comfy PNG to a Discord thread (maintenance fallback)."""
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+COMFY_OUTPUT = Path(r"D:\ComfyUI\output")
+STATE_FILE = Path(r"D:\HermesData\state\comfy-delivery-daemon.json")
+POST_SCRIPT = Path(__file__).resolve().parents[2] / "temp" / "post_discord_image.py"
+DEFAULT_CHANNEL = "1521146755985576116"
+
+
+def _load_state() -> dict:
+    if STATE_FILE.is_file():
+        try:
+            return json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"last_name": "", "last_mtime": 0.0, "delivered": [], "delivered_sha256": []}
+
+
+def _save_state(state: dict) -> None:
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def newest_png() -> Path | None:
+    newest: Path | None = None
+    newest_mtime = 0.0
+    for path in COMFY_OUTPUT.glob("standard__*.png"):
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        if mtime > newest_mtime:
+            newest_mtime = mtime
+            newest = path
+    return newest
+
+
+def main() -> int:
+    channel = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CHANNEL
+    png = newest_png()
+    if not png:
+        print(json.dumps({"ok": False, "error": "no comfy png found"}))
+        return 1
+    state = _load_state()
+    digest = _sha256_file(png)
+    delivered = list(state.get("delivered") or [])
+    delivered_sha = list(state.get("delivered_sha256") or [])
+    if png.name in delivered or digest in delivered_sha:
+        print(json.dumps({"ok": True, "skipped": True, "reason": "already_delivered", "image": png.name}))
+        return 0
+    scripts = Path(__file__).resolve().parents[1]
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    from windows_subprocess import prefer_pythonw, run_hidden
+
+    caption = f"Force-deliver fallback — {png.name}"
+    proc = run_hidden(
+        [prefer_pythonw(sys.executable), str(POST_SCRIPT), channel, str(png), caption],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+    if proc.returncode != 0:
+        print(json.dumps({"ok": False, "error": proc.stderr or proc.stdout}))
+        return proc.returncode
+    delivered.append(png.name)
+    delivered_sha.append(digest)
+    state["delivered"] = delivered[-50:]
+    state["delivered_sha256"] = delivered_sha[-50:]
+    state["last_name"] = png.name
+    state["last_mtime"] = png.stat().st_mtime
+    _save_state(state)
+    print(proc.stdout.strip() or json.dumps({"ok": True, "image": png.name}))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
