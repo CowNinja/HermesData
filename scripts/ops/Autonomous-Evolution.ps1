@@ -91,13 +91,26 @@ function Invoke-EvolutionCycle([hashtable]$st) {
         } catch {}
     }
 
-    # Pattern: Comfy down -> start (never repair-kill when inference is offline)
+    # Pattern: Comfy down -> start (skip when image pipeline paused for sovereign router)
+    $pipelinePaused = $false
+    $pauseFile = Join-Path $root "state\image-pipeline-pause.json"
+    if (Test-Path $pauseFile) {
+        try {
+            $pauseState = Get-Content $pauseFile -Raw | ConvertFrom-Json
+            $pipelinePaused = [bool]$pauseState.paused
+        } catch {}
+    }
     $comfyUp = $false
     try {
         Invoke-RestMethod -Uri "http://127.0.0.1:8188/system_stats" -TimeoutSec 4 | Out-Null
         $comfyUp = $true
     } catch {}
-    if (-not $comfyUp) {
+    if ($pipelinePaused) {
+        if ($comfyUp) {
+            & "D:\ComfyUI\Comfy-Stack.ps1" stop inference -Quiet 2>&1 | Out-Null
+            $actions += "stop_comfy_paused"
+        }
+    } elseif (-not $comfyUp) {
         & "D:\ComfyUI\Comfy-Stack.ps1" start inference -Quiet | Out-Null
         $actions += "start_comfy_inference"
     } else {

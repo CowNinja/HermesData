@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lightweight Comfy pipeline monitor — queue depth, delivery latency, JSON metrics."""
+"""Lightweight Comfy pipeline monitor - queue depth, delivery latency, JSON metrics."""
 from __future__ import annotations
 
 import argparse
@@ -15,7 +15,8 @@ OPS = ROOT / "scripts" / "ops"
 if str(OPS) not in sys.path:
     sys.path.insert(0, str(OPS))
 
-from comfy_queue_client import comfy_up, queue_status, write_metrics  # noqa: E402
+from comfy_output_patterns import iter_output_pngs  # noqa: E402
+from comfy_queue_client import comfy_up, merge_metrics, queue_status  # noqa: E402
 
 STATE = ROOT / "state"
 LOGS = ROOT / "logs"
@@ -40,7 +41,7 @@ def _read_json(path: Path) -> dict:
 def _latest_png() -> dict:
     best = None
     best_mtime = 0.0
-    for path in COMFY_OUTPUT.glob("standard__*.png"):
+    for path in iter_output_pngs(COMFY_OUTPUT):
         try:
             mtime = path.stat().st_mtime
         except OSError:
@@ -90,8 +91,9 @@ def snapshot() -> dict:
         "latest_png": _latest_png(),
         "delivery": _delivery_latency(),
         "last_variation_loop": (prior.get("last_variation_loop") or {}),
+        "frame_timings": (prior.get("frame_timings") or [])[-14:],
     }
-    write_metrics(payload)
+    merge_metrics(payload)
     return payload
 
 

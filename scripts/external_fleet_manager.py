@@ -212,22 +212,39 @@ class FleetManager:
         kind: str,
         capabilities: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
+        ranked = self.select_provider_candidates(kind, capabilities)
+        return ranked[0] if ranked else None
+
+    def select_provider_candidates(
+        self,
+        kind: str,
+        capabilities: Optional[List[str]] = None,
+        *,
+        healthy_only: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Ranked provider list for failover — highest score first."""
         caps = [str(c).lower() for c in (capabilities or [])]
-        candidates = self.list_providers(kind=kind, healthy_only=True)
-        if not candidates:
+        candidates = self.list_providers(kind=kind, healthy_only=healthy_only)
+        if not candidates and healthy_only:
             candidates = self.list_providers(kind=kind, healthy_only=False)
         if not caps:
-            return candidates[0] if candidates else None
+            return candidates
         scored: List[Tuple[int, Dict[str, Any]]] = []
         for p in candidates:
             pcaps = {str(c).lower() for c in (p.get("capabilities") or [])}
-            score = sum(2 for c in caps if c in pcaps) + int(p.get("priority") or 0)
+            score = sum(2 for c in caps if c in pcaps) + int(p.get("_effective_priority") or p.get("priority") or 0)
             if any(c in pcaps for c in caps):
                 scored.append((score, p))
         if not scored:
-            return candidates[0] if candidates else None
-        scored.sort(key=lambda x: -x[0])
-        return scored[0][1]
+            return candidates
+        scored.sort(key=lambda x: (-x[0], str(x[1].get("id"))))
+        return [p for _, p in scored]
+
+    def _max_provider_retries(self) -> int:
+        try:
+            return max(1, int((self._registry.get("policy") or {}).get("max_retries_per_provider") or 2))
+        except Exception:
+            return 2
 
     def infer_capabilities(
         self,
@@ -339,9 +356,12 @@ class FleetManager:
             "max_tokens": 8,
             "temperature": 0,
         }
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "User-Agent": "Phronesis-Opportunistic-Fleet/1.0"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        if "openrouter" in base:
+            headers["HTTP-Referer"] = "https://phronesis.local"
+            headers["X-Title"] = "Phronesis Opportunistic Fleet"
         status, body = self._http_post(url, payload, headers=headers, timeout=45)
         ok = status == 200 and bool(body)
         return {"ok": ok, "http_status": status, "preview": str(body)[:200]}
@@ -406,27 +426,18 @@ class FleetManager:
         except urllib.error.HTTPError as exc:
             return exc.code, exc.read().decode("utf-8", errors="replace")[:500]
 
-    def dispatch_compute(
+    def _dispatch_compute_one(
         self,
+        provider: Dict[str, Any],
         prompt: str,
         *,
-        capabilities: Optional[List[str]] = None,
         system: str = "",
         max_tokens: int = 1024,
-        task_type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        if not self.enabled:
-            return {"success": False, "tier": TIER_NAME, "error": "fleet_disabled"}
-        caps = capabilities or self.infer_capabilities(prompt, task_type=task_type)
-        provider = self.select_provider("compute", caps)
-        if not provider:
-            return {"success": False, "tier": TIER_NAME, "error": "no_compute_provider", "capabilities": caps}
-
         api_key = _resolve_api_key(provider)
         if not api_key and provider.get("api_key_env"):
             return {
                 "success": False,
-                "tier": TIER_NAME,
                 "error": f"missing_env:{provider.get('api_key_env')}",
                 "provider_id": provider.get("id"),
             }
@@ -445,7 +456,7 @@ class FleetManager:
             "max_tokens": max_out,
             "temperature": 0.3,
         }
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "User-Agent": "Phronesis-Opportunistic-Fleet/1.0"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
         if "openrouter" in base:
@@ -457,26 +468,21 @@ class FleetManager:
         elapsed = round(time.time() - started, 2)
         text = ""
         if isinstance(body, dict):
-            text = (
-                body.get("choices", [{}])[0]
-                .get("message", {})
-                .get("content", "")
-            )
+            choices = body.get("choices") or []
+            if choices:
+                text = (choices[0].get("message") or {}).get("content", "")
         ok = status == 200 and bool(str(text).strip())
         result = {
             "success": ok,
-            "tier": TIER_NAME,
             "response": str(text).strip(),
             "model": model,
             "provider_id": provider.get("id"),
             "provider_name": provider.get("name"),
-            "capabilities": caps,
             "latency_sec": elapsed,
             "http_status": status,
         }
         if not ok:
             result["error"] = body if isinstance(body, dict) else str(body)[:500]
-        _log(DISPATCH_LOG, {"event": "compute_dispatch", **{k: result.get(k) for k in result}})
         tel = _telemetry_monitor()
         if tel and provider.get("id"):
             tel.record_dispatch(
@@ -487,6 +493,70 @@ class FleetManager:
                 timeout=status == 0 or elapsed >= 115,
                 error=result.get("error") if not ok else None,
             )
+        return result
+
+    def dispatch_compute(
+        self,
+        prompt: str,
+        *,
+        capabilities: Optional[List[str]] = None,
+        system: str = "",
+        max_tokens: int = 1024,
+        task_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if not self.enabled:
+            return {"success": False, "tier": TIER_NAME, "error": "fleet_disabled"}
+        caps = capabilities or self.infer_capabilities(prompt, task_type=task_type)
+        candidates = self.select_provider_candidates("compute", caps, healthy_only=True)
+        if not candidates:
+            candidates = self.select_provider_candidates("compute", caps, healthy_only=False)
+        if not candidates:
+            return {"success": False, "tier": TIER_NAME, "error": "no_compute_provider", "capabilities": caps}
+
+        max_tries = min(len(candidates), self._max_provider_retries() * 2)
+        attempts: List[Dict[str, Any]] = []
+        for provider in candidates[:max_tries]:
+            one = self._dispatch_compute_one(
+                provider, prompt, system=system, max_tokens=max_tokens,
+            )
+            attempts.append({
+                "provider_id": provider.get("id"),
+                "http_status": one.get("http_status"),
+                "success": one.get("success"),
+                "error": one.get("error"),
+            })
+            if one.get("success"):
+                result = {
+                    "success": True,
+                    "tier": TIER_NAME,
+                    "response": one.get("response"),
+                    "model": one.get("model"),
+                    "provider_id": one.get("provider_id"),
+                    "provider_name": one.get("provider_name"),
+                    "capabilities": caps,
+                    "latency_sec": one.get("latency_sec"),
+                    "http_status": one.get("http_status"),
+                    "failover_attempts": len(attempts),
+                }
+                _log(DISPATCH_LOG, {"event": "compute_dispatch", **{k: result.get(k) for k in result}})
+                return result
+            pid = str(provider.get("id") or "")
+            if pid:
+                self._health_state.setdefault("providers", {})[pid] = {
+                    "status": "down",
+                    "last_check": _utc_now(),
+                    "detail": {"dispatch_fail": one.get("error"), "http_status": one.get("http_status")},
+                }
+        self._save_health_state()
+        last = attempts[-1] if attempts else {}
+        result = {
+            "success": False,
+            "tier": TIER_NAME,
+            "error": last.get("error") or "all_compute_providers_failed",
+            "capabilities": caps,
+            "attempts": attempts,
+        }
+        _log(DISPATCH_LOG, {"event": "compute_dispatch_fail", **result})
         return result
 
     def dispatch_context(
@@ -614,6 +684,22 @@ class FleetManager:
         )
         compute["context_prefetch"] = bool(context_block)
         compute["triggers"] = triggers
+        if not compute.get("success") and context_block.strip():
+            snippet = context_block.strip()[:6000]
+            compute = {
+                "success": True,
+                "tier": TIER_NAME,
+                "response": (
+                    "[T2 CONTEXT-ONLY — compute providers unavailable; synthesize from prefetch]\n"
+                    + snippet
+                ),
+                "model": "context-only-fallback",
+                "provider_id": "context-prefetch-fallback",
+                "context_prefetch": True,
+                "context_only": True,
+                "compute_error": compute.get("error"),
+                "triggers": triggers,
+            }
         return compute
 
     def run_health_cycle(
@@ -698,8 +784,25 @@ class FleetManager:
         return {"ok": True, "sandbox_count": len(sandbox), "deprecated": "use_procurement_engine"}
 
 
+def _config_fleet_enabled() -> bool:
+    """Operator gate in config.yaml — registry alone is not enough."""
+    try:
+        cfg_path = Path(r"D:\HermesData\config.yaml")
+        if not cfg_path.is_file():
+            return False
+        if yaml is None:
+            return False
+        raw = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+        fleet = (raw.get("local_sovereign") or {}).get("opportunistic_fleet") or {}
+        return bool(fleet.get("enabled"))
+    except Exception:
+        return False
+
+
 def fleet_available() -> bool:
     try:
+        if not _config_fleet_enabled():
+            return False
         fm = FleetManager()
         return fm.enabled and (
             bool(fm.list_providers("compute")) or bool(fm.list_providers("context"))

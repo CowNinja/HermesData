@@ -117,15 +117,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 2914
+        "completed": 2962
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T17:46:58.023415-04:00",
-      "next_run_at": "2026-07-04T12:35:00-04:00",
-      "last_run_at": "2026-07-04T12:30:19.517459-04:00",
+      "next_run_at": "2026-07-04T16:35:00-04:00",
+      "last_run_at": "2026-07-04T16:30:38.260384-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -205,15 +205,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 241
+        "completed": 245
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T15:57:56.760952-04:00",
-      "next_run_at": "2026-07-04T12:51:20.762689-04:00",
-      "last_run_at": "2026-07-04T11:51:20.762689-04:00",
+      "next_run_at": "2026-07-04T16:52:32.249904-04:00",
+      "last_run_at": "2026-07-04T15:52:32.249904-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -358,15 +358,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 208
+        "completed": 212
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-24T19:10:41.706853-04:00",
-      "next_run_at": "2026-07-04T12:50:20.817372-04:00",
-      "last_run_at": "2026-07-04T11:50:20.817372-04:00",
+      "next_run_at": "2026-07-04T16:51:32.243417-04:00",
+      "last_run_at": "2026-07-04T15:51:32.243417-04:00",
       "last_status": "error",
       "last_error": "Script exited with code 1\nstdout:\nCRITICAL: Fieldy script not found at C:\\Users\\CowNi\\fieldy\\Fieldy-RecentPull.ps1",
       "last_delivery_error": null,
@@ -444,15 +444,15 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 47
+        "completed": 48
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-07-04T16:32:17.514701-04:00",
-      "last_run_at": "2026-07-04T08:31:30.902581-04:00",
+      "next_run_at": "2026-07-04T20:32:35.669986-04:00",
+      "last_run_at": "2026-07-04T12:32:35.167216-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -493,17 +493,17 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 264
+        "completed": 271
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T19:59:53.051242-04:00",
-      "next_run_at": "2026-07-04T12:56:22.080664-04:00",
-      "last_run_at": "2026-07-04T12:26:22.080664-04:00",
+      "next_run_at": "2026-07-04T16:32:36.375062-04:00",
+      "last_run_at": "2026-07-04T16:02:36.375062-04:00",
       "last_status": "error",
-      "last_error": "Script exited with code 1\nstdout:\n## Self-Recovery-Watchdog 2026-07-04T16:26:17.252144+00:00\nHermesData: unpushed=0 dirty=192 remote=https://github.com/CowNinja/HermesData.git\nPhronesisVault: unpushed=0 dirty=75 remote=https://github.com/CowNinja/PhronesisVault.git\nSKIP PhronesisSilo: no_git\n\n[ISSUES: 2]\n  - HermesData: 192 dirty files (nothing committed to push)\n  - PhronesisVault: 75 dirty files (nothing committed to push)",
+      "last_error": "Script exited with code 1\nstdout:\n## Self-Recovery-Watchdog 2026-07-04T20:02:32.689644+00:00\nHermesData: unpushed=0 dirty=204 remote=https://github.com/CowNinja/HermesData.git\nPhronesisVault: unpushed=0 dirty=121 remote=https://github.com/CowNinja/PhronesisVault.git\nSKIP PhronesisSilo: no_git\n\n[ISSUES: 2]\n  - HermesData: 204 dirty files (nothing committed to push)\n  - PhronesisVault: 121 dirty files (nothing committed to push)",
       "last_delivery_error": null,
       "deliver": "origin",
       "origin": {
@@ -542,15 +542,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 128
+        "completed": 132
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T22:59:28.297996-04:00",
-      "next_run_at": "2026-07-04T12:50:20.849895-04:00",
-      "last_run_at": "2026-07-04T11:50:20.849895-04:00",
+      "next_run_at": "2026-07-04T16:51:32.276454-04:00",
+      "last_run_at": "2026-07-04T15:51:32.276454-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -685,15 +685,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 57
+        "completed": 59
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:15.417577-04:00",
-      "next_run_at": "2026-07-04T13:50:25.659181-04:00",
-      "last_run_at": "2026-07-04T11:50:25.659181-04:00",
+      "next_run_at": "2026-07-04T17:51:37.278376-04:00",
+      "last_run_at": "2026-07-04T15:51:37.278376-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -732,15 +732,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 58
+        "completed": 60
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:25.077977-04:00",
-      "next_run_at": "2026-07-04T13:50:21.210055-04:00",
-      "last_run_at": "2026-07-04T11:50:21.210055-04:00",
+      "next_run_at": "2026-07-04T17:50:32.462761-04:00",
+      "last_run_at": "2026-07-04T15:50:32.462761-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -871,15 +871,15 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 133
+        "completed": 148
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T11:46:43.622278-04:00",
-      "next_run_at": "2026-07-04T12:37:28.363497-04:00",
-      "last_run_at": "2026-07-04T12:22:28.363497-04:00",
+      "next_run_at": "2026-07-04T16:37:44.448525-04:00",
+      "last_run_at": "2026-07-04T16:22:44.448525-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -922,15 +922,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 76
+        "completed": 83
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T13:06:18.302675-04:00",
-      "next_run_at": "2026-07-04T12:58:28.867841-04:00",
-      "last_run_at": "2026-07-04T12:28:28.867841-04:00",
+      "next_run_at": "2026-07-04T16:35:38.990573-04:00",
+      "last_run_at": "2026-07-04T16:05:38.990573-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1016,15 +1016,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 11
+        "completed": 59
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-04T11:35:00-04:00",
-      "next_run_at": "2026-07-04T12:35:00-04:00",
-      "last_run_at": "2026-07-04T12:30:21.070529-04:00",
+      "next_run_at": "2026-07-04T16:35:00-04:00",
+      "last_run_at": "2026-07-04T16:30:47.058396-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1036,5 +1036,5 @@
       "pinned": true
     }
   ],
-  "updated_at": "2026-07-04T12:32:17.515698-04:00"
+  "updated_at": "2026-07-04T16:32:35.670996-04:00"
 }

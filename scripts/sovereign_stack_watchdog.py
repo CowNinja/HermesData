@@ -321,8 +321,21 @@ def force_deliver_pending_comfy_png(state: Dict[str, Any], comfy_output: Dict[st
         return {"action": "force_deliver", "ok": False, "error": str(exc)}
 
 
+def _image_pipeline_paused() -> bool:
+    try:
+        pause_path = SCRIPTS.parent / "state" / "image-pipeline-pause.json"
+        if not pause_path.is_file():
+            return False
+        data = json.loads(pause_path.read_text(encoding="utf-8"))
+        return bool((data or {}).get("paused"))
+    except Exception:
+        return False
+
+
 def recover_stalled_image_turn(state: Dict[str, Any], stall: Dict[str, Any]) -> Dict[str, Any]:
     """Bounded recovery: ping Comfy, bootstrap if down, retry up to 2 times."""
+    if _image_pipeline_paused():
+        return {"action": "skipped", "reason": "image_pipeline_paused"}
     if not stall.get("stalled"):
         return {"action": "none"}
     retries = int(state.get("image_stall_retries") or 0)
@@ -477,7 +490,37 @@ def vram_mode_recovery() -> Dict[str, Any]:
         except Exception as exc:
             actions.append({"action": "start_llama_text_mode", "ok": False, "error": str(exc)})
 
-    if mode == "image" and not _port_open(8188) and comfy_stack.is_file():
+    pipeline_paused = False
+    try:
+        pause_path = Path(r"D:\HermesData\state\image-pipeline-pause.json")
+        if pause_path.is_file():
+            import json as _json
+
+            pipeline_paused = bool((_json.loads(pause_path.read_text(encoding="utf-8")) or {}).get("paused"))
+    except Exception:
+        pipeline_paused = False
+
+    if pipeline_paused and _port_open(8188) and comfy_stack.is_file():
+        try:
+            proc = run_hidden(
+                hidden_powershell_args(str(comfy_stack), "stop", "inference"),
+                capture_output=True,
+                text=True,
+                timeout=120,
+                cwd=str(comfy_stack.parent),
+            )
+            actions.append(
+                {
+                    "action": "stop_comfy_pipeline_paused",
+                    "ok": not _port_open(8188),
+                    "exit_code": proc.returncode,
+                    "stdout_tail": (proc.stdout or "")[-300:],
+                }
+            )
+        except Exception as exc:
+            actions.append({"action": "stop_comfy_pipeline_paused", "ok": False, "error": str(exc)})
+
+    if mode == "image" and not pipeline_paused and not _port_open(8188) and comfy_stack.is_file():
         try:
             proc = run_hidden(
                 hidden_powershell_args(str(comfy_stack), "start", "inference"),

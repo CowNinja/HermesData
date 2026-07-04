@@ -20,6 +20,7 @@ COMFY_OUTPUT = Path(r"D:\ComfyUI\output")
 STATE_FILE = Path(r"D:\HermesData\state\comfy-delivery-daemon.json")
 POSTED_REGISTRY = Path(r"D:\HermesData\state\comfy-discord-posted.json")
 BATCH_SESSION_FILE = Path(r"D:\HermesData\state\comfy-batch-session.json")
+METRICS_FILE = Path(r"D:\HermesData\state\comfy-pipeline-metrics.json")
 LOCK_FILE = Path(r"D:\HermesData\state\comfy-delivery-daemon.lock")
 TICK_LOCK_FILE = Path(r"D:\HermesData\state\comfy-delivery-tick.lock")
 DEFAULT_CHANNEL = "1521146755985576116"
@@ -27,6 +28,16 @@ POST_SCRIPT = SCRIPTS.parent / "temp" / "post_discord_image.py"
 POLL_SEC = 3
 MAX_LEDGER = 200
 HERMES_GATEWAY_MARKER = "hermes-gateway"
+
+_OPS = SCRIPTS / "ops"
+if str(_OPS) not in sys.path:
+    sys.path.insert(0, str(_OPS))
+
+from comfy_output_patterns import (  # noqa: E402
+    is_batch_png,
+    iter_output_pngs,
+    parse_png_index,
+)
 
 
 def _hermes_grace_sec() -> float:
@@ -171,19 +182,67 @@ def _save_batch_session(session: dict) -> None:
 
 
 def _png_series_index(png_name: str, session: dict) -> int | None:
-    m = re.match(r"standard__(\d+)_\.png$", png_name)
-    if not m:
+    num = parse_png_index(png_name)
+    if num is None:
         return None
-    num = int(m.group(1))
     start = int(session.get("series_start_png") or 0)
     if start > 0:
         return num - start + 1
     return None
 
 
-def _batch_caption(png_name: str) -> str | None:
+def _expected_group_size(session: dict) -> int:
+    series = str(session.get("series") or "")
+    m = re.search(r"\((\d+)\)", series)
+    if m:
+        return int(m.group(1))
+    labels = list(session.get("labels") or [])
+    if labels:
+        return labels[0].count(" & ") + 1
+    return 0
+
+
+def _frame_characters_for_png(png_name: str) -> list[str] | None:
+    if not METRICS_FILE.is_file():
+        return None
+    try:
+        data = json.loads(METRICS_FILE.read_text(encoding="utf-8-sig"))
+        for row in reversed(list(data.get("frame_timings") or [])):
+            if str(row.get("png") or "") == png_name:
+                chars = row.get("characters")
+                if isinstance(chars, list):
+                    return [str(c) for c in chars if c]
+                return None
+    except Exception:
+        return None
+    return None
+
+
+def _batch_contamination_guard(png_name: str) -> tuple[bool, str]:
+    """Block solo/stray renders from posting under an active N-girl batch caption."""
     session = _load_batch_session()
     if not session.get("active"):
+        return True, ""
+    recipe = str(session.get("recipe") or "")
+    if recipe not in ("harem_group", "harem_triplets"):
+        return True, ""
+    expected = _expected_group_size(session)
+    if expected < 3:
+        return True, ""
+    chars = _frame_characters_for_png(png_name)
+    if chars is None:
+        return True, ""
+    if len(chars) >= expected:
+        return True, ""
+    return False, f"solo_leak:{len(chars)}_of_{expected}"
+
+
+def _batch_caption(png_name: str) -> str | None:
+    session = _load_batch_session()
+    if not session.get("series") or not session.get("labels"):
+        return None
+    total = int(session.get("total") or 0)
+    if total < 1:
         return None
     total = int(session.get("total") or 7)
     labels = list(session.get("labels") or [])
@@ -194,8 +253,8 @@ def _batch_caption(png_name: str) -> str | None:
         index = min(posted, total)
     label = labels[index - 1] if index - 1 < len(labels) else ""
     if label:
-        return f"{series} {index}/{total} — {label} — {png_name}"
-    return f"{series} {index}/{total} — {png_name}"
+        return f"{series} {index}/{total} - {label} - {png_name}"
+    return f"{series} {index}/{total} - {png_name}"
 
 
 def _sync_batch_delivered_count(png_name: str) -> None:
@@ -203,13 +262,24 @@ def _sync_batch_delivered_count(png_name: str) -> None:
     if not session.get("active"):
         return
     index = _png_series_index(png_name, session)
-    if index is None:
-        return
+    total = int(session.get("total") or 0)
+    if index is None or index < 1 or (total and index > total):
+        # regional__00001 uses a separate Comfy counter; advance by delivery order
+        index = int(session.get("delivered_count") or 0) + 1
     session["delivered_count"] = max(int(session.get("delivered_count") or 0), index)
     total = int(session.get("total") or 7)
     if session["delivered_count"] >= total:
         session["active"] = False
         session["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    try:
+        ops = SCRIPTS.parent / "ops"
+        if str(ops) not in sys.path:
+            sys.path.insert(0, str(ops))
+        from rp_batch_session import batch_health_summary  # noqa: WPS433
+
+        session["batch_health"] = batch_health_summary(session)
+    except Exception:
+        pass
     _save_batch_session(session)
 
 
@@ -226,6 +296,11 @@ def _deliver(channel: str, png_name: str, *, caption: str | None = None) -> tupl
         return False, "already_posted"
     if not _ready_for_daemon_delivery(png_name, digest, mtime):
         return False, "hermes_pending"
+    ok_guard, guard_reason = _batch_contamination_guard(png_name)
+    if not ok_guard:
+        state = _load_state()
+        _mark_delivered(state, png_name, mtime, digest)
+        return False, guard_reason
     text = caption or _batch_caption(png_name) or f"Auto-deliver: {png_name}"
     proc = run_hidden(
         [prefer_pythonw(sys.executable), str(POST_SCRIPT), channel, str(png_path), text],
@@ -250,7 +325,21 @@ def _deliver(channel: str, png_name: str, *, caption: str | None = None) -> tupl
         return False, "no_discord_id"
     _record_discord_post(png_name, digest, discord_id)
     _sync_batch_delivered_count(png_name)
+    _archive_delivered_png(png_path, caption=text)
     return True, discord_id
+
+
+def _archive_delivered_png(png_path: Path, *, caption: str = "") -> None:
+    """Gallery + series archive so Discord delivery does not outpace local retention."""
+    try:
+        ops = SCRIPTS / "ops"
+        if str(ops) not in sys.path:
+            sys.path.insert(0, str(ops))
+        from comfy_output_archive import archive_png  # noqa: WPS433
+
+        archive_png(png_path, caption=caption)
+    except Exception:
+        pass
 
 
 def _already_delivered(state: dict, name: str, digest: str) -> bool:
@@ -282,7 +371,7 @@ def _seal_existing_pngs(state: dict) -> dict:
     last_mtime = float(state.get("last_mtime") or 0)
     cursor_mtime = last_mtime
     seal_all = cursor_mtime <= 0
-    for path in sorted(COMFY_OUTPUT.glob("standard__*.png"), key=lambda p: p.stat().st_mtime):
+    for path in sorted(iter_output_pngs(COMFY_OUTPUT), key=lambda p: p.stat().st_mtime):
         try:
             mtime = path.stat().st_mtime
         except OSError:
@@ -315,7 +404,7 @@ def bootstrap_state() -> dict:
 def _undelivered_pngs(state: dict) -> list[tuple[str, float, str]]:
     cursor_mtime = float(state.get("last_mtime") or 0)
     pending: list[tuple[str, float, str]] = []
-    for path in sorted(COMFY_OUTPUT.glob("standard__*.png"), key=lambda p: p.stat().st_mtime):
+    for path in sorted(iter_output_pngs(COMFY_OUTPUT), key=lambda p: p.stat().st_mtime):
         try:
             mtime = path.stat().st_mtime
         except OSError:
@@ -333,7 +422,7 @@ def _undelivered_pngs(state: dict) -> list[tuple[str, float, str]]:
 
 def record_hermes_delivery(image_path: str | Path) -> dict:
     path = Path(image_path)
-    if path.name.startswith("standard__") and path.suffix.lower() == ".png":
+    if is_batch_png(path.name):
         png_path = path if path.is_file() else COMFY_OUTPUT / path.name
     else:
         png_path = path
@@ -364,7 +453,7 @@ def record_hermes_delivery(image_path: str | Path) -> dict:
 
 def seal_png_path(image_path: str | Path) -> dict:
     path = Path(image_path)
-    if path.name.startswith("standard__") and path.suffix.lower() == ".png":
+    if is_batch_png(path.name):
         png_path = path if path.is_file() else COMFY_OUTPUT / path.name
     else:
         png_path = path
@@ -432,7 +521,7 @@ def _tick_locked(channel: str) -> dict:
     if not pending:
         waiting = 0
         cursor_mtime = float(state.get("last_mtime") or 0)
-        for path in COMFY_OUTPUT.glob("standard__*.png"):
+        for path in iter_output_pngs(COMFY_OUTPUT):
             try:
                 mtime = path.stat().st_mtime
             except OSError:

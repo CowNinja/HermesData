@@ -282,11 +282,23 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
 
     local_sovereign = patched.setdefault("local_sovereign", {})
     if isinstance(local_sovereign, dict):
-        if local_sovereign.get("opportunistic_fleet", {}).get("enabled") is True:
-            fleet = local_sovereign.setdefault("opportunistic_fleet", {})
-            if isinstance(fleet, dict):
-                fleet["enabled"] = False
-                changes.append("local_sovereign.opportunistic_fleet.enabled→false")
+        fleet = local_sovereign.setdefault("opportunistic_fleet", {})
+        if isinstance(fleet, dict):
+            if fleet.get("registry") in (None, ""):
+                fleet["registry"] = "D:/HermesData/config/fleet_registry.yaml"
+                changes.append("local_sovereign.opportunistic_fleet.registry")
+            if fleet.get("prefer_free_before_grok") is None:
+                fleet["prefer_free_before_grok"] = True
+                changes.append("local_sovereign.opportunistic_fleet.prefer_free_before_grok→true")
+            if fleet.get("augment_local_with_context") is None:
+                fleet["augment_local_with_context"] = True
+                changes.append("local_sovereign.opportunistic_fleet.augment_local_with_context→true")
+            if fleet.get("fallback_on_local_fail") is None:
+                fleet["fallback_on_local_fail"] = True
+                changes.append("local_sovereign.opportunistic_fleet.fallback_on_local_fail→true")
+            if fleet.get("proactive_realtime_triggers") is None:
+                fleet["proactive_realtime_triggers"] = True
+                changes.append("local_sovereign.opportunistic_fleet.proactive_realtime_triggers→true")
         for key, value in LOCAL_SOVEREIGN_DEFAULTS.items():
             if key == "tiers" and isinstance(value, dict):
                 tiers = local_sovereign.setdefault("tiers", {})

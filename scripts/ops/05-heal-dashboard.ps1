@@ -35,7 +35,7 @@ if (-not $up) {
     $py = if (Test-Path $VenvPython) { $VenvPython } else { $VenvPythonw }
     Start-Process -FilePath $py `
         -ArgumentList "-m", "hermes_cli.main", "dashboard", "--port", "$dashPort", "--host", $dashHost, "--skip-build", "--no-open" `
-        -WorkingDirectory $HermesRoot `
+        -WorkingDirectory $agentRoot `
         -WindowStyle Hidden
     $up = Wait-PortUp -Port $dashPort -MaxSeconds 35
 }

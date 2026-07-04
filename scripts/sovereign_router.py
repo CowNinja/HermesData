@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """
-Sovereign Router - Local-first dispatch to minimize Grok / cloud token usage.
+DEPRECATED — Legacy Ollama router (phi3:mini / qwen2.5:14b @ :11434).
 
-Core principle: Route as much work as possible to local models (Ollama live).
-Tiers (simple start):
-- fast: lightweight local for simple tasks
-- strong: capable local (14B class) for reasoning / code
-- escalate: only for tasks that truly require cloud (manual flag or future classifier)
+Canonical sovereign path (2026-07+):
+  Hermes Gateway :8642 -> Sovereign Proxy :8091 -> llama-server :8090 (Qwythos)
 
-Usage:
-    from sovereign_router import dispatch
-    result = dispatch("Write a Python function to...", task_type="code")
-    print(result["model"], result["response"][:200])
+Use sovereign_openai_proxy.py + router_bridge.py for agent chat.
+Ollama :11434 is embeddings/vision aux only — not the sovereign brain.
 
-Provenance included on every dispatch.
+This module remains for router_bridge fallback and historical tests only.
+New code must not import dispatch() for agent paths.
 """
 
 import os

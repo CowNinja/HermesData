@@ -664,6 +664,11 @@ def bridge_dispatch(
         return None
 
     def _try_fleet(*, local_failed: bool = False) -> Optional[Dict[str, Any]]:
+        if (task_type or "").lower().replace("-", "_") in (
+            "roleplay", "narrative", "rp", "immersive_roleplay",
+        ) or "roleplay" in (platform or "").lower():
+            attempts.append({"backend": "opportunistic_fleet", "status": "skipped", "reason": "roleplay_blocked"})
+            return None
         fleet_triggers = detect_opportunistic_fleet_triggers(
             prompt=prompt,
             task_type=task_type,

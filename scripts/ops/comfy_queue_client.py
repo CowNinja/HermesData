@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lightweight ComfyUI queue client — submit, poll, metrics."""
+"""Lightweight ComfyUI queue client - submit, poll, metrics."""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188").rstrip("/")
 COMFY_OUT = Path(os.environ.get("COMFY_OUTPUT", r"D:\ComfyUI\output"))
@@ -64,6 +64,25 @@ def queue_status() -> dict[str, Any]:
         return {"error": str(exc)}
 
 
+def interrupt_render() -> bool:
+    """Stop the currently running Comfy job (POST required)."""
+    try:
+        api_post("/interrupt", {})
+        return True
+    except Exception:
+        return False
+
+
+def clear_queue() -> bool:
+    """Drain pending queue jobs before a new batch (prevents cross-run contamination)."""
+    interrupt_render()
+    try:
+        api_post("/queue", {"clear": True})
+        return True
+    except Exception:
+        return False
+
+
 def history_for(prompt_id: str) -> dict[str, Any] | None:
     try:
         hist = api_get(f"/history/{prompt_id}")
@@ -101,6 +120,7 @@ def wait_for_prompts(
     timeout: float = 3600.0,
     poll_sec: float = 1.5,
     since_ts: float | None = None,
+    on_complete: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> dict[str, dict[str, Any]]:
     started = since_ts or time.time()
     pending = {pid: pid for pid in prompt_ids}
@@ -115,6 +135,8 @@ def wait_for_prompts(
                 done.append(pid)
         for pid in done:
             pending.pop(pid, None)
+            if on_complete is not None:
+                on_complete(pid, results[pid])
         if pending:
             time.sleep(poll_sec)
     if pending:
@@ -130,7 +152,13 @@ def recover_recent_output(
 ) -> dict[str, str] | None:
     best_path: Path | None = None
     best_mtime = 0.0
-    for path in COMFY_OUT.glob(pattern):
+    globs = [pattern]
+    if pattern == "standard__*.png":
+        globs.append("regional__*.png")
+    paths: list[Path] = []
+    for pat in globs:
+        paths.extend(COMFY_OUT.glob(pat))
+    for path in paths:
         try:
             st = path.stat()
         except OSError:

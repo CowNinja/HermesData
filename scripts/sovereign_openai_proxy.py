@@ -326,7 +326,8 @@ def _get_breaker(port: int) -> _CircuitBreaker:
 
 
 def _dispatch_upstream_with_pool(url: str, payload: bytes,
-                                content_type: str = "application/json") -> Dict[str, Any]:
+                                content_type: str = "application/json",
+                                max_attempts: int = 2) -> Dict[str, Any]:
     """Serialize an upstream call through the circuit breaker + connection pool."""
     from urllib.parse import urlparse as _up
     parsed = _up(url)
@@ -335,13 +336,33 @@ def _dispatch_upstream_with_pool(url: str, payload: bytes,
     if not breaker.allow_request:
         raise ConnectionError(f"Circuit breaker OPEN for port {port} — upstream appears down")
     headers = {"Content-Type": content_type}
-    try:
-        status, data = _upstream_pool.request("POST", url, body=payload, headers=headers)
-        breaker.record_success()
-        return {"status": status, "body": data}
-    except Exception:
-        breaker.record_failure()
-        raise
+    last_exc: Optional[Exception] = None
+    for attempt in range(max(1, max_attempts)):
+        try:
+            status, data = _upstream_pool.request("POST", url, body=payload, headers=headers)
+            breaker.record_success()
+            return {"status": status, "body": data}
+        except Exception as exc:
+            last_exc = exc
+            breaker.record_failure()
+            msg = str(exc).lower()
+            transient = any(
+                token in msg
+                for token in (
+                    "10053",
+                    "10054",
+                    "connection was aborted",
+                    "connection was closed",
+                    "broken pipe",
+                    "reset by peer",
+                )
+            )
+            if not transient or attempt >= max_attempts - 1:
+                raise
+            time.sleep(0.35 * (attempt + 1))
+    if last_exc:
+        raise last_exc
+    raise ConnectionError("upstream dispatch failed")
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1660,12 +1681,24 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             messages = _inject_tool_optimised_mode(messages, tier=tier)
 
         tools_reserve = _estimate_tools_tokens(body.get("tools")) if body.get("tools") else 0
+        augment_meta: Dict[str, Any] = {}
         try:
             trimmed_messages, trim_meta = trim_messages_tier_aware(
                 messages,
                 model,
                 extra_reserve_tokens=tools_reserve,
             )
+            try:
+                from escalation_router import maybe_augment_messages_with_context
+
+                pre_prompt = messages_to_prompt(trimmed_messages)
+                trimmed_messages, augment_meta = maybe_augment_messages_with_context(
+                    trimmed_messages, pre_prompt, routing,
+                )
+                if augment_meta.get("augmented"):
+                    trim_meta = {**trim_meta, "fleet_context_augment": augment_meta}
+            except Exception as aug_exc:
+                _log_event({"event": "fleet_augment_skip", "error": str(aug_exc)})
             prompt = messages_to_prompt(trimmed_messages)
         except Exception as exc:
             _log_event({"event": "trim_exception", "error": str(exc), "model": model})
@@ -1713,6 +1746,14 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 result = dispatch_via_bridge(
                     prompt, model, trim_meta=trim_meta, routing=routing,
                 )
+            try:
+                from escalation_router import resolve_post_local_dispatch
+
+                if augment_meta.get("augmented"):
+                    result.setdefault("provenance", {})["context_augment"] = augment_meta
+                result = resolve_post_local_dispatch(prompt, routing, result)
+            except Exception as esc_exc:
+                _log_event({"event": "escalation_resolve_skip", "error": str(esc_exc)})
         except Exception as exc:
             _log_event({"event": "dispatch_exception", "error": str(exc), "model": model})
             status, err = openai_error(503, f"dispatch failed: {exc}")
@@ -1722,7 +1763,7 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         latency = round(time.time() - started, 2)
         prov = result.get("provenance") or {}
 
-        if result.get("escalation"):
+        if result.get("escalation") and not result.get("success"):
             msg = (
                 "[GROK ESCALATION RECOMMENDED] "
                 + str(prov.get("escalation_reason") or result.get("response", ""))

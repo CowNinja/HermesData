@@ -128,7 +128,22 @@ def scan() -> dict:
             expected = start + delivered
             next_png = Path(rf"D:\ComfyUI\output\standard__{expected:05d}_.png")
             checks["next_expected_png"] = next_png.name
-            if delivered > 0 and not next_png.is_file():
+            render_done = int(batch.get("render_completed") or 0)
+            queue_pending = 0
+            try:
+                from comfy_queue_client import queue_status as _qs  # noqa: WPS433
+
+                q = _qs()
+                queue_pending = len((q.get("queue_pending") or [])) if isinstance(q, dict) else 0
+            except Exception:
+                pass
+            # Skip false alarm while Comfy still has work queued or renders ahead of delivery.
+            if (
+                delivered > 0
+                and not next_png.is_file()
+                and queue_pending == 0
+                and render_done <= delivered
+            ):
                 issues.append(
                     {
                         "code": "batch_render_gap",

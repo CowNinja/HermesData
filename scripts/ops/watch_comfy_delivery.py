@@ -57,6 +57,17 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
+def _daemon_active() -> bool:
+    lock = Path(r"D:\HermesData\state\comfy-delivery-daemon.lock")
+    if not lock.is_file():
+        return False
+    try:
+        pid = int(lock.read_text(encoding="utf-8").strip())
+    except Exception:
+        return False
+    return _pid_alive(pid)
+
+
 def _ensure_daemon(channel: str) -> None:
     lock = Path(r"D:\HermesData\state\comfy-delivery-daemon.lock")
     pid = 0
@@ -113,9 +124,14 @@ def main() -> int:
         new_paths = [p for p, mt in cur.items() if p not in prev or prev[p] < mt]
         if new_paths:
             for p in sorted(new_paths):
-                _log(f"NEW {Path(p).name}")
-            result = _tick(args.channel)
-            _log(f"TICK {json.dumps(result)}")
+                name = Path(p).name
+                if _daemon_active():
+                    _log(f"NEW {name} (daemon delivers)")
+                else:
+                    _log(f"NEW {name}")
+            if not _daemon_active():
+                result = _tick(args.channel)
+                _log(f"TICK {json.dumps(result)}")
         prev = cur
         time.sleep(max(2, args.poll))
 
