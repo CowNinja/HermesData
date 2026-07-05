@@ -68,6 +68,14 @@ FACTUAL_TOOL_MARKERS = (
     "image_gen",
     "generate an image",
     "golden toaster",
+    # File / collab — Qwythos narrates tools unless tool_choice=required
+    "read_file",
+    "write_file",
+    "must use tools",
+    "must call tools",
+    "grok/cursor",
+    "plan-first",
+    "grok-hermes",
 )
 
 _THINK_BLOCK_RE = re.compile(
@@ -789,6 +797,15 @@ def _message_blob(messages: List[Dict[str, Any]]) -> str:
     return "\n".join(parts)
 
 
+def _user_developer_blob(messages: List[Dict[str, Any]]) -> str:
+    """User/developer text only — system prompts mention #alice-roleplay as policy."""
+    parts: List[str] = []
+    for msg in messages or []:
+        if str(msg.get("role") or "").lower() in ("user", "developer"):
+            parts.append(_extract_content(msg.get("content")))
+    return "\n".join(parts)
+
+
 def _roleplay_route_active(
     routing: Optional[Dict[str, Any]] = None,
     model: str = "",
@@ -803,7 +820,7 @@ def _roleplay_route_active(
         return True
     if "roleplay" in model_l:
         return True
-    blob = _message_blob(messages or []).lower()
+    blob = _user_developer_blob(messages or []).lower()
     if any(
         token in blob
         for token in (
@@ -916,6 +933,58 @@ def _build_terminal_tool_call(command: str) -> Dict[str, Any]:
             "arguments": json.dumps({"command": _windows_powershell_wrap(command)}),
         },
     }
+
+
+def _build_read_file_tool_call(path: str) -> Dict[str, Any]:
+    return {
+        "id": f"call_{uuid.uuid4().hex[:12]}",
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "arguments": json.dumps({"path": path}),
+        },
+    }
+
+
+def _build_write_file_tool_call(path: str, content: str = "") -> Dict[str, Any]:
+    return {
+        "id": f"call_{uuid.uuid4().hex[:12]}",
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "arguments": json.dumps({"path": path, "content": content}),
+        },
+    }
+
+
+def _synthesize_file_tool_call(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Derive read_file/write_file from explicit paths in user instructions."""
+    for msg in reversed(messages or []):
+        if not isinstance(msg, dict) or msg.get("role") != "user":
+            continue
+        content = _extract_content(msg.get("content"))
+        lower = content.lower()
+        if "write_file" in lower:
+            m = re.search(
+                r"write_file\s+(?:to\s+)?([A-Za-z]:\\[^\s`\"']+\.md)",
+                content,
+                re.IGNORECASE,
+            )
+            if m:
+                return _build_write_file_tool_call(m.group(1).strip())
+        if "read_file" in lower:
+            m = re.search(
+                r"read_file\s+(?:on\s+)?([A-Za-z]:\\[^\s`\"']+\.md)",
+                content,
+                re.IGNORECASE,
+            )
+            if m:
+                return _build_read_file_tool_call(m.group(1).strip())
+            paths = re.findall(r"(D:\\[^\s`\"']+\.md)", content, re.IGNORECASE)
+            if paths:
+                return _build_read_file_tool_call(paths[0])
+        break
+    return None
 
 
 def _build_image_generate_tool_call(prompt: str, aspect_ratio: str = "portrait") -> Dict[str, Any]:
@@ -1266,6 +1335,8 @@ def dispatch_via_native_router(
     if body.get("tools") and not msg.get("tool_calls"):
         synthesized = None
         if factual_tools:
+            synthesized = _synthesize_file_tool_call(messages)
+        if synthesized is None and factual_tools:
             synthesized = _synthesize_factual_terminal_call(messages)
         if synthesized is None:
             synthesized = _synthesize_image_generate_call(messages)

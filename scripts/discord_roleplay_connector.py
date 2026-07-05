@@ -259,18 +259,8 @@ def scan_messages_for_roleplay(
 
     if not in_alice and chat_name and "alice-roleplay" in chat_name.lower():
         in_alice = True
-    if not in_alice and system_blob:
-        sys_l = system_blob.lower()
-        if any(
-            token in sys_l
-            for token in (
-                "#alice-roleplay",
-                "alice rp sandbox",
-                "alice narrator thread",
-                "platform alice-roleplay",
-            )
-        ):
-            in_alice = True
+    # Do not scan raw system_blob for #alice-roleplay — Hermes default stance
+    # mentions it as policy text and would false-positive api_server/cron turns.
 
     if not chat_id:
         for pattern in (

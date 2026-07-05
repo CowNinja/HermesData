@@ -17,13 +17,14 @@
     "model_locked":  true,
     "model_rotation_locked":  true,
     "model_swap_success":  true,
+    "swap_note":  "2026-07-04 restored Qwythos — Grok-Hermes Phase 1 API collab bus",
     "allowed_models":  [
                            "Qwythos-9B-Q6_K"
                        ],
     "ctx_size":  65536,
-    "runtime_ctx_size":  16384,
-    "use_runtime_ctx_split":  true,
-    "n_gpu_layers":  38,
+    "runtime_ctx_size":  65536,
+    "use_runtime_ctx_split":  false,
+    "n_gpu_layers":  99,
     "proxy_script":  "D:\\HermesData\\scripts\\sovereign_openai_proxy.py",
     "ports":  {
                   "router":  8090,
