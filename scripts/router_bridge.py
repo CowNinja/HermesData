@@ -907,6 +907,16 @@ def _log_token_usage(
         backend = (result.get("provenance") or {}).get("selected_backend", "none")
         is_local = bool(result.get("success")) and backend in ("ollama", "vault_v0.11")
         is_fleet = bool(result.get("success")) and backend == "opportunistic_fleet"
+        usage = result.get("usage") if isinstance(result.get("usage"), dict) else {}
+        openai_resp = result.get("openai_response")
+        if isinstance(openai_resp, dict) and not usage:
+            usage = openai_resp.get("usage") or {}
+        input_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+        output_tokens = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
+        if is_local and not input_tokens and not output_tokens:
+            preview = str(result.get("response") or "")
+            output_tokens = max(50, len(preview) // 4)
+            input_tokens = max(300, len(prompt or "") // 4)
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "source": "router_bridge",
@@ -917,11 +927,26 @@ def _log_token_usage(
             "task_type": task_type,
             "backend": backend,
             "would_be_remote": None if (is_local or is_fleet) else "grok_escalation",
-            "est_tokens_saved": 300 if is_local else (200 if is_fleet else 0),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "est_tokens_saved": input_tokens + output_tokens if is_local else (200 if is_fleet else 0),
             "success": result.get("success"),
         }
         with open(logp, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
+        if is_local and (input_tokens or output_tokens):
+            try:
+                from sovereign_usage_savings import record_local_usage
+
+                record_local_usage(
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    backend=backend,
+                    model=str(result.get("model") or ""),
+                    source="router_bridge",
+                )
+            except Exception:
+                pass
     except Exception:
         pass
 

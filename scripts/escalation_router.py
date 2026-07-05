@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-escalation_router.py — T2 (free fleet) + T3 (paid) escalation for sovereign proxy.
+escalation_router.py -- T2 (free fleet) + T3 (paid) escalation for sovereign proxy.
 
 Local-first invariant:
   - Qwythos @ :8090 is always attempted first (native passthrough).
   - T2 supplements on: local failure, proactive realtime triggers (context augment),
     or explicit escalation_tier=T2 (tool stress).
-  - T3 only on explicit escalation_tier=T3 or high-stakes triggers — never roleplay.
+  - T3 only on explicit escalation_tier=T3 or high-stakes triggers -- never roleplay.
 
 Config gate: local_sovereign.opportunistic_fleet.enabled in config.yaml
 Registry: config/fleet_registry.yaml
@@ -18,6 +18,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -93,6 +94,31 @@ def is_roleplay_route(routing: Optional[Dict[str, Any]]) -> bool:
     return False
 
 
+def _prefetch_timeout_sec() -> float:
+    pol = fleet_policy()
+    try:
+        reg = _load_yaml(Path(pol.get("registry") or HERMES_ROOT / "config" / "fleet_registry.yaml"))
+        rules = (reg.get("procurement") or {}).get("pass_rules") or {}
+        return float(rules.get("context_latency_max_sec") or 20)
+    except Exception:
+        return 20.0
+
+
+def _dispatch_context_bounded(fm: Any, query: str, *, capabilities: List[str]) -> Dict[str, Any]:
+    """Bounded T2 context prefetch -- augment is optional; never block local path indefinitely."""
+    timeout_sec = _prefetch_timeout_sec()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        fut = pool.submit(fm.dispatch_context, query, capabilities=capabilities)
+        try:
+            return fut.result(timeout=timeout_sec)
+        except FuturesTimeout:
+            return {
+                "success": False,
+                "error": "context_prefetch_timeout",
+                "timeout_sec": timeout_sec,
+            }
+
+
 def _fleet_triggers(prompt: str, routing: Dict[str, Any], *, local_failed: bool = False) -> Dict[str, Any]:
     from router_bridge import detect_opportunistic_fleet_triggers
 
@@ -111,7 +137,7 @@ def maybe_augment_messages_with_context(
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     T2 augment mode: prefetch real-time context into messages before local dispatch.
-    Does not replace local inference — supplements working memory only.
+    Does not replace local inference -- supplements working memory only.
     """
     meta: Dict[str, Any] = {"augmented": False}
     pol = fleet_policy()
@@ -129,7 +155,9 @@ def maybe_augment_messages_with_context(
         from external_fleet_manager import FleetManager
 
         fm = FleetManager()
-        ctx = fm.dispatch_context(prompt[:600], capabilities=["real-time-search"])
+        ctx = _dispatch_context_bounded(
+            fm, prompt[:600], capabilities=["real-time-search"]
+        )
         if not ctx.get("success"):
             meta["augment_skipped"] = ctx.get("error") or "context_dispatch_failed"
             return messages, meta
@@ -140,7 +168,7 @@ def maybe_augment_messages_with_context(
         note = {
             "role": "system",
             "content": (
-                "[T2 CONTEXT AUGMENT — opportunistic fleet prefetch; verify before citing]\n"
+                "[T2 CONTEXT AUGMENT -- opportunistic fleet prefetch; verify before citing]\n"
                 + snippet
             ),
         }
@@ -164,7 +192,7 @@ def try_t2_fleet_dispatch(
     *,
     local_failed: bool = False,
 ) -> Dict[str, Any]:
-    """Tier 1.5 — free compute + optional context via external_fleet_manager."""
+    """Tier 1.5 -- free compute + optional context via external_fleet_manager."""
     started = time.time()
     pol = fleet_policy()
     if not pol.get("enabled"):
@@ -239,7 +267,7 @@ def try_t2_fleet_dispatch(
 
 def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Tier 3 — paid / heavy reasoning. Tries free fleet first when prefer_free_before_grok.
+    Tier 3 -- paid / heavy reasoning. Tries free fleet first when prefer_free_before_grok.
     Falls back to xAI Grok OpenAI-compat when GROK_API_KEY present.
     """
     if is_roleplay_route(routing):
@@ -268,7 +296,7 @@ def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]
             "success": False,
             "escalation": True,
             "tier": "grok_escalation",
-            "response": "[T3 PAID ESCALATION] GROK_API_KEY missing — enable in Bitwarden or use Hermes Grok provider directly.",
+            "response": "[T3 PAID ESCALATION] GROK_API_KEY missing -- enable in Bitwarden or use Hermes Grok provider directly.",
             "provenance": {
                 "selected_backend": "paid_escalation",
                 "escalation_tier": "T3",

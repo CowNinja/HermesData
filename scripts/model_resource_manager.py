@@ -28,6 +28,7 @@ START_UNIFIED_PS1 = HERMES_SCRIPTS / "Start-Unified-Router-8090.ps1"
 START_LLAMA_PS1 = HERMES_SCRIPTS / "ops" / "02-start-llama.ps1"
 START_PROXY_PS1 = HERMES_SCRIPTS / "ops" / "03-start-proxy.ps1"
 START_PROXY_LEGACY_PS1 = HERMES_SCRIPTS / "Start-Sovereign-Proxy-8091.ps1"
+ONEBUTTON_PS1 = HERMES_SCRIPTS / "Phronesis-OneButton-Start.ps1"
 WATCHDOG_LOG = VAULT / "Operations" / "logs" / "sovereign-stack-watchdog.jsonl"
 MAX_RECOVERY_ATTEMPTS = 3
 
@@ -301,15 +302,63 @@ def attempt_moe_recovery(dry_run: bool = False) -> Dict[str, Any]:
         state["last_recovery"] = datetime.now(timezone.utc).isoformat()
         save_state(state)
         matrix = tier_matrix(force_refresh=True)
-        return {
+        result: Dict[str, Any] = {
             "ok": matrix.get("moe_ready", False),
             "script": script.name,
             "exit_code": proc.returncode,
             "stdout_tail": (proc.stdout or "")[-500:],
             "matrix": matrix,
         }
+        # Align with Phronesis-Heal: onebutton restores 8090+8091 when start-llama alone fails.
+        if not result["ok"] and ONEBUTTON_PS1.is_file():
+            try:
+                proc_ob = run_hidden(
+                    hidden_powershell_args(
+                        str(ONEBUTTON_PS1),
+                        "-SkipGateway",
+                        "-SkipDashboard",
+                        "-SkipWorkspace",
+                        "-SkipSmoke",
+                    ),
+                    cwd=str(HERMES_SCRIPTS),
+                    capture_output=True,
+                    text=True,
+                    timeout=200,
+                )
+                matrix = tier_matrix(force_refresh=True)
+                result.update(
+                    {
+                        "ok": matrix.get("agent_local_ready", False),
+                        "fallback": "onebutton_inference",
+                        "fallback_exit_code": proc_ob.returncode,
+                        "fallback_stdout_tail": (proc_ob.stdout or "")[-500:],
+                        "matrix": matrix,
+                    }
+                )
+            except Exception as ob_exc:
+                result["fallback_error"] = str(ob_exc)
+        return result
     except Exception as exc:
         return {"ok": False, "reason": str(exc)}
+
+
+def _maintenance_lock_blocks_recovery() -> Optional[str]:
+    lock_path = HERMES_SCRIPTS.parent / "state" / "maintenance-lock.json"
+    if not lock_path.is_file():
+        return None
+    try:
+        raw = json.loads(lock_path.read_text(encoding="utf-8"))
+        until = raw.get("until")
+        if until:
+            from datetime import datetime
+
+            if datetime.now().astimezone() > datetime.fromisoformat(str(until)):
+                return None
+        if raw.get("block_stack_heal") or raw.get("reason") == "hermes_update":
+            return str(raw.get("reason") or "maintenance_lock")
+    except Exception:
+        return None
+    return None
 
 
 def preflight_for_agent(auto_recover: bool = False) -> Dict[str, Any]:
@@ -319,6 +368,13 @@ def preflight_for_agent(auto_recover: bool = False) -> Dict[str, Any]:
     if matrix.get("agent_local_ready"):
         result["cooldown_reset"] = reset_recovery_counters_on_green(matrix)
         result["ok"] = True
+        return result
+
+    lock_reason = _maintenance_lock_blocks_recovery()
+    if auto_recover and lock_reason:
+        result["skipped"] = True
+        result["reason"] = lock_reason
+        result["ok"] = matrix.get("agent_local_ready", False)
         return result
 
     if auto_recover:

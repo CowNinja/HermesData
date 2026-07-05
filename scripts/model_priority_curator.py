@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-model_priority_curator.py — Holistic model priority board for sovereign stack.
+model_priority_curator.py -- Holistic model priority board for sovereign stack.
 
 Unifies local GPU inventory, benchmark scores, free cloud fleet, and paid fallbacks
 into one ranked priority state for the dashboard panel. Does NOT auto-promote while
-model_rotation_locked is true — ranks and recommends only.
+model_rotation_locked is true -- ranks and recommends only.
 
 Usage:
   python model_priority_curator.py --tick          # lightweight refresh (cron)
@@ -31,6 +31,8 @@ LIFECYCLE_PATH = PHM / "lifecycle_manifest.json"
 BENCHMARK_DIR = VAULT / "Operations" / "benchmark-results"
 CURATOR_REPORT = VAULT / "Operations" / "logs" / "fleet-curator-report.json"
 HEALTH_STATE = VAULT / "Operations" / "logs" / "fleet-health-state.json"
+PROCUREMENT_STATE = VAULT / "Operations" / "logs" / "fleet-procurement-state.json"
+PROCUREMENT_REPORT = VAULT / "Operations" / "logs" / "fleet-procurement-report.json"
 STATE_OUT = VAULT / "Operations" / "model-priority-state.json"
 LOG_PATH = VAULT / "Operations" / "logs" / "model-priority-curator.jsonl"
 
@@ -217,8 +219,49 @@ def _provider_health(pid: str) -> Dict[str, Any]:
     return (health.get("providers") or {}).get(pid) or {}
 
 
+def _procurement_benchmarks() -> Dict[str, Dict[str, Any]]:
+    """Provider id -> procurement benchmark (TTFT, compliance, pass) when available."""
+    out: Dict[str, Dict[str, Any]] = {}
+    for path in (PROCUREMENT_STATE, PROCUREMENT_REPORT):
+        data = _load_json(path)
+        for entry in (data.get("providers") or data.get("benchmarked") or []):
+            if not isinstance(entry, dict):
+                continue
+            pid = str(entry.get("id") or entry.get("provider_id") or "")
+            if not pid:
+                continue
+            bench = entry.get("benchmark") or entry.get("bench")
+            if isinstance(bench, dict) and bench:
+                out[pid] = bench
+            elif entry.get("ttft_sec") is not None or entry.get("pass") is not None:
+                out[pid] = {
+                    "ttft_sec": entry.get("ttft_sec"),
+                    "compliance": entry.get("compliance"),
+                    "tokens_per_sec": entry.get("tokens_per_sec"),
+                    "pass": entry.get("pass"),
+                }
+        for pid, meta in (data.get("provider_benchmarks") or {}).items():
+            if isinstance(meta, dict) and pid:
+                out[str(pid)] = meta
+    return out
+
+
+def _latency_ms_from_health(health: Dict[str, Any]) -> Optional[float]:
+    if health.get("avg_latency_ms") is not None:
+        return float(health["avg_latency_ms"])
+    if health.get("last_latency_ms") is not None:
+        return float(health["last_latency_ms"])
+    if health.get("latency_sec") is not None:
+        return round(float(health["latency_sec"]) * 1000.0, 1)
+    detail = health.get("detail") if isinstance(health.get("detail"), dict) else {}
+    if detail.get("latency_sec") is not None:
+        return round(float(detail["latency_sec"]) * 1000.0, 1)
+    return None
+
+
 def _rank_cloud_providers(registry: Dict[str, Any], *, paid: bool) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
+    proc_bench = _procurement_benchmarks()
     section = "compute_providers"
     for entry in registry.get(section) or []:
         if not isinstance(entry, dict):
@@ -242,7 +285,24 @@ def _rank_cloud_providers(registry: Dict[str, Any], *, paid: bool) -> List[Dict[
             score -= 30.0
         if health.get("blacklisted_until"):
             score -= 50.0
-        latency = health.get("avg_latency_ms") or health.get("last_latency_ms")
+        latency = _latency_ms_from_health(health)
+        if latency is not None:
+            if latency < 800:
+                score += 8.0
+            elif latency > 5000:
+                score -= 10.0
+        bench = proc_bench.get(pid)
+        if bench:
+            if bench.get("pass") is True:
+                score += 12.0
+            elif bench.get("pass") is False:
+                score -= 20.0
+            ttft = bench.get("ttft_sec")
+            if ttft is not None and float(ttft) < 8.0:
+                score += 5.0
+            compliance = bench.get("compliance")
+            if compliance is not None:
+                score += min(10.0, float(compliance) * 10.0)
         rows.append(
             {
                 "id": pid,
@@ -252,8 +312,8 @@ def _rank_cloud_providers(registry: Dict[str, Any], *, paid: bool) -> List[Dict[
                 "model": str(entry.get("model") or ""),
                 "status": "active" if enabled and h_status == "up" else ("configured" if enabled else "off"),
                 "score": round(score, 1),
-                "detail": f"health={h_status}" + (f" · {latency}ms" if latency else ""),
-                "benchmark": None,
+                "detail": f"health={h_status}" + (f" . {latency:.0f}ms" if latency is not None else ""),
+                "benchmark": bench,
                 "promotable": False,
             }
         )
@@ -349,7 +409,7 @@ def build_priority_state(*, refresh_cloud: bool = False) -> Dict[str, Any]:
         if top:
             recommendation = f"Consider promote: {top['name']} (score {top['score']})"
     elif locked:
-        recommendation = "Rotation locked — rankings inform only; active model unchanged"
+        recommendation = "Rotation locked -- rankings inform only; active model unchanged"
 
     tiers = [
         {
@@ -362,14 +422,14 @@ def build_priority_state(*, refresh_cloud: bool = False) -> Dict[str, Any]:
         {
             "id": "gpu_standby",
             "label": "GPU standby",
-            "subtitle": "Not loaded — swap requires restart",
+            "subtitle": "Not loaded -- swap requires restart",
             "models": [r for r in local_ranked if r["status"] != "active"][:6],
             "active_id": None,
         },
         {
             "id": "internet_free",
             "label": "Internet free",
-            "subtitle": "Tier 1.5 opportunistic fleet" + (" — ON" if fleet_on else " — OFF"),
+            "subtitle": "Tier 1.5 opportunistic fleet" + (" -- ON" if fleet_on else " -- OFF"),
             "models": free_ranked[:8],
             "active_id": free_ranked[0]["id"] if free_ranked else None,
         },
@@ -444,11 +504,12 @@ def main() -> int:
     parser.add_argument("--stdout", action="store_true", help="Print JSON to stdout")
     args = parser.parse_args()
 
+    refresh = bool(args.refresh_cloud or args.tick)
     if args.tick:
-        state = tick(refresh_cloud=args.refresh_cloud)
+        state = tick(refresh_cloud=refresh)
     else:
-        state = build_priority_state(refresh_cloud=args.refresh_cloud)
-        if args.stdout or not STATE_OUT.is_file():
+        state = build_priority_state(refresh_cloud=refresh)
+        if args.stdout or args.refresh_cloud or not STATE_OUT.is_file():
             write_state(state)
 
     print(json.dumps(state, indent=2))

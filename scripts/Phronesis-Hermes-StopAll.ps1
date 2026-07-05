@@ -14,6 +14,7 @@ function Log([string]$m) {
 }
 
 Log "=== Phronesis Hermes Stop-All ==="
+$SelfPid = $PID
 
 # Hermes CLI / gateway / dashboard / desktop backend
 & "D:\HermesData\hermes-agent\venv\Scripts\hermes.exe" gateway stop 2>$null | Out-Null
@@ -26,14 +27,24 @@ $patterns = @(
     'hermes-setup\.exe',
     'hermes-agent\.exe',
     'roleplay-image-rider',
-    'sovereign_openai_proxy'
+    'sovereign_openai_proxy',
+    'tui_gateway\.slash_worker',
+    'watch_comfy_delivery',
+    'comfy_delivery_daemon',
+    'sovereign_stack_watchdog',
+    'model_management_agent'
 )
 
 Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($_.ProcessId -eq $SelfPid) { return }
     $cmd = $_.CommandLine
     if (-not $cmd) { return }
     $kill = $false
     if ($cmd -like "*$VenvMarker*") { $kill = $true }
+    # System-python HermesData scripts also block venv .pyd updates (ForkGuard orphans).
+    if ($_.Name -match '^(python|pythonw)$' -and $cmd -like "*D:\HermesData\scripts\*" -and $cmd -notmatch 'llama-server') {
+        $kill = $true
+    }
     foreach ($p in $patterns) {
         if ($cmd -match $p) { $kill = $true; break }
     }
@@ -47,6 +58,7 @@ Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object {
 
 # Broad sweep for orphaned venv python(w) still holding .pyd locks
 Get-Process python, pythonw, hermes, electron -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($_.Id -eq $SelfPid) { return }
     try {
         $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -ErrorAction SilentlyContinue
         if ($p.CommandLine -like "*$VenvMarker*") {

@@ -20,15 +20,15 @@
       "schedule_display": "0 */6 * * *",
       "repeat": {
         "times": 999,
-        "completed": 60
+        "completed": 61
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-14T11:15:30.249015-04:00",
-      "next_run_at": "2026-07-04T18:00:00-04:00",
-      "last_run_at": "2026-07-04T12:00:27.316525-04:00",
+      "next_run_at": "2026-07-05T00:00:00-04:00",
+      "last_run_at": "2026-07-04T18:00:43.428617-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -69,15 +69,15 @@
       "schedule_display": "0 */6 * * *",
       "repeat": {
         "times": 999,
-        "completed": 105
+        "completed": 106
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-15T07:45:59.378021-04:00",
-      "next_run_at": "2026-07-04T18:00:00-04:00",
-      "last_run_at": "2026-07-04T12:00:50.192894-04:00",
+      "next_run_at": "2026-07-05T00:00:00-04:00",
+      "last_run_at": "2026-07-04T18:01:01.751817-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -117,15 +117,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 2962
+        "completed": 3009
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T17:46:58.023415-04:00",
-      "next_run_at": "2026-07-04T16:35:00-04:00",
-      "last_run_at": "2026-07-04T16:30:38.260384-04:00",
+      "next_run_at": "2026-07-04T20:35:00-04:00",
+      "last_run_at": "2026-07-04T20:30:02.912200-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -139,17 +139,14 @@
     {
       "id": "275895154786",
       "name": "Daily-Skills-Reflection",
-      "prompt": "Run wisdom-keeper-reflection and hermes-agent-skill-authoring on recent activity. Update sovereign skill patches and vault MD appends only.\n\nIMPORTANT CONSTRAINTS:\n- NEVER send results to WhatsApp, Telegram, or any external platform.\n- SILENT mode: if nothing significant changed, produce zero output.\n- Write to vault only (D:\\PhronesisVault).\n- Use [SILENT] prefix when no meaningful change occurred.\n- Do NOT attempt any platform delivery via send_message tool.",
-      "skills": [
-        "wisdom-keeper-reflection",
-        "hermes-agent-skill-authoring"
-      ],
-      "skill": "wisdom-keeper-reflection",
+      "prompt": "Script-only gate: scan skill usage + librarian changelog; [SILENT] if no changes. Deep LLM reflection = ad-hoc only.",
+      "skills": [],
+      "skill": null,
       "model": "phronesis-sovereign-auto",
       "provider": "phronesis-sovereign",
       "base_url": null,
-      "script": null,
-      "no_agent": false,
+      "script": "daily_skills_reflection_gate.py",
+      "no_agent": true,
       "context_from": null,
       "schedule": {
         "kind": "cron",
@@ -168,8 +165,8 @@
       "created_at": "2026-06-22T23:52:23.622388-04:00",
       "next_run_at": "2026-07-05T09:00:00-04:00",
       "last_run_at": "2026-07-04T09:01:02.749797-04:00",
-      "last_status": "error",
-      "last_error": "RuntimeError: Response remained truncated after 4 continuation attempts",
+      "last_status": "ok",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
       "origin": {
@@ -205,15 +202,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 245
+        "completed": 249
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T15:57:56.760952-04:00",
-      "next_run_at": "2026-07-04T16:52:32.249904-04:00",
-      "last_run_at": "2026-07-04T15:52:32.249904-04:00",
+      "next_run_at": "2026-07-04T20:52:59.676054-04:00",
+      "last_run_at": "2026-07-04T19:52:59.676054-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -358,17 +355,17 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 212
+        "completed": 214
       },
-      "enabled": true,
-      "state": "scheduled",
-      "paused_at": null,
-      "paused_reason": null,
+      "enabled": false,
+      "state": "paused",
+      "paused_at": "2026-07-04T22:01:30+00:00",
+      "paused_reason": "Fieldy-RecentPull.ps1 missing at C:\\Users\\CowNi\\fieldy -- paused by cron_audit until path restored",
       "created_at": "2026-06-24T19:10:41.706853-04:00",
-      "next_run_at": "2026-07-04T16:51:32.243417-04:00",
-      "last_run_at": "2026-07-04T15:51:32.243417-04:00",
-      "last_status": "error",
-      "last_error": "Script exited with code 1\nstdout:\nCRITICAL: Fieldy script not found at C:\\Users\\CowNi\\fieldy\\Fieldy-RecentPull.ps1",
+      "next_run_at": "2026-07-04T18:51:39.033840-04:00",
+      "last_run_at": "2026-07-04T17:51:39.033840-04:00",
+      "last_status": "paused",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
       "origin": {
@@ -444,15 +441,15 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 48
+        "completed": 49
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-07-04T20:32:35.669986-04:00",
-      "last_run_at": "2026-07-04T12:32:35.167216-04:00",
+      "next_run_at": "2026-07-05T00:33:01.203109-04:00",
+      "last_run_at": "2026-07-04T16:32:58.546027-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -493,17 +490,17 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 271
+        "completed": 279
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T19:59:53.051242-04:00",
-      "next_run_at": "2026-07-04T16:32:36.375062-04:00",
-      "last_run_at": "2026-07-04T16:02:36.375062-04:00",
-      "last_status": "error",
-      "last_error": "Script exited with code 1\nstdout:\n## Self-Recovery-Watchdog 2026-07-04T20:02:32.689644+00:00\nHermesData: unpushed=0 dirty=204 remote=https://github.com/CowNinja/HermesData.git\nPhronesisVault: unpushed=0 dirty=121 remote=https://github.com/CowNinja/PhronesisVault.git\nSKIP PhronesisSilo: no_git\n\n[ISSUES: 2]\n  - HermesData: 204 dirty files (nothing committed to push)\n  - PhronesisVault: 121 dirty files (nothing committed to push)",
+      "next_run_at": "2026-07-04T20:44:01.452726-04:00",
+      "last_run_at": "2026-07-04T20:14:01.452726-04:00",
+      "last_status": "ok",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "origin",
       "origin": {
@@ -542,15 +539,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 132
+        "completed": 136
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T22:59:28.297996-04:00",
-      "next_run_at": "2026-07-04T16:51:32.276454-04:00",
-      "last_run_at": "2026-07-04T15:51:32.276454-04:00",
+      "next_run_at": "2026-07-04T20:51:59.844138-04:00",
+      "last_run_at": "2026-07-04T19:51:59.844138-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -600,8 +597,8 @@
       "created_at": "2026-06-28T23:03:35.140665-04:00",
       "next_run_at": "2026-07-05T06:00:00-04:00",
       "last_run_at": "2026-07-04T07:50:58.757503-04:00",
-      "last_status": "error",
-      "last_error": "Script exited with code 1\nstderr:\nTraceback (most recent call last):\n  File \"D:\\HermesData\\scripts\\daily_model_audit.py\", line 47, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File \"D:\\HermesData\\scripts\\daily_model_audit.py\", line 15, in main\n    audit = run_script(\"model_inventory.py\", \"--audit\")\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\HermesData\\scripts\\daily_model_audit.py\", line 8, in run_script\n    result = subprocess.run(\n             ^^^^^^^^^^^^^^^\n  File \"C:\\Users\\CowNi\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\subprocess.py\", line 550, in run\n    stdout, stderr = process.communicate(input, timeout=timeout)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\CowNi\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\subprocess.py\", line 1209, in communicate\n    stdout, stderr = self._communicate(input, endtime, timeout)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\CowNi\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\subprocess.py\", line 1628, in _communicate\n    raise TimeoutExpired(self.args, orig_timeout)\nsubprocess.TimeoutExpired: Command '['D:\\\\HermesData\\\\hermes-agent\\\\venv\\\\Scripts\\\\pythonw.exe', 'model_inventory.py', '--audit']' timed out after 120 seconds",
+      "last_status": "ok",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
       "origin": {
@@ -685,15 +682,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 59
+        "completed": 61
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:15.417577-04:00",
-      "next_run_at": "2026-07-04T17:51:37.278376-04:00",
-      "last_run_at": "2026-07-04T15:51:37.278376-04:00",
+      "next_run_at": "2026-07-04T21:52:07.034739-04:00",
+      "last_run_at": "2026-07-04T19:52:07.034739-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -732,15 +729,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 60
+        "completed": 62
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:25.077977-04:00",
-      "next_run_at": "2026-07-04T17:50:32.462761-04:00",
-      "last_run_at": "2026-07-04T15:50:32.462761-04:00",
+      "next_run_at": "2026-07-04T21:50:59.949217-04:00",
+      "last_run_at": "2026-07-04T19:50:59.949217-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -850,18 +847,16 @@
     {
       "id": "6081ec2e875d",
       "name": "PhronesisVault CNS Watchdog",
-      "prompt": "Ingest the CNS metadata from K:\\PhronesisVault into the PhronesisVault index. Look for the vault folder; once it's present, run the cns-ingestion skill to scan all files, extract metadata (title, tags, date, word count, etc.), and write the results back into the runtime index on D:\\HermesData\\PhronesisVault\\index. Keep the output concise but actionable for Jeff.",
-      "skills": [
-        "cns-ingestion"
-      ],
-      "skill": "cns-ingestion",
+      "prompt": "Script-only CNS ingest gate: scan K:/PhronesisVault, write index JSONL. Skip if drive unmounted.",
+      "skills": [],
+      "skill": null,
       "model": null,
       "provider": null,
       "provider_snapshot": "custom",
       "model_snapshot": "phronesis-sovereign-auto",
       "base_url": null,
-      "script": null,
-      "no_agent": false,
+      "script": "cns_watchdog_gate.py",
+      "no_agent": true,
       "context_from": null,
       "schedule": {
         "kind": "interval",
@@ -871,15 +866,15 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 148
+        "completed": 163
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T11:46:43.622278-04:00",
-      "next_run_at": "2026-07-04T16:37:44.448525-04:00",
-      "last_run_at": "2026-07-04T16:22:44.448525-04:00",
+      "next_run_at": "2026-07-04T20:45:17.147405-04:00",
+      "last_run_at": "2026-07-04T20:30:17.147405-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -922,15 +917,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 83
+        "completed": 91
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T13:06:18.302675-04:00",
-      "next_run_at": "2026-07-04T16:35:38.990573-04:00",
-      "last_run_at": "2026-07-04T16:05:38.990573-04:00",
+      "next_run_at": "2026-07-04T20:45:07.459538-04:00",
+      "last_run_at": "2026-07-04T20:15:07.459538-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1016,15 +1011,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 59
+        "completed": 106
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-04T11:35:00-04:00",
-      "next_run_at": "2026-07-04T16:35:00-04:00",
-      "last_run_at": "2026-07-04T16:30:47.058396-04:00",
+      "next_run_at": "2026-07-04T20:35:00-04:00",
+      "last_run_at": "2026-07-04T20:30:04.088716-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1036,5 +1031,5 @@
       "pinned": true
     }
   ],
-  "updated_at": "2026-07-04T16:32:35.670996-04:00"
+  "updated_at": "2026-07-04T20:33:01.203109-04:00"
 }

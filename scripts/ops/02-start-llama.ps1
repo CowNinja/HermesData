@@ -27,8 +27,8 @@ $Ngl      = if ($Ngl) { $Ngl } else { [int]$core.n_gpu_layers }
 if (-not (Test-Path $llamaServer)) { Write-Host "FATAL: $llamaServer not found" -ForegroundColor Red; exit 1 }
 if (-not (Test-Path $Model))       { Write-Host "FATAL: $Model not found" -ForegroundColor Red; exit 1 }
 
-Stop-Process -Name "llama-server" -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "Phronesis-Llama-Process.ps1")
+if (Stop-LlamaOnPort -Port $Port) { Start-Sleep -Seconds 1 }
 
 $args = @(
     "--model", $Model,

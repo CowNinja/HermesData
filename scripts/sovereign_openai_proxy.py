@@ -1802,7 +1802,23 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             "native_passthrough": bool(prov.get("native_passthrough")),
             "tool_passthrough": bool(prov.get("tool_passthrough") or result.get("tool_calls")),
         }
-        _log_event({"event": "dispatch_ok", "model": model, **{k: v for k, v in extra.items() if k != "context_trim"}})
+        usage_in = usage_out = 0
+        openai_resp = result.get("openai_response")
+        if isinstance(openai_resp, dict):
+            usage = openai_resp.get("usage") or {}
+            usage_in = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+            usage_out = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
+        if not usage_in and not usage_out:
+            usage_in = int(trim_meta.get("final_tokens_estimate") or estimate_tokens(messages_to_prompt(messages)))
+            usage_out = max(50, len(content) // 4)
+
+        _log_event({
+            "event": "dispatch_ok",
+            "model": model,
+            "input_tokens": usage_in,
+            "output_tokens": usage_out,
+            **{k: v for k, v in extra.items() if k != "context_trim"},
+        })
         _log_generation_provenance({
             "event": "proxy_dispatch_ok",
             "gateway_model": routing.get("request_model") or model,
@@ -1816,7 +1832,28 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             "response_preview": content[:200],
             "latency_sec": latency,
             "uncensored_route": prov.get("uncensored_route"),
+            "input_tokens": usage_in,
+            "output_tokens": usage_out,
+            "usage": {
+                "prompt_tokens": usage_in,
+                "completion_tokens": usage_out,
+                "total_tokens": usage_in + usage_out,
+            },
         })
+        try:
+            backend = str(prov.get("selected_backend") or "native_8090")
+            if backend in ("native_8090", "native_8090_cached", "vault_v0.11", "ollama"):
+                from sovereign_usage_savings import record_local_usage
+
+                record_local_usage(
+                    input_tokens=usage_in,
+                    output_tokens=usage_out,
+                    backend=backend,
+                    model=str(resolved_model or model),
+                    source="proxy",
+                )
+        except Exception:
+            pass
 
         def _async_checkpoint() -> None:
             try:

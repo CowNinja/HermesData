@@ -270,7 +270,7 @@ def detect_identical_image_tool_loop(state: Dict[str, Any]) -> Dict[str, Any]:
             state["identical_image_loop_notices"] = retries + 1
             payload["notify"] = (
                 "Detected duplicate image_generate calls within "
-                f"{IDENTICAL_IMAGE_TOOL_WINDOW_SEC}s — use /reset if the turn stalls "
+                f"{IDENTICAL_IMAGE_TOOL_WINDOW_SEC}s -- use /reset if the turn stalls "
                 "after Comfy already wrote a PNG."
             )
     else:
@@ -376,6 +376,83 @@ def recover_stalled_image_turn(state: Dict[str, Any], stall: Dict[str, Any]) -> 
             actions.append({"action": "bootstrap_comfy", "ok": False, "error": str(exc)})
     state["image_stall_retries"] = retries + 1
     return {"action": "recover_attempt", "retries": state["image_stall_retries"], "actions": actions}
+
+
+def _http_status(url: str, *, timeout: float = 6.0) -> int:
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            return int(resp.status)
+    except urllib.error.HTTPError as exc:
+        return int(exc.code)
+    except Exception:
+        return 0
+
+
+def workspace_health_recover(*, auto_recover: bool = True) -> Dict[str, Any]:
+    """Probe :3001 workspace; restart via restart-workspace.ps1 when down or SSR 500."""
+    ws_port = 3001
+    start_ws = True
+    try:
+        core_path = SCRIPTS / "phronesis-core.json"
+        if core_path.is_file():
+            core = json.loads(core_path.read_text(encoding="utf-8"))
+            start_ws = bool(core.get("start_workspace", True))
+            ws_port = int((core.get("ports") or {}).get("workspace") or 3001)
+    except Exception:
+        pass
+
+    result: Dict[str, Any] = {"port": ws_port, "up": _port_open(ws_port), "action": "none"}
+    if not start_ws:
+        result["action"] = "skipped"
+        result["reason"] = "start_workspace_false"
+        return result
+    base = f"http://127.0.0.1:{ws_port}"
+    if result["up"]:
+        auth_status = _http_status(f"{base}/api/auth-check", timeout=4)
+        dash_status = _http_status(f"{base}/dashboard", timeout=8)
+        result["auth_check"] = auth_status == 200
+        result["dashboard_check"] = dash_status == 200
+        if auth_status != 200:
+            result["auth_error"] = f"status={auth_status}"
+        if dash_status != 200:
+            result["dashboard_error"] = f"status={dash_status}"
+        # auth-check alone is a false positive when SSR shell is broken (HTTPError in gateway probe).
+        if result["auth_check"] and result["dashboard_check"]:
+            return result
+        if not auto_recover:
+            result["action"] = "degraded_no_recover"
+            return result
+    elif not auto_recover:
+        result["action"] = "down_no_recover"
+        return result
+
+    restart_ps1 = SCRIPTS / "ops" / "restart-workspace.ps1"
+    if not restart_ps1.is_file():
+        result["action"] = "skipped"
+        result["reason"] = "restart_workspace_ps1_missing"
+        return result
+    try:
+        proc = run_hidden(
+            hidden_powershell_args(str(restart_ps1), "-Quiet"),
+            capture_output=True,
+            text=True,
+            timeout=180,
+            cwd=str(SCRIPTS),
+        )
+        result.update(
+            {
+                "action": "restart_workspace",
+                "ok": _port_open(ws_port),
+                "exit_code": proc.returncode,
+                "stdout_tail": (proc.stdout or "")[-300:],
+            }
+        )
+    except Exception as exc:
+        result.update({"action": "restart_workspace", "ok": False, "error": str(exc)})
+    return result
 
 
 def _port_open(port: int, host: str = "127.0.0.1", timeout: float = 1.5) -> bool:
@@ -593,6 +670,7 @@ def run_tick(*, auto_recover: bool = True, run_mgmt: bool = False, once: bool = 
     state["ticks"] = int(state.get("ticks") or 0) + 1
 
     log_scan = scan_log_patterns()
+    workspace_recovery = workspace_health_recover(auto_recover=auto_recover)
     vram_recovery = vram_mode_recovery() if auto_recover else {"vram_mode": _load_vram_mode(), "skipped": True}
 
     comfy_health = comfy_health_ping()
@@ -652,6 +730,7 @@ def run_tick(*, auto_recover: bool = True, run_mgmt: bool = False, once: bool = 
             "recoveries": preflight.get("recoveries"),
         },
         "log_scan": log_scan,
+        "workspace_recovery": workspace_recovery,
         "vram_recovery": vram_recovery,
         "comfy_health": comfy_health,
         "comfy_output_poll": comfy_output,

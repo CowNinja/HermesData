@@ -5,18 +5,27 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $corePath = Join-Path $scriptRoot "..\phronesis-core.json"
 $dashPort = 9119
+# Loopback bind for reliable local heal -- 0.0.0.0 from core can leave zombie forks without HTTP.
 $dashHost = "127.0.0.1"
 if (Test-Path $corePath) {
     try {
         $core = Get-Content $corePath -Raw | ConvertFrom-Json
         if ($core.ports.dashboard) { $dashPort = [int]$core.ports.dashboard }
-        if ($core.dashboard_host) { $dashHost = [string]$core.dashboard_host }
     } catch {
         # keep default
     }
 }
 
+$env:HERMES_QUIET_SECRETS = '1'
+Remove-NonVenvGatewayDashboard | Out-Null
 Stop-HermesProcesses -RolePattern 'hermes_cli.main dashboard' | Out-Null
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match 'hermes_cli\.main dashboard' } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+$staleListener = Get-PortListenerPid -Port $dashPort
+if ($staleListener -and -not (Test-VenvOwnsDashboard)) {
+    Stop-Process -Id $staleListener -Force -ErrorAction SilentlyContinue
+}
 Start-Sleep -Seconds 2
 
 $agentRoot = Join-Path $HermesRoot "hermes-agent"
@@ -28,19 +37,33 @@ if (-not (Test-Path $webDist)) {
     Pop-Location
 }
 
-# pythonw hidden first (ForkGuard default); python.exe hidden fallback if port slow
+function Test-DashboardHttp {
+    param([int]$Port)
+    return (Test-HttpOk -Url "http://127.0.0.1:$Port/api/status")
+}
+
+# pythonw hidden first (ForkGuard default); python.exe hidden fallback if HTTP slow
 Start-VenvDashboard
-$up = Wait-PortUp -Port $dashPort -MaxSeconds 30
+$up = $false
+for ($i = 0; $i -lt 45; $i++) {
+    Start-Sleep -Seconds 1
+    if (Test-DashboardHttp -Port $dashPort) { $up = $true; break }
+}
 if (-not $up) {
     $py = if (Test-Path $VenvPython) { $VenvPython } else { $VenvPythonw }
+    $dashArgs = @("-m", "hermes_cli.main", "dashboard", "--port", "$dashPort", "--host", $dashHost, "--no-open")
+    if (Test-Path $webDist) { $dashArgs += "--skip-build" }
     Start-Process -FilePath $py `
-        -ArgumentList "-m", "hermes_cli.main", "dashboard", "--port", "$dashPort", "--host", $dashHost, "--skip-build", "--no-open" `
+        -ArgumentList $dashArgs `
         -WorkingDirectory $agentRoot `
         -WindowStyle Hidden
-    $up = Wait-PortUp -Port $dashPort -MaxSeconds 35
+    for ($i = 0; $i -lt 45; $i++) {
+        Start-Sleep -Seconds 1
+        if (Test-DashboardHttp -Port $dashPort) { $up = $true; break }
+    }
 }
 if ($up) {
-    Write-Host "CLI dashboard listening on :$dashPort"
+    Write-Host "CLI dashboard listening on :$dashPort (api/status OK)"
     exit 0
 }
 Write-Host "CLI dashboard failed to bind :$dashPort within timeout"

@@ -22,6 +22,7 @@ if (-not (Test-Path $corePath)) { Write-Host "FATAL: phronesis-core.json missing
 $core = Get-Content $corePath -Raw | ConvertFrom-Json
 
 . (Join-Path $PSScriptRoot "Phronesis-ForkGuard.ps1")
+. (Join-Path $PSScriptRoot "Phronesis-Llama-Process.ps1")
 
 $py = $core.venv_python
 $logDir = $core.log_dir
@@ -76,12 +77,9 @@ Log "=== Phronesis One-Button Start ==="
 $forkKills = Ensure-VenvHermesOnly
 if ($forkKills -gt 0) { Log "ForkGuard: removed $forkKills non-venv Hermes process(es)" }
 
-# --- Dedup: one llama ---
-$llamas = @(Get-Process -Name llama-server -ErrorAction SilentlyContinue)
-if ($llamas.Count -gt 1) {
-    $llamas | Select-Object -Skip 1 | Stop-Process -Force
-    Log "Killed $($llamas.Count - 1) duplicate llama-server"
-}
+# --- Dedup: one Phronesis llama on router port (Ollama-safe) ---
+$dupKilled = Remove-DuplicatePhronesisLlamas -RouterPort ([int]$core.ports.router)
+if ($dupKilled -gt 0) { Log "Killed $dupKilled duplicate Phronesis llama-server" }
 
 # Stop wrong model BEFORE VRAM check so 9B can load
 $preferred = $core.model
@@ -89,7 +87,7 @@ if (Port-Up $core.ports.router) {
     $loaded = Get-LoadedModelPath
     if ($loaded -and $loaded -ne $preferred) {
         Log "Model swap: stopping 8090 ($(Split-Path $loaded -Leaf) -> $(Split-Path $preferred -Leaf))"
-        Get-Process -Name llama-server -ErrorAction SilentlyContinue | Stop-Process -Force
+        Stop-LlamaOnPort -Port ([int]$core.ports.router) | Out-Null
         Start-Sleep -Seconds 4
     }
 }
@@ -194,8 +192,15 @@ if (-not $SkipWorkspace -and $core.start_workspace) {
 }
 
 # --- Roleplay image rider (Discord Pony sidecar) ---
+$imagePaused = $false
+$pausePath = Join-Path (Split-Path $PSScriptRoot -Parent) "state\image-pipeline-pause.json"
+if (Test-Path $pausePath) {
+    try { $imagePaused = [bool]((Get-Content $pausePath -Raw | ConvertFrom-Json).paused) } catch {}
+}
 $riderScript = "D:\PhronesisVault\Roleplay-Sandbox\scripts\Start-Image-Rider.ps1"
-if (Test-Path $riderScript) {
+if ($imagePaused) {
+    Log "Image rider skipped (image-pipeline-pause.json)"
+} elseif (Test-Path $riderScript) {
     Log "Starting roleplay-image-rider daemon..."
     & powershell -NoProfile -ExecutionPolicy Bypass -File $riderScript
     Log "Image rider launch invoked"

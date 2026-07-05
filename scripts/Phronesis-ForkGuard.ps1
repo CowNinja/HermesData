@@ -273,6 +273,15 @@ function Start-VenvDashboard {
         -WindowStyle Hidden
 }
 
+function Stop-WorkspaceServer {
+    $wsPort = if ($Core -and $Core.ports.workspace) { [int]$Core.ports.workspace } else { 3001 }
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match 'server-entry\.js' } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Get-NetTCPConnection -LocalPort $wsPort -State Listen -ErrorAction SilentlyContinue |
+        ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+}
+
 function Start-WorkspaceServer {
     $node = if ($Core -and $Core.node_exe) { $Core.node_exe } else { "node.exe" }
     $wsDir = if ($Core -and $Core.workspace_dir) { $Core.workspace_dir } else { "D:\HermesData\hermes-workspace" }
@@ -282,6 +291,15 @@ function Start-WorkspaceServer {
         -WorkingDirectory $wsDir `
         -WindowStyle Hidden
     return $true
+}
+
+function Restart-WorkspaceServer {
+    param([int]$MaxSeconds = 40)
+    $wsPort = if ($Core -and $Core.ports.workspace) { [int]$Core.ports.workspace } else { 3001 }
+    Stop-WorkspaceServer
+    Start-Sleep -Seconds 2
+    if (-not (Start-WorkspaceServer)) { return $false }
+    return Wait-PortUp -Port $wsPort -MaxSeconds $MaxSeconds
 }
 
 function Wait-PortUp {

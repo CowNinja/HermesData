@@ -19,7 +19,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         print(f"  PASS {name}")
     else:
         ERRORS.append(f"{name}: {detail}")
-        print(f"  FAIL {name} — {detail}")
+        print(f"  FAIL {name} -- {detail}")
 
 
 def main() -> int:
@@ -44,16 +44,7 @@ def main() -> int:
         str(ctx.get("error") or ctx.get("response", ""))[:80],
     )
 
-    t2 = try_t2_fleet_dispatch(
-        "Summarize the latest trends in local LLM routers in 2 sentences.",
-        {"task_type": "research"},
-        local_failed=True,
-    )
-    check("t2_local_fail_dispatch", t2.get("success"), str(t2.get("error")))
-    if t2.get("success"):
-        check("t2_has_provider", bool(t2.get("provenance", {}).get("provider_id") or t2.get("model")))
-
-    # Proxy path — realtime augment trigger (local should still answer)
+    # Proxy path first -- realtime augment can block 90-150s on 3060 (T2 prefetch + Qwythos).
     payload = {
         "model": "phronesis-sovereign-auto",
         "messages": [{"role": "user", "content": "What happened today in AI news? One sentence."}],
@@ -65,13 +56,23 @@ def main() -> int:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+    proxy_timeout = 180
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=proxy_timeout) as resp:
             body = json.loads(resp.read().decode())
         content = (body.get("choices") or [{}])[0].get("message", {}).get("content", "")
         check("proxy_realtime_local", bool(str(content).strip()), "empty response")
     except Exception as exc:
         check("proxy_realtime_local", False, str(exc))
+
+    t2 = try_t2_fleet_dispatch(
+        "Summarize the latest trends in local LLM routers in 2 sentences.",
+        {"task_type": "research"},
+        local_failed=True,
+    )
+    check("t2_local_fail_dispatch", t2.get("success"), str(t2.get("error")))
+    if t2.get("success"):
+        check("t2_has_provider", bool(t2.get("provenance", {}).get("provider_id") or t2.get("model")))
 
     print(f"\n=== Results: {len(ERRORS)} failures ===")
     for e in ERRORS:

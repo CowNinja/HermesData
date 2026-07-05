@@ -1,6 +1,7 @@
 # Phronesis-Heal.ps1 - Shared auto-heal engine (Guardian + manual heal use this)
 param(
     [switch]$ForceGateway,
+    [switch]$ForceStackHeal,
     [switch]$Quiet
 )
 
@@ -10,6 +11,7 @@ $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $My
 . (Join-Path $scriptRoot "Phronesis-Session.ps1")
 . (Join-Path $scriptRoot "Phronesis-ForkGuard.ps1")
 . (Join-Path $scriptRoot "Phronesis-Maintenance-Lock.ps1")
+. (Join-Path $scriptRoot "Phronesis-Llama-Process.ps1")
 
 $corePath = Join-Path $scriptRoot "phronesis-core.json"
 $core = Get-Content $corePath -Raw | ConvertFrom-Json
@@ -19,6 +21,14 @@ New-Item -ItemType Directory -Force -Path $core.log_dir | Out-Null
 
 $actions = @()
 
+$stackBlock = Test-PhronesisMaintenanceBlocked -Action stack_heal
+if ($stackBlock.blocked -and -not $ForceStackHeal) {
+    $msg = "Heal skipped ($($stackBlock.reason)) - use -ForceStackHeal after update completes"
+    if (-not $Quiet) { Write-Host $msg -ForegroundColor DarkYellow }
+    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | Session $session SKIP | maintenance_lock=$($stackBlock.reason)" | Out-File -Append -FilePath $log
+    return [PSCustomObject]@{ Healthy = $false; Status = "LOCKED"; Actions = "maintenance_lock"; Ports = ""; ExitCode = 2 }
+}
+
 function Port-Up([int]$p) {
     return [bool](Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue)
 }
@@ -27,16 +37,21 @@ function Write-Heal([string]$m, [string]$color = "Gray") {
     if (-not $Quiet) { Write-Host $m -ForegroundColor $color }
 }
 
-# ForkGuard - kill non-venv Hermes forks
-$fk = Ensure-VenvHermesOnly
-if ($fk -gt 0) { $actions += "forkguard:$fk"; Write-Heal "ForkGuard removed $fk non-venv process(es)" "Yellow" }
+# ForkGuard - kill non-venv Hermes forks (skip during hermes_update lock)
+$fkBlock = Test-PhronesisMaintenanceBlocked -Action forkguard
+if (-not $fkBlock.blocked) {
+    $fk = Ensure-VenvHermesOnly
+    if ($fk -gt 0) { $actions += "forkguard:$fk"; Write-Heal "ForkGuard removed $fk non-venv process(es)" "Yellow" }
+} else {
+    $actions += "forkguard:LOCKED"
+}
 
-# Max 1 llama-server
-$llamas = @(Get-Process -Name llama-server -ErrorAction SilentlyContinue)
-if ($llamas.Count -gt 1) {
-    $llamas | Select-Object -Skip 1 | Stop-Process -Force
-    $actions += "kill_extra_llama:$($llamas.Count - 1)"
-    Write-Heal "Killed $($llamas.Count - 1) duplicate llama-server" "Yellow"
+# Max 1 Phronesis llama on :8090 (do not touch Ollama llama-server on other ports)
+$routerPort = [int]$core.ports.router
+$dupKilled = Remove-DuplicatePhronesisLlamas -RouterPort $routerPort
+if ($dupKilled -gt 0) {
+    $actions += "kill_extra_llama:$dupKilled"
+    Write-Heal "Killed $dupKilled duplicate Phronesis llama-server" "Yellow"
 }
 
 # Inference 8090/8091
@@ -141,17 +156,22 @@ if ($core.start_workspace) {
     $wsPort = [int]$core.ports.workspace
     if (-not (Port-Up $wsPort)) {
         Write-Heal "Healing workspace ($wsPort)..." "Cyan"
-        if (Start-WorkspaceServer) {
-            if (Wait-PortUp -Port $wsPort -MaxSeconds 25) { $actions += "workspace_restart:OK" }
-            else { $actions += "workspace_restart:FAIL" }
+        $restartWs = Join-Path $scriptRoot "ops\restart-workspace.ps1"
+        $wsOk = $false
+        if (Test-Path $restartWs) {
+            & powershell -NoProfile -ExecutionPolicy Bypass -File $restartWs -Quiet | Out-Null
+            $wsOk = ($LASTEXITCODE -eq 0) -and (Port-Up $wsPort)
+        } elseif (Restart-WorkspaceServer -MaxSeconds 35) {
+            $wsOk = $true
         }
+        $actions += if ($wsOk) { "workspace_restart:OK" } else { "workspace_restart:FAIL" }
     }
     $port3001 = if (Port-Up $wsPort) { "UP" } else { "DOWN" }
 }
 
 $port8090 = if (Port-Up $core.ports.router) { "UP" } else { "DOWN" }
 $port8091 = if (Port-Up $core.ports.proxy) { "UP" } else { "DOWN" }
-$llamaCount = @(Get-Process -Name llama-server -ErrorAction SilentlyContinue).Count
+$llamaCount = @(Get-PhronesisLlamaProcesses).Count
 $venvProxy = Test-VenvOwns8091
 $venvGw = if ($core.start_gateway) { Test-VenvOwnsGateway } else { $true }
 $venvDash = if ($core.start_dashboard) { Test-VenvOwnsDashboard } else { $true }

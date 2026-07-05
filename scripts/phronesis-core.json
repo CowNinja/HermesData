@@ -111,6 +111,20 @@
                              "description":  "Full agent tick â€” cloud health + harness + fleet suggest",
                              "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File D:\\HermesData\\scripts\\model_management_cron.ps1 -Mode full",
                              "enabled":  true
+                         },
+                         {
+                             "id":  "cron-curator-light",
+                             "schedule":  "0 */6 * * *",
+                             "description":  "Cron fleet audit + bounded pause on broken script deps",
+                             "command":  "D:\\HermesData\\hermes-agent\\venv\\Scripts\\python.exe D:\\HermesData\\scripts\\cron_curator_agent.py --tick --summary",
+                             "enabled":  true
+                         },
+                         {
+                             "id":  "cron-curator-full",
+                             "schedule":  "0 4 * * *",
+                             "description":  "Cron curator full-tick: probes + sovereign-router LLM diagnose",
+                             "command":  "D:\\HermesData\\hermes-agent\\venv\\Scripts\\python.exe D:\\HermesData\\scripts\\cron_curator_agent.py --full-tick --summary",
+                             "enabled":  true
                          }
                      ],
     "wisdom_extensions":  [

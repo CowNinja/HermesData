@@ -100,10 +100,21 @@ function Test-DiscordTurnInFlight {
 
 function Test-PhronesisMaintenanceBlocked {
     param(
-        [ValidateSet('gateway_restart', 'gateway_stop', 'vram_switch', 'gateway_heal')]
+        [ValidateSet('gateway_restart', 'gateway_stop', 'vram_switch', 'gateway_heal', 'stack_heal', 'forkguard')]
         [string]$Action
     )
     $lock = Get-PhronesisMaintenanceLock
+    if (-not $lock) {
+        return @{ blocked = $false; reason = "" }
+    }
+
+    # Hermes venv update window — block all stack respawns (Guardian/Heal/watchdog preflight).
+    if ($lock.block_stack_heal -or $lock.reason -eq 'hermes_update') {
+        if ($Action -in @('stack_heal', 'forkguard', 'gateway_heal', 'gateway_restart', 'gateway_stop')) {
+            return @{ blocked = $true; reason = $lock.reason }
+        }
+    }
+
     $inFlight = Test-DiscordTurnInFlight -ThreadId ($lock.thread_id) -MaxAgeMinutes 15
 
     $gwPort = 8642

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-recovery watchdog — unpushed-commit check + bounded auto-push.
+"""Self-recovery watchdog -- unpushed-commit check + bounded auto-push.
 
 Runs via Hermes cron every 30m (Self-Recovery-Watchdog job).
 Never logs secret values. PS-pipe-safe summary line at end.
@@ -112,7 +112,8 @@ def main() -> int:
                 issues.append(msg)
                 print(f"  PUSH FAIL {name}: {result.get('stderr')}")
         elif dirty > 0:
-            issues.append(f"{name}: {dirty} dirty files (nothing committed to push)")
+            # Dirty working tree is normal on an active dev machine -- warn only, do not fail cron.
+            print(f"  INFO {name}: {dirty} dirty files (uncommitted -- not a cron failure)")
 
     if issues:
         print(f"\n[ISSUES: {len(issues)}]")

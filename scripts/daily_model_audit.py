@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Daily model audit + auto-reconcile wrapper. Exits silently if clean."""
 import subprocess, sys, json
+from pathlib import Path
 
 SCRIPTS = r"D:\PhronesisVault\scripts"
+VENV_PY = r"D:\HermesData\hermes-agent\venv\Scripts\python.exe"
 
 def run_script(*args: str) -> dict:
+    py = VENV_PY if Path(VENV_PY).is_file() else sys.executable
     result = subprocess.run(
-        [sys.executable, *args],
-        cwd=SCRIPTS, capture_output=True, text=True, timeout=120,
+        [py, *args],
+        cwd=SCRIPTS, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
     )
     return {"rc": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
 

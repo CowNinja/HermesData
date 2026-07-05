@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-model_management_agent.py — Swiss-army-knife autonomous model management orchestrator.
+model_management_agent.py -- Swiss-army-knife autonomous model management orchestrator.
 
 Assesses local GPU models, free cloud fleet, and paid fallbacks; benchmarks health;
 applies bounded self-healing via existing scripts; updates priority rankings.
@@ -48,7 +48,7 @@ INVENTORY_PATH = PHM / "model_inventory.json"
 MODELS_ROOT = PHM / "models"
 MODEL_DIRS = ("current", "candidates", "archive")
 BENCHMARK_DIR = VAULT / "Operations" / "benchmark-results"
-# RTX 3060 12GB — reserve for OS/ComfyUI + KV headroom
+# RTX 3060 12GB -- reserve for OS/ComfyUI + KV headroom
 VRAM_RESERVE_MB = 2500
 DUAL_MODEL_MIN_FREE_MB = 3500
 SMALL_MODEL_MAX_GB = 4.0
@@ -65,7 +65,7 @@ BENCHMARK_PASS_RATE_MIN = 70.0
 BENCHMARK_COMPOSITE_MIN = 55.0
 MAX_REMEDIATION_ACTIONS_PER_TICK = 4
 
-# Script toolbox (existing — orchestrated, not duplicated)
+# Script toolbox (existing -- orchestrated, not duplicated)
 TOOLBOX = {
     "heal_stack": SCRIPTS / "Phronesis-Heal.ps1",
     "start_llama": SCRIPTS / "ops" / "02-start-llama.ps1",
@@ -100,7 +100,7 @@ def _load_json(path: Path) -> Dict[str, Any]:
 
 
 def _operator_commands(issue_codes: List[str]) -> Dict[str, str]:
-    """Reliable CLI one-liners — PS-pipe-safe."""
+    """Reliable CLI one-liners -- PS-pipe-safe."""
     py = str(_resolve_venv_python())
     cmds = {
         "tick": r"D:\HermesData\scripts\run-model-management-agent.ps1 -Tick",
@@ -109,7 +109,7 @@ def _operator_commands(issue_codes: List[str]) -> Dict[str, str]:
         "cron_full": r"D:\HermesData\scripts\model_management_cron.ps1 -Mode full",
         "summary": f'"{py}" D:\\HermesData\\scripts\\model_management_agent.py --tick --summary',
         "panel": f'"{py}" D:\\PhronesisVault\\scripts\\app_hooks.py',
-        "ps_pipe_warning": "Never pipe full agent JSON through Select-Object -First N — use --summary",
+        "ps_pipe_warning": "Never pipe full agent JSON through Select-Object -First N -- use --summary",
     }
     if "L09" in issue_codes:
         cmds["reconcile_drift"] = (
@@ -133,7 +133,7 @@ def _parse_session_health_patterns() -> List[str]:
     checks = (
         ("proxy", "8091", "proxy flapping or down"),
         ("gateway", "8642", "gateway timeout or restart"),
-        ("8081", "8082", "legacy 808x reference — purge from ops"),
+        ("8081", "8082", "legacy 808x reference -- purge from ops"),
         ("fork", "duplicate", "fork guard / duplicate pythonw"),
         ("vram", "oom", "VRAM pressure or OOM"),
         ("drift", "ini", "inventory or ini drift"),
@@ -145,7 +145,7 @@ def _parse_session_health_patterns() -> List[str]:
 
 
 def _run_diagnostics_preflight(*, repair: bool = False) -> Dict[str, Any]:
-    """Invoke-SovereignStackDiagnostics.ps1 — read-only on amber, optional -Repair."""
+    """Invoke-SovereignStackDiagnostics.ps1 -- read-only on amber, optional -Repair."""
     if not DIAGNOSTICS_PS1.is_file():
         return {"ok": False, "skipped": True, "reason": "diagnostics_script_missing"}
     args = [
@@ -181,11 +181,11 @@ def _self_reflection(
     constellation: Dict[str, Any],
     remediations: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Agent reflection loop — lessons for next tick and vault ingest."""
+    """Agent reflection loop -- lessons for next tick and vault ingest."""
     codes = [str(i.get("code") or "") for i in issues if i.get("code")]
     patterns = _parse_session_health_patterns()
     recommendation = constellation.get("recommendation") or (
-        "Stack healthy — maintain single Qwythos primary."
+        "Stack healthy -- maintain single Qwythos primary."
         if stack.get("stack_ready")
         else stack.get("overall", {}).get("recommended_action", "Heal stack")
     )
@@ -200,17 +200,17 @@ def _self_reflection(
         "remediation_actions": [r.get("action") for r in remediations if r.get("action")],
         "next_tick_hints": [],
         "ps_pipe_artifact_note": (
-            "PowerShell Select-Object -First N on agent JSON can report exit 1 — "
+            "PowerShell Select-Object -First N on agent JSON can report exit 1 -- "
             "use run-model-management-agent.ps1 or --summary; amber = non-blocking operator flags"
         ),
         "operator_commands": _operator_commands(codes),
     }
     if "proxy flapping" in " ".join(patterns) or not (stack.get("8091") or {}).get("up"):
-        reflection["next_tick_hints"].append("Prioritize proxy stability — ForkGuard + heal")
+        reflection["next_tick_hints"].append("Prioritize proxy stability -- ForkGuard + heal")
     if codes and status == "amber":
-        reflection["next_tick_hints"].append("Review issue codes — operator reconcile if L09 ini drift")
+        reflection["next_tick_hints"].append("Review issue codes -- operator reconcile if L09 ini drift")
     if constellation.get("mode") == "dual_feasible":
-        reflection["next_tick_hints"].append("VRAM headroom — benchmark small candidate before dual-load")
+        reflection["next_tick_hints"].append("VRAM headroom -- benchmark small candidate before dual-load")
     REFLECTION_LOG.parent.mkdir(parents=True, exist_ok=True)
     with open(REFLECTION_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(reflection) + "\n")
@@ -218,7 +218,7 @@ def _self_reflection(
 
 
 def _resolve_venv_python() -> Path:
-    """Hermes venv from phronesis-core.json — never system Python313."""
+    """Hermes venv from phronesis-core.json -- never system Python313."""
     core = _load_json(CORE_PATH)
     configured = str(core.get("venv_python") or "").strip()
     if configured:
@@ -254,6 +254,8 @@ def _run_python(script: Path, args: List[str], timeout: int = 120) -> Dict[str, 
             [str(py), str(script), *args],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             cwd=str(script.parent),
         )
@@ -324,8 +326,12 @@ def _benchmark_age_days(meta: Optional[Dict[str, Any]]) -> Optional[float]:
         return None
 
 
-def _local_smoke_probe(port: int = 8090, timeout: float = 8.0) -> Dict[str, Any]:
-    """Lightweight inference smoke — not full harness."""
+def _local_smoke_probe(
+    port: int = 8090,
+    timeout: float = 15.0,
+    retries: int = 2,
+) -> Dict[str, Any]:
+    """Lightweight inference smoke -- not full harness. Retries for 3060 warmup/busy GPU."""
     url = f"http://127.0.0.1:{port}/v1/chat/completions"
     payload = {
         "model": "smoke",
@@ -335,26 +341,43 @@ def _local_smoke_probe(port: int = 8090, timeout: float = 8.0) -> Dict[str, Any]
         "stream": False,
     }
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    start = time.perf_counter()
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = json.loads(resp.read().decode("utf-8", errors="replace"))
-            elapsed = int((time.perf_counter() - start) * 1000)
-            text = (
-                (body.get("choices") or [{}])[0]
-                .get("message", {})
-                .get("content", "")
-            )
-            ok = bool(str(text).strip())
-            return {"ok": ok, "latency_ms": elapsed, "preview": str(text)[:80]}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc), "latency_ms": int((time.perf_counter() - start) * 1000)}
+    last: Dict[str, Any] = {"ok": False, "error": "no_attempt"}
+    for attempt in range(max(1, retries)):
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        start = time.perf_counter()
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                body = json.loads(resp.read().decode("utf-8", errors="replace"))
+                elapsed = int((time.perf_counter() - start) * 1000)
+                text = (
+                    (body.get("choices") or [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                )
+                ok = bool(str(text).strip())
+                last = {
+                    "ok": ok,
+                    "latency_ms": elapsed,
+                    "preview": str(text)[:80],
+                    "attempt": attempt + 1,
+                }
+                if ok:
+                    return last
+        except Exception as exc:
+            last = {
+                "ok": False,
+                "error": str(exc),
+                "latency_ms": int((time.perf_counter() - start) * 1000),
+                "attempt": attempt + 1,
+            }
+        if attempt + 1 < retries:
+            time.sleep(2.0)
+    return last
 
 
 def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str, Any]:
@@ -382,7 +405,7 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
             {
                 "code": "L02",
                 "severity": "high",
-                "message": f"Wrong model on :8090 — loaded {loaded[-60:]} expected {expected}",
+                "message": f"Wrong model on :8090 -- loaded {loaded[-60:]} expected {expected}",
                 "fix": "start-llama",
             }
         )
@@ -436,7 +459,7 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
             {
                 "code": "L06",
                 "severity": "medium",
-                "message": f"Benchmark stale ({age:.0f}d old) — re-run harness",
+                "message": f"Benchmark stale ({age:.0f}d old) -- re-run harness",
                 "fix": "benchmark-active",
             }
         )
@@ -524,13 +547,16 @@ def assess_cloud_fleet(*, probe: bool) -> Dict[str, Any]:
             {
                 "code": "C00",
                 "severity": "info",
-                "message": "Opportunistic fleet OFF — Phase B0 shadow health only (no routing)",
+                "message": "Opportunistic fleet OFF -- Phase B0 shadow health only (no routing)",
                 "fix": "none",
             }
         )
+    procurement_summary: Optional[Dict[str, Any]] = None
     if probe:
         health_args = ["--health", "--shadow"] if shadow_mode else ["--health"]
         health_summary = _run_python(TOOLBOX["fleet_health"], health_args, timeout=180)
+        if enabled:
+            procurement_summary = _run_python(TOOLBOX["fleet_curator"], ["--procure-tick"], timeout=180)
         for row in (health_summary.get("results") or []):
             if row.get("status") == "missing_env":
                 continue
@@ -579,6 +605,7 @@ def assess_cloud_fleet(*, probe: bool) -> Dict[str, Any]:
         "free_count": len(free),
         "paid_registry_count": len(paid_reg),
         "health": health_summary,
+        "procurement": procurement_summary,
         "disabled_providers": disabled_providers,
         "issues": issues,
     }
@@ -623,7 +650,7 @@ def assess_constellation(
     gpu: Dict[str, Any],
     stack: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """VRAM-aware model constellation — single primary vs dual-load feasibility."""
+    """VRAM-aware model constellation -- single primary vs dual-load feasibility."""
     issues: List[Dict[str, Any]] = []
     dirs = _scan_models_dirs()
     vram_total = float(gpu.get("vram_total_mb") or 12288)
@@ -651,21 +678,21 @@ def assess_constellation(
                 "primary": active_name or core.get("model_label"),
                 "secondary": best_small["file"],
                 "secondary_role": "classifier_or_fast",
-                "note": "Theoretical — llama.cpp single-server today loads one GGUF on :8090",
+                "note": "Theoretical -- llama.cpp single-server today loads one GGUF on :8090",
             }
     elif vram_used / max(vram_total, 1) > 0.9:
         issues.append(
             {
                 "code": "V01",
                 "severity": "medium",
-                "message": f"VRAM tight ({gpu.get('pct_used', 0):.0f}% used) — dual-model not recommended",
+                "message": f"VRAM tight ({gpu.get('pct_used', 0):.0f}% used) -- dual-model not recommended",
                 "fix": "manual",
             }
         )
 
     locked = bool(core.get("model_rotation_locked", True))
     recommendation = (
-        "Keep Qwythos as sole GPU model — maximum ctx and KV efficiency on RTX 3060 12GB"
+        "Keep Qwythos as sole GPU model -- maximum ctx and KV efficiency on RTX 3060 12GB"
         if mode == "single_primary" or locked
         else f"Dual-load theoretically possible; benchmark {dual_pair['secondary']} before promoting"
     )
@@ -688,7 +715,7 @@ def assess_constellation(
 
 
 def assess_inventory(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str, Any]:
-    """Inventory ↔ disk ↔ models.ini drift via fleetctl (read-only)."""
+    """Inventory <-> disk <-> models.ini drift via fleetctl (read-only)."""
     loaded = str((stack.get("8090") or {}).get("loaded") or "")
     drift = _run_python(TOOLBOX["fleetctl"], ["drift", "--json", "--loaded", loaded], timeout=60)
     issues: List[Dict[str, Any]] = []
@@ -700,7 +727,7 @@ def assess_inventory(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str, A
             {
                 "code": "L09",
                 "severity": sev,
-                "message": f"Inventory drift: {problem.get('code')} — {problem}",
+                "message": f"Inventory drift: {problem.get('code')} -- {problem}",
                 "fix": "manual",
                 "hint": "fleetctl reconcile (operator) or fleetctl drift --json",
             }
@@ -776,7 +803,7 @@ def remediate(
     dry_run: bool = False,
     allow_benchmark: bool = False,
 ) -> List[Dict[str, Any]]:
-    """Apply bounded fixes using existing scripts. Priority: stack → model → cloud."""
+    """Apply bounded fixes using existing scripts. Priority: stack -> model -> cloud."""
     fix_order = ["heal", "start-llama", "start-proxy", "restart-gateway", "auto-disable-cloud", "benchmark-active"]
     actions_taken: List[Dict[str, Any]] = []
     seen_fixes: set = set()
@@ -867,7 +894,7 @@ def run_tick(
     for block in (stack_assess, local, inventory, constellation, cloud, paid, fleet):
         all_issues.extend(block.get("issues") or [])
 
-    # Deduplicate heal vs specific fixes — prefer specific
+    # Deduplicate heal vs specific fixes -- prefer specific
     if any(i.get("fix") in ("start-llama", "start-proxy", "restart-gateway") for i in all_issues):
         all_issues = [i for i in all_issues if i.get("fix") != "heal"]
 
@@ -1002,13 +1029,13 @@ CAPABILITIES = [
 
 LIMITATIONS = [
     "Will NOT auto-promote or swap GGUF while model_rotation_locked is true",
-    "Will NOT run fleetctl reconcile automatically — drift flagged for operator",
-    "Will NOT enable opportunistic_fleet — requires config.yaml change by operator",
-    "Will NOT download or delete models — inventory changes need fleetctl/manual",
-    "Heavy benchmark harness can take 5–15 min — only on --full-tick or --benchmark-active",
-    "Paid API probes require env API keys — missing keys flagged, not auto-fixed",
+    "Will NOT run fleetctl reconcile automatically -- drift flagged for operator",
+    "Will NOT enable opportunistic_fleet -- requires config.yaml change by operator",
+    "Will NOT download or delete models -- inventory changes need fleetctl/manual",
+    "Heavy benchmark harness can take 5-15 min -- only on --full-tick or --benchmark-active",
+    "Paid API probes require env API keys -- missing keys flagged, not auto-fixed",
     "Max 4 remediation actions per tick to avoid restart storms",
-    "Split/multi-part GGUF files flagged manual — no auto-merge",
+    "Split/multi-part GGUF files flagged manual -- no auto-merge",
     "Does not manage :9119 CLI dashboard or ComfyUI VRAM contention",
     "Light --tick skips cloud probes, fleet suggest, and harness auto-run",
 ]
