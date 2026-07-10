@@ -48,16 +48,22 @@ PACK_FILES: list[tuple[Path, str]] = [
 
 
 def cloud_destinations() -> list[Path]:
-    """Prefer Google Drive (Drive for Desktop mirror), then OneDrive interim."""
+    """Prefer Google Drive (Drive for Desktop mirror), then OneDrive.
+
+    After off-C move, also check D:\\CloudSync\\* roots (see Move playbook).
+    """
     home = Path(os.environ.get("USERPROFILE", r"C:\Users\CowNi"))
     return [
-        # Google Drive for Desktop — mirrored "My Drive" (confirmed on this host)
+        # Post-move targets (D: off C-space)
+        Path(r"D:\CloudSync\Google-My-Drive\Phronesis-Recovery"),
+        Path(r"D:\CloudSync\OneDrive\Phronesis-Recovery"),
+        # Google Drive for Desktop — current mirror root on this host
         home / "My Drive" / "Phronesis-Recovery",
         Path(r"G:\My Drive\Phronesis-Recovery"),
         Path(r"G:\MyDrive\Phronesis-Recovery"),
         home / "Google Drive" / "Phronesis-Recovery",
         home / "GoogleDrive" / "Phronesis-Recovery",
-        # Interim / second cloud
+        # OneDrive (current C: location until relocated)
         home / "OneDrive" / "Phronesis-Recovery",
     ]
 
