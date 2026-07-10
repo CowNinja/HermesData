@@ -159,8 +159,7 @@ auxiliary:
     base_url: http://127.0.0.1:8091/v1
     api_key: local
   compression:
-    provider: xai-oauth
-    model: grok-4.5
+    provider: auto
     timeout: 360
   skills_hub:
     provider: phronesis-sovereign
@@ -194,13 +193,17 @@ auxiliary:
     api_key: ''
     timeout: 30
   triage_specifier:
-    provider: auto
-    model: ''
+    provider: phronesis-sovereign
+    model: phronesis-sovereign-auto
     timeout: 120
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   kanban_decomposer:
-    provider: auto
-    model: ''
+    provider: phronesis-sovereign
+    model: phronesis-sovereign-auto
     timeout: 180
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   profile_describer:
     provider: phronesis-sovereign
     model: phronesis-sovereign-auto
@@ -208,27 +211,29 @@ auxiliary:
     base_url: http://127.0.0.1:8091/v1
     api_key: local
   curator:
-    provider: auto
-    model: ''
+    provider: phronesis-sovereign
+    model: phronesis-sovereign-auto
     timeout: 600
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   monitor:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: phronesis-sovereign
+    model: phronesis-sovereign-auto
     timeout: 60
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   background_review:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: phronesis-sovereign
+    model: phronesis-sovereign-auto
     timeout: 120
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   moa_aggregator:
-    provider: xai-oauth
-    model: grok-4.3
-    base_url: ''
-    api_key: ''
+    provider: phronesis-sovereign
+    model: phronesis-sovereign-auto
     timeout: 600
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
 display:
   compact: true
   personality: technical

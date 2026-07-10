@@ -80,6 +80,9 @@ def main() -> int:
     results.append(run_script("thin_orchestrator_status.py", timeout=60))
 
     if args.mode == "weekly":
+        results.append(run_script("k_domain_shelves_ensure.py", timeout=60))
+        results.append(run_script("k_test_ingest_domain_propose.py", timeout=180))
+        results.append(run_script("orchestrator_quest_dispatch.py", timeout=120))
         results.append(run_script("gardener_phase_b_proposals.py", ["--stale-days", "30"], timeout=600))
         if args.execute_safe:
             # Only scripts that implement digest+archive recoverable patterns

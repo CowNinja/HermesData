@@ -143,6 +143,13 @@ def _dump_yaml(data: Dict[str, Any]) -> str:
     return yaml.safe_dump(data, sort_keys=False, default_flow_style=False, allow_unicode=True)
 
 
+def _is_cloud_primary_model(model: Dict[str, Any]) -> bool:
+    provider = str(model.get("provider") or "").strip().lower()
+    if provider in _CLOUD_FALLBACK_PROVIDERS:
+        return True
+    return provider.startswith("custom:") and "phronesis-sovereign" not in provider
+
+
 def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     changes: List[str] = []
     patched = deepcopy(data)
@@ -154,6 +161,7 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     local_sovereign = patched.get("local_sovereign") or {}
     force_local = isinstance(local_sovereign, dict) and local_sovereign.get("force_local") is not False
     current_provider = str(model.get("provider") or "").strip().lower()
+    cloud_primary = _is_cloud_primary_model(model)
     leaked_cloud = current_provider in {
         "xai-oauth",
         "xai",
@@ -168,9 +176,12 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
             if model.get(key) != value:
                 model[key] = value
                 changes.append(f"model.{key}")
-    if int(model.get("context_length") or 0) != MIN_CONTEXT:
-        model["context_length"] = MIN_CONTEXT
-        changes.append("model.context_length")
+    # Cloud primaries (e.g. grok-4.5 @ 500k) must keep their large context_length.
+    # Forcing 65536 here caused endless Discord compaction loops.
+    if not cloud_primary:
+        if int(model.get("context_length") or 0) != MIN_CONTEXT:
+            model["context_length"] = MIN_CONTEXT
+            changes.append("model.context_length")
 
     providers = patched.get("custom_providers") or []
     if not isinstance(providers, list):
@@ -219,7 +230,17 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
             old_url = str(compression.get("base_url") or "")
             old_model = str(compression.get("model") or "")
             old_provider = str(compression.get("provider") or "").strip().lower()
-            if (
+            sovereign_compression = (
+                "phronesis-sovereign" in old_model.lower()
+                or old_provider in ("phronesis-sovereign", f"custom:{SOVEREIGN_PROVIDER}".lower())
+                or "8091" in old_url
+            )
+            if cloud_primary and not force_local and sovereign_compression:
+                compression.clear()
+                compression["provider"] = "auto"
+                compression["timeout"] = 360
+                changes.append("auxiliary.compression→auto(cloud-primary)")
+            elif not cloud_primary and (
                 "11434" in old_url
                 or "ollama" in old_model.lower()
                 or not old_model
