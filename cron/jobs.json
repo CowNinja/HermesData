@@ -206,15 +206,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 336
+        "completed": 337
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T15:57:56.760952-04:00",
-      "next_run_at": "2026-07-10T11:01:31.814467-04:00",
-      "last_run_at": "2026-07-10T10:01:31.814467-04:00",
+      "next_run_at": "2026-07-10T12:02:19.462172-04:00",
+      "last_run_at": "2026-07-10T11:02:19.462172-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -453,17 +453,17 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 71
+        "completed": 72
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-07-10T14:59:19.181611-04:00",
-      "last_run_at": "2026-07-10T06:59:19.035181-04:00",
-      "last_status": "ok",
-      "last_error": null,
+      "next_run_at": "2026-07-10T15:00:01.710398-04:00",
+      "last_run_at": "2026-07-10T11:00:01.710398-04:00",
+      "last_status": "error",
+      "last_error": "Script exited with code 1\nstderr:\nTraceback (most recent call last):\n  File \"D:\\HermesData\\scripts\\backup-resilience.py\", line 159, in <module>\n    main()\n  File \"D:\\HermesData\\scripts\\backup-resilience.py\", line 142, in main\n    if os.path.isdir(silo_candidate):\n       ^^\nNameError: name 'os' is not defined\nstdout:\n## Resilience Backup v3 20260710-105919\n\n## PhronesisVault Backup\n  untracked (sample 5/215):\n    ?? .obsidian/00-INDEX.md\n    ?? .obsidian/plugins/agent-client/00-INDEX.md\n    ?? .obsidian/plugins/breadcrumbs/00-INDEX.md\n    ?? .obsidian/plugins/breadcrumbs/main.js.20260709-105807.bak\n    ?? .obsidian/plugins/buttons/00-INDEX.md\nOK PhronesisVault pushed: ok\n\n## HermesData Backup\n  untracked (sample 5/210):\n    ?? .hermes/00-INDEX.md\n    ?? .hermes/scripts/00-INDEX.md\n    ?? .hermes/scripts/loop-lint-gate.py.20260709-124414.bak\n    ?? .hermes/scripts/universal_ingest_monitor.py.20260709-124414.bak\n    ?? .skills_prompt_snapshot.json\nOK HermesData pushed: ok",
       "last_delivery_error": null,
       "deliver": "local",
       "origin": {
@@ -551,15 +551,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 224
+        "completed": 225
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T22:59:28.297996-04:00",
-      "next_run_at": "2026-07-10T11:00:31.792720-04:00",
-      "last_run_at": "2026-07-10T10:00:31.792720-04:00",
+      "next_run_at": "2026-07-10T12:01:19.463425-04:00",
+      "last_run_at": "2026-07-10T11:01:19.463425-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -694,15 +694,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 104
+        "completed": 105
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:15.417577-04:00",
-      "next_run_at": "2026-07-10T11:00:27.820553-04:00",
-      "last_run_at": "2026-07-10T09:00:27.820553-04:00",
+      "next_run_at": "2026-07-10T13:01:24.431732-04:00",
+      "last_run_at": "2026-07-10T11:01:24.431732-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -741,15 +741,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 113
+        "completed": 114
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:25.077977-04:00",
-      "next_run_at": "2026-07-10T11:00:27.845030-04:00",
-      "last_run_at": "2026-07-10T09:00:27.845030-04:00",
+      "next_run_at": "2026-07-10T13:01:19.482965-04:00",
+      "last_run_at": "2026-07-10T11:01:19.482965-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -875,15 +875,15 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 496
+        "completed": 497
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T11:46:43.622278-04:00",
-      "next_run_at": "2026-07-10T11:10:19.715500-04:00",
-      "last_run_at": "2026-07-10T10:55:19.715500-04:00",
+      "next_run_at": "2026-07-10T11:25:38.243419-04:00",
+      "last_run_at": "2026-07-10T11:10:38.243419-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1002,15 +1002,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 1150
+        "completed": 1154
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-04T11:35:00-04:00",
-      "next_run_at": "2026-07-10T11:00:00-04:00",
-      "last_run_at": "2026-07-10T10:55:25.151969-04:00",
+      "next_run_at": "2026-07-10T11:20:00-04:00",
+      "last_run_at": "2026-07-10T11:15:23.411643-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1052,7 +1052,7 @@
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-08T16:36:36.708213-04:00",
-      "next_run_at": "2026-07-10T11:02:59.853763-04:00",
+      "next_run_at": "2026-07-10T11:33:18.628718-04:00",
       "last_run_at": "2026-07-10T10:32:59.853763-04:00",
       "last_status": "ok",
       "last_error": null,
@@ -1114,5 +1114,5 @@
       "pinned": false
     }
   ],
-  "updated_at": "2026-07-10T10:59:19.181611-04:00"
+  "updated_at": "2026-07-10T11:15:23.411643-04:00"
 }

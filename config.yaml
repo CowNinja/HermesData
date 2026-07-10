@@ -104,19 +104,19 @@ tool_output:
   max_line_length: 1200
 tool_loop_guardrails:
   warnings_enabled: true
-  hard_stop_enabled: false
+  hard_stop_enabled: true
   warn_after:
-    exact_failure: 8
-    same_tool_failure: 10
-    idempotent_no_progress: 8
+    exact_failure: 6
+    same_tool_failure:  8
+    idempotent_no_progress:  6
   hard_stop_after:
-    exact_failure: 25
-    same_tool_failure: 30
-    idempotent_no_progress: 25
+    exact_failure: 12
+    same_tool_failure:  15
+    idempotent_no_progress:  12
 compression:
   enabled: true
-  threshold: 0.95
-  target_ratio: 0.3
+  threshold: 0.78
+  target_ratio: 0.50
   protect_last_n: 40
   hygiene_hard_message_limit: 1200
   protect_first_n: 8
@@ -162,10 +162,10 @@ auxiliary:
     model: ''
     timeout: 360
   compression:
-    # Use xAI for summarization when compaction does fire — local 9B @ 64k ctx
-    # is too slow and holds session locks, causing "endless compacting" UX.
-    provider: auto
-    model: ''
+    # Prefer Grok for compaction summaries — local 9B is too lossy on tool-heavy
+    # traces and contributed to compact thrash loops.
+    provider: xai-oauth
+    model: grok-4.5
     timeout: 360
   skills_hub:
     provider: auto
