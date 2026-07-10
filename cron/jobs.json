@@ -206,15 +206,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 338
+        "completed": 340
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T15:57:56.760952-04:00",
-      "next_run_at": "2026-07-10T13:02:23.197918-04:00",
-      "last_run_at": "2026-07-10T12:02:23.197918-04:00",
+      "next_run_at": "2026-07-10T15:02:33.651533-04:00",
+      "last_run_at": "2026-07-10T14:02:33.651533-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -460,10 +460,10 @@
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-07-10T15:00:01.710398-04:00",
+      "next_run_at": "2026-07-10T19:00:39.476780-04:00",
       "last_run_at": "2026-07-10T11:00:01.710398-04:00",
       "last_status": "error",
-      "last_error": "Script exited with code 1\nstderr:\nTraceback (most recent call last):\n  File \"D:\\HermesData\\scripts\\backup-resilience.py\", line 159, in <module>\n    main()\n  File \"D:\\HermesData\\scripts\\backup-resilience.py\", line 142, in main\n    if os.path.isdir(silo_candidate):\n       ^^\nNameError: name 'os' is not defined\nstdout:\n## Resilience Backup v3 20260710-105919\n\n## PhronesisVault Backup\n  untracked (sample 5/215):\n    ?? .obsidian/00-INDEX.md\n    ?? .obsidian/plugins/agent-client/00-INDEX.md\n    ?? .obsidian/plugins/breadcrumbs/00-INDEX.md\n    ?? .obsidian/plugins/breadcrumbs/main.js.20260709-105807.bak\n    ?? .obsidian/plugins/buttons/00-INDEX.md\nOK PhronesisVault pushed: ok\n\n## HermesData Backup\n  untracked (sample 5/210):\n    ?? .hermes/00-INDEX.md\n    ?? .hermes/scripts/00-INDEX.md\n    ?? .hermes/scripts/loop-lint-gate.py.20260709-124414.bak\n    ?? .hermes/scripts/universal_ingest_monitor.py.20260709-124414.bak\n    ?? .skills_prompt_snapshot.json\nOK HermesData pushed: ok",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
       "origin": {
@@ -476,7 +476,7 @@
       "enabled_toolsets": [
         "terminal"
       ],
-      "workdir": null,
+      "workdir": "D:\\HermesData",
       "fire_claim": null,
       "pinned": true
     },
@@ -502,15 +502,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 451
+        "completed": 456
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T19:59:53.051242-04:00",
-      "next_run_at": "2026-07-10T12:24:27.110864-04:00",
-      "last_run_at": "2026-07-10T11:54:27.110864-04:00",
+      "next_run_at": "2026-07-10T15:30:39.498622-04:00",
+      "last_run_at": "2026-07-10T14:29:39.579567-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -551,15 +551,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 226
+        "completed": 228
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T22:59:28.297996-04:00",
-      "next_run_at": "2026-07-10T13:01:23.168195-04:00",
-      "last_run_at": "2026-07-10T12:01:23.168195-04:00",
+      "next_run_at": "2026-07-10T15:01:33.621873-04:00",
+      "last_run_at": "2026-07-10T14:01:33.621873-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -694,15 +694,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 105
+        "completed": 106
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:15.417577-04:00",
-      "next_run_at": "2026-07-10T13:01:24.431732-04:00",
-      "last_run_at": "2026-07-10T11:01:24.431732-04:00",
+      "next_run_at": "2026-07-10T15:01:35.928744-04:00",
+      "last_run_at": "2026-07-10T13:01:35.928744-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -741,15 +741,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 114
+        "completed": 115
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:25.077977-04:00",
-      "next_run_at": "2026-07-10T13:01:19.482965-04:00",
-      "last_run_at": "2026-07-10T11:01:19.482965-04:00",
+      "next_run_at": "2026-07-10T15:01:30.457066-04:00",
+      "last_run_at": "2026-07-10T13:01:30.457066-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -768,8 +768,8 @@
       "prompt": "You are the Skill Librarian. Run the weekly skill library audit:\n1. Skills inventory via skills_list\n2. Check for stale/duplicate skills\n3. Index health check\n4. Report findings to vault\nUse local sovereign model only.",
       "skills": [],
       "skill": null,
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "provider_snapshot": "openrouter",
       "model_snapshot": "openrouter/owl-alpha",
       "base_url": null,
@@ -844,7 +844,7 @@
       "created_at": "2026-07-01T08:13:23.601175-04:00",
       "next_run_at": "2026-07-11T08:00:00-04:00",
       "last_run_at": "2026-07-10T08:01:14.788128-04:00",
-      "last_status": "error",
+      "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
@@ -875,15 +875,15 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 500
+        "completed": 511
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T11:46:43.622278-04:00",
-      "next_run_at": "2026-07-10T12:13:23.472434-04:00",
-      "last_run_at": "2026-07-10T11:58:23.472434-04:00",
+      "next_run_at": "2026-07-10T15:15:39.512866-04:00",
+      "last_run_at": "2026-07-10T14:45:39.191519-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1002,15 +1002,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 1163
+        "completed": 1198
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-04T11:35:00-04:00",
-      "next_run_at": "2026-07-10T12:05:00-04:00",
-      "last_run_at": "2026-07-10T12:01:56.949226-04:00",
+      "next_run_at": "2026-07-10T15:05:00-04:00",
+      "last_run_at": "2026-07-10T14:55:41.378239-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1045,15 +1045,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": 999,
-        "completed": 70
+        "completed": 76
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-08T16:36:36.708213-04:00",
-      "next_run_at": "2026-07-10T12:03:32.722517-04:00",
-      "last_run_at": "2026-07-10T11:33:32.722517-04:00",
+      "next_run_at": "2026-07-10T15:09:45.124855-04:00",
+      "last_run_at": "2026-07-10T14:39:45.124855-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1089,16 +1089,280 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 2
+        "completed": 7
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-10T14:52:28.611336+00:00",
-      "next_run_at": "2026-07-10T12:24:27.397885-04:00",
-      "last_run_at": "2026-07-10T11:54:27.397885-04:00",
+      "next_run_at": "2026-07-10T15:30:39.555577-04:00",
+      "last_run_at": "2026-07-10T14:29:41.005705-04:00",
       "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "local",
+        "chat_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "D:\\HermesData",
+      "fire_claim": null,
+      "pinned": false
+    },
+    {
+      "id": "vaultwalker-daily-safe",
+      "name": "VaultWalker-Daily-Safe",
+      "prompt": "Safe VaultWalker gardener (dry-run default). Feedback score to vault logs.",
+      "skills": [],
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
+      "base_url": null,
+      "script": "vaultwalker_cron.py",
+      "no_agent": true,
+      "context_from": [],
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 4 * * *",
+        "display": "0 4 * * *"
+      },
+      "schedule_display": "0 4 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-10T16:34:35.672126+00:00",
+      "next_run_at": "2026-07-11T04:00:00-04:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "local",
+        "chat_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "D:\\HermesData",
+      "fire_claim": null,
+      "pinned": false
+    },
+    {
+      "id": "gardener-phase-b-weekly",
+      "name": "Gardener-Phase-B-Proposals",
+      "prompt": "Phase B proposal-only distill/archive/resurface report",
+      "skills": [],
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
+      "base_url": null,
+      "script": "gardener_phase_b_proposals.py",
+      "no_agent": true,
+      "context_from": [],
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 5 * * 0",
+        "display": "30 5 * * 0"
+      },
+      "schedule_display": "30 5 * * 0",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-10T16:56:15.744856+00:00",
+      "next_run_at": "2026-07-12T05:30:00-04:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "local",
+        "chat_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "D:\\HermesData",
+      "fire_claim": null,
+      "pinned": false
+    },
+    {
+      "id": "insights-lessons-monthly",
+      "name": "Insights-Lessons-Monthly",
+      "prompt": "Monthly hermes insights \u2192 lessons learned MD",
+      "skills": [],
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
+      "base_url": null,
+      "script": "insights_lessons_monthly.py",
+      "no_agent": true,
+      "context_from": [],
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 1 * *",
+        "display": "0 9 1 * *"
+      },
+      "schedule_display": "0 9 1 * *",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-10T16:56:15.744856+00:00",
+      "next_run_at": "2026-08-01T09:00:00-04:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "local",
+        "chat_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "D:\\HermesData",
+      "fire_claim": null,
+      "pinned": false
+    },
+    {
+      "id": "vault-gardener-weekly-pipeline",
+      "name": "Vault-Gardener-Weekly-Pipeline",
+      "prompt": "Weekly: Phase B proposals + wikilink repair + index refresh",
+      "skills": [],
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
+      "base_url": null,
+      "script": "vault_gardener_weekly_pipeline.py",
+      "no_agent": true,
+      "context_from": [],
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 6 * * 0",
+        "display": "0 6 * * 0"
+      },
+      "schedule_display": "0 6 * * 0",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": false,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": "superseded by Vault-Gardener-Autonomy-Weekly",
+      "created_at": "2026-07-10T17:42:50.850380+00:00",
+      "next_run_at": "2026-07-12T06:00:00-04:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "local",
+        "chat_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "D:\\HermesData",
+      "fire_claim": null,
+      "pinned": false
+    },
+    {
+      "id": "vault-gardener-autonomy-daily",
+      "name": "Vault-Gardener-Autonomy-Daily",
+      "prompt": "Daily light gardener autonomy suite",
+      "skills": [],
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
+      "base_url": null,
+      "script": "vault_gardener_autonomy_daily.py",
+      "no_agent": true,
+      "context_from": [],
+      "schedule": {
+        "kind": "cron",
+        "expr": "15 5 * * *",
+        "display": "15 5 * * *"
+      },
+      "schedule_display": "15 5 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-10T17:47:33.186753+00:00",
+      "next_run_at": "2026-07-11T05:15:00-04:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "local",
+        "chat_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "D:\\HermesData",
+      "fire_claim": null,
+      "pinned": false
+    },
+    {
+      "id": "vault-gardener-autonomy-weekly",
+      "name": "Vault-Gardener-Autonomy-Weekly",
+      "prompt": "Weekly full suite + safe execute",
+      "skills": [],
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
+      "base_url": null,
+      "script": "vault_gardener_autonomy_weekly.py",
+      "no_agent": true,
+      "context_from": [],
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 6 * * 0",
+        "display": "30 6 * * 0"
+      },
+      "schedule_display": "30 6 * * 0",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-10T17:47:33.186753+00:00",
+      "next_run_at": "2026-07-12T06:30:00-04:00",
+      "last_run_at": null,
+      "last_status": null,
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
@@ -1114,5 +1378,5 @@
       "pinned": false
     }
   ],
-  "updated_at": "2026-07-10T12:02:23.197918-04:00"
+  "updated_at": "2026-07-10T15:00:39.555577-04:00"
 }

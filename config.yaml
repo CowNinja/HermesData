@@ -555,6 +555,17 @@ skills:
   - uncensored-image-generation
   - weights-and-biases
   - yuanbao
+  - airtable
+  - excalidraw
+  - nano-pdf
+  - songwriting-and-ai-music
+  - x-browser-poster
+  - x-post
+  - x-poster
+  - freellmapi
+  - agentmail
+  - blackbox
+  - dogfood
 curator:
   enabled: true
   interval_hours: 168
@@ -790,7 +801,7 @@ code_execution:
 tools:
   tool_search:
     enabled: auto
-    threshold_pct: 10
+    threshold_pct: 8
     search_default_limit: 5
     max_search_limit: 20
 logging:
@@ -973,19 +984,11 @@ platform_toolsets:
   - skills
   - cronjob
   - vision
-  - cronjob
-  - delegation
-  - file
   - image_gen
   - kanban
-  - memory
   - session_search
-  - skills
-  - terminal
   - todo
   - tts
-  - vision
-  - web
   - x_search
 image_gen:
   provider: comfyui_local

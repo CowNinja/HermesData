@@ -59,6 +59,23 @@ def gpu_line() -> str:
         return f"GPU n/a ({type(e).__name__})"
 
 
+
+def _thin_orchestrator_line() -> str:
+    try:
+        import json
+        import subprocess
+        import sys
+        from pathlib import Path
+        p = Path(r"D:\HermesData\scripts\thin_orchestrator_status.py")
+        if not p.is_file():
+            return ""
+        r = subprocess.run([sys.executable, str(p)], capture_output=True, text=True, timeout=20)
+        d = json.loads(r.stdout or "{}")
+        ports = d.get("ports") or {}
+        return "Thin orchestrator ports: " + ", ".join(f"{k}={v}" for k, v in ports.items())
+    except Exception:
+        return ""
+
 def main() -> int:
     now = datetime.now(timezone.utc).astimezone()
     lines = [f"# Dawn Pulse {now.strftime('%Y-%m-%d %H:%M %Z')}", ""]

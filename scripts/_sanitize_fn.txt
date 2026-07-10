@@ -1,0 +1,17 @@
+def sanitize_non_ascii(text: str) -> str:
+    """ASCII-clean without destroying structure.
+
+    CRITICAL: never collapse newlines/tabs (2026-07-09 zero-newline incident).
+    Only strip non-ASCII; preserve LF/CR/TAB and normal spaces.
+    """
+    normalized = unicodedata.normalize("NFKD", text)
+    out = []
+    for ch in normalized:
+        o = ord(ch)
+        if o in (9, 10, 13) or 32 <= o <= 126:
+            out.append(ch)
+    cleaned = "".join(out)
+    if text.count(chr(10)) > 0 and cleaned.count(chr(10)) == 0:
+        return text  # refuse zero-newline corruption
+    return cleaned if cleaned else text
+

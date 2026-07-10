@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VaultWalker v0.7.0 - Rebuilt clean, explicit-only gates, rock solid.
+VaultWalker v0.6.2 - Rebuilt clean, explicit-only gates, rock solid.
 
 Simple, clean, ASCII-only.
 Uses existing local model (qwythos 9b abliterated via sovereign router) for intelligent evaluation at every step:
@@ -205,7 +205,6 @@ def load_config() -> Dict:
     global_cfg.setdefault("persistent_state", True)
     global_cfg.setdefault("staggered_cycles", True)
     global_cfg.setdefault("local_models", True)
-    global_cfg.setdefault("dry_run_default", True)
 
     return {
         "version": "0.6.2",
@@ -233,21 +232,9 @@ def file_hash(path: Path) -> str:
         return "ERROR"
 
 def sanitize_non_ascii(text: str) -> str:
-    """ASCII-clean without destroying structure.
-
-    CRITICAL: never collapse newlines/tabs (2026-07-09 zero-newline incident).
-    Only strip non-ASCII; preserve LF/CR/TAB and normal spaces.
-    """
     normalized = unicodedata.normalize("NFKD", text)
-    out = []
-    for ch in normalized:
-        o = ord(ch)
-        if o in (9, 10, 13) or 32 <= o <= 126:
-            out.append(ch)
-    cleaned = "".join(out)
-    if text.count(chr(10)) > 0 and cleaned.count(chr(10)) == 0:
-        return text  # refuse zero-newline corruption
-    return cleaned if cleaned else text
+    ascii_only = re.sub(r"[^\x00-\x7F]+", "", normalized)
+    return re.sub(r"\s+", " ", ascii_only).strip() or "sanitized"
 
 def load_persistent_state(silo_name: str) -> Dict[str, Any]:
     if not GLOBAL_POLICIES.get("persistent_state", True):
@@ -299,13 +286,13 @@ def update_per_folder_indexes(root: Path, silo_name: str, state: Dict[str, Any],
     for dirpath in root.rglob("*"):
         if not dirpath.is_dir():
             continue
-        if any(x in str(dirpath).lower() for x in ["node_modules", ".git", "__pycache__", "tmp", ".obsidian", ".smart-env", ".trash", "archives"]):
+        if any(x in str(dirpath).lower() for x in ["node_modules", ".git", "__pycache__", "tmp"]):
             continue
         if not should_process_deep(dirpath, state):
             continue
         files = [f for f in dirpath.iterdir() if f.is_file()]
         idx_file = dirpath / "00-INDEX.md" if not (dirpath / "INDEX.md").exists() else dirpath / "INDEX.md"
-        content = f"""# {dirpath.name} INDEX (VaultWalker v0.7.0, {datetime.now().strftime('%Y-%m-%d')}) Silo: {silo_name}
+        content = f"""# {dirpath.name} INDEX (VaultWalker v0.6.2, {datetime.now().strftime('%Y-%m-%d')}) Silo: {silo_name}
 
 **Separation + Explicit Gates**: Agent reads this first.
 - Explicit RP material is centralized ONLY in RoleplaySandbox (block by default elsewhere).
@@ -328,14 +315,25 @@ Files: {len(files)}
     return updated
 
 def clean_code_non_ascii(root: Path) -> int:
-    """DISABLED by default (v0.7.1).
-
-    Prior sanitize_non_ascii collapsed whitespace and could flatten scripts
-    (zero-newline class). ASCII repair for code must use repair_ascii_scripts.py
-    which preserves newlines. VaultWalker never mass-rewrites code in place.
-    """
-    print("[VAULTWALKER] clean_code_non_ascii skipped (disabled; use repair_ascii_scripts.py)")
-    return 0
+    cleaned = 0
+    exts = {".py", ".sh", ".yaml", ".yml", ".js"}
+    for p in root.rglob("*"):
+        if p.is_file() and p.suffix.lower() in exts:
+            try:
+                txt = p.read_text(encoding="utf-8", errors="ignore")
+                if any(ord(c) > 127 for c in txt):
+                    san = sanitize_non_ascii(txt)
+                    if san != txt:
+                        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                        bak = p.with_name(p.name + "." + ts + ".bak")
+                        with open(bak, "w", encoding="utf-8") as bf:
+                            bf.write(txt)
+                        with open(p, "w", encoding="utf-8") as f:
+                            f.write(san)
+                        cleaned += 1
+            except:
+                continue
+    return cleaned
 
 def review_and_modify_markdowns(root: Path, vision_text: str, silo_name: str, state: Dict[str, Any], is_light: bool) -> Dict:
     """Review with residency/policy tags + local model intelligent actions.
@@ -463,7 +461,7 @@ def evaluate_and_relocate_misplaced(root: Path, silo_name: str, dry_run: bool = 
         if not p.is_file():
             continue
         pstr = str(p).lower()
-        if any(x in pstr for x in [".git", "node_modules", "__pycache__", "tmp", ".bak", "backup", ".obsidian", ".smart-env", ".trash"]):
+        if any(x in pstr for x in [".git", "node_modules", "__pycache__", "tmp", ".bak", "backup"]):
             continue
         if p.suffix.lower() in skip_exts:
             continue
@@ -537,7 +535,7 @@ def run_silo(name: str, root: Path) -> Tuple[str, Dict]:
 
 def main():
     global args, DRY_RUN
-    parser = argparse.ArgumentParser(description="VaultWalker v0.7.0 - explicit-only silo housekeeper")
+    parser = argparse.ArgumentParser(description="VaultWalker v0.6.2 - explicit-only silo housekeeper")
     parser.add_argument("--silos", nargs="*", default=list(SILOS.keys()))
     parser.add_argument("--dry-run", action="store_true", help="Dry run: no writes or moves")
     args = parser.parse_args()

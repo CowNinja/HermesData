@@ -456,7 +456,15 @@ def _parse_prompt_routing(prompt: str, *, model_hint: Optional[str] = None) -> D
         "scene": scene,
         "registry_mode": mode,
         "raw_prompt": text,
+        # fresh = bypass cached portrait file only. Does NOT imply new face seed.
         "fresh": mode == "explicit" or "fresh" in lower or "alternate" in lower,
+        # new_seed only when user explicitly wants a redesigned face
+        "new_seed": bool(
+            re.search(
+                r"\b(new\s+seed|redesign\s+face|new\s+face|reroll\s+face|different\s+face)\b",
+                lower,
+            )
+        ),
     }
 
 
@@ -476,6 +484,8 @@ def _build_render_cmd(spec: Dict[str, Any]) -> List[str]:
     cmd.extend(["--mode", mode])
     if spec.get("fresh"):
         cmd.append("--fresh")
+    # Preserve locked_seed for character consistency unless user asked to redesign face.
+    if spec.get("new_seed"):
         cmd.append("--new-seed")
     if spec.get("alternate"):
         cmd.extend(["--alternate", str(spec["alternate"])])
