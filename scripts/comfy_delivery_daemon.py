@@ -237,11 +237,85 @@ def _batch_contamination_guard(png_name: str) -> tuple[bool, str]:
     return False, f"solo_leak:{len(chars)}_of_{expected}"
 
 
+def _sidecar_for_png(png_name: str) -> dict | None:
+    """Resolve gallery sidecar for a Comfy output name (standard__00470_.png)."""
+    gallery_side = Path(r"D:\ComfyUI\gallery\sidecars")
+    if not gallery_side.is_dir():
+        return None
+    target = png_name.lower()
+    best: dict | None = None
+    best_mtime = -1.0
+    try:
+        for path in gallery_side.glob("*.json"):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8-sig"))
+            except Exception:
+                continue
+            if not isinstance(data, dict):
+                continue
+            src = str(data.get("source_comfy_output") or data.get("source") or "")
+            src_name = Path(src).name.lower() if src else ""
+            fname = str(data.get("filename") or path.name).lower()
+            if src_name == target or fname == target or target in src.lower():
+                try:
+                    mtime = path.stat().st_mtime
+                except OSError:
+                    mtime = 0.0
+                if mtime >= best_mtime:
+                    best = data
+                    best_mtime = mtime
+    except Exception:
+        return best
+    return best
+
+
+def _caption_from_sidecar(png_name: str) -> str | None:
+    """Prefer human caption from gallery sidecar over dumb Series — standard__*."""
+    meta = _sidecar_for_png(png_name)
+    if not meta:
+        return None
+    for key in ("caption", "display_title", "context"):
+        val = str(meta.get(key) or "").strip()
+        if not val:
+            continue
+        low = val.lower()
+        if low in {"series", "group", "portrait", "group + male center"}:
+            continue
+        if low.startswith("series —") or low.startswith("series -"):
+            continue
+        # Already good human text.
+        if " — " in val or " - " in val or len(val) >= 8:
+            return val
+    # Build from character + prompt fragments if caption empty/weak.
+    try:
+        # Prevent generate.py module-level pythonw reexec when imported as a library.
+        os.environ.setdefault("HERMES_PYTHONW_REEXEC", "1")
+        gen_py = Path(r"D:\HermesData\skills\creative\uncensored-image-generation\scripts")
+        if str(gen_py) not in sys.path:
+            sys.path.insert(0, str(gen_py))
+        from generate import build_display_caption  # noqa: WPS433
+
+        return build_display_caption(
+            str(meta.get("prompt") or ""),
+            model=str(meta.get("model") or ""),
+            tags=str(meta.get("tags") or ""),
+            context=str(meta.get("context") or ""),
+            character=str(meta.get("character") or ""),
+        )
+    except Exception:
+        char = str(meta.get("character") or "").strip()
+        if char:
+            return char.replace("-", " ").title()
+    return None
+
+
 def _batch_caption(png_name: str) -> str | None:
+    # Prefer per-image sidecar (who/pose/clothing) for both batch and solo.
+    side_cap = _caption_from_sidecar(png_name)
     session = _load_batch_session()
     labels = list(session.get("labels") or [])
     if not labels:
-        return None
+        return side_cap
 
     # Aggressive legacy sanitization: kill "Cast series", old grouped "Amira & Aisha - X/7", stale 7s
     raw_series = str(session.get("series") or "Series").strip()
@@ -264,13 +338,18 @@ def _batch_caption(png_name: str) -> str | None:
     if "Amira & Aisha" in label and (" - " in label or "/7" in label or total > 6):
         label = label.replace("Amira & Aisha - ", "Amira & Aisha — ").replace(" - ", " — ")
 
+    # Prefer sidecar who/pose/clothing; append sequence for active batches.
+    if side_cap:
+        if total > 1 and f"{index}/{total}" not in side_cap:
+            return f"{side_cap} — {index}/{total}"
+        return side_cap
+
     # Final: caption should be the descriptive name of the picture (who, what they're doing, sequence)
-    # Sanitized rich label is the 'file name' equivalent for text.
     descriptive = label
     if not ("/" in descriptive and (" — " in descriptive or " - " in descriptive)):
         descriptive = f"{label} — {index}/{total}"
-    # For Discord text: use the descriptive as main, keep original png for traceability
-    return f"{descriptive} — {png_name}"
+    # Keep png name only as low-priority trace — not the primary text users see.
+    return descriptive
 
 
 def _sync_batch_delivered_count(png_name: str) -> None:
@@ -319,18 +398,21 @@ def _deliver(channel: str, png_name: str, *, caption: str | None = None) -> tupl
         state = _load_state()
         _mark_delivered(state, png_name, mtime, digest)
         return False, guard_reason
-    rich = caption or _batch_caption(png_name)
+    rich = caption or _batch_caption(png_name) or _caption_from_sidecar(png_name)
     if not rich:
-        # Last resort: try to build from current session labels or clean name
+        # Last resort: session label, then character-ish stem — never bare "Series — standard__*"
         try:
             sess = _load_batch_session()
-            labels = list(sess.get('labels') or [])
+            labels = list(sess.get("labels") or [])
             if labels:
-                rich = labels[-1] + ' — ' + png_name
-            else:
-                rich = 'Series — ' + png_name
+                rich = str(labels[-1]).strip()
         except Exception:
-            rich = 'Series — ' + png_name
+            rich = ""
+    if not rich:
+        # Still nothing: strip Comfy technical name into a short fallback
+        stem = re.sub(r"^(standard|regional|draft|full)__+", "", png_name, flags=re.I)
+        stem = re.sub(r"_\.png$", "", stem, flags=re.I).strip("._ ")
+        rich = f"Render {stem}" if stem else "Render"
     text = rich
     proc = run_hidden(
         [prefer_pythonw(sys.executable), str(POST_SCRIPT), channel, str(png_path), text],

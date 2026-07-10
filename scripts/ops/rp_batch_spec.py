@@ -96,6 +96,32 @@ def resolve_series_plan(prompt: str, spec: Optional[dict] = None, total: Optiona
 def compose_series_from_intent(prompt: str, spec: Optional[dict] = None, total: Optional[int] = None) -> SeriesPlan:
     return resolve_series_plan(prompt, spec, total=total)
 
+def infer_batch_intent(prompt: str, inbound_text: str = "") -> tuple:
+    """Compatibility shim for image_generation_tool pre-delegation.
+
+    Returns (count, delegate_prompt, recipe).
+    """
+    text = (prompt or "").strip()
+    if inbound_text:
+        text = (text + chr(10) + inbound_text).strip()
+    plan = resolve_series_plan(text)
+    count = max(int(plan.total or 0), 0)
+    recipe = plan.recipe or "freeform"
+    return count, text, recipe
+
+def enrich_spec_from_intent(prompt: str, spec: Optional[dict] = None, inbound_text: str = "") -> dict:
+    """Merge series plan fields into a batch spec dict (ASCII-safe)."""
+    base = dict(spec or {})
+    text = (prompt or "").strip()
+    if inbound_text:
+        text = (text + chr(10) + inbound_text).strip()
+    plan = resolve_series_plan(text)
+    base.setdefault("batch_mode", "series")
+    base["total"] = int(plan.total or base.get("total") or 1)
+    base["recipe"] = plan.recipe or base.get("recipe") or "freeform"
+    base["series"] = plan.series or base.get("series") or "Series"
+    return base
+
 def build_caption(plan=None, frame=None, png_name: str = "", labels=None, index: Optional[int] = None, series: str = "Series") -> str:
     """Single source. Prefers rich label. ASCII only."""
     if frame and frame.label:
