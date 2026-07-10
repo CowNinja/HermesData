@@ -81,6 +81,8 @@ def main() -> int:
 
     if args.mode == "weekly":
         results.append(run_script("k_domain_shelves_ensure.py", timeout=60))
+        results.append(run_script("cloud_recovery_pack_sync.py", timeout=180))
+        results.append(run_script("backup_layers_status.py", timeout=60))
         results.append(run_script("k_test_ingest_domain_propose.py", timeout=180))
         results.append(run_script("orchestrator_quest_dispatch.py", timeout=120))
         results.append(run_script("gardener_phase_b_proposals.py", ["--stale-days", "30"], timeout=600))

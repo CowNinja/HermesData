@@ -95,7 +95,6 @@ def backup_repo(name: str, repo_dir: str, branch: str) -> None:
     run_git(["add", "-u"], repo_dir, timeout=20)
 
     # 2) Allowlist new files
-    staged_allow = 0
     for rel in ALLOWLIST.get(repo_dir, []):
         target = root / rel
         if not target.exists():
@@ -143,12 +142,13 @@ def main() -> None:
     log(f"## Resilience Backup v3 {TS}")
     backup_repo("PhronesisVault", r"D:\PhronesisVault", "master")
     backup_repo("HermesData", r"D:\HermesData", "main")
-    # PhronesisSilo: actual under Phronesis-Sovereign; fall back
+    # PhronesisSilo bulk on K: is NOT a git repo (by design).
     silo_candidate = r"K:\Phronesis-Sovereign\Personal-Digital-Silo"
-    if os.path.isdir(silo_candidate):
+    if os.path.isdir(silo_candidate) and os.path.isdir(os.path.join(silo_candidate, ".git")):
         backup_repo("PhronesisSilo", silo_candidate, "main")
     else:
-        backup_repo("PhronesisSilo", r"K:\PhronesisSilo", "main")
+        log("\n## PhronesisSilo Backup")
+        log("OK PhronesisSilo: skip git (bulk silo — K mirror + cloud recovery pack)")
 
     log("\n## Summary")
     if ERRORS:
