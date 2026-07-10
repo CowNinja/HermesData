@@ -20,6 +20,7 @@ ALLOWLIST: Dict[str, List[str]] = {
     r"D:\HermesData": [
         "scripts/",
         "skills/software-development/github-autobackup/",
+        "skills/devops/backup-restore-mechanism/",
         "hermes-workspace/src/screens/dashboard/components/",
         "hermes-workspace/src/routes/api/sovereign-stack/",
         "hermes-workspace/src/status/model-manager-strip.ts",
@@ -27,6 +28,8 @@ ALLOWLIST: Dict[str, List[str]] = {
         "gateway/",
         "mcps/",
         "cron/jobs.json",
+        "memories/MEMORY.md",
+        "memories/USER.md",
         "hermes-agent/agent/chat_completion_helpers.py",
         "plugins/image_gen/comfyui_local/",
         "live_cron_hook.py",
@@ -35,11 +38,13 @@ ALLOWLIST: Dict[str, List[str]] = {
         "Operations/",
         "scripts/",
         "MOCs/",
+        "Housekeeping.md",
         "docs/agent-coordination/sovereign-stack-performance.md",
         "docs/agent-coordination/sovereign-router-t2-t3.md",
         "docs/agent-coordination/GROK-HERMES-MASTER-PLAN.md",
         "Session-Health-Log.md",
         "INDEX.md",
+        "00-INDEX.md",
     ],
 }
 
