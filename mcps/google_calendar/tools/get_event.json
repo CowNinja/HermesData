@@ -1,0 +1,20 @@
+{
+  "name": "get_event",
+  "description": "Get full details of a single event from Google Calendar.\n\nUse this to retrieve complete event information including description, attendees, and location when you already have an event ID, which you may need to search the calendar for.\n\nParameters:\n- event_id: The ID of the event to retrieve (required, you may need to search to get it).\n- calendar_id: Optional calendar ID: use to get an event on a specific calendar. A calendar_id is in email format: people's email addresses correspond to their primary calendars. Defaults to the user's primary calendar.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "description": "The event ID to retrieve (from a previous search result)."
+      },
+      "calendar_id": {
+        "type": "string",
+        "description": "Calendar ID of the event (e.g. email address from google_calendar_list_calendars). Defaults to the user's primary calendar."
+      }
+    },
+    "required": [
+      "event_id"
+    ]
+  }
+}

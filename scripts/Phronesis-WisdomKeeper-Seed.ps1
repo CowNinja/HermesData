@@ -1,4 +1,6 @@
+# RP SANDBOX ONLY -- garden wall: do NOT run from run-everything-always.ps1
 # Seed Alice portrait/style recall hints into Roleplay MEMORY.md from rider log + visual tags.
+# Outbound to K: silo, fleet, or coordination docs is forbidden.
 param(
     [int]$MaxPortraitLines = 5
 )

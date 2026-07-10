@@ -1,0 +1,8 @@
+{
+  "name": "list_labels",
+  "description": "List all Gmail labels (both system and custom). Returns label IDs and names.\n\nUse this to discover available label IDs before using gmail_modify_labels.\nSystem labels include: INBOX, SENT, TRASH, SPAM, STARRED, IMPORTANT, UNREAD, DRAFT, CATEGORY_*.\nCustom labels have IDs like Label_123 with user-defined names.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}

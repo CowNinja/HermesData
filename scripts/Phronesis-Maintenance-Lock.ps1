@@ -60,7 +60,8 @@ function Clear-PhronesisMaintenanceLock {
 function Test-DiscordTurnInFlight {
     param(
         [string]$ThreadId = "",
-        [int]$MaxAgeMinutes = 15
+        [int]$MaxAgeMinutes = 15,
+        [int]$StuckMinutes = 4
     )
     if (-not (Test-Path $script:AgentLog)) { return $false }
     try {
@@ -69,8 +70,10 @@ function Test-DiscordTurnInFlight {
         return $false
     }
     $cutoff = (Get-Date).AddMinutes(-$MaxAgeMinutes)
+    $stuckCutoff = (Get-Date).AddMinutes(-$StuckMinutes)
     $pendingChat = $null
     $pendingAt = $null
+    $lastActivityAt = $null
     foreach ($line in $lines) {
         if ($line -match 'inbound message:.*chat=(\d+)') {
             $chat = $Matches[1]
@@ -80,10 +83,12 @@ function Test-DiscordTurnInFlight {
                 if ($pendingAt -lt $cutoff) { continue }
             }
             $pendingChat = $chat
+            $lastActivityAt = $pendingAt
         }
         if ($pendingChat -and $line -match "response ready:.*chat=$pendingChat") {
             $pendingChat = $null
             $pendingAt = $null
+            $lastActivityAt = $null
         }
         if ($line -match 'Flushing text batch.*thread:([^:]+):(\d+)') {
             $tid = $Matches[2]
@@ -93,9 +98,17 @@ function Test-DiscordTurnInFlight {
                 if ($pendingAt -lt $cutoff) { continue }
             }
             $pendingChat = $tid
+            $lastActivityAt = $pendingAt
+        }
+        if ($pendingChat -and $line -match '^(?<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*(agent\.(conversation_loop|tool_executor|turn_context)|Sending response|gateway\.run: response ready)') {
+            $ts = [datetime]::Parse($Matches['ts'])
+            if ($ts -ge $pendingAt) { $lastActivityAt = $ts }
         }
     }
-    return [bool]$pendingChat
+    if (-not $pendingChat) { return $false }
+    # Hung API call: inbound received but no agent progress for StuckMinutes — allow heal/restart.
+    if ($lastActivityAt -and $lastActivityAt -lt $stuckCutoff) { return $false }
+    return $true
 }
 
 function Test-PhronesisMaintenanceBlocked {
@@ -104,6 +117,19 @@ function Test-PhronesisMaintenanceBlocked {
         [string]$Action
     )
     $lock = Get-PhronesisMaintenanceLock
+
+    $gwPort = 8642
+    $gwListening = [bool](Get-NetTCPConnection -LocalPort $gwPort -State Listen -ErrorAction SilentlyContinue)
+
+    # Always defer disruptive gateway actions while a Discord turn is in-flight (no lock file required).
+    if ($Action -in @('gateway_restart', 'gateway_stop', 'gateway_heal')) {
+        $threadFilter = if ($lock -and $lock.thread_id) { [string]$lock.thread_id } else { "" }
+        $inFlight = Test-DiscordTurnInFlight -ThreadId $threadFilter -MaxAgeMinutes 15
+        if ($inFlight -and $gwListening) {
+            return @{ blocked = $true; reason = "discord_turn_in_flight" }
+        }
+    }
+
     if (-not $lock) {
         return @{ blocked = $false; reason = "" }
     }
@@ -115,15 +141,7 @@ function Test-PhronesisMaintenanceBlocked {
         }
     }
 
-    $inFlight = Test-DiscordTurnInFlight -ThreadId ($lock.thread_id) -MaxAgeMinutes 15
-
-    $gwPort = 8642
-    $gwListening = [bool](Get-NetTCPConnection -LocalPort $gwPort -State Listen -ErrorAction SilentlyContinue)
-
     if ($Action -in @('gateway_restart', 'gateway_stop', 'gateway_heal')) {
-        if ($inFlight -and $gwListening) {
-            return @{ blocked = $true; reason = "discord_turn_in_flight" }
-        }
         if ($lock -and $lock.protect_gateway) {
             if ($Action -eq 'gateway_restart') {
                 return @{ blocked = $true; reason = $lock.reason }

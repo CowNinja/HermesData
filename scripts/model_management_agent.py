@@ -45,6 +45,8 @@ CORE_PATH = SCRIPTS / "phronesis-core.json"
 CONFIG_PATH = HERMES_ROOT / "config.yaml"
 FLEET_REGISTRY = HERMES_ROOT / "config" / "fleet_registry.yaml"
 INVENTORY_PATH = PHM / "model_inventory.json"
+L04_ACK_PATH = VAULT / "Operations" / "l04-split-gguf-ack.json"
+SPLIT_GGUF_RE = __import__("re").compile(r"^(.+)-(\d+)-of-(\d+)\.gguf$", __import__("re").IGNORECASE)
 MODELS_ROOT = PHM / "models"
 MODEL_DIRS = ("current", "candidates", "archive")
 BENCHMARK_DIR = VAULT / "Operations" / "benchmark-results"
@@ -421,17 +423,39 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
         )
 
     inv = _load_json(INVENTORY_PATH)
-    gguf_count = len(inv.get("gguf_truth") or {})
-    split_gguf = [f for f in (inv.get("gguf_truth") or {}) if "00001-of" in f]
-    if split_gguf:
-        issues.append(
-            {
-                "code": "L04",
-                "severity": "medium",
-                "message": f"{len(split_gguf)} split GGUF file(s) need merge before load",
-                "fix": "manual",
-            }
-        )
+    gguf_truth = inv.get("gguf_truth") or {}
+    ack = _load_json(L04_ACK_PATH)
+    acked = set(ack.get("verified_pairs") or [])
+    split_groups: Dict[str, Dict[str, Any]] = {}
+    for fname in gguf_truth:
+        m = SPLIT_GGUF_RE.match(fname)
+        if not m:
+            continue
+        prefix, part_s, total_s = m.group(1), int(m.group(2)), int(m.group(3))
+        key = f"{prefix}-of-{total_s}"
+        grp = split_groups.setdefault(key, {"total": total_s, "parts": set()})
+        grp["parts"].add(part_s)
+    for key, grp in split_groups.items():
+        total = int(grp["total"])
+        missing = [i for i in range(1, total + 1) if i not in grp["parts"]]
+        if missing:
+            issues.append(
+                {
+                    "code": "L04",
+                    "severity": "medium",
+                    "message": f"Split GGUF incomplete ({key}): missing parts {missing}",
+                    "fix": "verify-split-gguf",
+                }
+            )
+        elif key not in acked:
+            issues.append(
+                {
+                    "code": "L04",
+                    "severity": "low",
+                    "message": f"Split GGUF pair complete ({key}) -- run verify-split-gguf to ack",
+                    "fix": "verify-split-gguf",
+                }
+            )
 
     bench_meta: Optional[Dict[str, Any]] = None
     if BENCHMARK_DIR.is_dir():

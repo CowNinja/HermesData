@@ -1,0 +1,24 @@
+{
+  "name": "delete_event",
+  "description": "Delete an event from the user's connected Google Calendar.\n\nRECURRING EVENTS: When search results show a recurring_event_id, each result is a single occurrence with its own event_id. To delete only ONE occurrence (e.g. just this Wednesday), use that occurrence's event_id. To delete the ENTIRE recurring series, use the recurring_event_id (the master event's ID).\n\nParameters:\n- event_id: The event ID to delete (required, you may need to search to get it). For recurring events: use the instance event_id to delete just that occurrence, or the recurring_event_id to delete the whole series.\n- send_updates: \"all\", \"externalOnly\", or \"none\" (default). Only set to \"all\" if the user explicitly asks to notify attendees, or if you believe notifications are important for this cancellation.\n- calendar_id: Optional calendar ID: use to delete an event on a specific calendar. A calendar_id is in email format: people's email addresses correspond to their primary calendars. Defaults to the user's primary calendar.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "description": "The event ID to delete (from a previous search result)."
+      },
+      "send_updates": {
+        "type": "string",
+        "description": "Whether to send email notifications to attendees about the cancellation: \"all\", \"externalOnly\", or \"none\" (default). Only set to \"all\" if the user explicitly asks to notify attendees."
+      },
+      "calendar_id": {
+        "type": "string",
+        "description": "Calendar ID of the event (e.g. email address from google_calendar_list_calendars). Defaults to the user's primary calendar."
+      }
+    },
+    "required": [
+      "event_id"
+    ]
+  }
+}

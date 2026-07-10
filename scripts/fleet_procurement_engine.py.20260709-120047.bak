@@ -1,0 +1,782 @@
+#!/usr/bin/env python3
+"""
+fleet_procurement_engine.py — Autonomous Opportunistic Fleet Procurement Engine.
+
+Discover → sandbox inject → benchmark (TTFT/quality/rate) → auto-promote or disable.
+Provider-agnostic: routing uses capability tags only.
+
+Usage:
+  python fleet_procurement_engine.py --procure-tick
+  python fleet_procurement_engine.py --simulate-loop
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+HERMES_SCRIPTS = Path(__file__).resolve().parent
+PROCUREMENT_LOG = Path(r"D:\PhronesisVault\Operations\logs\fleet-procurement.jsonl")
+PROCUREMENT_STATE = Path(r"D:\PhronesisVault\Operations\logs\fleet-procurement-state.json")
+PROCUREMENT_REPORT = Path(r"D:\PhronesisVault\Operations\logs\fleet-procurement-report.json")
+
+# --- Discovery seeds (expandable without code changes via registry procurement.discovery_seeds) ---
+DEFAULT_DISCOVERY_SEEDS = [
+    "https://raw.githubusercontent.com/public-apis/public-apis/master/README.md",
+    "https://raw.githubusercontent.com/Huanshere/GenAI-Free-API/main/README.md",
+    "https://raw.githubusercontent.com/cheahjs/free-llm-api-resources/main/README.md",
+]
+
+GITHUB_TOPICS = [
+    "free-api",
+    "openrouter",
+    "llm-api",
+    "openai-compatible",
+    "free-llm",
+]
+
+GITHUB_SEARCH_QUERIES = [
+    "free llm api openai compatible in:readme",
+    "openrouter free model list",
+    "searxng api endpoint",
+    "groq free tier api",
+]
+
+URL_PATTERN = re.compile(r"https?://[a-zA-Z0-9._~:/?#\[\]@!$&'()*+,;=%-]+")
+
+# Open-ended capability inference patterns (first principles — tags are data, not code)
+CAPABILITY_PATTERNS: List[Tuple[re.Pattern, str]] = [
+    (re.compile(r"1m[- ]?context|million[- ]?token|1,?000,?000", re.I), "1m-context"),
+    (re.compile(r"128k|131k|100k[- ]?context", re.I), "128k-context"),
+    (re.compile(r"70b|72b|65b", re.I), "70b-reasoning"),
+    (re.compile(r"deepseek|reasoning|r1", re.I), "reasoning"),
+    (re.compile(r"qwen", re.I), "synthesis"),
+    (re.compile(r"cod(er|ing)|python|refactor", re.I), "code"),
+    (re.compile(r"search|searx|brave|serper|duckduckgo|web", re.I), "real-time-search"),
+    (re.compile(r"fast|instant|low[- ]?latency", re.I), "fast-chat"),
+    (re.compile(r"vision|multimodal|image", re.I), "vision"),
+    (re.compile(r"synthesis|summar|instruct", re.I), "synthesis"),
+]
+
+COMPUTE_HINTS = ("openai", "/v1", "chat/completions", "groq", "openrouter", "together", "inference")
+CONTEXT_HINTS = ("search", "brave", "serper", "duckduckgo", "searx", "tavily", "exa", "web")
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _log(event: Dict[str, Any]) -> None:
+    try:
+        PROCUREMENT_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(PROCUREMENT_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
+    except Exception:
+        pass
+
+
+def infer_capabilities_from_text(*parts: str) -> List[str]:
+    """Open-ended capability tagging from discovery metadata."""
+    text = " ".join(p for p in parts if p)
+    caps: Set[str] = set()
+    for pattern, tag in CAPABILITY_PATTERNS:
+        if pattern.search(text):
+            caps.add(tag)
+    if not caps:
+        if any(h in text.lower() for h in CONTEXT_HINTS):
+            caps.add("real-time-search")
+        elif any(h in text.lower() for h in COMPUTE_HINTS):
+            caps.add("synthesis")
+    return sorted(caps)
+
+
+def _slug_id(*parts: str) -> str:
+    raw = "-".join(parts)[:64].lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", raw).strip("-")
+    if not slug:
+        slug = hashlib.sha256(raw.encode()).hexdigest()[:12]
+    return f"proc-{slug}"[:48]
+
+
+@dataclass
+class ResourceGovernor:
+    """Prevent procurement from overloading the machine."""
+    max_discoveries_per_tick: int = 5
+    max_benchmarks_per_tick: int = 3
+    max_http_per_tick: int = 12
+    max_concurrent_http: int = 2
+    tick_min_interval_sec: int = 120
+    benchmark_timeout_sec: int = 45
+
+    _http_count: int = field(default=0, init=False)
+    _held_slots: int = field(default=0, init=False)
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+    _semaphore: threading.Semaphore = field(init=False)
+
+    def __post_init__(self) -> None:
+        self._semaphore = threading.Semaphore(max(1, self.max_concurrent_http))
+
+    def _telemetry(self):
+        try:
+            from sovereign_telemetry_monitor import get_telemetry_monitor
+            return get_telemetry_monitor()
+        except Exception:
+            return None
+
+    @classmethod
+    def from_registry(cls, registry: Dict[str, Any]) -> "ResourceGovernor":
+        p = registry.get("procurement") or {}
+        return cls(
+            max_discoveries_per_tick=int(p.get("max_discoveries_per_tick") or 5),
+            max_benchmarks_per_tick=int(p.get("max_benchmarks_per_tick") or 3),
+            max_http_per_tick=int(p.get("max_http_per_tick") or 12),
+            max_concurrent_http=int(p.get("max_concurrent_http") or 2),
+            tick_min_interval_sec=int(p.get("tick_min_interval_sec") or 120),
+            benchmark_timeout_sec=int(p.get("benchmark_timeout_sec") or 45),
+        )
+
+    def load_state(self) -> Dict[str, Any]:
+        if PROCUREMENT_STATE.is_file():
+            try:
+                return json.loads(PROCUREMENT_STATE.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        return {"last_tick": None, "ticks": 0}
+
+    def save_state(self, state: Dict[str, Any]) -> None:
+        PROCUREMENT_STATE.parent.mkdir(parents=True, exist_ok=True)
+        PROCUREMENT_STATE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    def can_start_tick(self) -> Tuple[bool, str]:
+        state = self.load_state()
+        last = state.get("last_tick")
+        if not last:
+            return True, "first_tick"
+        try:
+            then = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+            elapsed = (datetime.now(timezone.utc) - then).total_seconds()
+            if elapsed < self.tick_min_interval_sec:
+                return False, f"cooldown_{int(self.tick_min_interval_sec - elapsed)}s"
+        except Exception:
+            pass
+        return True, "ok"
+
+    def acquire_http(self) -> bool:
+        with self._lock:
+            if self._http_count >= self.max_http_per_tick:
+                return False
+            self._http_count += 1
+        if self._semaphore.acquire(timeout=30):
+            with self._lock:
+                self._held_slots += 1
+            return True
+        with self._lock:
+            self._http_count = max(0, self._http_count - 1)
+        return False
+
+    def release_http(self) -> None:
+        with self._lock:
+            if self._held_slots > 0:
+                self._held_slots -= 1
+        self._semaphore.release()
+
+    def force_release_http(self) -> None:
+        """Zombie recovery: release a held semaphore slot without matching acquire."""
+        with self._lock:
+            if self._held_slots > 0:
+                self._held_slots -= 1
+                try:
+                    self._semaphore.release()
+                except ValueError:
+                    pass
+
+    def reset_tick_counters(self) -> None:
+        with self._lock:
+            self._http_count = 0
+
+
+class FleetProcurementEngine:
+    """Autonomous discover → sandbox → test → promote/disable pipeline."""
+
+    def __init__(self):
+        import sys
+        sys.path.insert(0, str(HERMES_SCRIPTS))
+        from external_fleet_manager import FleetManager, REGISTRY_PATH
+
+        self.fm = FleetManager()
+        self.registry_path = REGISTRY_PATH
+        self.governor = ResourceGovernor.from_registry(self.fm._registry)
+        self.pass_rules = (self.fm._registry.get("procurement") or {}).get("pass_rules") or {}
+
+    def _save_registry(self) -> None:
+        self.fm.save_registry()
+        self.fm.reload()
+
+    def _provider_exists(self, provider_id: str) -> bool:
+        for section in ("compute_providers", "context_providers", "sandbox_providers"):
+            for p in self.fm._registry.get(section) or []:
+                if p.get("id") == provider_id:
+                    return True
+        return False
+
+    def inject_sandbox(self, candidate: Dict[str, Any], kind: str) -> Dict[str, Any]:
+        """Inject discovered resource into sandbox tier (not routed until promoted)."""
+        pid = str(candidate.get("id") or _slug_id(candidate.get("name", ""), candidate.get("base_url", "")))
+        if self._provider_exists(pid):
+            return {"ok": False, "reason": "already_exists", "id": pid}
+
+        entry = {
+            **candidate,
+            "id": pid,
+            "enabled": False,
+            "lifecycle": "sandbox",
+            "discovered_at": _utc_now(),
+            "discovery_source": candidate.get("discovery_source", "procurement_engine"),
+        }
+        sandbox = self.fm._registry.setdefault("sandbox_providers", [])
+        sandbox.append(entry)
+        self._save_registry()
+        _log({"event": "sandbox_inject", "id": pid, "kind": kind})
+        return {"ok": True, "id": pid, "lifecycle": "sandbox", "kind": kind}
+
+    def benchmark_provider(self, provider_id: str, *, simulate: bool = False) -> Dict[str, Any]:
+        """TTFT, compliance smoke, basic rate-limit signal."""
+        provider = self.fm._find_provider_any(provider_id)
+        if not provider:
+            return {"ok": False, "error": "not_found", "id": provider_id}
+
+        kind = provider.get("_kind") or "compute"
+        started = time.time()
+        result: Dict[str, Any] = {"id": provider_id, "kind": kind}
+
+        if kind == "compute":
+            result.update(self._benchmark_compute(provider, simulate=simulate, provider_id=provider_id))
+        else:
+            result.update(self._benchmark_context(provider, simulate=simulate, provider_id=provider_id))
+
+        result["total_sec"] = round(time.time() - started, 2)
+        result["pass"] = self._evaluate_pass(result, kind)
+        _log({"event": "benchmark", **result})
+        tel = self.governor._telemetry()
+        if tel:
+            tel.record_dispatch(
+                loop="procurement_benchmark",
+                provider_id=provider_id,
+                success=bool(result.get("ok")),
+                latency_sec=float(result.get("total_sec") or 0),
+                ttft_sec=result.get("ttft_sec"),
+                timeout=result.get("reason") == "http_budget_exceeded",
+                error=result.get("reason") or result.get("error"),
+            )
+        return result
+
+    def _benchmark_compute(self, provider: Dict[str, Any], *, simulate: bool, provider_id: str = "") -> Dict[str, Any]:
+        from external_fleet_manager import _resolve_api_key
+
+        api_key = _resolve_api_key(provider)
+        if not api_key and provider.get("api_key_env") and not simulate:
+            return {"ok": False, "reason": "missing_api_key", "ttft_sec": None, "compliance": 0.0}
+
+        base = str(provider.get("base_url") or "").rstrip("/")
+        model = str(provider.get("model") or "default")
+        url = f"{base}/chat/completions"
+        prompt = "Reply with exactly the word OK and nothing else."
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 16,
+            "temperature": 0,
+            "stream": True,
+        }
+        headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        if simulate and not base.startswith("http"):
+            return {"ok": True, "ttft_sec": 0.5, "compliance": 1.0, "tokens_per_sec": 10.0, "simulated": True}
+
+        tel = self.governor._telemetry()
+        task_id: Optional[str] = None
+        if tel:
+            acquired, task_id = tel.wrap_governor_http(
+                self.governor,
+                loop="procurement_benchmark",
+                expected_sec=float(self.governor.benchmark_timeout_sec),
+                provider_id=provider_id or str(provider.get("id") or ""),
+            )
+            if not acquired:
+                return {"ok": False, "reason": "http_budget_exceeded"}
+        elif not self.governor.acquire_http():
+            return {"ok": False, "reason": "http_budget_exceeded"}
+        try:
+            started = time.time()
+            ttft: Optional[float] = None
+            chunks: List[str] = []
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=self.governor.benchmark_timeout_sec) as resp:
+                    for raw in resp:
+                        line = raw.decode("utf-8", errors="replace").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        ds = line[5:].strip()
+                        if ds == "[DONE]":
+                            break
+                        try:
+                            evt = json.loads(ds)
+                            delta = evt.get("choices", [{}])[0].get("delta", {}).get("content")
+                            if delta:
+                                if ttft is None:
+                                    ttft = time.time() - started
+                                chunks.append(str(delta))
+                        except Exception:
+                            pass
+            except urllib.error.HTTPError as exc:
+                rate_limited = exc.code == 429
+                return {
+                    "ok": False,
+                    "http_status": exc.code,
+                    "rate_limited": rate_limited,
+                    "ttft_sec": None,
+                    "compliance": 0.0,
+                    "reason": "http_error",
+                }
+            except (TimeoutError, urllib.error.URLError) as exc:
+                return {
+                    "ok": False,
+                    "reason": "timeout",
+                    "error": str(exc),
+                    "ttft_sec": None,
+                    "compliance": 0.0,
+                }
+            total = time.time() - started
+            text = "".join(chunks)
+            compliance = 1.0 if re.search(r"\bOK\b", text, re.I) else (0.5 if text.strip() else 0.0)
+            out_tokens = max(1, len(text) // 4)
+            tps = out_tokens / max(total - (ttft or 0), 0.01)
+            return {
+                "ok": compliance >= 0.5,
+                "ttft_sec": round(ttft or total, 3),
+                "compliance": compliance,
+                "tokens_per_sec": round(tps, 2),
+                "text_preview": text[:80],
+            }
+        finally:
+            if tel:
+                tel.release_governor_http(self.governor, task_id)
+            else:
+                self.governor.release_http()
+
+    def _benchmark_context(self, provider: Dict[str, Any], *, simulate: bool, provider_id: str = "") -> Dict[str, Any]:
+        pid = str(provider.get("id") or "")
+        if simulate and not str(provider.get("base_url") or "").startswith("http"):
+            return {"ok": True, "ttft_sec": 0.3, "compliance": 1.0, "simulated": True}
+
+        tel = self.governor._telemetry()
+        task_id: Optional[str] = None
+        if tel:
+            acquired, task_id = tel.wrap_governor_http(
+                self.governor,
+                loop="procurement_benchmark",
+                expected_sec=20.0,
+                provider_id=provider_id or pid,
+            )
+            if not acquired:
+                return {"ok": False, "reason": "http_budget_exceeded"}
+        elif not self.governor.acquire_http():
+            return {"ok": False, "reason": "http_budget_exceeded"}
+        try:
+            started = time.time()
+            res = self.fm.dispatch_context(
+                "Python programming language",
+                capabilities=["real-time-search"],
+                provider_id=pid,
+            )
+            elapsed = res.get("latency_sec") or round(time.time() - started, 2)
+            text = str(res.get("response") or "")
+            compliance = 1.0 if len(text) > 20 else (0.5 if text else 0.0)
+            return {
+                "ok": res.get("success", False),
+                "ttft_sec": elapsed,
+                "compliance": compliance,
+                "latency_sec": elapsed,
+                "text_preview": text[:80],
+            }
+        finally:
+            if tel:
+                tel.release_governor_http(self.governor, task_id)
+            else:
+                self.governor.release_http()
+
+    def _evaluate_pass(self, bench: Dict[str, Any], kind: str) -> bool:
+        rules = self.pass_rules
+        if not bench.get("ok"):
+            return False
+        ttft_max = float(rules.get("compute_ttft_max_sec" if kind == "compute" else "context_latency_max_sec", 20))
+        ttft = bench.get("ttft_sec")
+        if ttft is not None and float(ttft) > ttft_max:
+            return False
+        compliance_min = float(rules.get("compliance_min", 0.5))
+        if float(bench.get("compliance") or 0) < compliance_min:
+            return False
+        if bench.get("rate_limited"):
+            return False
+        return True
+
+    def promote_provider(self, provider_id: str, bench: Dict[str, Any]) -> Dict[str, Any]:
+        """Move sandbox → production with enabled lifecycle."""
+        sandbox = self.fm._registry.get("sandbox_providers") or []
+        entry = None
+        new_sandbox = []
+        for p in sandbox:
+            if p.get("id") == provider_id:
+                entry = dict(p)
+            else:
+                new_sandbox.append(p)
+        if not entry:
+            return {"ok": False, "reason": "not_in_sandbox", "id": provider_id}
+
+        kind = "context" if entry.get("api_mode") in (
+            "duckduckgo_instant", "brave_search", "serper_search", "generic_search", "searxng"
+        ) or "search" in str(entry.get("base_url", "")).lower() else "compute"
+
+        entry["lifecycle"] = "enabled"
+        entry["enabled"] = True
+        entry["promoted_at"] = _utc_now()
+        entry["benchmark"] = {k: bench.get(k) for k in ("ttft_sec", "compliance", "tokens_per_sec", "pass")}
+        entry.pop("_section", None)
+        entry.pop("_kind", None)
+
+        section = "context_providers" if kind == "context" else "compute_providers"
+        self.fm._registry.setdefault(section, []).append(entry)
+        self.fm._registry["sandbox_providers"] = new_sandbox
+        self._save_registry()
+        _log({"event": "promote", "id": provider_id, "section": section})
+        return {"ok": True, "id": provider_id, "section": section, "lifecycle": "enabled"}
+
+    def disable_provider(self, provider_id: str, reason: str) -> Dict[str, Any]:
+        """Disable in any section; move to disabled lifecycle."""
+        for section in ("compute_providers", "context_providers", "sandbox_providers"):
+            for p in self.fm._registry.get(section) or []:
+                if p.get("id") == provider_id:
+                    p["enabled"] = False
+                    p["lifecycle"] = "disabled"
+                    p["disabled_at"] = _utc_now()
+                    p["disabled_reason"] = reason
+                    self._save_registry()
+                    _log({"event": "disable", "id": provider_id, "reason": reason})
+                    return {"ok": True, "id": provider_id, "reason": reason}
+        return {"ok": False, "reason": "not_found"}
+
+    def discover_candidates(self) -> List[Dict[str, Any]]:
+        """Multi-source discovery with governor budget."""
+        registry = self.fm._registry
+        procurement = registry.get("procurement") or {}
+        seeds = procurement.get("discovery_seeds") or DEFAULT_DISCOVERY_SEEDS
+        candidates: List[Dict[str, Any]] = []
+        seen_urls: Set[str] = set()
+
+        def _add(c: Dict[str, Any]) -> None:
+            url = str(c.get("base_url") or "").rstrip("/")
+            if not url or url in seen_urls:
+                return
+            if len(candidates) >= self.governor.max_discoveries_per_tick:
+                return
+            seen_urls.add(url)
+            candidates.append(c)
+
+        # GitHub topics
+        token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+        for topic in GITHUB_TOPICS[:3]:
+            if len(candidates) >= self.governor.max_discoveries_per_tick:
+                break
+            repos = self._github_topic(topic, token)
+            for r in repos[:2]:
+                _add({
+                    "id": _slug_id("gh-topic", topic, r.get("name", "")),
+                    "name": r.get("name", "")[:80],
+                    "base_url": r.get("html_url", ""),
+                    "api_mode": "metadata_only",
+                    "capabilities": infer_capabilities_from_text(r.get("description", ""), topic),
+                    "discovery_source": f"github_topic:{topic}",
+                    "notes": "Repo discovery — needs README parse pass",
+                })
+
+        # GitHub search
+        for q in GITHUB_SEARCH_QUERIES[:2]:
+            if len(candidates) >= self.governor.max_discoveries_per_tick:
+                break
+            for r in self._github_search(q, token)[:2]:
+                desc = r.get("description") or ""
+                _add({
+                    "id": _slug_id("gh", r.get("full_name", "")),
+                    "name": r.get("full_name", ""),
+                    "base_url": r.get("html_url", ""),
+                    "capabilities": infer_capabilities_from_text(desc, q),
+                    "discovery_source": f"github_search:{q}",
+                    "notes": desc[:120],
+                })
+
+        # Awesome-list seeds → parse endpoints
+        for seed in seeds:
+            if len(candidates) >= self.governor.max_discoveries_per_tick:
+                break
+            if not self.governor.acquire_http():
+                break
+            try:
+                text = self._fetch(seed)
+                if text:
+                    for p in self._parse_markdown_endpoints(text, seed):
+                        _add(p)
+            finally:
+                self.governor.release_http()
+
+        # Known no-key context (always re-validate)
+        _add({
+            "id": "proc-duckduckgo-instant",
+            "name": "DuckDuckGo Instant (procurement validate)",
+            "base_url": "https://api.duckduckgo.com/",
+            "api_mode": "duckduckgo_instant",
+            "capabilities": ["real-time-search", "lookup", "fast-facts"],
+            "priority": 2,
+            "discovery_source": "curated_no_key",
+        })
+
+        _log({"event": "discover", "count": len(candidates)})
+        return candidates
+
+    def _fetch(self, url: str, timeout: float = 20) -> Optional[str]:
+        req = urllib.request.Request(url, headers={"User-Agent": "Phronesis-Procurement/2.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+
+    def _github_search(self, query: str, token: Optional[str]) -> List[Dict[str, Any]]:
+        headers = {"Accept": "application/vnd.github+json", "User-Agent": "Phronesis-Procurement"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        url = "https://api.github.com/search/repositories?" + urllib.parse.urlencode(
+            {"q": query, "sort": "stars", "per_page": 5}
+        )
+        if not self.governor.acquire_http():
+            return []
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            return list(data.get("items") or [])
+        except Exception as exc:
+            _log({"event": "github_error", "query": query, "error": str(exc)})
+            return []
+        finally:
+            self.governor.release_http()
+
+    def _github_topic(self, topic: str, token: Optional[str]) -> List[Dict[str, Any]]:
+        return self._github_search(f"topic:{topic}", token)
+
+    def _parse_markdown_endpoints(self, text: str, source: str) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        for line in text.splitlines():
+            if "http" not in line:
+                continue
+            urls = URL_PATTERN.findall(line)
+            if not urls:
+                continue
+            line_l = line.lower()
+            kind = None
+            if any(h in line_l for h in COMPUTE_HINTS):
+                kind = "compute"
+            elif any(h in line_l for h in CONTEXT_HINTS):
+                kind = "context"
+            else:
+                continue
+            url = urls[0].rstrip(")")
+            caps = infer_capabilities_from_text(line, source)
+            api_mode = "openai_chat" if kind == "compute" else "duckduckgo_instant"
+            if "searx" in line_l:
+                api_mode = "searxng"
+            model = ""
+            m = re.search(r"(deepseek|llama|qwen|mixtral)[^\s|]*", line_l, re.I)
+            if m and kind == "compute":
+                model = m.group(0)
+            out.append({
+                "id": _slug_id(url),
+                "name": line.strip()[:80],
+                "base_url": url if kind == "context" else url.split("/v1")[0] + "/v1" if "/v1" in url else url,
+                "api_mode": api_mode,
+                "model": model or "auto",
+                "capabilities": caps,
+                "priority": 1,
+                "discovery_source": source,
+            })
+        return out[:15]
+
+    def procure_tick(self, *, discover: bool = True) -> Dict[str, Any]:
+        """Full autonomous procurement tick with resource limits."""
+        can, reason = self.governor.can_start_tick()
+        if not can:
+            return {"ok": False, "skipped": True, "reason": reason}
+
+        tel = self.governor._telemetry()
+        if tel:
+            defer, defer_reason = tel.should_defer_procurement()
+            if defer and discover:
+                discover = False
+                _log({"event": "procure_deferred", "reason": defer_reason})
+
+        self.governor.reset_tick_counters()
+        report: Dict[str, Any] = {
+            "timestamp": _utc_now(),
+            "phase": "procure_tick",
+            "discovered": [],
+            "sandboxed": [],
+            "benchmarked": [],
+            "promoted": [],
+            "disabled": [],
+        }
+
+        # Phase 1: Re-validate production providers
+        benchmarks_run = 0
+        for p in self.fm.list_providers(healthy_only=False):
+            if benchmarks_run >= self.governor.max_benchmarks_per_tick:
+                break
+            pid = str(p.get("id") or "")
+            if not pid:
+                continue
+            bench = self.benchmark_provider(pid)
+            benchmarks_run += 1
+            report["benchmarked"].append({"id": pid, "pass": bench.get("pass"), "bench": bench})
+            if not bench.get("pass"):
+                self.disable_provider(pid, bench.get("reason") or "benchmark_fail")
+                report["disabled"].append(pid)
+
+        # Phase 2: Discover + sandbox + test + promote
+        if discover:
+            candidates = self.discover_candidates()
+            report["discovered"] = [c.get("id") for c in candidates]
+            for c in candidates:
+                if benchmarks_run >= self.governor.max_benchmarks_per_tick:
+                    break
+                # Skip metadata-only github repo links
+                if c.get("api_mode") == "metadata_only":
+                    continue
+                if not str(c.get("base_url", "")).startswith("http"):
+                    continue
+                kind = "context" if c.get("api_mode") in (
+                    "duckduckgo_instant", "searxng", "brave_search", "generic_search"
+                ) else "compute"
+                inj = self.inject_sandbox(c, kind)
+                if not inj.get("ok"):
+                    continue
+                report["sandboxed"].append(inj.get("id"))
+                bench = self.benchmark_provider(inj["id"])
+                benchmarks_run += 1
+                report["benchmarked"].append({"id": inj["id"], "pass": bench.get("pass"), "bench": bench})
+                if bench.get("pass"):
+                    prom = self.promote_provider(inj["id"], bench)
+                    if prom.get("ok"):
+                        report["promoted"].append(inj["id"])
+                else:
+                    self.disable_provider(inj["id"], "benchmark_fail")
+                    report["disabled"].append(inj["id"])
+
+        state = self.governor.load_state()
+        state["last_tick"] = _utc_now()
+        state["ticks"] = int(state.get("ticks", 0)) + 1
+        state["last_report_summary"] = {
+            "promoted": len(report["promoted"]),
+            "disabled": len(report["disabled"]),
+            "sandboxed": len(report["sandboxed"]),
+        }
+        self.governor.save_state(state)
+        report["ok"] = True
+        PROCUREMENT_REPORT.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        _log({"event": "procure_tick_complete", **report})
+        tel = self.governor._telemetry()
+        if tel:
+            tick_started = datetime.fromisoformat(str(report["timestamp"]).replace("Z", "+00:00"))
+            duration = (datetime.now(timezone.utc) - tick_started).total_seconds()
+            tel.record_loop_summary(
+                loop="procure_tick",
+                duration_sec=duration,
+                tasks=len(report.get("benchmarked") or []),
+                failures=len(report.get("disabled") or []),
+            )
+            report["telemetry"] = tel.optimize_tick()
+        return report
+
+    def simulate_loop(self) -> Dict[str, Any]:
+        """Simulated discovery→sandbox→benchmark→promote without external hammering."""
+        self.governor.reset_tick_counters()
+        # Use unique id to avoid collision
+        sim_id = f"sim-{int(time.time())}"
+        candidate = {
+            "id": sim_id,
+            "name": "Simulated DDG Context Provider",
+            "base_url": "https://api.duckduckgo.com/",
+            "api_mode": "duckduckgo_instant",
+            "capabilities": infer_capabilities_from_text("real-time-search duckduckgo"),
+            "priority": 1,
+            "discovery_source": "simulate_loop",
+        }
+        steps: List[Dict[str, Any]] = []
+
+        inj = self.inject_sandbox(candidate, "context")
+        steps.append({"step": "inject_sandbox", **inj})
+
+        bench = self.benchmark_provider(sim_id)
+        steps.append({"step": "benchmark", **bench})
+
+        if bench.get("pass"):
+            prom = self.promote_provider(sim_id, bench)
+            steps.append({"step": "promote", **prom})
+        else:
+            dis = self.disable_provider(sim_id, "simulate_fail")
+            steps.append({"step": "disable", **dis})
+
+        # Cleanup sim from production if promoted (demote back to keep registry clean)
+        if bench.get("pass"):
+            self.disable_provider(sim_id, "simulate_cleanup")
+            sandbox = self.fm._registry.get("sandbox_providers") or []
+            self.fm._registry["sandbox_providers"] = [p for p in sandbox if p.get("id") != sim_id]
+            prod = self.fm._registry.get("context_providers") or []
+            self.fm._registry["context_providers"] = [p for p in prod if p.get("id") != sim_id]
+            self._save_registry()
+            steps.append({"step": "simulate_cleanup", "ok": True})
+
+        report = {
+            "timestamp": _utc_now(),
+            "mode": "simulate_loop",
+            "steps": steps,
+            "all_pass": bench.get("pass", False),
+        }
+        PROCUREMENT_REPORT.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        return report
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Fleet Procurement Engine")
+    parser.add_argument("--procure-tick", action="store_true")
+    parser.add_argument("--simulate-loop", action="store_true")
+    parser.add_argument("--discover-only", action="store_true")
+    args = parser.parse_args()
+
+    engine = FleetProcurementEngine()
+    if args.simulate_loop:
+        print(json.dumps(engine.simulate_loop(), indent=2))
+    elif args.discover_only:
+        print(json.dumps(engine.discover_candidates(), indent=2))
+    else:
+        print(json.dumps(engine.procure_tick(), indent=2))

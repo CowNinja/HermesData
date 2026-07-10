@@ -109,12 +109,26 @@ def repair_file(path: Path, *, dry_run: bool = False) -> tuple[str, int]:
     repaired = to_ascii(text)
     if newline == "\r\n":
         repaired = repaired.replace("\n", "\r\n").replace("\r\r\n", "\r\n")
+    # HARD GUARD: never flatten multi-line sources (2026-07-09 zero-newline incident)
+    src_nl = raw.count(b"\n")
+    out_bytes = repaired.encode("ascii")
+    out_nl = out_bytes.count(b"\n")
+    if src_nl > 0 and out_nl == 0:
+        raise RuntimeError(
+            f"newline integrity refused for {path}: source had {src_nl} LF, "
+            "repair would write 0 (would create zero-newline corruption)"
+        )
+    if src_nl >= 5 and out_nl < max(1, src_nl // 10):
+        raise RuntimeError(
+            f"newline integrity refused for {path}: source LF={src_nl} out LF={out_nl} "
+            "(suspiciously collapsed)"
+        )
     non_ascii_before = sum(1 for b in raw if b not in (9, 10, 13) and (b < 32 or b > 126))
-    if repaired.encode("ascii") == raw:
+    if out_bytes == raw:
         return "ok", 0
     if dry_run:
         return "would_fix", non_ascii_before
-    path.write_bytes(repaired.encode("ascii"))
+    path.write_bytes(out_bytes)
     return "fixed", non_ascii_before
 
 

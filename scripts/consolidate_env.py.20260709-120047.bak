@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""One-time env consolidation — merge live .env files into D:\\HermesData\\.env.
+
+Archival copies under Backups/ and state-snapshots/ are backed up but not merged.
+Never prints secret values.
+"""
+from __future__ import annotations
+
+import re
+import shutil
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+HERMES_ROOT = Path(r"D:\HermesData")
+VAULT_ROOT = Path(r"D:\PhronesisVault")
+CANONICAL = HERMES_ROOT / ".env"
+KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+
+# Later entries win on key conflicts. Canonical is last.
+MERGE_SOURCES: List[Path] = [
+    HERMES_ROOT / "profiles" / "builder" / ".env",
+    HERMES_ROOT / "profiles" / "km-agent" / ".env",
+    HERMES_ROOT / "profiles" / "ops-watch" / ".env",
+    HERMES_ROOT / "profiles" / "orchestrator" / ".env",
+    HERMES_ROOT / "profiles" / "qa" / ".env",
+    HERMES_ROOT / "profiles" / "researcher" / ".env",
+    HERMES_ROOT / "profiles" / "strategist" / ".env",
+    HERMES_ROOT / "profiles" / "alice-roleplay" / ".env",
+    HERMES_ROOT / "hermes-studio" / ".env",
+    HERMES_ROOT / "hermes-workspace" / ".env",
+    HERMES_ROOT / "MemoryTools" / "wisdom-keeper" / "env" / ".env",
+    VAULT_ROOT / "Digital-Twin" / "Goal2-CompanionSynthesis" / "replika-export-tool" / ".env",
+    VAULT_ROOT / "Roleplay-Sandbox" / "profile" / ".env",
+    CANONICAL,
+]
+
+RETIRE_AFTER_MERGE: List[Path] = [p for p in MERGE_SOURCES if p != CANONICAL]
+
+SKIP_BACKUP_PREFIXES = ("Backups", "state-snapshots")
+
+
+def parse_env(path: Path) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    if not path.exists():
+        return out
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        t = line.strip()
+        if not t or t.startswith("#"):
+            continue
+        m = KEY_RE.match(t)
+        if m:
+            out[m.group(1)] = m.group(2)
+    return out
+
+
+def merge_all() -> Tuple[Dict[str, str], List[str]]:
+    merged: Dict[str, str] = {}
+    log: List[str] = []
+    for src in MERGE_SOURCES:
+        if not src.exists():
+            log.append(f"SKIP missing: {src}")
+            continue
+        keys = parse_env(src)
+        new = [k for k in keys if k not in merged]
+        log.append(f"MERGE {src.name} @ {src.parent.name}: {len(keys)} keys ({len(new)} new)")
+        merged.update(keys)
+    return merged, log
+
+
+def write_canonical(merged: Dict[str, str], template: Path) -> None:
+    lines: List[str] = []
+    seen = set()
+    if template.exists():
+        for line in template.read_text(encoding="utf-8", errors="replace").splitlines():
+            t = line.strip()
+            m = KEY_RE.match(t) if t and not t.startswith("#") else None
+            if m:
+                key = m.group(1)
+                if key in merged:
+                    lines.append(f"{key}={merged[key]}")
+                    seen.add(key)
+                else:
+                    lines.append(line)
+            else:
+                lines.append(line)
+    else:
+        lines.append("# Hermes canonical environment — D:\\HermesData\\.env")
+        lines.append(f"# Consolidated {datetime.now().isoformat(timespec='seconds')}")
+        lines.append("")
+
+    extra = sorted(k for k in merged if k not in seen)
+    if extra:
+        lines.append("")
+        lines.append("# --- consolidated from retired .env files ---")
+        for key in extra:
+            lines.append(f"{key}={merged[key]}")
+
+    CANONICAL.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def backup_tree(ts: str) -> Path:
+    root = HERMES_ROOT / "secrets" / "env-backups" / ts
+    root.mkdir(parents=True, exist_ok=True)
+    for src in MERGE_SOURCES:
+        if not src.exists():
+            continue
+        rel = src.relative_to(src.anchor) if src.is_absolute() else src
+        dest = root / str(rel).lstrip("\\/")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+    return root
+
+
+def retire_files(ts: str) -> List[str]:
+    log: List[str] = []
+    for path in RETIRE_AFTER_MERGE:
+        if not path.exists():
+            continue
+        path.unlink()
+        log.append(f"DELETED: {path}")
+    return log
+
+
+def main() -> int:
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    if not CANONICAL.exists():
+        print(f"FATAL: canonical missing: {CANONICAL}", file=sys.stderr)
+        return 1
+
+    backup_root = backup_tree(ts)
+    merged, merge_log = merge_all()
+    write_canonical(merged, CANONICAL)
+    retire_log = retire_files(ts)
+
+    print(f"## Env consolidation {ts}")
+    print(f"Backup: {backup_root}")
+    print(f"Canonical: {CANONICAL}")
+    print(f"Total keys: {len(merged)}")
+    for line in merge_log:
+        print(line)
+    for line in retire_log:
+        print(line)
+    print("[OK]")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

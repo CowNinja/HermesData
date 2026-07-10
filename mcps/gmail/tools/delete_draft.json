@@ -1,0 +1,16 @@
+{
+  "name": "delete_draft",
+  "description": "Permanently delete a Gmail draft. This action cannot be undone.\n\nUse this tool when the user explicitly asks to discard or delete a draft.\nThe draft_id should come from gmail_create_draft or gmail_list_drafts.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "draft_id": {
+        "type": "string",
+        "description": "The draft ID to delete. Use the draft_id from gmail_create_draft or gmail_list_drafts."
+      }
+    },
+    "required": [
+      "draft_id"
+    ]
+  }
+}

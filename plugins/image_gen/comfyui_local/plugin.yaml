@@ -1,0 +1,5 @@
+name: comfyui_local
+version: 1.0.0
+description: "Local ComfyUI Pony/Juggernaut image generation via :8188 (832x1216 standard, render-policy)."
+author: Phronesis
+kind: backend

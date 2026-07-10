@@ -1,0 +1,20 @@
+{
+  "name": "create_folder",
+  "description": "Create a new folder in Google Drive. Before creating, use google_drive_search with mime_type_filter='application/vnd.google-apps.folder' to check if a folder with this name already exists. Google Drive allows duplicate folder names, so always search first to avoid creating duplicates.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "folder_name": {
+        "type": "string",
+        "description": "Name of the folder to create"
+      },
+      "parent_folder_id": {
+        "type": "string",
+        "description": "Parent folder ID (creates in Drive root if omitted)"
+      }
+    },
+    "required": [
+      "folder_name"
+    ]
+  }
+}

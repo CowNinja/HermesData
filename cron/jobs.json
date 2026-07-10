@@ -5,9 +5,9 @@
       "name": "Universal-Ingestion-Monitor",
       "prompt": "Config-driven ingestion monitor. Reads Operations/ingestion_targets.yaml; probes all enabled targets; distills new signal via local_content_distill.py (prefer=vault, task_type=synthesis). No per-source Python scripts.",
       "skills": [],
-      "skill": "cns-ingestion",
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "base_url": null,
       "script": "universal_ingest_monitor.py",
       "no_agent": true,
@@ -20,19 +20,19 @@
       "schedule_display": "0 */6 * * *",
       "repeat": {
         "times": 999,
-        "completed": 62
+        "completed": 77
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-14T11:15:30.249015-04:00",
-      "next_run_at": "2026-07-05T06:00:00-04:00",
-      "last_run_at": "2026-07-05T00:00:33.957098-04:00",
+      "next_run_at": "2026-07-10T12:00:00-04:00",
+      "last_run_at": "2026-07-10T06:00:16.900603-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "origin",
+      "deliver": "local",
       "origin": null,
       "enabled_toolsets": [
         "web",
@@ -42,7 +42,9 @@
       ],
       "workdir": "D:\\PhronesisVault",
       "fire_claim": null,
-      "pinned": true
+      "pinned": true,
+      "provider_snapshot": null,
+      "model_snapshot": null
     },
     {
       "id": "31c154062810",
@@ -55,9 +57,9 @@
         "arxiv"
       ],
       "skill": "llm-wiki",
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
-      "base_url": "http://127.0.0.1:8091/v1",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
+      "base_url": null,
       "script": null,
       "no_agent": false,
       "context_from": null,
@@ -69,16 +71,16 @@
       "schedule_display": "0 */6 * * *",
       "repeat": {
         "times": 999,
-        "completed": 107
+        "completed": 122
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-15T07:45:59.378021-04:00",
-      "next_run_at": "2026-07-05T06:00:00-04:00",
-      "last_run_at": "2026-07-05T00:00:48.723556-04:00",
-      "last_status": "ok",
+      "next_run_at": "2026-07-10T12:00:00-04:00",
+      "last_run_at": "2026-07-10T06:01:06.175099-04:00",
+      "last_status": "error",
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
@@ -117,15 +119,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 3105
+        "completed": 3599
       },
-      "enabled": true,
-      "state": "scheduled",
-      "paused_at": null,
+      "enabled": false,
+      "state": "paused",
+      "paused_at": "2026-07-08T17:02:53.733115-04:00",
       "paused_reason": null,
       "created_at": "2026-06-22T17:46:58.023415-04:00",
-      "next_run_at": "2026-07-05T04:35:00-04:00",
-      "last_run_at": "2026-07-05T04:30:47.984481-04:00",
+      "next_run_at": "2026-07-08T17:05:00-04:00",
+      "last_run_at": "2026-07-08T17:00:19.743778-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -134,7 +136,9 @@
       "enabled_toolsets": null,
       "workdir": "D:\\PhronesisVault",
       "fire_claim": null,
-      "pinned": true
+      "pinned": true,
+      "provider_snapshot": null,
+      "model_snapshot": null
     },
     {
       "id": "275895154786",
@@ -156,15 +160,15 @@
       "schedule_display": "0 9 * * *",
       "repeat": {
         "times": null,
-        "completed": 11
+        "completed": 16
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T23:52:23.622388-04:00",
-      "next_run_at": "2026-07-05T09:00:00-04:00",
-      "last_run_at": "2026-07-04T09:01:02.749797-04:00",
+      "next_run_at": "2026-07-11T09:00:00-04:00",
+      "last_run_at": "2026-07-10T09:00:27.861377-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -179,7 +183,7 @@
       "workdir": "D:\\PhronesisVault",
       "fire_claim": null,
       "provider_snapshot": null,
-      "model_snapshot": "openrouter/owl-alpha",
+      "model_snapshot": null,
       "pinned": true
     },
     {
@@ -188,8 +192,8 @@
       "prompt": "Loop v2 lint gate. Script only. Empty stdout if clean.",
       "skills": [],
       "skill": null,
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "base_url": null,
       "script": "loop-lint-gate.py",
       "no_agent": true,
@@ -202,15 +206,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 257
+        "completed": 336
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T15:57:56.760952-04:00",
-      "next_run_at": "2026-07-05T04:53:44.168433-04:00",
-      "last_run_at": "2026-07-05T03:53:44.168433-04:00",
+      "next_run_at": "2026-07-10T11:01:31.814467-04:00",
+      "last_run_at": "2026-07-10T10:01:31.814467-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -219,15 +223,17 @@
       "enabled_toolsets": null,
       "workdir": "D:\\PhronesisVault",
       "fire_claim": null,
-      "pinned": true
+      "pinned": true,
+      "provider_snapshot": null,
+      "model_snapshot": null
     },
     {
       "id": "daily-vault-hygiene-5e3f9159",
       "name": "Daily-Vault-Hygiene-Audit",
       "skills": [],
       "skill": null,
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "base_url": null,
       "script": "daily-vault-hygiene.py",
       "no_agent": true,
@@ -240,15 +246,15 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 11
+        "completed": 16
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-24T14:30:57.417086-04:00",
-      "next_run_at": "2026-07-05T06:00:00-04:00",
-      "last_run_at": "2026-07-04T07:50:35.715532-04:00",
+      "next_run_at": "2026-07-11T06:00:00-04:00",
+      "last_run_at": "2026-07-10T06:01:06.440882-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -257,15 +263,17 @@
       "enabled_toolsets": null,
       "workdir": "D:\\PhronesisVault",
       "fire_claim": null,
-      "pinned": true
+      "pinned": true,
+      "provider_snapshot": null,
+      "model_snapshot": null
     },
     {
       "id": "discord-nightly-dashboard-a1b2c3d4",
       "name": "Discord-Nightly-Dashboard",
       "skills": [],
       "skill": null,
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "base_url": null,
       "script": "discord-nightly-dashboard.py",
       "no_agent": true,
@@ -278,15 +286,15 @@
       "schedule_display": "0 23 * * *",
       "repeat": {
         "times": null,
-        "completed": 11
+        "completed": 15
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-24T19:15:00-04:00",
-      "next_run_at": "2026-07-05T23:00:00-04:00",
-      "last_run_at": "2026-07-04T23:00:53.683899-04:00",
+      "next_run_at": "2026-07-10T23:00:00-04:00",
+      "last_run_at": "2026-07-09T23:00:04.464827-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -295,7 +303,9 @@
       "enabled_toolsets": null,
       "workdir": "D:\\PhronesisVault",
       "fire_claim": null,
-      "pinned": true
+      "pinned": true,
+      "provider_snapshot": null,
+      "model_snapshot": null
     },
     {
       "id": "discord-weekly-evolve-e5f6a7b8",
@@ -316,15 +326,15 @@
       "schedule_display": "0 10 * * 0",
       "repeat": {
         "times": null,
-        "completed": 1
+        "completed": 2
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-24T19:15:00-04:00",
-      "next_run_at": "2026-07-05T10:00:00-04:00",
-      "last_run_at": "2026-06-29T10:00:41.296223-04:00",
+      "next_run_at": "2026-07-12T10:00:00-04:00",
+      "last_run_at": "2026-07-05T10:00:35.355873-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -386,8 +396,8 @@
       "name": "Citadel-Daily-Channel-Audit",
       "skills": [],
       "skill": null,
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "base_url": null,
       "script": "citadel-daily-audit.py",
       "no_agent": true,
@@ -400,15 +410,15 @@
       "schedule_display": "0 7 * * *",
       "repeat": {
         "times": null,
-        "completed": 9
+        "completed": 13
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-25T15:25:00-04:00",
-      "next_run_at": "2026-07-05T07:00:00-04:00",
-      "last_run_at": "2026-07-04T07:51:34.107427-04:00",
+      "next_run_at": "2026-07-11T07:00:00-04:00",
+      "last_run_at": "2026-07-10T07:00:19.281081-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -417,7 +427,9 @@
       "enabled_toolsets": null,
       "workdir": "D:\\PhronesisVault",
       "fire_claim": null,
-      "pinned": true
+      "pinned": true,
+      "provider_snapshot": null,
+      "model_snapshot": null
     },
     {
       "id": "646449c250f1",
@@ -441,15 +453,15 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 51
+        "completed": 71
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-07-05T08:34:45.549783-04:00",
-      "last_run_at": "2026-07-05T00:33:48.465543-04:00",
+      "next_run_at": "2026-07-10T14:59:19.181611-04:00",
+      "last_run_at": "2026-07-10T06:59:19.035181-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -470,7 +482,7 @@
     },
     {
       "id": "cc127b21a784",
-      "name": "Self-Recovery-Watchdog",
+      "name": "Git-Repo-Recovery-30m",
       "prompt": "Run the self-recovery watchdog script by executing: bash /d/HermesData/scripts/self-recovery-watchdog.sh. Report the output.",
       "skills": [],
       "skill": null,
@@ -490,19 +502,19 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 295
+        "completed": 449
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T19:59:53.051242-04:00",
-      "next_run_at": "2026-07-05T04:55:47.474993-04:00",
-      "last_run_at": "2026-07-05T04:25:47.474993-04:00",
+      "next_run_at": "2026-07-10T11:22:47.249031-04:00",
+      "last_run_at": "2026-07-10T10:52:47.249031-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "origin",
+      "deliver": "local",
       "origin": {
         "platform": "discord",
         "chat_id": "1520147367771246733",
@@ -513,7 +525,7 @@
       "enabled_toolsets": [
         "terminal"
       ],
-      "workdir": null,
+      "workdir": "D:\\HermesData",
       "fire_claim": null,
       "pinned": true
     },
@@ -539,15 +551,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 144
+        "completed": 224
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T22:59:28.297996-04:00",
-      "next_run_at": "2026-07-05T04:52:44.162603-04:00",
-      "last_run_at": "2026-07-05T03:52:44.162603-04:00",
+      "next_run_at": "2026-07-10T11:00:31.792720-04:00",
+      "last_run_at": "2026-07-10T10:00:31.792720-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -572,8 +584,8 @@
         "hermes-agent"
       ],
       "skill": "hermes-agent",
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "provider_snapshot": null,
       "model_snapshot": null,
       "base_url": null,
@@ -588,15 +600,15 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 8
+        "completed": 13
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T23:03:35.140665-04:00",
-      "next_run_at": "2026-07-05T06:00:00-04:00",
-      "last_run_at": "2026-07-04T07:50:58.757503-04:00",
+      "next_run_at": "2026-07-11T06:00:00-04:00",
+      "last_run_at": "2026-07-10T06:00:17.289353-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -635,19 +647,19 @@
       "schedule_display": "every 1440m",
       "repeat": {
         "times": null,
-        "completed": 5
+        "completed": 9
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T10:43:21.828267-04:00",
-      "next_run_at": "2026-07-05T10:48:20.158279-04:00",
-      "last_run_at": "2026-07-04T10:48:20.158279-04:00",
+      "next_run_at": "2026-07-10T18:58:10.918987-04:00",
+      "last_run_at": "2026-07-09T18:58:10.918987-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "origin",
+      "deliver": "local",
       "origin": {
         "platform": "discord",
         "chat_id": "1520947260358398042",
@@ -682,15 +694,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 65
+        "completed": 104
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:15.417577-04:00",
-      "next_run_at": "2026-07-05T05:52:48.414449-04:00",
-      "last_run_at": "2026-07-05T03:52:48.414449-04:00",
+      "next_run_at": "2026-07-10T11:00:27.820553-04:00",
+      "last_run_at": "2026-07-10T09:00:27.820553-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -710,15 +722,15 @@
     {
       "id": "955961238bba",
       "name": "extract-wisdom",
-      "prompt": "Run the episodic memory extractor:\n\n1. Execute: `cd D:/HermesData && python scripts/extract_wisdom.py --scan-sessions --limit 30`\n2. Execute: `cd D:/HermesData && python scripts/extract_wisdom.py --scan-errors`\n3. Report a brief summary: how many new entries were found and saved, and list the top 3 most interesting findings by category.",
+      "prompt": "",
       "skills": [],
       "skill": null,
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "provider_snapshot": null,
       "model_snapshot": null,
-      "base_url": "http://127.0.0.1:8091/v1",
-      "script": "extract_wisdom.py",
+      "base_url": null,
+      "script": "extract_x_wisdom.py",
       "no_agent": true,
       "context_from": null,
       "schedule": {
@@ -729,27 +741,23 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 66
+        "completed": 113
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:25.077977-04:00",
-      "next_run_at": "2026-07-05T05:51:44.322564-04:00",
-      "last_run_at": "2026-07-05T03:51:44.322564-04:00",
+      "next_run_at": "2026-07-10T11:00:27.845030-04:00",
+      "last_run_at": "2026-07-10T09:00:27.845030-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "origin",
-      "origin": {
-        "platform": "discord",
-        "chat_id": "1521154736991240233",
-        "chat_name": "Phronesis Citadel / #skill-evolution / self-improvement /learn https://x.com/i/status/2071081880300982330",
-        "thread_id": "1521154736991240233",
-        "user_id": "1302338152396230750"
-      },
-      "enabled_toolsets": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": [
+        "web"
+      ],
       "workdir": null,
       "fire_claim": null,
       "pinned": true
@@ -776,16 +784,16 @@
       "schedule_display": "0 9 * * 1",
       "repeat": {
         "times": null,
-        "completed": 0
+        "completed": 1
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T16:14:58.062967-04:00",
-      "next_run_at": "2026-07-06T09:00:00-04:00",
-      "last_run_at": null,
-      "last_status": null,
+      "next_run_at": "2026-07-13T09:00:00-04:00",
+      "last_run_at": "2026-07-06T09:00:27.690803-04:00",
+      "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
@@ -802,21 +810,22 @@
         "terminal"
       ],
       "workdir": null,
-      "pinned": true
+      "pinned": true,
+      "fire_claim": null
     },
     {
       "id": "dda6fc158471",
       "name": "Sovereign-Dawn-Pulse",
-      "prompt": "You are the Sovereign Dawn Pulse \u2014 a holistic daily morning briefing for Jeff.\n\nRun a comprehensive health check of the following:\n- Ports 8090, 8091, 8189, 8642\n- GPU VRAM usage\n- Last 24h benchmark trends\n- Yesterday's achievements\n- Today's priorities\n\nUse the local sovereign model only. Keep it tight \u2014 3-5 bullet points delivered in a single message.",
+      "prompt": "Script-only dawn pulse (ports/GPU/integrity). No LLM.",
       "skills": [],
       "skill": null,
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "provider_snapshot": null,
       "model_snapshot": null,
       "base_url": null,
-      "script": null,
-      "no_agent": false,
+      "script": "dawn_pulse_script.py",
+      "no_agent": true,
       "context_from": null,
       "schedule": {
         "kind": "cron",
@@ -826,22 +835,22 @@
       "schedule_display": "0 8 * * *",
       "repeat": {
         "times": null,
-        "completed": 3
+        "completed": 8
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-01T08:13:23.601175-04:00",
-      "next_run_at": "2026-07-05T08:00:00-04:00",
-      "last_run_at": "2026-07-04T08:00:58.198003-04:00",
-      "last_status": "ok",
+      "next_run_at": "2026-07-11T08:00:00-04:00",
+      "last_run_at": "2026-07-10T08:01:14.788128-04:00",
+      "last_status": "error",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "origin",
+      "deliver": "local",
       "origin": null,
       "enabled_toolsets": null,
-      "workdir": null,
+      "workdir": "D:\\HermesData",
       "fire_claim": null
     },
     {
@@ -866,19 +875,19 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 193
+        "completed": 496
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T11:46:43.622278-04:00",
-      "next_run_at": "2026-07-05T04:37:46.008271-04:00",
-      "last_run_at": "2026-07-05T04:22:46.008271-04:00",
+      "next_run_at": "2026-07-10T11:10:19.715500-04:00",
+      "last_run_at": "2026-07-10T10:55:19.715500-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "origin",
+      "deliver": "local",
       "origin": {
         "platform": "discord",
         "chat_id": "1522070156346658846",
@@ -897,17 +906,15 @@
       "id": "cb3b84dd05fc",
       "name": "DriveWatch CDEKG",
       "prompt": "Run: Get-PSDrive -PSProvider FileSystem. Keep only C, D, G, K drives. Build a compact markdown table with columns: Drive | Free GB | Used GB. Convert Free to GB if it shows as GiB (e.g., 232.20 GiB \u2192 232.20 GB). Deliver the table as your final message, no extra chatter.",
-      "skills": [
-        "shell-pwsh"
-      ],
-      "skill": "shell-pwsh",
+      "skills": [],
+      "skill": null,
       "model": null,
       "provider": null,
-      "provider_snapshot": "custom",
-      "model_snapshot": "phronesis-sovereign-auto",
+      "provider_snapshot": null,
+      "model_snapshot": null,
       "base_url": null,
       "script": null,
-      "no_agent": false,
+      "no_agent": true,
       "context_from": null,
       "schedule": {
         "kind": "interval",
@@ -917,26 +924,20 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 106
+        "completed": 166
       },
-      "enabled": true,
-      "state": "scheduled",
-      "paused_at": null,
-      "paused_reason": null,
+      "enabled": false,
+      "state": "paused",
+      "paused_at": "2026-07-06T15:30:00-04:00",
+      "paused_reason": "Paused per audit (safe while away): shell-pwsh skill mismatch on bash wrapper + drift (unpinned, grok-build switch). No script. Re-enable after Python rewrite or pin.",
       "created_at": "2026-07-02T13:06:18.302675-04:00",
-      "next_run_at": "2026-07-05T04:46:07.823817-04:00",
-      "last_run_at": "2026-07-05T04:16:07.823817-04:00",
-      "last_status": "ok",
-      "last_error": null,
+      "next_run_at": "2026-07-06T15:10:41.037515-04:00",
+      "last_run_at": "2026-07-06T14:40:41.037515-04:00",
+      "last_status": "error",
+      "last_error": "RuntimeError: Skipped to prevent unintended spend: global inference config drifted since this job was created (provider 'custom' -> 'xai-oauth'; model 'phronesis-sovereign-auto' -> 'grok-build-0.1'), and this job is unpinned. No inference call was made. To run on the new config, pin it explicitly: `cronjob action=update job_id=cb3b84dd05fc provider=<provider> model=<model>` (or pin the original values to keep them). See #44585.",
       "last_delivery_error": null,
-      "deliver": "origin",
-      "origin": {
-        "platform": "discord",
-        "chat_id": "1522070156346658846",
-        "chat_name": "Phronesis Citadel / #hermes-audit / uh-oh we're getting errors again. What's up?",
-        "thread_id": "1522070156346658846",
-        "user_id": "1302338152396230750"
-      },
+      "deliver": "local",
+      "origin": null,
       "enabled_toolsets": null,
       "workdir": null,
       "fire_claim": null
@@ -944,20 +945,16 @@
     {
       "id": "619c316c342a",
       "name": "ComfyUI-Gallery-Refresh",
-      "prompt": "You are the daily curator for the PhronesisVault ComfyUI image gallery. Your job is to refresh the mobile gallery state by pulling the latest image manifest from the ComfyUI backend, enriching each entry with tier metadata from the silo (if present), and writing the consolidated JSON back to the gallery state store at D:\\PhronesisVault\\gallery-state.json. \n\n1. Load the ComfyUI manifest from the web endpoint (or local cache if the endpoint is down) \u2014 it contains image URLs, titles, and basic tags.\n2. For each image, look up its tier metadata in the CNS index (D:\\PhronesisVault\\index) \u2014 fields like `tier`, `viewCount`, and `lastAccessed` help the mobile UI prioritize content.\n3. Merge the two data sources, preserving all original ComfyUI fields and appending the tier metadata as a nested `metadata` object.\n4. Validate the final JSON structure \u2014 ensure no nulls where strings are expected and that the `images` array length matches the manifest.\n5. Write the result to D:\\PhronesisVault\\gallery-state.json and confirm the write with a concise summary (image count, any newly indexed tiers, and the timestamp of the refresh).\n\nTone: crisp, data-driven, and mobile-first \u2014 the gallery UI will render this JSON directly, so clarity beats verbosity.",
-      "skills": [
-        "file",
-        "web",
-        "delegation"
-      ],
-      "skill": "file",
-      "model": "anthropic/claude-sonnet-4",
-      "provider": "custom:phronesis-sovereign",
+      "prompt": "Script-only Comfy gallery manifest refresh (no LLM).",
+      "skills": [],
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "provider_snapshot": null,
       "model_snapshot": null,
       "base_url": null,
-      "script": null,
-      "no_agent": false,
+      "script": "comfy_gallery_refresh_script.py",
+      "no_agent": true,
       "context_from": null,
       "schedule": {
         "kind": "cron",
@@ -967,28 +964,22 @@
       "schedule_display": "0 9 * * *",
       "repeat": {
         "times": null,
-        "completed": 1
+        "completed": 4
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-03T13:04:52.909373-04:00",
-      "next_run_at": "2026-07-05T09:00:00-04:00",
-      "last_run_at": "2026-07-04T09:01:12.921596-04:00",
+      "next_run_at": "2026-07-11T09:00:00-04:00",
+      "last_run_at": "2026-07-10T10:52:47.620917-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "origin",
-      "origin": {
-        "platform": "discord",
-        "chat_id": "1522325123817013269",
-        "chat_name": "Phronesis Citadel / #hermes / Roleplay-Sandbox \u2014 Central DB",
-        "thread_id": "1522325123817013269",
-        "user_id": "1302338152396230750"
-      },
+      "deliver": "local",
+      "origin": null,
       "enabled_toolsets": null,
-      "workdir": "D:\\PhronesisVault",
+      "workdir": "D:\\HermesData",
       "fire_claim": null
     },
     {
@@ -997,8 +988,8 @@
       "prompt": "Script-only RP image pipeline bottleneck scan with auto-fix (no LLM).",
       "skills": [],
       "skill": null,
-      "model": "phronesis-sovereign-auto",
-      "provider": "phronesis-sovereign",
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
       "base_url": null,
       "script": "rp-bottleneck-fix-cron.py",
       "no_agent": true,
@@ -1011,15 +1002,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 202
+        "completed": 1150
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-04T11:35:00-04:00",
-      "next_run_at": "2026-07-05T04:35:00-04:00",
-      "last_run_at": "2026-07-05T04:30:50.086005-04:00",
+      "next_run_at": "2026-07-10T11:00:00-04:00",
+      "last_run_at": "2026-07-10T10:55:25.151969-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1028,8 +1019,100 @@
       "enabled_toolsets": null,
       "workdir": "D:\\HermesData",
       "fire_claim": null,
-      "pinned": true
+      "pinned": true,
+      "provider_snapshot": null,
+      "model_snapshot": null
+    },
+    {
+      "id": "7a88f3b80c33",
+      "name": "Stack-Healing-30m",
+      "prompt": "ONE stack healer only. Script stack_healing_once.py: restore gateway :8642 if down (Phronesis.ps1 gateway start / ForkGuard, clear stale restart_loop) then sovereign_stack_watchdog --once. Never daemonize. Silent when green. Local deliver only. Do not create extra healers.",
+      "skills": [],
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "base_url": null,
+      "script": "stack_healing_once.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 30,
+        "display": "every 30m"
+      },
+      "schedule_display": "every 30m",
+      "repeat": {
+        "times": 999,
+        "completed": 69
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-08T16:36:36.708213-04:00",
+      "next_run_at": "2026-07-10T11:02:59.853763-04:00",
+      "last_run_at": "2026-07-10T10:32:59.853763-04:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "discord",
+        "chat_id": "1523740118370881546",
+        "chat_name": "Phronesis Citadel / #hermes / Reoccurring errors",
+        "thread_id": "1523740118370881546",
+        "user_id": "1302338152396230750"
+      },
+      "enabled_toolsets": null,
+      "workdir": "D:\\HermesData",
+      "fire_claim": null
+    },
+    {
+      "id": "script-newline-integrity-gate",
+      "name": "Script-Newline-Integrity-Gate",
+      "prompt": "Script-only zero-newline integrity gate. Silent if clean.",
+      "skills": [],
+      "skill": null,
+      "model": "grok-build-0.1",
+      "provider": "xai-oauth",
+      "base_url": null,
+      "script": "script_newline_integrity_gate.py",
+      "no_agent": true,
+      "context_from": [],
+      "schedule": {
+        "kind": "interval",
+        "minutes": 30,
+        "display": "every 30m"
+      },
+      "schedule_display": "every 30m",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-10T14:52:28.611336+00:00",
+      "next_run_at": "2026-07-10T11:22:43.903790-04:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "local",
+        "chat_id": null
+      },
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "workdir": "D:\\HermesData",
+      "fire_claim": null,
+      "pinned": false
     }
   ],
-  "updated_at": "2026-07-05T04:34:45.550792-04:00"
+  "updated_at": "2026-07-10T10:59:19.181611-04:00"
 }

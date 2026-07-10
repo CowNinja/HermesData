@@ -1,0 +1,25 @@
+{
+  "name": "rsvp_event",
+  "description": "Accept, decline, or tentatively accept a Google Calendar event. Also allows for removal of RSVP status.\n\nParameters:\n- event_id: The event ID to respond to (required, you can get it from a search).\n- response_status: \"accepted\", \"declined\", \"tentative\", or \"needsAction\" to remove your RSVP (required).\n- calendar_id: Optional calendar ID: use to respond to an event on a specific calendar. A calendar_id is in email format: people's email addresses correspond to their primary calendars. Defaults to the user's primary calendar.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "description": "The event ID to respond to (from a previous search result)."
+      },
+      "response_status": {
+        "type": "string",
+        "description": "Your response: \"accepted\", \"declined\", \"tentative\", or \"needsAction\" (to remove your RSVP)."
+      },
+      "calendar_id": {
+        "type": "string",
+        "description": "Calendar ID of the event (e.g. email address from google_calendar_list_calendars). Defaults to the user's primary calendar."
+      }
+    },
+    "required": [
+      "event_id",
+      "response_status"
+    ]
+  }
+}

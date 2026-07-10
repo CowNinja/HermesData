@@ -1,0 +1,13 @@
+{
+  "name": "list_calendars",
+  "description": "List all calendars on the user's Google Calendar account.\nReturns each calendar's ID, name, timezone, and access level (owner, writer, reader).\nUse this to discover which calendars the user has.\n\nParameters:\n- max_results: Maximum number of calendars to return (default 100, max 250).\n\nThe calendars returned will contain an id field, which you should use to specify any non-primary calendars in other Google Calendar tools.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "max_results": {
+        "type": "integer",
+        "description": "Maximum number of calendars to return (default 100, max 250)."
+      }
+    }
+  }
+}

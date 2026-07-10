@@ -1,0 +1,28 @@
+{
+  "name": "read_file",
+  "description": "Read the text content of a specific file from the user's Google Drive.\n\nUse this tool after google_drive_search ONLY to glance at it's rough content,\nfor example to summarize, answer a question, decide whether the file is relevant, or\ncite a specific passage. \n\nContent returned here is lossy: layout, images,\nformulas, formatting, and anything beyond a character/line cap are\ndiscarded, and binary file types are not readable at all.\n\nSupports Google Docs (exported as Markdown), Google Sheets (exported as CSV),\nGoogle Slides (exported as plain text), PDFs, and other text-based files.\nBinary files (images, videos, zip) cannot be read by this tool.\n\nFor large files, use start_line/end_line to read specific sections, or rely on\nmax_chars to truncate. When content is truncated, inform the user and offer to\nread more.\n\nWhen presenting file content:\n- Summarize or answer the user's question based on the content\n- Use the render_inline_citation tool to cite specific parts\n- If the file is too large, read the most relevant section first",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "The Google Drive file ID to read (from google_drive_search results)"
+      },
+      "max_chars": {
+        "type": "integer",
+        "description": "Maximum number of characters to return (default 100000, max 500000). Ignored when start_line/end_line are set."
+      },
+      "start_line": {
+        "type": "integer",
+        "description": "Optional start line (1-based inclusive) for reading a specific range"
+      },
+      "end_line": {
+        "type": "integer",
+        "description": "Optional end line (1-based inclusive) for reading a specific range"
+      }
+    },
+    "required": [
+      "file_id"
+    ]
+  }
+}

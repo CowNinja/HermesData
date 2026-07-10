@@ -78,7 +78,7 @@ if ($core.start_gateway) {
     $healCooldownSec = 90
 
     $gwDown = -not (Port-Up $gwPort)
-    $gwBadOwner = (Port-Up $gwPort) -and -not (Test-VenvOwnsGateway)
+    $gwBadOwner = (Port-Up $gwPort) -and -not (Test-VenvOwnsGateway) -and -not (Test-GatewayHealth)
     $gwUnhealthy = (Port-Up $gwPort) -and -not (Test-GatewayHealth)
 
     $inCooldown = $false
@@ -94,7 +94,7 @@ if ($core.start_gateway) {
         if ($zombies.Count -gt 0) { $actions += "gw_zombies:$($zombies.Count)" }
 
         if ($gwBadOwner) {
-            $killed = @(Stop-HermesProcesses -RolePattern 'hermes_cli\.main gateway run' -NonVenvOnly)
+            $killed = @(Stop-HermesProcesses -RolePattern $HermesGatewayRolePattern -NonVenvOnly)
             if ($killed.Count -gt 0) { $actions += "gateway_kill_nonvenv:$($killed.Count)" }
             Start-Sleep -Seconds 2
         }
@@ -102,9 +102,23 @@ if ($core.start_gateway) {
         & $core.venv_python (Join-Path $scriptRoot "sovereign_preflight.py") 2>$null
 
         $restartBlock = Test-PhronesisMaintenanceBlocked -Action gateway_restart
-        if ($gwDown) { Start-VenvGateway; $actions += "gateway_start" }
-        elseif (-not $restartBlock.blocked) { Restart-VenvGateway; $actions += "gateway_restart" }
-        else { $actions += "gateway_restart:LOCKED"; Write-Heal "Gateway restart skipped (maintenance lock / in-flight Discord)" "DarkYellow" }
+        if ($gwDown) {
+            Start-VenvGateway
+            $actions += "gateway_start"
+        } elseif ($gwBadOwner) {
+            if (-not ((Test-VenvOwnsGateway) -and (Test-GatewayHealth))) {
+                Start-VenvGateway
+                $actions += "gateway_start_after_bad_owner"
+            } else {
+                $actions += "gateway_bad_owner_fixed"
+            }
+        } elseif ($gwUnhealthy -and -not $restartBlock.blocked) {
+            Restart-VenvGateway
+            $actions += "gateway_restart"
+        } elseif ($gwUnhealthy) {
+            $actions += "gateway_restart:LOCKED"
+            Write-Heal "Gateway restart skipped (maintenance lock / in-flight Discord)" "DarkYellow"
+        }
 
         New-Item -ItemType Directory -Force -Path (Split-Path $healMarker) | Out-Null
         Set-Content -Path $healMarker -Value (Get-Date -Format 'o') -NoNewline
@@ -141,7 +155,7 @@ if ($core.start_dashboard) {
                 $actions += "dashboard_restart:FAIL"
             }
         } else {
-            Stop-HermesProcesses -RolePattern 'hermes_cli\.main dashboard' | Out-Null
+            Stop-HermesProcesses -RolePattern $HermesDashboardRolePattern | Out-Null
             Start-VenvDashboard
             if (Wait-PortUp -Port $dashPort -MaxSeconds 35) { $actions += "dashboard_restart:OK" }
             else { $actions += "dashboard_restart:FAIL" }

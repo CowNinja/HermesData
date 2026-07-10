@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""
+semantic_query_engine.py — Tier-aware local semantic retrieval.
+
+Combines sqlite-vec ANN search with 8090 LRU router for complexity-based
+tier selection and optional synthesis reranking on complex queries.
+
+Usage:
+  from semantic_query_engine import SovereignSemanticEngine
+  engine = SovereignSemanticEngine()
+  result = engine.retrieve("how does hierarchical chunking work?", k=5)
+"""
+from __future__ import annotations
+
+import re
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
+
+from hierarchical_chunker import HierarchicalChunker, estimate_tokens
+from router_bridge import bridge_dispatch, preview_route
+from sovereign_vector_store import DEFAULT_DB, SearchHit, SovereignVectorStore
+
+COMPLEX_QUERY_TOKEN_THRESHOLD = 2000
+SIMPLE_RETRIEVE_K = 5
+COMPLEX_RETRIEVE_K = 12
+RERANK_MIN_HITS = 4
+
+TIER_RETRIEVE_PROFILES: Dict[str, Dict[str, Any]] = {
+    "local_hot": {"k_multiplier": 0.6, "rerank": False, "task_type": "lookup"},
+    "local_classifier": {"k_multiplier": 0.5, "rerank": False, "task_type": "classify"},
+    "local_warm": {"k_multiplier": 1.0, "rerank": False, "task_type": "lookup"},
+    "local_cold": {"k_multiplier": 1.5, "rerank": True, "task_type": "synthesis"},
+}
+
+
+@dataclass
+class RetrievalResult:
+    query: str
+    hits: List[SearchHit]
+    formatted_snippets: List[str]
+    route: Dict[str, Any]
+    tier: str
+    complexity: str
+    k_requested: int
+    reranked: bool = False
+    elapsed_ms: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "query": self.query,
+            "hits": [h.to_dict() for h in self.hits],
+            "formatted_snippets": self.formatted_snippets,
+            "route": self.route,
+            "tier": self.tier,
+            "complexity": self.complexity,
+            "k_requested": self.k_requested,
+            "reranked": self.reranked,
+            "elapsed_ms": self.elapsed_ms,
+            "metadata": self.metadata,
+        }
+
+
+class SovereignSemanticEngine:
+    """Local semantic retrieval with 8090 tier-aware routing."""
+
+    def __init__(
+        self,
+        store: Optional[SovereignVectorStore] = None,
+        *,
+        db_path: Optional[Path] = None,
+        embed_fn: Optional[Callable[[str], Optional[List[float]]]] = None,
+        enable_rerank: bool = True,
+    ):
+        self.store = store or SovereignVectorStore(db_path or DEFAULT_DB, embed_fn=embed_fn)
+        self.enable_rerank = enable_rerank
+        self._chunker = HierarchicalChunker()
+
+    def resolve_retrieval_route(
+        self,
+        query: str,
+        *,
+        task_type: Optional[str] = None,
+        escalation_tier: Optional[str] = None,
+        context_tokens: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Map query to 8090 LRU tier via router_bridge.preview_route."""
+        ctx = context_tokens or estimate_tokens(query) + 800
+        profile = TIER_RETRIEVE_PROFILES.get(escalation_tier or "", {})
+        route_task = task_type or profile.get("task_type") or "lookup"
+
+        if ctx > COMPLEX_QUERY_TOKEN_THRESHOLD or len(query) > 800:
+            route_task = "synthesis"
+
+        route = preview_route(task_type=route_task, prompt=query)
+        if escalation_tier:
+            route["escalation_tier_override"] = escalation_tier
+        route["context_tokens_estimate"] = ctx
+        return route
+
+    def _k_for_route(self, base_k: int, route: Dict[str, Any], escalation_tier: Optional[str]) -> int:
+        tier = escalation_tier or route.get("tier") or "local_warm"
+        profile = TIER_RETRIEVE_PROFILES.get(tier, {"k_multiplier": 1.0})
+        mult = float(profile.get("k_multiplier", 1.0))
+        if (route.get("complexity") or "simple") == "complex":
+            mult *= 1.5
+        return max(1, int(base_k * mult))
+
+    def _format_hit(self, hit: SearchHit) -> str:
+        src = hit.source_path or hit.document_id[:12]
+        parent = ""
+        if hit.parent_text:
+            pt = hit.parent_text
+            parent = f" | ctx: {pt[:200]}..." if len(pt) > 200 else f" | ctx: {pt}"
+        text = hit.text[:500] + "..." if len(hit.text) > 500 else hit.text
+        return f"[semantic:{hit.level} score={hit.score}] ({src}) {text}{parent}"
+
+    def _rerank_via_router(self, query: str, hits: List[SearchHit], route: Dict[str, Any]) -> List[SearchHit]:
+        """Use local MoE to rerank top hits for complex / cold-tier queries."""
+        if not self.enable_rerank or len(hits) < RERANK_MIN_HITS:
+            return hits
+
+        snippets = "\n\n".join(
+            f"--- chunk {i + 1} (score={h.score}) ---\n{h.text[:600]}"
+            for i, h in enumerate(hits[:8])
+        )
+        prompt = (
+            f"Given the user query: {query}\n\n"
+            "Rank these retrieved passages by relevance (most relevant first). "
+            "Return ONLY a comma-separated list of chunk numbers (e.g. 3,1,5,2).\n\n"
+            f"{snippets}"
+        )
+        try:
+            result = bridge_dispatch(
+                prompt,
+                task_type="classify",
+                force_local=True,
+                context_tokens_estimate=route.get("context_tokens_estimate"),
+            )
+            if not result.get("success"):
+                return hits
+            resp = (result.get("response") or "").strip()
+            nums = [int(x) for x in re.findall(r"\d+", resp)[: len(hits)]]
+            reordered: List[SearchHit] = []
+            seen: set = set()
+            for n in nums:
+                idx = n - 1
+                if 0 <= idx < len(hits) and idx not in seen:
+                    reordered.append(hits[idx])
+                    seen.add(idx)
+            for i, h in enumerate(hits):
+                if i not in seen:
+                    reordered.append(h)
+            return reordered[: len(hits)]
+        except Exception:
+            return hits
+
+    def retrieve(
+        self,
+        query: str,
+        *,
+        k: int = SIMPLE_RETRIEVE_K,
+        task_type: Optional[str] = None,
+        escalation_tier: Optional[str] = None,
+        context_tokens: Optional[int] = None,
+        include_parent: bool = True,
+    ) -> RetrievalResult:
+        started = time.time()
+        route = self.resolve_retrieval_route(
+            query,
+            task_type=task_type,
+            escalation_tier=escalation_tier,
+            context_tokens=context_tokens,
+        )
+        k_eff = self._k_for_route(k, route, escalation_tier)
+        hits = self.store.search(query, k=k_eff, include_parent=include_parent)
+
+        reranked = False
+        tier = escalation_tier or route.get("tier") or "local_warm"
+        if self.enable_rerank and TIER_RETRIEVE_PROFILES.get(tier, {}).get("rerank"):
+            new_hits = self._rerank_via_router(query, hits, route)
+            if [h.chunk_id for h in new_hits] != [h.chunk_id for h in hits]:
+                reranked = True
+                hits = new_hits
+
+        formatted = [self._format_hit(h) for h in hits]
+        elapsed = round((time.time() - started) * 1000, 1)
+
+        return RetrievalResult(
+            query=query,
+            hits=hits,
+            formatted_snippets=formatted,
+            route=route,
+            tier=tier,
+            complexity=str(route.get("complexity") or "simple"),
+            k_requested=k_eff,
+            reranked=reranked,
+            elapsed_ms=elapsed,
+        )
+
+    def index_text(
+        self,
+        text: str,
+        *,
+        source_path: str = "",
+        content_hash: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return self.store.index_document(
+            text,
+            source_path=source_path,
+            content_hash=content_hash,
+            metadata=metadata,
+        )
+
+    def index_file(self, path: Path) -> Dict[str, Any]:
+        nodes = [n.to_dict() for n in self._chunker.chunk_file(path)]
+        return self.store.index_nodes(nodes)
+
+    def stats(self) -> Dict[str, Any]:
+        return self.store.stats()
+
+
+if __name__ == "__main__":
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description="Sovereign semantic query engine")
+    parser.add_argument("--query", type=str, required=True)
+    parser.add_argument("--k", type=int, default=5)
+    parser.add_argument("--tier", type=str, default="")
+    parser.add_argument("--no-rerank", action="store_true")
+    args = parser.parse_args()
+
+    engine = SovereignSemanticEngine(enable_rerank=not args.no_rerank)
+    result = engine.retrieve(
+        args.query,
+        k=args.k,
+        escalation_tier=args.tier or None,
+    )
+    print(json.dumps(result.to_dict(), indent=2))

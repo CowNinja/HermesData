@@ -1,0 +1,32 @@
+{
+  "name": "availability",
+  "description": "Check availability for one or more people using Google Calendar.\nReturns busy time intervals within the requested time range. Does not return event details — only whether each person is free or busy.\n\nParameters:\n- time_min/time_max: Time range to check (required). Use RFC3339 timestamps with the user's timezone offset from viewer context (e.g. 1970-01-31T12:00:00-08:00). Always include the offset.\n- calendars: Email addresses of people to check, in array format. If omitted, checks the user's own calendar.\n- timezone: IANA timezone (e.g. \"America/Chicago\") for the response times.\n\nUse this tool to find available meeting times across multiple people.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "time_min": {
+        "type": "string",
+        "description": "Start of the time range to check (RFC3339 with timezone offset, e.g. 1970-01-31T12:00:00-08:00). Always include the user's timezone offset from viewer context."
+      },
+      "time_max": {
+        "type": "string",
+        "description": "End of the time range to check (RFC3339 with timezone offset, e.g. 1970-01-31T13:00:00-08:00). Always include the user's timezone offset from viewer context."
+      },
+      "calendars": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Email addresses of people whose availability to check. If empty, checks the user's own calendar."
+      },
+      "timezone": {
+        "type": "string",
+        "description": "IANA timezone for the response (e.g. \"America/Chicago\"). Busy intervals will be returned in this timezone."
+      }
+    },
+    "required": [
+      "time_min",
+      "time_max"
+    ]
+  }
+}

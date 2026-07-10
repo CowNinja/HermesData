@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""
+Final benchmark: TTFT, decode tok/s, reasoning support, skill quality.
+HITS PORT 8090 DIRECTLY (not proxy). Kills/restarts llama-server per model.
+"""
+import json, time, urllib.request, subprocess, re, sys
+from pathlib import Path
+
+LLAMA = Path(r"D:\PhronesisModels\binaries\test-prebuilts\2026-06-28-b9828-cuda13\llama-server.exe")
+MODELS_DIR = Path(r"D:\PhronesisModels\models\candidates")
+API = "http://127.0.0.1:8090"
+
+CANDIDATES = [
+    {"id": "qwen2-5-7b",      "file": "Qwen2.5-7B-Instruct-Q5_K_M.gguf",                    "ctx": 8192, "ngl": 28},
+    {"id": "qwen3-5-9b",      "file": "Qwen3.5-9B-Q4_K_M.gguf",                             "ctx": 8192, "ngl": 99},
+    {"id": "qwen3-8b-ablit",  "file": "Huihui-Qwen3-8B-abliterated-v2.i1-Q4_K_M.gguf",       "ctx": 8192, "ngl": 99},
+    {"id": "llama-8b-ablit",  "file": "Meta-Llama-3.1-8B-Instruct-abliterated-Q5_K_M.gguf", "ctx": 8192, "ngl": 99},
+    {"id": "coder-14b-ablit", "file": "Qwen2.5-Coder-14B-Instruct-abliterated-Q5_K_M.gguf",  "ctx": 8192, "ngl": 99},
+    {"id": "rocinante-12b",   "file": "Rocinante-12B-v1.1-Q4_K_M.gguf",                     "ctx": 8192, "ngl": 35},
+    {"id": "llama-3-2-3b",    "file": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",                 "ctx": 8192, "ngl": 35},
+]
+
+def kill_llama():
+    subprocess.run(["taskkill","/F","/IM","llama-server.exe"], capture_output=True, timeout=10)
+    time.sleep(3)
+
+def wait_ready():
+    for i in range(90):
+        time.sleep(1)
+        try:
+            r = urllib.request.urlopen(f"{API}/v1/models", timeout=2)
+            if json.loads(r.read()).get("data"):
+                return True
+        except:
+            pass
+    return False
+
+def query_stream(prompt, max_tokens=256):
+    """Returns (ttft, decode_tok_s, total_s, content_text, reasoning_text, token_count)"""
+    body = json.dumps({
+        "messages": [{"role":"user","content":prompt}],
+        "max_tokens": max_tokens, "temperature": 0.1, "stream": True,
+    }).encode()
+    req = urllib.request.Request(f"{API}/v1/chat/completions", data=body,
+                                 headers={"Content-Type":"application/json"}, method="POST")
+
+    begin = time.time()
+    resp = urllib.request.urlopen(req, timeout=180)
+    text, reasoning = "", ""
+    tokens = 0
+    first_content = None
+
+    for raw in resp:
+        line = raw.decode(errors="replace").strip()
+        if line == "data: [DONE]":
+            break
+        if not line.startswith("data: "):
+            continue
+        try:
+            d = json.loads(line[6:])
+            delta = d.get("choices",[{}])[0].get("delta",{})
+            c, rc = delta.get("content",""), delta.get("reasoning_content","")
+            if c:
+                text += c; tokens += 1
+                if first_content is None:
+                    first_content = time.time() - begin
+            if rc:
+                reasoning += rc
+                if first_content is None:
+                    first_content = time.time() - begin
+        except:
+            pass
+
+    total = time.time() - begin
+    ttft = first_content if first_content else total
+    body_time = max(total - ttft, 0.01)
+    tps = tokens / body_time if tokens > 0 else 0
+    return ttft, tps, total, text, reasoning, tokens
+
+def score(prompt_type, text):
+    """Simple quality heuristic 0-100."""
+    if not text:
+        return 0
+    text_lower = text.lower()
+    if "json" in prompt_type:
+        try:
+            d = json.loads(text)
+            return 100 if isinstance(d, list) else 50
+        except:
+            m = re.search(r'\[[\s\S]*?\]', text)
+            if m:
+                try: return 70 if isinstance(json.loads(m.group()), list) else 40
+                except: pass
+            return 10
+    if "coding" in prompt_type:
+        s = 0
+        for kw, pts in [("def ",20),("->",10),("type",10),("import",10),("return",15),("list[",10),("dict",10),("sorted",10)]:
+            if kw in text_lower: s += pts
+        return min(s, 100)
+    if "reasoning" in prompt_type:
+        s = 20 if "meet" in text_lower or "2" in text else 0
+        s += 20 if "hour" in text_lower else 0
+        s += 20 if "180" in text or "300" in text else 0  # 180 miles / combined speed
+        s += 20 if "step" in text_lower or "work" in text else 0
+        return min(s, 100)
+    return 50  # default
+
+def benchmark_one(c):
+    kill_llama()
+    mp = MODELS_DIR / c["file"]
+    print(f"\n  Loading {c['id']} ({c['file']})...")
+    proc = subprocess.Popen([
+        str(LLAMA),"--model",str(mp),"--host","127.0.0.1","--port","8090",
+        "--ctx-size",str(c["ctx"]),"--n-gpu-layers",str(c["ngl"]),
+        "--parallel","1","--cont-batching"
+    ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    if not wait_ready():
+        proc.kill()
+        return {"id": c["id"], "error": "timeout loading"}
+
+    r = {"id": c["id"], "tests": {}}
+    prompts = {
+        "speed":   ("Say hello in exactly 5 words.", 32),
+        "coding":  ("Write a Python function that sorts a dict by value desc, ties by key asc. Type hints + edge cases.", 256),
+        "reasoning": ("Two trains 300 miles apart. Train A at 60mph, Train B at 80mph toward each other. When and where do they meet? Show work.", 256),
+        "json":    ('Output valid JSON array of 3 US states: {state, capital, pop}. Sort ascending by state name. No markdown.', 256),
+    }
+
+    for pname, (prompt, mt) in prompts.items():
+        try:
+            ttft, tps, total, text, reasoning, ntok = query_stream(prompt, mt)
+            r["tests"][pname] = {
+                "ttft": round(ttft, 3),
+                "tok_s": round(tps, 1),
+                "tokens": ntok,
+                "total_s": round(total, 2),
+                "thinking": len(reasoning),
+                "quality": score(pname, text),
+                "preview": text[:120].replace("\n"," "),
+            }
+            print(f"    {pname}: TTFT={ttft:.2f}s {tps:.1f}t/s q={score(pname,text)} think={len(reasoning)}c")
+        except Exception as e:
+            r["tests"][pname] = {"error": str(e)}
+            print(f"    {pname}: ERROR {e}")
+
+    proc.terminate()
+    try: proc.wait(timeout=5)
+    except: proc.kill()
+    time.sleep(2)
+
+def main():
+    print("=" * 70)
+    print("PHRONESIS MODEL BENCHMARK — FINAL v2")
+    print(f"GPU: RTX 3060 12GB | Hits port 8090 direct")
+    print("=" * 70)
+
+    all_r = []
+    for c in CANDIDATES:
+        all_r.append(benchmark_one(c))
+
+    # Print rankings
+    print(f"\n\n{'='*90}")
+    print(f"{'Model':<22} {'TTFT':>6} {'Spd_tps':>8} {'Code_q':>7} {'Reason_q':>8} {'JSON_q':>7} {'Think_c':>7}")
+    print("-" * 90)
+    for r in all_r:
+        t = r.get("tests", {})
+        ttft = t.get("speed",{}).get("ttft","?")
+        sps = t.get("speed",{}).get("tok_s","?")
+        cq = t.get("coding",{}).get("quality","-")
+        rq = t.get("reasoning",{}).get("quality","-")
+        jq = t.get("json",{}).get("quality","-")
+        th = t.get("speed",{}).get("thinking", 0)
+        print(f"{r['id']:<22} {ttft!s:>6} {sps!s:>8} {cq!s:>7} {rq!s:>8} {jq!s:>7} {th!s:>7}")
+
+    # Save details to JSON file
+    out = Path(r"D:\PhronesisVault\Operations\logs") / "benchmark_v2_results.json"
+    with open(out, "w") as f:
+        json.dump(all_r, f, indent=2, ensure_ascii=False)
+    print(f"\nFull results: {out}")
+    return all_r
+
+if __name__ == "__main__":
+    main()

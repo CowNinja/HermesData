@@ -20,6 +20,49 @@ $env:HERMES_CONFIG_PATH = Join-Path $HermesRoot "config.yaml"
 
 $script:VenvPythonw = $VenvPython -replace 'python\.exe$', 'pythonw.exe'
 
+function Start-HiddenProcess {
+    param(
+        [Parameter(Mandatory)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [string]$WorkingDirectory = ""
+    )
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $FilePath
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    if ($WorkingDirectory) { $psi.WorkingDirectory = $WorkingDirectory }
+    if ($ArgumentList -and $ArgumentList.Count -gt 0) {
+        $parts = foreach ($a in $ArgumentList) {
+            if ($null -eq $a) { continue }
+            if ($a -match '[\s"]') {
+                '"' + ($a -replace '"', '\"') + '"'
+            } else {
+                $a
+            }
+        }
+        $psi.Arguments = [string]::Join(' ', $parts)
+    }
+    return [System.Diagnostics.Process]::Start($psi)
+}
+
+function Invoke-HiddenProcess {
+    param(
+        [Parameter(Mandatory)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [string]$WorkingDirectory = "",
+        [int]$TimeoutMs = 120000
+    )
+    $proc = Start-HiddenProcess -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory
+    if (-not $proc) { return @{ ExitCode = -1; TimedOut = $false } }
+    $done = $proc.WaitForExit($TimeoutMs)
+    return @{
+        ExitCode = if ($done) { $proc.ExitCode } else { -1 }
+        TimedOut = -not $done
+        ProcessId = $proc.Id
+    }
+}
+
 function Get-PortListenerPid {
     param([int]$Port)
     $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -68,17 +111,25 @@ function Test-VenvOwns8091 {
     return (Test-ProcessTreeMatches -ProcessId $listenerPid -RolePattern 'sovereign_openai_proxy' -RequireVenvInChain)
 }
 
+$script:HermesGatewayRolePattern = 'hermes_cli\.main gateway run|-m gateway\.run|gateway\.run|hermes(\.exe)?\s+gateway\s+run'
+$script:HermesDashboardRolePattern = 'hermes_cli\.main dashboard|hermes(\.exe)?\s+dashboard'
+
 function Test-VenvOwnsGateway {
     $listenerPid = Get-PortListenerPid -Port $(if ($Core) { $Core.ports.gateway } else { 8642 })
     if (-not $listenerPid) { return $false }
-    return (Test-ProcessTreeMatches -ProcessId $listenerPid -RolePattern 'hermes_cli\.main gateway run' -RequireVenvInChain)
+    return (Test-ProcessTreeMatches -ProcessId $listenerPid -RolePattern $HermesGatewayRolePattern -RequireVenvInChain)
 }
 
 function Test-VenvOwnsDashboard {
     $port = if ($Core -and $Core.ports.dashboard) { [int]$Core.ports.dashboard } else { 9119 }
     $listenerPid = Get-PortListenerPid -Port $port
     if (-not $listenerPid) { return $false }
-    return (Test-ProcessTreeMatches -ProcessId $listenerPid -RolePattern 'hermes_cli\.main dashboard' -RequireVenvInChain)
+    return (Test-ProcessTreeMatches -ProcessId $listenerPid -RolePattern $HermesDashboardRolePattern -RequireVenvInChain)
+}
+
+function Test-DashboardHealth {
+    $port = if ($Core -and $Core.ports.dashboard) { [int]$Core.ports.dashboard } else { 9119 }
+    return (Test-HttpOk -Url "http://127.0.0.1:$port/api/status")
 }
 
 function Test-GatewayHealth {
@@ -123,12 +174,12 @@ function Remove-NonVenvGatewayDashboard {
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         Where-Object {
             $_.CommandLine -and (
-                $_.CommandLine -match 'hermes_cli\.main gateway run' -or
-                $_.CommandLine -match 'hermes_cli\.main dashboard'
+                $_.CommandLine -match $HermesGatewayRolePattern -or
+                $_.CommandLine -match $HermesDashboardRolePattern
             )
         } |
         ForEach-Object {
-            $role = if ($_.CommandLine -match 'gateway run') { 'hermes_cli\.main gateway run' } else { 'hermes_cli\.main dashboard' }
+            $role = if ($_.CommandLine -match 'gateway\s+run') { $HermesGatewayRolePattern } else { $HermesDashboardRolePattern }
             $venvOk = Test-ProcessTreeMatches -ProcessId $_.ProcessId -RolePattern $role -RequireVenvInChain
             if (-not $venvOk) {
                 Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
@@ -159,7 +210,7 @@ function Remove-StaleGatewayZombies {
         }
     }
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -and $_.CommandLine -match 'hermes_cli\.main gateway run' } |
+        Where-Object { $_.CommandLine -and $_.CommandLine -match $HermesGatewayRolePattern } |
         ForEach-Object {
             if (-not $keep.ContainsKey([int]$_.ProcessId)) {
                 Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
@@ -208,6 +259,14 @@ function Stop-NonVenvPortOwner {
     if (Test-ProcessTreeMatches -ProcessId $listener -RolePattern $RolePattern -RequireVenvInChain) {
         return $killed
     }
+    # Healthy gateway on Windows: venv pythonw spawns a base-Python child that owns
+    # :8642. Do not SIGKILL a responding listener during a flaky venv-chain walk.
+    $gwPort = Get-GatewayPort
+    if ($Port -eq $gwPort -and (Test-GatewayHealth)) {
+        if (Test-ProcessTreeMatches -ProcessId $listener -RolePattern $RolePattern) {
+            return $killed
+        }
+    }
     Stop-Process -Id $listener -Force -ErrorAction SilentlyContinue
     $killed += $listener
     return $killed
@@ -219,9 +278,11 @@ function Ensure-VenvHermesOnly {
     $killed += @(Stop-NonVenvPortOwner -Port 8091 -RolePattern 'sovereign_openai_proxy')
     $killed += @(Remove-NonVenvGatewayDashboard)
     $gwPort = if ($Core) { [int]$Core.ports.gateway } else { 8642 }
-    $killed += @(Stop-NonVenvPortOwner -Port $gwPort -RolePattern 'hermes_cli\.main gateway run')
+    if (-not (Test-GatewayHealth)) {
+        $killed += @(Stop-NonVenvPortOwner -Port $gwPort -RolePattern $HermesGatewayRolePattern)
+    }
     $dashPort = if ($Core -and $Core.ports.dashboard) { [int]$Core.ports.dashboard } else { 9119 }
-    $killed += @(Stop-NonVenvPortOwner -Port $dashPort -RolePattern 'hermes_cli\.main dashboard')
+    $killed += @(Stop-NonVenvPortOwner -Port $dashPort -RolePattern $HermesDashboardRolePattern)
     return $killed.Count
 }
 
@@ -236,24 +297,33 @@ function Wait-ProxyVenvReady {
 
 function Start-VenvGateway {
     Set-HermesGatewayEnv
+    $gwPort = Get-GatewayPort
+    # Healthy listener already up — never spawn a second gateway (causes restart storms).
+    if ((Get-PortListenerPid -Port $gwPort) -and (Test-GatewayHealth)) {
+        return
+    }
+    if ((Test-VenvOwnsGateway) -and (Test-GatewayHealth)) {
+        return
+    }
     $pyw = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
-    Start-Process -FilePath $pyw `
-        -ArgumentList "-m", "hermes_cli.main", "gateway", "run" `
-        -WorkingDirectory $HermesRoot `
-        -WindowStyle Hidden
+    Start-HiddenProcess -FilePath $pyw `
+        -ArgumentList @("-m", "gateway.run") `
+        -WorkingDirectory $HermesRoot | Out-Null
 }
 
 function Restart-VenvGateway {
     # Uses Hermes planned-stop markers - avoids ForkGuard/gateway startup races.
     Set-HermesGatewayEnv
     $pyw = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
-    Start-Process -FilePath $pyw `
-        -ArgumentList "-m", "hermes_cli.main", "gateway", "restart" `
-        -WorkingDirectory $HermesRoot `
-        -WindowStyle Hidden
+    Start-HiddenProcess -FilePath $pyw `
+        -ArgumentList @("-m", "hermes_cli.main", "gateway", "restart") `
+        -WorkingDirectory $HermesRoot | Out-Null
 }
 
 function Start-VenvDashboard {
+    if ((Test-VenvOwnsDashboard) -and (Test-DashboardHealth)) {
+        return
+    }
     $pyw = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
     $agentRoot = Join-Path $HermesRoot "hermes-agent"
     $webDist = Join-Path $agentRoot "hermes_cli\web_dist"
@@ -267,10 +337,7 @@ function Start-VenvDashboard {
     if (Test-Path (Join-Path $webDist "index.html")) {
         $dashArgs += "--skip-build"
     }
-    Start-Process -FilePath $pyw `
-        -ArgumentList $dashArgs `
-        -WorkingDirectory $agentRoot `
-        -WindowStyle Hidden
+    Start-HiddenProcess -FilePath $pyw -ArgumentList $dashArgs -WorkingDirectory $agentRoot | Out-Null
 }
 
 function Stop-WorkspaceServer {
@@ -286,10 +353,7 @@ function Start-WorkspaceServer {
     $node = if ($Core -and $Core.node_exe) { $Core.node_exe } else { "node.exe" }
     $wsDir = if ($Core -and $Core.workspace_dir) { $Core.workspace_dir } else { "D:\HermesData\hermes-workspace" }
     if (-not (Test-Path (Join-Path $wsDir "server-entry.js"))) { return $false }
-    Start-Process -FilePath $node `
-        -ArgumentList "server-entry.js" `
-        -WorkingDirectory $wsDir `
-        -WindowStyle Hidden
+    Start-HiddenProcess -FilePath $node -ArgumentList @("server-entry.js") -WorkingDirectory $wsDir | Out-Null
     return $true
 }
 

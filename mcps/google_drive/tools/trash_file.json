@@ -1,0 +1,16 @@
+{
+  "name": "trash_file",
+  "description": "Move a Google Drive file to the Trash. The file can be recovered from Trash for 30 days.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "Google Drive file ID to move to trash"
+      }
+    },
+    "required": [
+      "file_id"
+    ]
+  }
+}

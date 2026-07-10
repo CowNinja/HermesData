@@ -1,31 +1,34 @@
 # 03-start-proxy.ps1 - Start MoE gateway proxy only (port 8091)
-# Usage:  D:\HermesData\scripts\ops\03-start-proxy.ps1 [-Port 8091] [-Host 127.0.0.1]
+# Usage:  D:\HermesData\scripts\ops\03-start-proxy.ps1 [-Port 8091] [-Host 0.0.0.0]
 
 param(
-    [string]$BindHost = "127.0.0.1",
+    [string]$BindHost = "0.0.0.0",
     [int]$Port        = 8091
 )
 
 $ErrorActionPreference = "Continue"
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $scriptRoot "..\Phronesis-ForkGuard.ps1")
+
 $proxyScript = "D:\HermesData\scripts\sovereign_openai_proxy.py"
 
 if (-not (Test-Path $proxyScript)) { Write-Host "FATAL: $proxyScript not found" -ForegroundColor Red; exit 1 }
 
-# Kill existing proxy (python processes running our proxy script) via WMI
-$proxyProcs = @(
-    Get-CimInstance Win32_Process -Filter "Name='python.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
-    Get-CimInstance Win32_Process -Filter "Name='pythonw.exe' AND CommandLine LIKE '%sovereign_openai_proxy%'" -ErrorAction SilentlyContinue
-) | Where-Object { $_ }
-if ($proxyProcs) {
-    Write-Host "  Killing existing proxy process(es)..." -ForegroundColor Cyan
-    $proxyProcs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# Port-first stop avoids WMI scans and console flashes.
+$listener = Get-PortListenerPid -Port $Port
+if ($listener) {
+    Write-Host "  Killing existing proxy listener pid=$listener..." -ForegroundColor Cyan
+    Stop-Process -Id $listener -Force -ErrorAction SilentlyContinue
 } else {
-    Write-Host "  No existing proxy found." -ForegroundColor DarkGray
+    Write-Host "  No existing proxy listener on :$Port." -ForegroundColor DarkGray
 }
 Start-Sleep -Seconds 1
 
 Write-Host "Starting proxy on ${BindHost}:${Port}..." -ForegroundColor Yellow
-& powershell -NoProfile -ExecutionPolicy Bypass -File "D:\HermesData\scripts\Start-Sovereign-Proxy-8091.ps1"
+$startScript = "D:\HermesData\scripts\Start-Sovereign-Proxy-8091.ps1"
+Start-HiddenProcess -FilePath "powershell.exe" -ArgumentList @(
+    "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", $startScript
+) | Out-Null
 Start-Sleep -Seconds 3
 
 try {

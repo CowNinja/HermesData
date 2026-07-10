@@ -92,7 +92,18 @@ def _pick_script(prompt: str, spec: dict) -> tuple[Path, list[str], str]:
             pass
     count_args = _count_args(count)
     lower = (prompt or "").lower()
-    if any(k in lower for k in ("harem girl", "harem girls", "per harem", "harem portrait")):
+    if any(
+        k in lower
+        for k in (
+            "harem girl",
+            "harem girls",
+            "harem member",
+            "harem members",
+            "per harem",
+            "harem portrait",
+            "one of each harem",
+        )
+    ):
         return HAREM, count_args, "Harem portraits"
     if any(k in lower for k in ("crawl", "crawling", "hands and knees", "on all fours", "kitchen")):
         return KITCHEN, count_args, "Kitchen crawl"
@@ -305,6 +316,7 @@ def main() -> int:
     parser.add_argument("prompt", nargs="?", default="")
     parser.add_argument("--spec-json", default="")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--mode", choices=["identical", "varied"], default="varied", help="identical vs varied render mode")
     args = parser.parse_args()
 
     spec: dict = {}
@@ -330,6 +342,7 @@ def main() -> int:
         return 1
 
     spec["batch_count"] = count
+    spec["mode"] = getattr(args, "mode", "varied") if "args" in dir() else "varied"
     result = launch(args.prompt, spec, dry_run=args.dry_run)
     print(json.dumps(result))
     return 0 if result.get("ok") else 1

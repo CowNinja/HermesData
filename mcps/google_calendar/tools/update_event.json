@@ -1,0 +1,82 @@
+{
+  "name": "update_event",
+  "description": "Update an existing event in Google Calendar.\n\nOnly the provided fields will be modified; omitted fields remain unchanged.\n\nRECURRING EVENTS: When search results show a recurring_event_id, each result is a single occurrence with its own event_id. To modify only ONE occurrence, use that occurrence's event_id. To modify the entire series, use the recurring_event_id (the master event's ID). To change which days a recurring event repeats on, update the recurrence rules on the master event.\n\nParameters:\n- event_id: The event ID to update (required, you may need to search to get it). For recurring events: use the instance event_id to update just that occurrence, or the recurring_event_id to update the whole series.\n- summary: Updated event title.\n- start_time/end_time: Updated event start and end timestamps. Use YYYY-MM-DD for all-day events, otherwise use RFC3339 timestamps with the user's timezone offset from viewer context (e.g. 1970-01-31T12:00:00-08:00). Always include the offset — never send bare datetimes.\n- description: Updated description.\n- location: Updated location.\n- attendees: Updated attendee list. IMPORTANT: this replaces the entire attendee list. To add or remove a single attendee, first use google_calendar_get_event to get the current attendees, then pass the complete updated list.\n- recurrence: Updated recurrence rules (RFC 5545). Only works on master recurring events. Example: [\"RRULE:FREQ=WEEKLY;BYDAY=MO,SA\"] to change a M-W-S event to M-S only.\n- timezone: IANA timezone (e.g. \"America/Chicago\") for the event times.\n- send_updates: \"all\", \"externalOnly\", or \"none\" (default). Only set to \"all\" if the user explicitly asks to notify attendees, or if you believe notifications are important for this update.\n- calendar_id: Optional calendar ID: use to update an event on a specific calendar. A calendar_id is in email format: people's email addresses correspond to their primary calendars. Defaults to the user's primary calendar.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "description": "The event ID to update (from a previous search result)."
+      },
+      "summary": {
+        "type": "string",
+        "description": "Updated event title."
+      },
+      "start_time": {
+        "type": "string",
+        "description": "Updated start time as RFC3339 with timezone offset (e.g. 1970-01-31T12:00:00-08:00), or YYYY-MM-DD for all-day events. Always include the user's timezone offset from viewer context."
+      },
+      "end_time": {
+        "type": "string",
+        "description": "Updated end time as RFC3339 with timezone offset (e.g. 1970-01-31T13:00:00-08:00), or YYYY-MM-DD for all-day events. Always include the user's timezone offset from viewer context."
+      },
+      "description": {
+        "type": "string",
+        "description": "Updated event description or notes."
+      },
+      "location": {
+        "type": "string",
+        "description": "Updated location of the event."
+      },
+      "attendees": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Updated attendee list (email addresses). This REPLACES the full attendee list — to add or remove a single attendee, first search for the event to get the current list, then pass the complete updated list."
+      },
+      "recurrence": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Updated recurrence rules (RFC 5545 strings, e.g. [\"RRULE:FREQ=WEEKLY;BYDAY=MO,SA\"]). Only applicable to master recurring events (not individual instances). An empty list means \"don't change recurrence\"."
+      },
+      "timezone": {
+        "type": "string",
+        "description": "IANA timezone for the event times (e.g. \"America/Chicago\")."
+      },
+      "send_updates": {
+        "type": "string",
+        "description": "Whether to send email notifications to attendees about this update: \"all\", \"externalOnly\", or \"none\" (default). Only set to \"all\" if the user explicitly asks to notify attendees about the change."
+      },
+      "calendar_id": {
+        "type": "string",
+        "description": "Calendar ID of the event (e.g. email address from google_calendar_list_calendars). Defaults to the user's primary calendar."
+      },
+      "attachments": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "file_url": {
+              "type": "string",
+              "description": "Google Drive file URL (web_view_link from google_drive_search)"
+            },
+            "title": {
+              "type": "string",
+              "description": "Display title for the attachment"
+            }
+          },
+          "required": [
+            "file_url"
+          ]
+        },
+        "description": "Google Drive files to attach to the event. Each entry needs a file_url from google_drive_search. When provided, fully replaces the attachment list. Omit to leave existing attachments unchanged."
+      }
+    },
+    "required": [
+      "event_id"
+    ]
+  }
+}

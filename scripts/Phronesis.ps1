@@ -207,6 +207,10 @@ switch ($Command) {
         switch ($sub) {
             'start' {
                 Set-HermesGatewayEnv
+                if ((Test-VenvOwnsGateway) -and (Test-GatewayHealth)) {
+                    Write-Host "Gateway already UP on $gwPort (venv-owned, healthy)" -ForegroundColor Green
+                    exit 0
+                }
                 Start-VenvGateway
                 if (Wait-GatewayReady -MaxSeconds 45) { Write-Host "Gateway UP on $gwPort" -ForegroundColor Green; exit 0 }
                 Write-Host "Gateway failed to become ready" -ForegroundColor Red; exit 1
@@ -231,8 +235,8 @@ switch ($Command) {
             }
             'restart' {
                 $block = Test-PhronesisMaintenanceBlocked -Action gateway_restart
-                if ($block.blocked) {
-                    Write-Host "Gateway restart blocked: $($block.reason)" -ForegroundColor Yellow
+                if ($block.blocked -and -not $ForceGateway) {
+                    Write-Host "Gateway restart blocked: $($block.reason) (use -ForceGateway if stuck)" -ForegroundColor Yellow
                     exit 2
                 }
                 Restart-VenvGateway

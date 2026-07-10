@@ -23,17 +23,20 @@ function Write-Step([string]$msg) {
 }
 
 Write-Step "Stopping stale workspace listeners on :$wsPort..."
-Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -match 'server-entry\.js' } |
-    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# Port-first stop avoids slow Win32_Process WMI scans and stray console spawns.
 Get-NetTCPConnection -LocalPort $wsPort -State Listen -ErrorAction SilentlyContinue |
     ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 2
 
 if ($Build) {
     Write-Step "Building hermes-workspace (vite)..."
+    $buildLog = Join-Path $HermesRoot "logs\workspace-build.log"
+    $logDir = Split-Path -Parent $buildLog
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+    $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Add-Content -Path $buildLog -Value "=== workspace build $stamp ==="
     Push-Location $wsDir
-    & npx vite build 2>&1 | Out-Null
+    & npx vite build *>> $buildLog
     $buildOk = ($LASTEXITCODE -eq 0)
     Pop-Location
     if (-not $buildOk) {
@@ -58,15 +61,26 @@ if (-not (Wait-PortUp -Port $wsPort -MaxSeconds 40)) {
     exit 1
 }
 
-# auth-check is the reliable liveness probe (SSR root may 500 during cold start)
-try {
-    $r = Invoke-WebRequest -Uri "http://127.0.0.1:$wsPort/api/auth-check" -UseBasicParsing -TimeoutSec 15
-    if ($r.StatusCode -ne 200) {
-        Write-Host "auth-check probe failed status $($r.StatusCode)" -ForegroundColor Red
-        exit 1
+# auth-check is the reliable liveness probe (SSR root may 500 during cold start).
+# Retry: first request after restart can exceed 15s while Node warms SSR routes.
+$authOk = $false
+for ($attempt = 1; $attempt -le 4; $attempt++) {
+    try {
+        $r = Invoke-WebRequest -Uri "http://127.0.0.1:$wsPort/api/auth-check" -UseBasicParsing -TimeoutSec 30
+        if ($r.StatusCode -eq 200) {
+            $authOk = $true
+            break
+        }
+        Write-Step ("auth-check attempt " + $attempt + " status " + $r.StatusCode + " - retrying...")
     }
-} catch {
-    Write-Host "auth-check probe failed: $_" -ForegroundColor Red
+    catch {
+        $errMsg = $_.Exception.Message
+        Write-Step ("auth-check attempt " + $attempt + " - " + $errMsg)
+    }
+    Start-Sleep -Seconds 3
+}
+if (-not $authOk) {
+    Write-Host "auth-check probe failed after 4 attempts" -ForegroundColor Red
     exit 1
 }
 

@@ -1,0 +1,33 @@
+{
+  "name": "batch_modify_labels",
+  "description": "Add or remove labels on multiple Gmail messages at once. More efficient than modifying one at a time.\n\nCommon bulk operations:\n- Mark all as read: remove_label_ids = [\"UNREAD\"]\n- Archive all: remove_label_ids = [\"INBOX\"]\n- Star all: add_label_ids = [\"STARRED\"]\n\nThe message_ids should come from gmail_search results. Maximum ~1000 messages per batch.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "message_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "List of message IDs to modify (from gmail_search results)"
+      },
+      "add_label_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Label IDs to add to all messages (e.g. [\"STARRED\", \"IMPORTANT\"])"
+      },
+      "remove_label_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Label IDs to remove from all messages (e.g. [\"UNREAD\", \"INBOX\"])"
+      }
+    },
+    "required": [
+      "message_ids"
+    ]
+  }
+}

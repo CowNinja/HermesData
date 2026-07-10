@@ -1,0 +1,16 @@
+{
+  "name": "trash_message",
+  "description": "Move a Gmail message to the Trash folder. The message can be recovered from Trash for 30 days.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "Message ID to move to trash (from gmail_search or gmail_get_message)"
+      }
+    },
+    "required": [
+      "message_id"
+    ]
+  }
+}

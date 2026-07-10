@@ -1,0 +1,16 @@
+{
+  "name": "send_draft",
+  "description": "Send an existing Gmail draft. This will deliver the email to all recipients.\n\nIMPORTANT: This action is IRREVERSIBLE. Once sent, the email cannot be unsent.\n\nThe draft_id should come from a previous gmail_create_draft or gmail_list_drafts result.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "draft_id": {
+        "type": "string",
+        "description": "The draft ID to send. Use the draft_id from gmail_create_draft or gmail_list_drafts."
+      }
+    },
+    "required": [
+      "draft_id"
+    ]
+  }
+}

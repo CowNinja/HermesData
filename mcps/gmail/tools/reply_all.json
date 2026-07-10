@@ -1,0 +1,25 @@
+{
+  "name": "reply_all",
+  "description": "Reply to all recipients of an email. Automatically fetches the original message to determine\nall recipients (sender goes to To, all other To/CC go to CC). Uses proper threading headers.\n\nIMPORTANT: This sends to ALL original recipients. Use gmail_send_message with specific recipients for a\ntargeted reply to only some people.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "Message ID to reply to (from gmail_search or gmail_get_message)"
+      },
+      "body": {
+        "type": "string",
+        "description": "Reply body (plain text)"
+      },
+      "body_html": {
+        "type": "string",
+        "description": "Optional HTML body for rich formatting"
+      }
+    },
+    "required": [
+      "message_id",
+      "body"
+    ]
+  }
+}

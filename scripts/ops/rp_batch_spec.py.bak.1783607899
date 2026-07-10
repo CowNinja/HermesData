@@ -1,0 +1,1168 @@
+"""First-principles RP batch series planning - any N, any cast, any scene recipe."""
+from __future__ import annotations
+
+import importlib.util
+import itertools
+import json
+import re
+import sys
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any
+
+OPS = Path(__file__).resolve().parent
+
+if str(OPS) not in sys.path:
+    sys.path.insert(0, str(OPS))
+
+from rp_sandbox_paths import BATCH_HAREM, BATCH_KITCHEN, SANDBOX, SANDBOX_LIB  # noqa: E402
+
+# CAST_ROSTER uses pre-existing LegacyHarem girls (Amira, Aisha etc.) as the alignment guideline/template.
+# All future characters must match the quality/structure of these (digital footprint fidelity).
+# Resolver + registry make it extensible for any new named or general subjects.
+CAST_ROSTER: tuple[str, ...] = (
+    "alice",
+    "chloe",
+    "becca",
+    "emily",
+    "sassy",
+    "lyra",
+    "zara",
+    "amira",
+    "aisha",
+)
+
+# Scene/pose rounds - cycled for variety when total > unique combinations
+# Pose rounds - cycled when total > unique combination count; scene clauses scale to group_size.
+GROUP_POSE_ROUNDS: list[tuple[str, str, str]] = [
+    (
+        "standing together",
+        "",
+        "standing side by side, arms around each other, full body, manor bedroom, silk sheets, warm golden cinematic lighting, looking at viewer, seductive",
+    ),
+    (
+        "on all fours",
+        "on-all-fours",
+        "on all fours side by side, hands and knees, looking back at viewer, manor bedroom, silk sheets, soft golden lighting",
+    ),
+    (
+        "reclining together",
+        "",
+        "reclining together on silk sheets, intimate pose, full body, warm golden bedroom lighting, looking at viewer",
+    ),
+    (
+        "kneeling together",
+        "",
+        "kneeling on bed facing viewer, hands on thighs, seductive smiles, manor bedroom, soft pink and golden ambient light",
+    ),
+]
+
+PAIR_POSE_ROUNDS: list[tuple[str, str, str]] = [
+    (
+        "standing together",
+        "",
+        "two girls standing side by side, arms around each other, full body, manor bedroom, silk sheets, warm golden cinematic lighting, looking at viewer, seductive",
+    ),
+    (
+        "on all fours duo",
+        "on-all-fours",
+        "two girls on all fours side by side, hands and knees, looking back at viewer, manor bedroom, silk sheets, soft golden lighting",
+    ),
+    (
+        "reclining together",
+        "",
+        "two girls reclining together on silk sheets, intimate pose, full body, warm golden bedroom lighting, looking at viewer",
+    ),
+    (
+        "kneeling duo",
+        "",
+        "two girls kneeling on bed facing viewer, hands on thighs, seductive smiles, manor bedroom, soft pink and golden ambient light",
+    ),
+]
+
+@dataclass
+class RenderFrame:
+    """One queued image - 1..N characters (solo / duo / trio / group)."""
+
+    characters: list[str]
+    mode: str = "explicit"
+    scene: str = ""
+    alternate: str = ""
+    label: str = ""
+    location: str = ""
+    props: list[str] = field(default_factory=list)
+    object_prompt: str = ""
+    outfit_overrides: dict[str, str] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class SeriesPlan:
+    series: str
+    recipe: str
+    total: int
+    frames: list[RenderFrame] = field(default_factory=list)
+
+    @property
+    def labels(self) -> list[str]:
+        return [f.label for f in self.frames[: self.total]]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "series": self.series,
+            "recipe": self.recipe,
+            "total": self.total,
+            "labels": self.labels,
+            "frames": [f.to_dict() for f in self.frames],
+        }
+
+
+def _display(slug: str) -> str:
+    return slug.strip().capitalize()
+
+
+def _make_frame_label(slug: str, idx: int, total: int, prompt: str = "", scene: str = "") -> str:
+    """Subject + optional variant descriptor + index. Include short scene/pose hint when helpful."""
+    base = _display(slug)
+    lower = ((prompt or "") + " " + (scene or "")).lower()
+    variant = ""
+    if any(k in lower for k in ("base profile", "base portrait", "profile")):
+        variant = "base profile"
+    elif "explicit" in lower or "variants" in lower:
+        subjects_count = max(1, len([s for s in ["amira","aisha"] if s in lower]) or 1)
+        vnum = ((idx // subjects_count) % 3) + 1
+        variant = "base" if vnum == 1 else f"explicit v{vnum-1}"
+
+    # Add short pose/clothing descriptor
+    hint = ""
+    if "hands and knees" in lower or "on all fours" in lower or "crawl" in lower:
+        hint = "hands & knees"
+    elif "naked" in lower or "nude" in lower:
+        hint = "nude"
+    elif "skimpy" in lower or "revealing" in lower or "lingerie" in lower:
+        hint = "skimpy"
+    elif "dressed" in lower:
+        hint = "dressed"
+
+    parts = [base]
+    if variant: parts.append(variant)
+    if hint: parts.append(hint)
+    core = " — ".join(parts)
+    return f"{core} — {idx + 1}/{total}" if total > 1 else core
+def _group_label(chars: tuple[str, ...] | list[str], pose_label: str) -> str:
+    names = " & ".join(_display(c) for c in chars)
+    return f"{names} - {pose_label}"
+
+
+def _pair_label(a: str, b: str, pose_label: str) -> str:
+    return _group_label((a, b), pose_label)
+
+
+def _roster_cap(prompt: str, spec: dict | None) -> int:
+    roster = roster_from_text(prompt, spec or {})
+    if roster:
+        return max(1, len(roster))
+    gs = int((spec or {}).get("group_size") or 0)
+    return max(10, gs)
+
+
+_WORD_TO_GIRL_COUNT = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+}
+
+# Numeric or word count with optional intervening tokens ("four LegacyHarem girls", "three Arabian brunettes").
+_GIRL_COUNT_RE = re.compile(
+    r"\b(\d+|one|two|three|four|five|six|seven)\s+(?:\w+\s+){0,10}"
+    r"(?:girls?|women|brunettes?|blondes?|redheads?|models?|figures?)\b",
+    re.I,
+)
+
+
+def _token_to_girl_count(token: str) -> int:
+    tok = str(token or "").strip().lower()
+    if tok.isdigit():
+        return int(tok)
+    return int(_WORD_TO_GIRL_COUNT.get(tok, 0))
+
+
+_POSE_OVERRIDE_MARKERS = (
+    "spread",
+    "spreading",
+    "cheeks",
+    "ass cheeks",
+    "bent over",
+    "presenting",
+    "hands on",
+    "pump ass",
+)
+
+
+def _pose_overrides_template(scene_frag: str) -> bool:
+    lower = (scene_frag or "").lower()
+    return any(m in lower for m in _POSE_OVERRIDE_MARKERS)
+
+
+_ALTERNATE_POSE_CLAUSES: dict[str, str] = {
+    "on-all-fours": "on all fours, hands and knees, looking back at viewer, full body",
+    "bent-over-spread": "bent over at waist, hands spreading ass cheeks, rear view, looking back at viewer, full body",
+}
+
+
+def _ensure_pose_in_scene(label: str, alternate: str, scene: str) -> str:
+    """Inject pose tokens from portrait label/alternate when scene only has lighting stubs."""
+    lower_scene = (scene or "").lower()
+    alt_key = (alternate or "").strip().lower().replace("_", "-")
+    if alt_key in _ALTERNATE_POSE_CLAUSES:
+        clause = _ALTERNATE_POSE_CLAUSES[alt_key]
+        if clause.split(",")[0] not in lower_scene:
+            return f"{clause}, {scene}".strip(", ")
+    lower_label = (label or "").lower()
+    label_poses = (
+        ("on all fours", "on all fours, hands and knees, looking back at viewer, full body"),
+        ("bent over", "bent over at waist, hands spreading ass cheeks, rear view, looking back at viewer, full body"),
+        ("standing", "standing contrapposto, full body head to toe, looking at viewer"),
+        ("kneeling", "kneeling on bed, hands on thighs, upright torso, looking at viewer, full body"),
+        ("reclining", "reclining on silk sheets, one knee raised, full body, looking at viewer"),
+    )
+    for token, clause in label_poses:
+        if token in lower_label and token not in lower_scene:
+            return f"{clause}, {scene}".strip(", ")
+    return scene
+
+
+def _named_cast_group_size(text: str) -> int:
+    """Detect 'Alice and Chloe' style duo/trio without requiring 'two girls'."""
+    lower = (text or "").lower()
+    if not re.search(r"\band\b", lower):
+        return 0
+    found = [s for s in CAST_ROSTER if re.search(rf"\b{re.escape(s)}\b", lower)]
+    if len(found) >= 2:
+        return min(len(found), 3)
+    return 0
+
+
+def _extract_freeform_scene_clause(text: str) -> str:
+    """Pass through user scene/subject/pose — strip only batch scheduling headers."""
+    body = re.sub(r"^OOC:\s*", "", text or "", flags=re.I).strip()
+    body = re.sub(r"\b(?:series|batch)\s+of\s+\d+\s*(?:images?)?\b", "", body, flags=re.I)
+    body = re.sub(
+        r"\b(?:one|a)\s+(?:girl|woman)\s+per\s+(?:image|picture|portrait)\b",
+        "",
+        body,
+        flags=re.I,
+    )
+    body = re.sub(r"\s+", " ", body).strip(" ,.-")
+    return body if len(body) >= 6 else ""
+
+
+def batch_intent_signature(prompt: str, spec: dict | None = None) -> str:
+    """Stable fingerprint for resume-vs-fresh decisions — no hardcoded scene names."""
+    enriched = enrich_spec_from_intent(prompt, spec or {})
+    merged = merge_intent_texts(prompt, str((spec or {}).get("_inbound_text") or ""), enriched)
+    core = re.sub(r"\s+", " ", merged.lower()).strip()[:400]
+    return "|".join(
+        [
+            str(enriched.get("batch_recipe") or ""),
+            str(enriched.get("group_size") or ""),
+            str(enriched.get("batch_count") or ""),
+            str(enriched.get("scene") or "").strip().lower()[:200],
+            core,
+        ]
+    )
+
+
+def _extract_outfit_scene_clause(text: str) -> str:
+    """Pass through outfit/pose prose after stripping series/count headers."""
+    body = re.sub(r"^OOC:\s*", "", text or "", flags=re.I).strip()
+    body = re.sub(r"\b(?:series|batch)\s+of\s+\d+\s*(?:images?)?\b", "", body, flags=re.I)
+    body = re.sub(
+        r"\b(?:one\s+of\s+each|each)\s+(?:harem\s+)?(?:member|girl)s?\b[.,]?\s*",
+        "",
+        body,
+        flags=re.I,
+    )
+    body = re.sub(r"\s+", " ", body).strip(" ,.-")
+    return body if len(body) >= 20 else ""
+
+
+def infer_outfit_fragment(prompt: str, spec: dict | None = None) -> str:
+    """Long outfit prose -> frame.object_prompt (not merged into pose scene)."""
+    spec = spec or {}
+    if spec.get("outfit") or spec.get("outfit_override"):
+        return str(spec.get("outfit") or spec.get("outfit_override") or "").strip()
+    return _extract_outfit_scene_clause(prompt or "")
+
+
+def infer_scene_fragment(prompt: str, spec: dict | None = None) -> str:
+    """Short location/mood only — pose stays on each frame template."""
+    spec = spec or {}
+    if spec.get("scene") or spec.get("scene_override"):
+        raw = str(spec.get("scene") or spec.get("scene_override") or "").strip()
+        if len(raw) < 120:
+            return raw
+    lower = (prompt or "").lower()
+    hints: list[tuple[str, str]] = [
+        (r"\bmanor\s+bath\b", "manor bath, marble steam room, golden hour light, steam rising"),
+        (r"\broman\s+bath\b", "roman bath, steam rising, golden hour light, marble tiles"),
+        (r"\bkitchen\b", "manor kitchen, marble counters, warm overhead lighting"),
+        (r"\bpool\b|\bpoolside\b", "outdoor poolside, sunlit water, lounge chairs"),
+        (r"\bgarden\b", "manor garden, lush greenery, soft afternoon light"),
+        (r"\bbedroom\b|\bmanor\s+bedroom\b", "manor bedroom, silk sheets, warm golden cinematic lighting"),
+        (r"\bnursery\b", "manor nursery, soft pink ambient light, plush carpet"),
+        (r"\bnight\b|\bat\s+night\b", "nighttime, moonlit windows, soft lamp glow"),
+        (r"\bsteam(y|ing)?\b", "steamy atmosphere, warm humid air, glistening skin"),
+        (r"\bgolden\s+hour\b", "golden hour lighting, warm cinematic glow"),
+        (r"\bvaried\s+angles?\b", "varied camera angles, dynamic composition, multiple viewpoints"),
+    ]
+    for pattern, clause in hints:
+        if re.search(pattern, lower):
+            return clause
+    freeform = _extract_freeform_scene_clause(prompt or "")
+    return freeform
+
+
+def _load_last_inbound_text() -> str:
+    inbound = Path(r"D:\HermesData\state\rp-last-inbound.json")
+    if not inbound.is_file():
+        return ""
+    try:
+        data = json.loads(inbound.read_text(encoding="utf-8-sig"))
+        return str(data.get("text") or "").strip()
+    except Exception:
+        return ""
+
+
+def merge_intent_texts(prompt: str, inbound_text: str = "", spec: dict | None = None) -> str:
+    """Canonical merged OOC — only blends stored inbound when spec explicitly requests it."""
+    spec = spec or {}
+    texts: list[str] = []
+    if inbound_text.strip():
+        texts.append(inbound_text.strip())
+    elif spec.get("_inbound_text"):
+        texts.append(str(spec["_inbound_text"]).strip())
+    elif spec.get("use_stored_inbound"):
+        stored = _load_last_inbound_text()
+        if stored:
+            texts.append(stored)
+    if prompt.strip():
+        texts.append(prompt.strip())
+    scene_extra = str(spec.get("scene") or "").strip()
+    if scene_extra:
+        texts.append(scene_extra)
+    return "\n".join(dict.fromkeys(texts)) or (prompt or "")
+
+
+def enrich_spec_from_intent(
+    prompt: str,
+    spec: dict | None = None,
+    *,
+    inbound_text: str = "",
+) -> dict[str, Any]:
+    """Swiss-army-knife: derive batch_count, group_size, recipe, scene from any OOC phrasing."""
+    spec = dict(spec or {})
+    merged = merge_intent_texts(prompt, inbound_text, spec)
+
+    # Strong override: use centralized resolver for explicit named characters (twins priority)
+    try:
+        if str(SANDBOX_LIB) not in sys.path:
+            sys.path.insert(0, str(SANDBOX_LIB))
+        from visual_registry import resolve_image_count
+        central_count = resolve_image_count(merged, spec)
+        if central_count >= 1:
+            count = central_count
+    except Exception:
+        pass
+    group_size = int(spec.get("group_size") or 0) or infer_group_size(merged, spec)
+    if group_size >= 2:
+        spec["group_size"] = group_size
+    recipe = str(spec.get("batch_recipe") or detect_recipe(merged, spec))
+    spec["batch_recipe"] = recipe
+    scene_frag = infer_scene_fragment(merged, spec)
+    if scene_frag and not spec.get("scene"):
+        spec["scene"] = scene_frag
+    count = int(spec.get("batch_count") or 0)
+    if count < 2:
+        try:
+            if str(SANDBOX_LIB) not in sys.path:
+                sys.path.insert(0, str(SANDBOX_LIB))
+            from visual_registry import _series_count  # noqa: WPS433
+
+            count = max(count, int(_series_count(merged) or 0))
+        except Exception:
+            pass
+    if count < 2:
+        lower = merged.lower()
+        if re.search(r"\b(?:one|a)\s+(?:portrait|image|picture)\s+per\s+harem\s+girl\b", lower):
+            count = len(CAST_ROSTER)
+        elif _harem_roster_requested(lower) and re.search(r"\b(?:series|batch)\s+of\s+(\d+)\b", lower):
+            m = re.search(r"\b(?:series|batch)\s+of\s+(\d+)\b", lower)
+            if m and int(m.group(1)) == len(CAST_ROSTER):
+                count = len(CAST_ROSTER)
+        elif _harem_roster_requested(lower) and any(k in lower for k in ("each", "every", "per girl", "one of each")):
+            count = len(CAST_ROSTER)
+        elif re.search(r"\bpair(?:s)?\s+of\s+(?:girls?|harem)\b", lower):
+            m = re.search(r"\b(?:series|batch)\s+of\s+(\d+)\b", lower)
+            count = int(m.group(1)) if m else 14
+        elif group_size >= 2:
+            m = re.search(r"\b(?:series|batch)\s+of\s+(\d+)\b", lower)
+            count = int(m.group(1)) if m else max(7, group_size)
+
+    # Critical override for named twins (user confirmed individual portraits + variants)
+    lower = merged.lower()
+    if ("amira" in lower or "aisha" in lower) and not any(x in lower for x in ["alice", "chloe", "becca", "emily", "sassy", "lyra", "zara"]):
+        # Use central count which handles "for each" and variants
+        try:
+            if str(SANDBOX_LIB) not in sys.path:
+                sys.path.insert(0, str(SANDBOX_LIB))
+            from visual_registry import resolve_image_count
+            c = resolve_image_count(merged, spec)
+            if c >= 1:
+                count = c
+        except Exception:
+            if "two explicit" in lower or "explicit versions" in lower:
+                count = 6  # 3 per twin (base + 2 explicit)
+            else:
+                count = 2  # one per twin
+
+    if count >= 2:
+        spec["batch_count"] = count
+    return spec
+
+
+def _apply_user_scene_to_frame(frame: RenderFrame, scene_frag: str) -> None:
+    """User OOC location overrides template bedroom/kitchen stubs."""
+    if not scene_frag:
+        return
+    base = str(frame.scene or "").strip()
+    if scene_frag.lower() in base.lower():
+        return
+    for stub in (
+        "manor bedroom, silk sheets, warm golden cinematic lighting",
+        "manor bedroom, silk sheets, soft golden lighting",
+        "manor bedroom",
+        "silk sheets",
+    ):
+        base = re.sub(re.escape(stub), "", base, flags=re.I)
+    base = re.sub(r",\s*,", ",", base).strip(" ,")
+    frame.scene = f"{base}, {scene_frag}".strip(", ") if base else scene_frag
+
+
+_SOLO_PER_IMAGE_RE = re.compile(
+    r"\b(?:one|a|single)\s+(?:girl|woman)\s+per\s+(?:image|picture|portrait|photo)\b"
+    r"|\b(?:solo|distinct)\s+images?\b"
+    r"|\bone\s+per\s+image\b"
+    r"|\bone\s+of\s+each\s+(?:harem\s+)?(?:member|girl)\b"
+    r"|\beach\s+(?:harem\s+)?(?:member|girl)\b"
+    r"|\beach\s+image\s+shows\s+(?:a\s+)?(?:different|distinct|unique)\b"
+    r"|\b(?:different|distinct|unique)\s+(?:solo\s+)?(?:images?|portraits?)\b",
+    re.I,
+)
+
+# _HAREM_ROSTER_MARKERS deprecated (relic from 7-girl harem). resolve_image_count is sole N source now.
+_HAREM_ROSTER_MARKERS = (
+    "LegacyHarem girl",
+    "LegacyHarem girls",
+    "LegacyHarem member",
+    "LegacyHarem members",
+    "each harem",
+    "per harem",
+    "entire harem",
+    "all girls",
+    "full harem",
+    "one of each harem",
+    "each cast girl",
+)
+
+
+def _harem_roster_requested(text: str) -> bool:
+    lower = (text or "").lower()
+    return any(m in lower for m in _HAREM_ROSTER_MARKERS)
+
+
+def _solo_per_image_requested(prompt: str) -> bool:
+    lower = (prompt or "").lower()
+    if _SOLO_PER_IMAGE_RE.search(lower):
+        return True
+    if re.search(r"\bsolo\b", lower) and re.search(r"\b(?:batch|series)\s+of\s+\d+\b", lower):
+        return True
+    return False
+
+
+def infer_group_size(prompt: str, spec: dict | None = None) -> int:
+    """Parse how many girls per frame (1=solo, 2=pair, 3=triplet, N=group). No hard cap beyond roster."""
+    spec = spec or {}
+    cap = _roster_cap(prompt, spec)
+    if spec.get("group_size"):
+        return max(1, min(cap, int(spec["group_size"])))
+    lower = (prompt or "").lower()
+    if _solo_per_image_requested(lower):
+        return 1
+    if re.search(r"\b(entire\s+harem|all\s+(?:seven|7)\s+(?:harem\s+)?girls?|full\s+harem)\b", lower):
+        return cap
+    if re.search(r"\bentire\s+cast\b|\ball\s+girls\b", lower):
+        return cap
+    explicit = 0
+    for match in _GIRL_COUNT_RE.finditer(lower):
+        n = _token_to_girl_count(match.group(1))
+        if n >= 2:
+            explicit = max(explicit, n)
+    if explicit >= 2:
+        return min(cap, explicit)
+    if re.search(r"\b(sextet|six\s+girls?|6\s*girls?)\b", lower):
+        return min(cap, 6)
+    if re.search(r"\b(quintet|five\s+girls?|5\s*girls?)\b", lower):
+        return min(cap, 5)
+    if re.search(r"\b(quartet|four\s+girls?|4\s*girls?)\b", lower):
+        return min(cap, 4)
+    if re.search(r"\b(triplet|triplets|trio|three\s+girls?|3\s*girls?)\b", lower):
+        return min(cap, 3)
+    if re.search(r"\b(pair|pairs|duo|duos|two\s+girls?|2\s*girls?|couple)\b", lower):
+        return 2
+    named = _named_cast_group_size(prompt)
+    if named >= 2:
+        return min(cap, named)
+    return 1
+
+
+def _group_scene_clause(group_size: int, scene_template: str) -> str:
+    if group_size <= 1:
+        return scene_template
+    prefix = f"{group_size} girls "
+    if scene_template.startswith("standing"):
+        return prefix + scene_template
+    if scene_template.startswith("on all fours"):
+        return prefix + scene_template
+    if scene_template.startswith("reclining"):
+        return prefix + scene_template
+    if scene_template.startswith("kneeling"):
+        return prefix + scene_template
+    return f"{group_size} girls {scene_template}"
+
+
+def named_cast_in_text(text: str, spec: dict | None = None) -> bool:
+    """True when user explicitly names cast slugs (not generic 'LegacyHarem girl' roster fill)."""
+    if spec:
+        chars = [str(c).lower().strip() for c in (spec.get("characters") or []) if c]
+        if chars:
+            return True
+    lower = (text or "").lower()
+    return any(re.search(rf"\b{re.escape(s)}\b", lower) for s in CAST_ROSTER)
+
+
+def roster_from_text(text: str, spec: dict | None = None) -> list[str]:
+    roster = _get_roster() if "_get_roster" in globals() else CAST_ROSTER
+    if spec:
+        chars = [str(c).lower().strip() for c in (spec.get("characters") or []) if c]
+        if chars:
+            order = {s: i for i, s in enumerate(roster)}
+            return sorted(chars, key=lambda s: order.get(s, 99))
+    lower = (text or "").lower()
+    found = [s for s in roster if re.search(rf"\b{s}\b", lower)]
+    if found:
+        return found
+
+    lower = (text or "").lower()
+    twins = [s for s in ["amira", "aisha"] if re.search(rf"{s}", lower)]
+    if twins and not any(re.search(rf"{s}", lower) for s in roster if s not in ["amira", "aisha"]):
+        return twins
+    # Only fall back to full roster for explicit LegacyHarem requests; never for specific named characters
+    if _harem_roster_requested(lower) and not any(re.search(rf"\b{s}\b", lower) for s in roster):
+        return []  # no auto full roster - resolver owns count
+    return []
+
+
+def infer_batch_intent(
+    prompt: str,
+    *,
+    inbound_text: str = "",
+    spec: dict | None = None,
+) -> tuple[int, str, str]:
+    """Return (count, delegate_prompt, recipe). count=0 means no batch delegation."""
+    delegate = inbound_text.strip() if inbound_text.strip() else prompt
+    enriched = enrich_spec_from_intent(prompt, spec, inbound_text=inbound_text)
+    count = int(enriched.get("batch_count") or 0)
+    recipe = str(enriched.get("batch_recipe") or detect_recipe(delegate, enriched))
+    return count, delegate, recipe
+
+
+def build_freeform_frames(
+    total: int,
+    *,
+    prompt: str = "",
+    group_size: int = 0,
+) -> list[RenderFrame]:
+    """Anonymous multi-image series — user words only, no cast roster."""
+    scene = _extract_freeform_scene_clause(prompt or "") or "detailed scene, artistic composition"
+    gs = group_size or infer_group_size(prompt or "", {})
+    frames: list[RenderFrame] = []
+    for i in range(total):
+        label = f"Trio {i + 1}/{total}" if gs == 3 else (f"Group {gs} — {i + 1}/{total}" if gs >= 2 else f"Freeform {i + 1}/{total}")
+        frames.append(
+            RenderFrame(
+                characters=[],
+                mode="freeform",
+                scene=scene,
+                object_prompt=scene,
+                label=label,
+            )
+        )
+    return frames
+
+
+def _showcase_rotation_requested(text: str) -> bool:
+    """Opt-in: per-girl pose rotation from batch-harem-series PORTRAITS table."""
+    lower = (text or "").lower()
+    return bool(
+        re.search(
+            r"\b(varied\s+poses?|pose\s+showcase|portrait\s+rotation|showcase\s+rotation|"
+            r"classic\s+harem\s+portraits?)\b",
+            lower,
+        )
+    )
+
+
+def detect_recipe(prompt: str, spec: dict | None = None) -> str:
+    """Prompt-first recipe: freeform or user_cast_series unless LegacyHarem templates explicitly requested."""
+    spec = spec or {}
+    if spec.get("batch_recipe"):
+        return str(spec["batch_recipe"])
+    lower = (prompt or "").lower()
+    has_cast = named_cast_in_text(prompt, spec)
+    LegacyHarem = _harem_roster_requested(lower)
+
+    if re.search(r"\bkitchen\s+crawl\b", lower) or (
+        re.search(r"\bcrawl(?:ing)?\b", lower) and re.search(r"\bkitchen\b", lower)
+    ):
+        return "kitchen_crawl"
+
+    if (LegacyHarem or has_cast) and _showcase_rotation_requested(lower):
+        return "harem_solo"
+
+    if LegacyHarem and re.search(r"\b(?:together|group\s+portrait|all\s+in\s+one)\b", lower):
+        gs = infer_group_size(prompt, spec)
+        if gs >= 4:
+            return "harem_group"
+        if gs == 3:
+            return "harem_triplets"
+        if gs == 2:
+            return "harem_pairs"
+
+    if has_cast or harem:
+        return "user_cast_series"
+
+    return "freeform_series"
+
+
+def series_name_for_recipe(recipe: str, *, group_size: int = 0, subjects: list[str] | None = None) -> str:
+    """Universal series name. Subject-driven, variant-aware, relic-free.
+    Uses actual subjects (e.g. Amira & Aisha) + any variant hints.
+    """
+    subjects = subjects or []
+    lower_recipe = (recipe or "").lower()
+
+    if subjects:
+        subj = " & ".join(_display(s) for s in subjects[:3])
+        if len(subjects) > 3:
+            subj += " + others"
+
+        # Variant-aware
+        if "variant" in lower_recipe or "explicit" in lower_recipe or "base" in lower_recipe or "profile" in lower_recipe:
+            return f"{subj} variants"
+        return f"{subj} series"
+
+    if "harem" in lower_recipe and group_size:
+        return f"Group ({group_size})"
+
+    return {
+        "harem_solo": "Solo portraits",
+        "harem_pairs": "Pairs",
+        "harem_triplets": "Triplets",
+        "harem_group": "Group",
+        "kitchen_crawl": "Kitchen crawl",
+        "freeform_series": "Series",
+        "user_cast_series": "Series",
+        "custom": "Custom series",
+    }.get(recipe, (recipe or "Series").replace("_", " ").title())
+
+
+def build_user_cast_frames(
+    total: int,
+    *,
+    prompt: str = "",
+    roster: list[str] | None = None,
+    group_size: int = 0,
+    spec: dict | None = None,
+) -> list[RenderFrame]:
+    """Universal cast batch — user OOC scene/pose/outfit; registry identity only when cast named."""
+    spec = spec or {}
+    roster_use = list(roster or roster_from_text(prompt, spec) or [])  # no CAST_ROSTER fallback (relic removed)
+    gs = max(1, int(group_size or 0) or infer_group_size(prompt, spec))
+    scene = _extract_freeform_scene_clause(prompt or "") or infer_scene_fragment(prompt, spec)
+    mode = _infer_render_mode(prompt)
+    frames: list[RenderFrame] = []
+
+    if gs >= 2:
+        rotate = bool(
+            re.search(
+                r"\b(?:different|distinct|rotating|varied)\s+(?:harem\s+)?(?:girl|member|trio)",
+                prompt or "",
+                re.I,
+            )
+        )
+        if rotate and len(roster_use) >= gs:
+            for i in range(total):
+                offset = (i * gs) % len(roster_use)
+                combo = [roster_use[(offset + j) % len(roster_use)] for j in range(gs)]
+                names = " & ".join(_display(c) for c in combo)
+                frames.append(
+                    RenderFrame(
+                        characters=list(combo),
+                        mode=mode,
+                        scene=scene,
+                        label=f"{names} — {i + 1}/{total}",
+                    )
+                )
+            return frames
+        chars = roster_use[: min(gs, len(roster_use))]
+        names = " & ".join(_display(c) for c in chars)
+        # Make descriptive even for groups: include group size hint and scene from prompt
+        group_desc = f"{gs} girls" if gs > len(chars) else names
+        for i in range(total):
+            hint = ""
+            lower = (prompt or "").lower()
+            if "hands and knees" in lower or "on all fours" in lower:
+                hint = "hands & knees"
+            elif "nude" in lower or "naked" in lower:
+                hint = "nude"
+            elif "skimpy" in lower or "revealing" in lower:
+                hint = "skimpy"
+            label = f"{names}"
+            if gs > 2:
+                label = f"{group_desc} ({names})"
+            if hint:
+                label += f" — {hint}"
+            label += f" — {i + 1}/{total}"
+            frames.append(
+                RenderFrame(
+                    characters=list(chars),
+                    mode=mode,
+                    scene=scene,
+                    label=label,
+                )
+            )
+        return frames
+
+    for i in range(total):
+        slug = roster_use[i % len(roster_use)]
+        label = _make_frame_label(slug, i, total, prompt)
+        frames.append(
+            RenderFrame(
+                characters=[slug],
+                mode=mode,
+                scene=scene,
+                label=label,
+            )
+        )
+    return frames
+
+
+def recipe_for_group_size(group_size: int) -> str:
+    return {
+        1: "harem_solo",
+        2: "harem_pairs",
+        3: "harem_triplets",
+    }.get(group_size, "harem_group")
+
+
+def build_group_frames(roster: list[str], group_size: int, total: int) -> list[RenderFrame]:
+    """Universal N-girl combinations - any group_size >= 1, any total."""
+    if group_size < 1:
+        return []
+    if group_size == 1:
+        return build_solo_frames(total)
+    combos = list(itertools.combinations(roster, group_size))
+    if not combos:
+        return []
+    if str(OPS) not in sys.path:
+        sys.path.insert(0, str(OPS))
+    from batch_series_pool import expand_pool  # noqa: WPS433
+
+    rounds = GROUP_POSE_ROUNDS if group_size != 2 else PAIR_POSE_ROUNDS
+    slots = expand_pool(combos, total)
+    frames: list[RenderFrame] = []
+    for i, combo in enumerate(slots):
+        pose_label, alternate, scene_tpl = rounds[i % len(rounds)]
+        scene = _group_scene_clause(group_size, scene_tpl)
+        frames.append(
+            RenderFrame(
+                characters=list(combo),
+                mode="explicit",
+                scene=scene,
+                alternate=alternate,
+                label = _group_label(combo, pose_label) + f" — {i+1}/{total}",
+            )
+        )
+    return frames
+
+
+def build_pair_frames(roster: list[str], total: int) -> list[RenderFrame]:
+    return build_group_frames(roster, 2, total)
+
+
+def build_triplet_frames(roster: list[str], total: int) -> list[RenderFrame]:
+    return build_group_frames(roster, 3, total)
+
+
+def _infer_render_mode(prompt: str) -> str:
+    """Skimpy outfit prose wins over bare-hip/nude vocabulary in the same OOC."""
+    if str(SANDBOX_LIB) not in sys.path:
+        sys.path.insert(0, str(SANDBOX_LIB))
+    try:
+        from prompt_compose import user_wants_exposed_partial  # noqa: WPS433
+
+        if user_wants_exposed_partial(prompt or ""):
+            return "exposed_partial"
+    except Exception:
+        pass
+    lower = (prompt or "").lower()
+    skimpy_markers = (
+        "skimpy",
+        "micro skirt",
+        "tube top",
+        "ribbon",
+        "strapless",
+        "loincloth",
+        "lingerie",
+        "bikini",
+        "underboob",
+        "sideboob",
+        "cleavage",
+        "tease",
+        "clothed",
+        "wearing",
+        "they wear",
+        "hot pink",
+        "barely covering",
+        "micro top",
+    )
+    if any(k in lower for k in skimpy_markers):
+        return "tease"
+    if any(
+        k in lower
+        for k in ("nude", "naked", "completely nude", "explicit", "uncensored", "bare skin only")
+    ):
+        return "explicit"
+    return "portrait"
+
+
+def build_solo_frames(total: int, *, prompt: str = "") -> list[RenderFrame]:
+    harem_py = BATCH_HAREM
+    if not harem_py.is_file():
+        return []
+    spec = importlib.util.spec_from_file_location("batch_harem_series", harem_py)
+    if spec is None or spec.loader is None:
+        return []
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    portraits = list(getattr(mod, "PORTRAITS", []) or [])
+    alt_rounds = list(getattr(mod, "PORTRAITS_ALT_ROUNDS", []) or [])
+    if str(OPS) not in sys.path:
+        sys.path.insert(0, str(OPS))
+    from batch_series_pool import expand_pool  # noqa: WPS433
+
+    def _round_label(item: tuple[str, str, str, str], round_idx: int) -> tuple[str, str, str, str]:
+        slug, label, alternate, scene = item
+        return (slug, f"{label} (pass {round_idx + 1})", alternate, scene)
+
+    pool = expand_pool(portraits, total, rounds=alt_rounds, decorate=_round_label)
+    mode = _infer_render_mode(prompt)
+    frames: list[RenderFrame] = []
+    for slug, label, alternate, scene in pool:
+        scene_use = _ensure_pose_in_scene(label, alternate, scene)
+        frames.append(
+            RenderFrame(
+                characters=[slug],
+                mode=mode,
+                scene=scene_use,
+                alternate=alternate if mode == "explicit" else "",
+                label=f"{_display(slug)} - {label}",
+            )
+        )
+    return frames
+
+
+def build_kitchen_frames(total: int) -> list[RenderFrame]:
+    kitchen_py = BATCH_KITCHEN
+    if not kitchen_py.is_file():
+        return []
+    spec = importlib.util.spec_from_file_location("batch_kitchen", kitchen_py)
+    if spec is None or spec.loader is None:
+        return []
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    variations = list(getattr(mod, "VARIATIONS", []) or [])
+    if str(OPS) not in sys.path:
+        sys.path.insert(0, str(OPS))
+    from batch_series_pool import expand_pool  # noqa: WPS433
+
+    def _pass_label(item: tuple[str, str], round_idx: int) -> tuple[str, str]:
+        label, scene = item
+        return (f"{label} (pass {round_idx + 1})", scene)
+
+    pool = expand_pool(variations, total, decorate=_pass_label)
+    return [
+        RenderFrame(
+            characters=["alice", "chloe"],
+            mode="explicit",
+            scene=scene,
+            alternate="on-all-fours",
+            label=f"Alice & Chloe - {label}",
+        )
+        for label, scene in pool
+    ]
+
+
+def build_custom_frames(spec: dict) -> list[RenderFrame]:
+    raw = spec.get("frames") or spec.get("jobs") or []
+    frames: list[RenderFrame] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        chars = [str(c).lower() for c in (item.get("characters") or item.get("character") or [])]
+        if isinstance(item.get("character"), str):
+            chars = [item["character"].lower()]
+        frames.append(
+            RenderFrame(
+                characters=chars,
+                mode=str(item.get("mode") or "explicit"),
+                scene=str(item.get("scene") or ""),
+                alternate=str(item.get("alternate") or ""),
+                label=str(item.get("label") or ""),
+            )
+        )
+    return frames
+
+
+def resolve_series_plan(
+    prompt: str,
+    spec: dict | None = None,
+    *,
+    total: int | None = None,
+    recipe: str | None = None,
+) -> SeriesPlan:
+    spec = dict(spec or {})
+    if str(SANDBOX_LIB) not in sys.path:
+        sys.path.insert(0, str(SANDBOX_LIB))
+    from visual_registry import resolve_image_count  # central, only source for N
+
+    merged = merge_intent_texts(prompt, str(spec.get("_inbound_text") or ""), spec)
+    count = total or int(spec.get("batch_count") or 0) or resolve_image_count(merged, spec)
+    if count < 1:
+        count = 1  # never fall back to full roster len (relic removed)
+    scene_frag = infer_scene_fragment(merged, spec) or str(spec.get("scene") or "").strip()
+    roster = roster_from_text(merged, spec) or []
+    gs_hint = int(spec.get("group_size") or 0) or infer_group_size(merged, spec)
+
+    # Force solo per named for "one for each"/individual portrait requests (user confirmed for twins)
+    # Force solo per named for "one for each"/individual portrait requests (user confirmed for twins)
+    lower = merged.lower()
+    if len(roster) >= 2 and any(k in lower for k in ("for each", "one per", "one for each", "per twin", "individual portrait", "one profile for each")):
+        gs_hint = 1
+
+    # Initialize to prevent UnboundLocalError (plan-driven)
+    frames: list = []
+    recipe_use = recipe or "freeform_series"
+    series = str(spec.get("series_name") or "Series")
+
+    if str(OPS) not in sys.path:
+        sys.path.insert(0, str(OPS))
+    from rp_batch_canon import plan_canon_audit, validate_cast_slugs  # noqa: WPS433
+
+    if _pose_overrides_template(scene_frag) and gs_hint >= 2 and len(roster) >= 2:
+        chars = roster[: min(gs_hint, len(roster))]
+        names_scene = ", ".join(_display(c) for c in chars)
+        frames = [
+            RenderFrame(
+                characters=list(chars),
+                mode="explicit",
+                scene=f"{names_scene}, {scene_frag}",
+                alternate="",
+                label=f"{names_scene} - frame {i + 1}/{count}",
+            )
+            for i in range(count)
+        ]
+        recipe_use = "custom"
+        series = str(spec.get("series_name") or f"{names_scene} — custom series")
+        for frame in frames[:count]:
+            validate_cast_slugs([c.lower() for c in frame.characters])
+        _ = plan_canon_audit(frames[:count])
+    
+    # (early verify removed - verification now at end of resolve for plan-driven correctness)
+
+    recipe_use = recipe or detect_recipe(merged, spec)
+
+    if recipe_use == "custom" or spec.get("frames") or spec.get("jobs"):
+        frames = build_custom_frames(spec)
+        if not frames and spec.get("plan_json"):
+            try:
+                plan_data = json.loads(spec["plan_json"])
+                frames = build_custom_frames(plan_data)
+            except json.JSONDecodeError:
+                pass
+        recipe_use = "custom"
+    elif recipe_use in ("harem_pairs", "harem_triplets", "harem_group"):
+        gs = {
+            "harem_pairs": 2,
+            "harem_triplets": 3,
+        }.get(recipe_use) or int(spec.get("group_size") or infer_group_size(prompt, spec))
+        gs = max(2, gs) if recipe_use != "harem_group" else max(2, gs)
+        if recipe_use == "harem_group":
+            gs = max(2, int(spec.get("group_size") or infer_group_size(prompt, spec)))
+        frames = build_group_frames(roster, gs, count)
+        recipe_use = recipe_for_group_size(gs) if gs <= 3 else "harem_group"
+    elif recipe_use == "kitchen_crawl":
+        frames = build_kitchen_frames(count)
+    elif recipe_use == "freeform_series":
+        frames = build_freeform_frames(count, prompt=merged, group_size=gs_hint)
+        recipe_use = "freeform_series"
+    elif recipe_use == "user_cast_series":
+        frames = build_user_cast_frames(
+            count,
+            prompt=merged,
+            roster=roster,
+            group_size=gs_hint,
+            spec=spec,
+        )
+        recipe_use = "user_cast_series"
+    elif recipe_use == "harem_solo":
+        frames = build_solo_frames(count, prompt=merged)
+        recipe_use = "harem_solo"
+    elif not roster and not _harem_roster_requested(merged.lower()):
+        frames = build_freeform_frames(count, prompt=merged, group_size=gs_hint)
+        recipe_use = "freeform_series"
+    else:
+        frames = build_user_cast_frames(
+            count,
+            prompt=merged,
+            roster=roster,
+            group_size=gs_hint,
+            spec=spec,
+        )
+        recipe_use = "user_cast_series"
+
+    if not frames:
+        raise ValueError(f"no_frames_for_recipe:{recipe_use}")
+
+    for frame in frames[:count]:
+        validate_cast_slugs([c.lower() for c in frame.characters])
+    _ = plan_canon_audit(frames[:count])
+
+    gs_final = len(frames[0].characters) if frames else 0
+    series = str(
+        spec.get("series_name")
+        or series_name_for_recipe(recipe_use, group_size=gs_final, subjects=roster or [])
+    )
+    default_location = str(spec.get("location") or spec.get("current_location") or "")
+    outfit_frag = infer_outfit_fragment(prompt, spec) or infer_outfit_fragment(merged, spec)
+    for frame in frames[:count]:
+        if default_location and not frame.location:
+            frame.location = default_location
+        if outfit_frag and recipe_use not in ("freeform_series", "user_cast_series"):
+            frame.object_prompt = outfit_frag
+        if scene_frag and len(scene_frag) < 120 and recipe_use not in ("freeform_series", "user_cast_series"):
+            _apply_user_scene_to_frame(frame, scene_frag)
+
+
+    # (early verify removed - verification now at end of resolve for plan-driven correctness)
+
+
+
+    # Plan-driven: normalize labels for exact title/caption match (subject + variant + pose + index)
+    # Always upgrade, including groups and user-cast
+    for i in range(min(count, len(frames))):
+        frame = frames[i]
+        current_label = getattr(frame, "label", "")
+        bad_patterns = ("Trio ", "Group ", "Freeform ", "Alice & Chloe", "Cast series", "Amira & Aisha - ")
+        if not current_label or any(g in current_label for g in bad_patterns) or "Amira & Aisha — " in current_label and count != 2:
+            chars = getattr(frame, "characters", []) or []
+            if chars:
+                names = " & ".join(_display(c) for c in chars)
+                slug = chars[0]
+            else:
+                names = "subject"
+                slug = "subject"
+            try:
+                base_label = _make_frame_label(slug, i, count, prompt=merged, scene=getattr(frame, "scene", "") or "")
+                if len(chars) > 1:
+                    base_label = names + " — " + base_label.split(" — ")[-1] if " — " in base_label else names
+                frame.label = base_label
+            except Exception:
+                frame.label = f"{names} — {i+1}/{count}"
+        if count > 1 and " — " not in getattr(frame, "label", ""):
+            frame.label = f"{getattr(frame, "label", slug)} — {i+1}/{count}"
+
+    # Final verification (single source of truth for requested N)
+    try:
+        verify_count(count, len(frames[:count]), merged)
+    except Exception as ve:
+        print(f"[PLAN VERIFY WARNING] {ve}")
+
+    return SeriesPlan(series=series, recipe=recipe_use, total=count, frames=frames[:count])
+
+def compose_series_from_intent(
+    prompt: str,
+    spec: dict | None = None,
+    *,
+    total: int | None = None,
+    recipe: str | None = None,
+) -> SeriesPlan:
+    """Single Swiss-army-knife entry: any N series, any group size, any scene from OOC or spec."""
+    return resolve_series_plan(prompt, spec, total=total, recipe=recipe)
+
+
+def slice_plan(plan: SeriesPlan, *, offset: int = 0, limit: int = 0) -> SeriesPlan:
+    frames = plan.frames[offset:]
+    if limit and limit > 0:
+        frames = frames[:limit]
+    return SeriesPlan(
+        series=plan.series,
+        recipe=plan.recipe,
+        total=plan.total,
+        frames=frames,
+    )
+
+def verify_count(requested: int, produced: int, prompt: str = ""):
+    """End-to-end verification: exact N match or fail loudly."""
+    if requested != produced:
+        raise ValueError(f"[VERIFICATION FAIL] Requested {requested} != produced {produced} for: {prompt[:80]}")
+    print(f"[VERIFICATION] Exact match N={requested}")
+    return True
+
+def build_caption(plan=None, frame=None, png_name="", *, labels=None, index=None, series="Series"):
+    """Single source of truth for captions/titles (plan-driven).
+    Prefers RenderFrame.label. Used by daemon, archive, gallery, Discord.
+    """
+    if plan and frame:
+        total = getattr(plan, "total", len(getattr(plan, "frames", [])))
+        frames = getattr(plan, "frames", [])
+        try:
+            idx = (frames.index(frame) if frame in frames else (index or 0)) + 1
+        except Exception:
+            idx = (index or 1)
+        label = getattr(frame, "label", str(frame) or "")
+        ser = getattr(plan, "series", series) or series
+        return f"{ser} {idx}/{total} — {label} — {png_name}".strip(" — ")
+    if labels:
+        total = len(labels)
+        idx = max(1, min((index or 1), total))
+        label = labels[idx-1]
+        return f"{series} {idx}/{total} — {label} — {png_name}".strip(" — ")
+    return png_name or "image"

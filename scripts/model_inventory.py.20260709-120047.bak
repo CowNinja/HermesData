@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""HermesData wrapper — delegates to PhronesisVault model_inventory.py."""
+from __future__ import annotations
+
+import runpy
+import sys
+from pathlib import Path
+
+VAULT_SCRIPT = Path(r"D:\PhronesisVault\scripts\model_inventory.py")
+
+if __name__ == "__main__":
+    sys.argv[0] = str(VAULT_SCRIPT)
+    runpy.run_path(str(VAULT_SCRIPT), run_name="__main__")

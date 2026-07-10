@@ -1,0 +1,30 @@
+{
+  "name": "modify_labels",
+  "description": "Add or remove labels on a Gmail message. Use this for common email actions:\n\n- Mark as read: remove_label_ids = [\"UNREAD\"]\n- Mark as unread: add_label_ids = [\"UNREAD\"]\n- Star: add_label_ids = [\"STARRED\"]\n- Unstar: remove_label_ids = [\"STARRED\"]\n- Archive: remove_label_ids = [\"INBOX\"]\n- Move to inbox: add_label_ids = [\"INBOX\"]\n- Mark important: add_label_ids = [\"IMPORTANT\"]\n- Mark as spam: add_label_ids = [\"SPAM\"], remove_label_ids = [\"INBOX\"]\n- Move to trash: add_label_ids = [\"TRASH\"], remove_label_ids = [\"INBOX\"]\n\nThe message_id should come from gmail_search or gmail_get_message results.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID to modify labels on. Use a message_id from gmail_search or gmail_get_message."
+      },
+      "add_label_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Label IDs to add. Common labels: STARRED, IMPORTANT, TRASH, SPAM. Use INBOX to move back to inbox."
+      },
+      "remove_label_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Label IDs to remove. Common: UNREAD (mark as read), INBOX (archive), STARRED, IMPORTANT, SPAM."
+      }
+    },
+    "required": [
+      "message_id"
+    ]
+  }
+}

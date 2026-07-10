@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Post Grok-direct travel heartbeat to Discord A+B when due (default every 6h)."""
+from __future__ import annotations
+
+import argparse
+import ctypes
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(r"D:\HermesData")
+STATE_FILE = ROOT / "state" / "grok-direct-heartbeat.json"
+BRIDGE_STATE = ROOT / "state" / "grok-direct-bridge.json"
+BRIDGE_LOCK = ROOT / "state" / "grok-direct-bridge.lock"
+INBOX_FILE = ROOT / "state" / "grok-inbox.json"
+TLDR = ROOT / "temp" / "post_grok_hermes_tldr.py"
+VENV = ROOT / "hermes-agent" / "venv" / "Scripts" / "python.exe"
+DEFAULT_INTERVAL_H = 6
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _load_json(path: Path, default: dict) -> dict:
+    if not path.is_file():
+        return dict(default)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        return data if isinstance(data, dict) else dict(default)
+    except Exception:
+        return dict(default)
+
+
+def _save_json(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name != "nt":
+        return os.path.exists(f"/proc/{pid}")
+    handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+    alive = bool(handle)
+    if handle:
+        ctypes.windll.kernel32.CloseHandle(handle)
+    return alive
+
+
+def bridge_status() -> dict:
+    pid = 0
+    if BRIDGE_LOCK.is_file():
+        try:
+            pid = int(BRIDGE_LOCK.read_text(encoding="utf-8").strip())
+        except Exception:
+            pid = 0
+    bridge_state = _load_json(BRIDGE_STATE, {})
+    last_reply = str(bridge_state.get("last_reply_at") or "")
+    reply_age = ""
+    if last_reply:
+        try:
+            dt = datetime.strptime(last_reply, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            mins = int((datetime.now(timezone.utc) - dt).total_seconds() // 60)
+            reply_age = f"{mins}m ago" if mins < 120 else f"{mins // 60}h ago"
+        except Exception:
+            reply_age = "unknown"
+    return {
+        "alive": _pid_alive(pid),
+        "pid": pid,
+        "last_reply_at": last_reply,
+        "last_reply_age": reply_age or "never",
+    }
+
+
+def xai_ok() -> bool:
+    bridge = ROOT / "scripts" / "discord_grok_bridge.py"
+    if not bridge.is_file():
+        return False
+    proc = subprocess.run(
+        [str(VENV), str(bridge), "--test-xai"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return "GROK_DIRECT_OK" in (proc.stdout or "")
+
+
+def inbox_pending() -> int:
+    inbox = _load_json(INBOX_FILE, {"items": []})
+    return sum(1 for i in inbox.get("items") or [] if i.get("status") == "pending")
+
+
+def due(interval_h: float, state: dict, force: bool) -> bool:
+    if force:
+        return True
+    last = str(state.get("last_post_at") or "")
+    if not last:
+        return True
+    try:
+        dt = datetime.strptime(last, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - dt).total_seconds() >= interval_h * 3600
+    except Exception:
+        return True
+
+
+def build_tldr(bridge: dict, xai: bool, pending: int) -> str:
+    emoji = "🟢" if bridge.get("alive") and xai else "🟡"
+    lines = [
+        f"{emoji} Grok-direct travel heartbeat",
+        f"bridge={'alive' if bridge.get('alive') else 'DOWN'} pid={bridge.get('pid')} | xAI={'OK' if xai else 'FAIL'}",
+        f"last_reply={bridge.get('last_reply_age')} | inbox_pending={pending}",
+        "vault: docs/agent-coordination/GROK-HERMES-MASTER-PLAN.md",
+        "⏭️ next: post in Jeff ↔ Grok direct thread for planning",
+    ]
+    return "\n".join(lines[:6])
+
+
+def post_tldr(text: str) -> bool:
+    proc = subprocess.run(
+        [str(VENV), str(TLDR), text],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return proc.returncode == 0
+
+
+def tick(*, interval_h: float, force: bool) -> dict:
+    state = _load_json(STATE_FILE, {})
+    if not due(interval_h, state, force):
+        return {"action": "skip", "reason": "not_due", "interval_h": interval_h}
+
+    bridge = bridge_status()
+    xai = xai_ok()
+    pending = inbox_pending()
+    text = build_tldr(bridge, xai, pending)
+    posted = post_tldr(text)
+
+    state["last_post_at"] = _utc_now()
+    state["last_bridge"] = bridge
+    state["last_xai_ok"] = xai
+    state["last_inbox_pending"] = pending
+    state["last_post_ok"] = posted
+    _save_json(STATE_FILE, state)
+
+    return {
+        "action": "posted" if posted else "post_failed",
+        "bridge": bridge,
+        "xai_ok": xai,
+        "inbox_pending": pending,
+        "text": text,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Grok direct heartbeat")
+    parser.add_argument("--tick", action="store_true", help="Post if interval elapsed")
+    parser.add_argument("--force", action="store_true", help="Post regardless of interval")
+    parser.add_argument("--interval-hours", type=float, default=DEFAULT_INTERVAL_H)
+    args = parser.parse_args()
+
+    if not args.tick and not args.force:
+        parser.error("Specify --tick or --force")
+
+    result = tick(interval_h=args.interval_hours, force=args.force)
+    print(json.dumps(result, default=str))
+    return 0 if result.get("action") == "posted" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

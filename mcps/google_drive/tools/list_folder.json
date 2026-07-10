@@ -1,0 +1,21 @@
+{
+  "name": "list_folder",
+  "description": "List the contents of a Google Drive folder (files and subfolders). Omit folder_id to list the root of the user's Drive. Use folder IDs from the response to navigate into subfolders.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "folder_id": {
+        "type": "string",
+        "description": "Folder ID to list (lists Drive root if omitted)"
+      },
+      "max_results": {
+        "type": "integer",
+        "description": "Max items to return (default 50, max 200)"
+      },
+      "page_token": {
+        "type": "string",
+        "description": "Pagination token from a previous response"
+      }
+    }
+  }
+}

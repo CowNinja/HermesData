@@ -131,6 +131,7 @@ def _build_args(
     height: int | None = None,
     cfg: float | None = None,
     filename_prefix: str = "",
+    mode: str = "varied",
 ) -> Namespace:
     m = gen.MODELS["pony"]
     return Namespace(
@@ -151,7 +152,30 @@ def _build_args(
         no_detailers=False,
         hand_detailer_cycles=max(1, int(hand_detailer_cycles or 3)),
         filename_prefix=filename_prefix or "",
+        mode=mode,
     )
+
+
+def _user_outfit_overlay() -> str:
+    """Pull OOC outfit/scene prose from last inbound (versatile batch hook)."""
+    inbound = Path(r"D:\HermesData\state\rp-last-inbound.json")
+    if not inbound.is_file():
+        return ""
+    try:
+        import json
+
+        data = json.loads(inbound.read_text(encoding="utf-8-sig"))
+        text = str(data.get("text") or "").strip()
+        if not text:
+            return ""
+        ops = Path(__file__).resolve().parent
+        if str(ops) not in sys.path:
+            sys.path.insert(0, str(ops))
+        from rp_batch_spec import infer_scene_fragment  # noqa: WPS433
+
+        return infer_scene_fragment(text, {})
+    except Exception:
+        return ""
 
 
 def build_harem_job(
@@ -163,15 +187,37 @@ def build_harem_job(
     scene: str,
     base_seed: int,
     index: int,
+    outfit_overlay: str = "",
+    mode: str = "portrait",
 ) -> dict[str, Any]:
     explicit_variant = alternate.strip().lower().replace(" ", "-") if alternate else ""
-    prompt, neg_extra, tag_list = vr.build_prompt(
-        mode="explicit",
-        characters=[slug],
-        scene=scene,
-        explicit_variant=explicit_variant,
-    )
+    overlay = (outfit_overlay or _user_outfit_overlay()).strip()
+    scene_merged = ", ".join(x for x in [scene.strip(), overlay] if x)
     cfg = vr.load_visual_tags()
+    prompt = ""
+    neg_extra = ""
+    tag_list: list[str] = []
+    try:
+        sandbox_lib = Path(r"D:\PhronesisVault\Roleplay-Sandbox\sandbox\lib")
+        if str(sandbox_lib) not in sys.path:
+            sys.path.insert(0, str(sandbox_lib))
+        from prompt_compose import compose_cast_enriched  # noqa: WPS433
+
+        prompt, neg_extra, tag_list = compose_cast_enriched(
+            [slug],
+            user_scene=scene_merged,
+            mode=mode,
+            canon_lock=False,
+            explicit_variant=explicit_variant,
+            cfg=cfg,
+        )
+    except Exception:
+        prompt, neg_extra, tag_list = vr.build_prompt(
+            mode=mode,
+            characters=[slug],
+            scene=scene_merged,
+            explicit_variant=explicit_variant,
+        )
     neg_prompt = f"{cfg.get('negative_base', '')}, {neg_extra}".strip(", ")
     seed = base_seed + index * 9973
     return {
@@ -180,7 +226,7 @@ def build_harem_job(
         "prompt": prompt,
         "seed": seed,
         "tags": ",".join(tag_list),
-        "context": f"roleplay:explicit:{slug}:{explicit_variant or 'portrait'}",
+        "context": f"roleplay:{mode}:{slug}:{explicit_variant or 'enriched'}",
         "negative_extra": neg_prompt,
         "hand_detailer": False,
     }

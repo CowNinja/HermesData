@@ -1,0 +1,86 @@
+{
+  "name": "search",
+  "description": "Search for files in the user's Google Drive using the Google Drive API (files.list with query filters). Returns metadata for matching files including file_id, name, mime_type, web_view_link, size_bytes, modified_time, owner_name, and a readable flag.\n\nWhen to use: the user mentions their files, documents, spreadsheets, slides, PDFs, notes, or reports; asks to find, search, list, or summarize their documents; references 'my files' or 'my docs'; asks for recent or starred files; or anything that could be in Google Drive.\n\nSearch behavior:\n- By default, the query performs full-text search on Google Workspace files (Docs, Sheets, Slides) and title-only matching on non-Google files (PDFs, Word, images, etc.).\n- Folders are excluded from results by default. To find folders, you must set mime_type_filter to 'application/vnd.google-apps.folder'.\n- Trashed files are always excluded.\n- When a text query is provided, results are ranked by relevance. When no query is provided (filter-only search), results are sorted by most recently modified first.\n- exact_name takes priority over query. If both are provided, only exact_name is used for name matching.\n\nReading file content: When the user wants to read, summarize, or analyze file content (not just find files), set include_content to true. This inlines the text of the top readable results (Google Docs as Markdown, Sheets as CSV, Slides as text, plus text/JSON/XML files). For files not readable inline (PDFs, Office docs, images), use google_drive_read_file with the file_id from the search results.\n\nCommon patterns:\n- Find files by keyword: provide query (e.g. \"quarterly report\")\n- Find file by exact name: use exact_name (e.g. \"Budget 2026.xlsx\")\n- List recent files: omit query, optionally set modified_after\n- List starred files: omit query, set starred to true\n- Find folders: set mime_type_filter to 'application/vnd.google-apps.folder' with query or exact_name\n- Search within a folder: set folder_name (e.g. \"Projects\")\n- Files user personally edited: set modified_by_me to true\n\nDo NOT set owner_email or shared_with_me unless the user explicitly asks about file ownership or sharing. General queries like 'my files' should search all accessible files.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Free-text search query. Matches file titles for all file types; also matches body content for Google Docs, Sheets, and Slides. Omit when using filter-only searches (starred, modified_after, shared_with_me, etc.). Ignored if exact_name is set."
+      },
+      "max_results": {
+        "type": "integer",
+        "description": "Maximum number of files to return (default 10, max 50)"
+      },
+      "mime_type_filter": {
+        "type": "string",
+        "description": "Filter results to a specific MIME type. Required to find folders (use 'application/vnd.google-apps.folder') since folders are excluded by default. Common values: 'application/vnd.google-apps.document' (Google Docs), 'application/vnd.google-apps.spreadsheet' (Google Sheets), 'application/vnd.google-apps.presentation' (Google Slides), 'application/pdf' (PDFs), 'application/vnd.google-apps.folder' (folders)."
+      },
+      "modified_after": {
+        "type": "string",
+        "description": "Only return files modified after this ISO 8601 date/time (e.g. '2026-03-01T00:00:00Z'). When used without a query, results are sorted by most recently modified first."
+      },
+      "modified_before": {
+        "type": "string",
+        "description": "Only return files modified before this ISO 8601 date/time (e.g. '2026-03-19T23:59:59Z')"
+      },
+      "folder_id": {
+        "type": "string",
+        "description": "Restrict search to files within this Google Drive folder ID"
+      },
+      "folder_name": {
+        "type": "string",
+        "description": "Search within a specific folder by its name (e.g. 'Projects', 'NASDAQ'). Use this when the user mentions a folder name. Automatically resolves to the folder ID. For nested folders, use the most specific folder name."
+      },
+      "page_token": {
+        "type": "string",
+        "description": "Pagination token from a previous search response's next_page_token"
+      },
+      "include_content": {
+        "type": "boolean",
+        "description": "When true, reads and inlines text content of the top 3 readable results (up to 10000 chars each). Readable formats: Google Docs (as Markdown), Google Sheets (as CSV), Google Slides (as text), plus text/*, JSON, XML, YAML files. For PDFs or Office docs, use google_drive_read_file separately. Set this when the user wants to read, summarize, or analyze content — not just find files."
+      },
+      "modified_by_me": {
+        "type": "boolean",
+        "description": "When true, sort by files the user personally edited (not files edited by collaborators). Use for queries like 'files I edited', 'my recent edits', 'documents I changed'."
+      },
+      "owner_email": {
+        "type": "string",
+        "description": "Filter to files owned by a specific email. Use 'me' for files the user created/owns. Do NOT set this for general queries like 'my files' — those include shared files too. Only use when the user explicitly asks about file ownership."
+      },
+      "shared_with_me": {
+        "type": "boolean",
+        "description": "When true, ONLY return files shared with the user (excludes files they own). Do NOT set for general queries — leave false to search all accessible files."
+      },
+      "starred": {
+        "type": "boolean",
+        "description": "When true, only return starred/favorited files. Can be used alone (without query) to list all starred files."
+      },
+      "title_only": {
+        "type": "boolean",
+        "description": "When true, search only file titles/names instead of full-text content search. Faster and more precise for finding files by name."
+      },
+      "exact_name": {
+        "type": "string",
+        "description": "Match a file by its exact name (e.g. 'Q1 Budget.xlsx'). If set, the query parameter is ignored. Use when the user provides a specific filename."
+      },
+      "created_after": {
+        "type": "string",
+        "description": "Only return files created after this ISO 8601 date/time. Use for 'files created this week' queries. Different from modified_after which tracks edits."
+      },
+      "created_before": {
+        "type": "string",
+        "description": "Only return files created before this ISO 8601 date/time."
+      },
+      "visibility": {
+        "type": "string",
+        "description": "Filter by sharing visibility. Values: 'anyoneWithLink', 'anyoneCanFind', 'domainWithLink', 'domainCanFind', 'limited'. Use for 'publicly shared files' queries."
+      },
+      "writer_email": {
+        "type": "string",
+        "description": "Filter to files where a specific email has write/edit access. Example: 'jane@company.com'"
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Rerun kitchen kneel trio — completely nude, rear camera (user correction)."""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(r"D:\HermesData")
+BATCH = Path(r"D:\PhronesisVault\Roleplay-Sandbox\sandbox\batch-rp-series.py")
+PY = ROOT / "hermes-agent" / "venv" / "Scripts" / "python.exe"
+INBOUND = ROOT / "state" / "rp-last-inbound.json"
+
+PROMPT = (
+    "OOC: series of 4, 3 harem girls kneeling together atop a brightly lit modern kitchen island, "
+    "hands and knees, backs dramatically arched, completely nude, camera shot from behind, "
+    "rear view full body, teasing seductive poses looking back at viewer, bare oiled slick skin gleaming."
+)
+
+
+def main() -> int:
+    INBOUND.write_text(
+        json.dumps({"text": PROMPT, "source": "kitchen_kneel_nude4", "at": "2026-07-06"}, indent=2),
+        encoding="utf-8",
+    )
+    spec = {"batch_count": 4, "group_size": 3, "batch_recipe": "user_cast_series", "fresh": True}
+    cmd = [
+        str(PY),
+        "-u",
+        str(BATCH),
+        "--spec-json",
+        json.dumps(spec, ensure_ascii=False),
+        PROMPT,
+        "--total",
+        "4",
+        "--recipe",
+        "user_cast_series",
+    ]
+    print("LAUNCH:", PROMPT)
+    return subprocess.call(cmd)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

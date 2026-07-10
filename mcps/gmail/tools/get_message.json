@@ -1,0 +1,16 @@
+{
+  "name": "get_message",
+  "description": "Retrieve the full content of a specific Gmail message, including the complete body text, all headers (From, To, Cc, Bcc), and labels.\n\nUse this tool when you need to:\n- Read the full body of an email (gmail_search only returns previews/snippets)\n- Get the complete email content before drafting a reply\n- Check all recipients (including Cc/Bcc) of a message\n- See which labels are applied to a message\n- See attachment metadata before downloading with gmail_attachment_download_artifact\n\nThe message_id should come from a previous gmail_search result.\n\nWhen presenting results:\n- Summarize key information from the email body\n- Include relevant headers when useful to the user\n- Do not fabricate content - only use what is returned",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The Gmail message ID to retrieve. Use a message_id from gmail_search results."
+      }
+    },
+    "required": [
+      "message_id"
+    ]
+  }
+}

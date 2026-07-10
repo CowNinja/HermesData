@@ -142,13 +142,13 @@ if (-not (Test-VenvOwns8091)) {
 if (-not $SkipGateway -and $core.start_gateway) {
     $gwPort = [int]$core.ports.gateway
     $gwDown = -not (Port-Up $gwPort)
-    $gwBadOwner = (Port-Up $gwPort) -and -not (Test-VenvOwnsGateway)
+    $gwBadOwner = (Port-Up $gwPort) -and -not (Test-VenvOwnsGateway) -and -not (Test-GatewayHealth)
     $gwUnhealthy = (Port-Up $gwPort) -and -not (Test-GatewayHealth)
     if ($gwDown -or $gwBadOwner -or $gwUnhealthy) {
         $zombies = @(Remove-StaleGatewayZombies)
         if ($zombies.Count -gt 0) { Log "Removed $($zombies.Count) stale gateway zombie(s)" }
         if ($gwBadOwner) {
-            $killed = @(Stop-HermesProcesses -RolePattern 'hermes_cli\.main gateway run' -NonVenvOnly)
+            $killed = @(Stop-HermesProcesses -RolePattern $HermesGatewayRolePattern -NonVenvOnly)
             if ($killed.Count -gt 0) { Log "Killed $($killed.Count) non-venv gateway process(es)" }
             Start-Sleep -Seconds 2
         }
@@ -167,7 +167,7 @@ if (-not $SkipDashboard -and $core.start_dashboard) {
     $needDash = (-not (Port-Up $dashPort)) -or -not (Test-VenvOwnsDashboard)
     if ($needDash) {
         Log "Starting Hermes dashboard on $dashPort (venv)..."
-        Stop-HermesProcesses -RolePattern 'hermes_cli\.main dashboard' | Out-Null
+        Stop-HermesProcesses -RolePattern $HermesDashboardRolePattern | Out-Null
         Start-VenvDashboard
         if (Wait-PortUp -Port $dashPort -MaxSeconds 45) { Log "$dashPort UP (venv-owned)" }
         else {

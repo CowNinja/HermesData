@@ -1,0 +1,13 @@
+{
+  "name": "list_drafts",
+  "description": "List the user's Gmail drafts. Returns draft IDs, subjects, recipients, and preview snippets.\n\nUse this tool to:\n- Check what drafts the user has pending\n- Find a specific draft to update or send\n- Get draft IDs for use with gmail_send_draft\n\nResults include draft_id (needed for sending), subject, recipients, and a snippet preview.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "max_results": {
+        "type": "integer",
+        "description": "Maximum number of drafts to return (default 10, max 50)"
+      }
+    }
+  }
+}

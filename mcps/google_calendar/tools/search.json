@@ -1,0 +1,29 @@
+{
+  "name": "search",
+  "description": "Search for events in Google Calendar.\n\nUse time_min/time_max for time-based questions (\"what meetings do I have today\", \"schedule for next week\") — compute actual RFC3339 timestamps with the user's timezone offset from viewer context (e.g. 2026-05-20T00:00:00-07:00). Always include the offset.\n\nIMPORTANT — query is simple text matching, NOT a search engine:\n- Use a SINGLE keyword or short phrase (e.g. \"dentist\", \"team sync\"). Do NOT use OR, AND, NOT operators — they are matched literally and will return empty results.\n- Prefer time_min/time_max alone to list events in a range, then filter results yourself. Only add query when you need to narrow by a specific word in the event title/description.\n- If a search returns empty, retry with a broader time range or drop the query entirely.\n\nTo search another user's calendar, pass their email as calendar_id.\nEvents returned contain an event_id, which is required for other Google Calendar tools.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Simple text match against event title, description, location, and attendees. Use a single keyword or short phrase (e.g. 'dentist', 'team sync'). Do NOT use OR/AND/NOT operators — they are matched literally. Omit to list all events in a time range."
+      },
+      "max_results": {
+        "type": "integer",
+        "description": "Maximum number of events to return (default 25, max 100)"
+      },
+      "time_min": {
+        "type": "string",
+        "description": "Start of time range (RFC3339 with timezone offset, e.g. 1970-01-31T12:00:00-08:00). Always include the user's timezone offset from viewer context."
+      },
+      "time_max": {
+        "type": "string",
+        "description": "End of time range (RFC3339 with timezone offset, e.g. 1970-01-31T13:00:00-08:00). Always include the user's timezone offset from viewer context."
+      },
+      "calendar_id": {
+        "type": "string",
+        "description": "Calendar ID to search (e.g. email address from google_calendar_list_calendars). Defaults to the user's primary calendar."
+      }
+    }
+  }
+}

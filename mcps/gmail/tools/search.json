@@ -1,0 +1,20 @@
+{
+  "name": "search",
+  "description": "Search for relevant emails in the user's connected Gmail account.\n\nSupports Gmail search operators for precise filtering:\n- from:sender@email.com - emails from a specific sender\n- to:recipient@email.com - emails to a specific recipient\n- subject:keyword - emails with keyword in subject\n- newer_than:7d - emails from the last 7 days\n- older_than:1m - emails older than 1 month\n- has:attachment - emails with attachments\n- is:unread - unread emails\n- label:important - emails with specific label\nWhen constructing the query for time-sensitive searches (e.g., \"today's meetings\" or \"tomorrow's schedule\"),\navoid relative keywords like \"today\" or \"this week\" in the query string.\nInstead, use absolute date operators (e.g., after:YYYY/MM/DD before:YYYY/MM/DD)\ncombined with topic keywords (e.g., \"interview\" or \"invitation\").\n\nWhen presenting results:\n- Present email content naturally and summarize key information\n- Include sender, date, and subject when relevant to the user's question\n- Do not fabricate email content - only use what is returned in the search results",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "The search query for Gmail. Supports Gmail search operators like from:, to:, subject:, newer_than:, older_than:, has:attachment, etc."
+      },
+      "max_results": {
+        "type": "integer",
+        "description": "Maximum number of email threads to return (default 10, max 50)"
+      }
+    },
+    "required": [
+      "query"
+    ]
+  }
+}

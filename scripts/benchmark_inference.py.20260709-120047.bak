@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""
+benchmark_inference.py — Before/after latency comparison for inference optimizations.
+
+Usage:
+  python benchmark_inference.py --baseline    # Run baseline (current server)
+  python benchmark_inference.py --url URL     # Custom endpoint
+
+Tests each endpoint with identical prompts and reports tokens/sec + TTFT.
+"""
+import argparse
+import json
+import time
+import requests
+import sys
+
+PROMPTS = [
+    ("short", "What is 2+2?"),
+    ("medium", "Write a Python function that computes fibonacci numbers recursively."),
+    ("long", "Explain the difference between KV-Caching and PagedAttention in LLM inference, with examples."),
+]
+
+def benchmark_openai_api(name, url, model, max_tokens=256):
+    """Benchmark an OpenAI-compatible endpoint (llama.cpp 8090 or vLLM 8095)."""
+    results = []
+    # Warmup
+    try:
+        requests.post(url, json={
+            "model": model,
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 1,
+            "stream": False
+        }, timeout=30)
+    except Exception:
+        pass
+
+    for label, prompt in PROMPTS:
+        try:
+            start = time.time()
+            resp = requests.post(url, json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": max_tokens,
+                "stream": False,
+                "temperature": 0.2
+            }, timeout=120)
+            elapsed = time.time() - start
+            data = resp.json()
+            usage = data.get("usage", {})
+            completion = usage.get("completion_tokens", 0)
+            prompt_t = usage.get("prompt_tokens", 0)
+            tps = completion / elapsed if elapsed > 0 else 0
+            ttft_est = elapsed * prompt_t / (prompt_t + completion) if (prompt_t + completion) > 0 else 0
+            results.append({
+                "label": label, "elapsed_sec": round(elapsed, 2),
+                "tokens": completion, "tps": round(tps, 1),
+                "ttft_est": round(ttft_est, 3)
+            })
+        except Exception as e:
+            results.append({"label": label, "error": str(e)})
+    return results
+
+def benchmark_ollama(name, model, max_tokens=256):
+    """Benchmark Ollama endpoint."""
+    url = "http://127.0.0.1:11434/api/generate"
+    results = []
+    for label, prompt in PROMPTS:
+        try:
+            start = time.time()
+            resp = requests.post(url, json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"num_predict": max_tokens, "temperature": 0.2}
+            }, timeout=120)
+            elapsed = time.time() - start
+            data = resp.json()
+            count = data.get("eval_count", 0)
+            eval_ns = data.get("eval_duration", 0)
+            tps = count / (eval_ns / 1e9) if eval_ns > 0 else 0
+            results.append({
+                "label": label, "elapsed_sec": round(elapsed, 2),
+                "tokens": count, "tps": round(tps, 1)
+            })
+        except Exception as e:
+            results.append({"label": label, "error": str(e)})
+    return results
+
+def benchmark_with_spec_decode(name, url, model, max_tokens=256):
+    """Benchmark with speculative decoding enabled (llama.cpp --spec-type simple)."""
+    results = []
+    for label, prompt in PROMPTS:
+        try:
+            start = time.time()
+            resp = requests.post(url, json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": max_tokens,
+                "stream": False,
+                "temperature": 0.2,
+                "speculative_decoding": True  # llama.cpp flag passthrough
+            }, timeout=120)
+            elapsed = time.time() - start
+            data = resp.json()
+            usage = data.get("usage", {})
+            completion = usage.get("completion_tokens", 0)
+            tps = completion / elapsed if elapsed > 0 else 0
+            results.append({
+                "label": label, "elapsed_sec": round(elapsed, 2),
+                "tokens": completion, "tps": round(tps, 1),
+                "spec_decode": True
+            })
+        except Exception as e:
+            results.append({"label": label, "error": str(e)})
+    return results
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Inference benchmark")
+    parser.add_argument("--baseline", action="store_true", help="Run baseline benchmarks")
+    parser.add_argument("--spec-decode", action="store_true", help="Benchmark with speculative decoding")
+    parser.add_argument("--url", default="http://127.0.0.1:8090/v1/chat/completions")
+    parser.add_argument("--model", default="Qwen2.5-7B-Instruct-Q5_K_M")
+    parser.add_argument("--output", default="D:/PhronesisVault/Operations/logs/benchmark-results.json")
+    args = parser.parse_args()
+
+    print("=" * 60)
+    print("INFERENCE BENCHMARK")
+    print("=" * 60)
+
+    all_results = {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"), "endpoints": {}}
+
+    # 8090 llama.cpp
+    print(f"\n[1] llama.cpp 8090 ({args.model})")
+    r = benchmark_openai_api("8090", args.url, args.model)
+    for x in r:
+        if "error" in x:
+            print(f"  {x['label']}: ERROR - {x['error']}")
+        else:
+            print(f"  {x['label']}: {x['elapsed_sec']}s, {x['tokens']}tok, {x['tps']} t/s")
+    all_results["endpoints"]["llama_8090"] = r
+
+    # Speculative decode (if --spec-decode flag)
+    if args.spec_decode:
+        print(f"\n[1b] llama.cpp 8090 + SPEC-DECODE ({args.model})")
+        r = benchmark_with_spec_decode("8090-spec", args.url, args.model)
+        for x in r:
+            if "error" in x:
+                print(f"  {x['label']}: ERROR - {x['error']}")
+            else:
+                print(f"  {x['label']}: {x['elapsed_sec']}s, {x['tokens']}tok, {x['tps']} t/s [spec]")
+        all_results["endpoints"]["llama_8090_spec_decode"] = r
+
+    # Ollama
+    print(f"\n[2] Ollama (qwen2.5:14b)")
+    r = benchmark_ollama("ollama", "qwen2.5:14b")
+    for x in r:
+        if "error" in x:
+            print(f"  {x['label']}: ERROR - {x['error']}")
+        else:
+            print(f"  {x['label']}: {x['elapsed_sec']}s, {x['tokens']}tok, {x['tps']} t/s")
+    all_results["endpoints"]["ollama_14b"] = r
+
+    # Save results
+    import os
+    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    with open(args.output, "w") as f:
+        json.dump(all_results, f, indent=2)
+    print(f"\nResults saved to {args.output}")
+    print("=" * 60)
+
+if __name__ == "__main__":
+    main()

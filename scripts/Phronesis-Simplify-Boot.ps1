@@ -16,12 +16,20 @@ $disable = @(
     "Hermes_Workspace",
     "Hermes_Workspace_Repair",
     "Sovereign-Proxy-Watchdog",
-    "Phronesis-LogIntelligence-Cron"
+    "Phronesis-LogIntelligence-Cron",
+    "Phronesis-Guardian-Loop",
+    "Phronesis-AutoHeal-Watchdog"
 )
 foreach ($t in $disable) {
     schtasks /Change /TN "\$t" /DISABLE 2>$null | Out-Null
     Disable-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue | Out-Null
     Write-Host "  Disabled: $t" -ForegroundColor DarkYellow
+}
+# Remove the worst offenders entirely (they respawn system-Python gateways/dashboards).
+foreach ($t in @("Phronesis-Guardian-Loop", "Phronesis-AutoHeal-Watchdog")) {
+    schtasks /End /TN "\$t" 2>$null | Out-Null
+    schtasks /Delete /TN "\$t" /F 2>$null | Out-Null
+    Write-Host "  Deleted: $t" -ForegroundColor DarkYellow
 }
 
 # REGISTER exactly 2 tasks

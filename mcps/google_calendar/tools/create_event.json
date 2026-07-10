@@ -1,0 +1,84 @@
+{
+  "name": "create_event",
+  "description": "Create an event in Google Calendar, including the user's connected one.\n\nParameters:\n- summary: Event title (required).\n- start_time/end_time: Event start and end timestamps (required). Use YYYY-MM-DD for all-day events, otherwise use RFC3339 timestamps with the user's timezone offset from viewer context (e.g. 1970-01-31T12:00:00-08:00). Always include the offset — never send bare datetimes.\n- description: Optional event body/notes.\n- location: Optional location.\n- attendees: Optional list of email addresses to invite. Remember to pass this as an array, even if it contains just one attendee. In almost all cases, you should invite the user.\n- recurrence: Optional RFC 5545 recurrence rules. Do not include DTSTART or DTEND.\n- add_video_conference: Set to true to attach a Google Meet link.\n- timezone: IANA timezone (e.g. \"America/Chicago\") for the event times. Always provide this.\n- send_updates: \"all\", \"externalOnly\", or \"none\" (default). Only set to \"all\" if the user explicitly asks to send invites or notify attendees, or if you believe notifications are important for the event.\n- calendar_id: Optional calendar ID: use to create an event on a specific calendar. A calendar_id is in email format: people's email addresses correspond to their primary calendars. Defaults to the user's primary calendar.\n\nIf the user has a request relative to today, like \"create an event for tomorrow\" or \"schedule for next week\",\ncompute the actual dates or timestamps for start_time and end_time rather than using relative words in query.\n\nThe result of this tool contains the created event's event_id, which you can use to get, update, delete, and RSVP to this event.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "string",
+        "description": "Event title."
+      },
+      "start_time": {
+        "type": "string",
+        "description": "Start time as RFC3339 with timezone offset (e.g. 1970-01-31T12:00:00-08:00), or YYYY-MM-DD for all-day events. Always include the user's timezone offset from viewer context."
+      },
+      "end_time": {
+        "type": "string",
+        "description": "End time as RFC3339 with timezone offset (e.g. 1970-01-31T13:00:00-08:00), or YYYY-MM-DD for all-day events. Always include the user's timezone offset from viewer context."
+      },
+      "description": {
+        "type": "string",
+        "description": "Event description or notes."
+      },
+      "location": {
+        "type": "string",
+        "description": "Location of the event."
+      },
+      "attendees": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "List of attendee email addresses to invite."
+      },
+      "recurrence": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "RFC 5545 recurrence rules (e.g. [\"RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR\"]). Do not include DTSTART or DTEND."
+      },
+      "add_video_conference": {
+        "type": "boolean",
+        "description": "When true, a Google Meet video conference link is added to the event."
+      },
+      "timezone": {
+        "type": "string",
+        "description": "IANA timezone for the event (e.g. \"America/Los_Angeles\"). Always provide this."
+      },
+      "send_updates": {
+        "type": "string",
+        "description": "Whether to send email notifications to attendees: \"all\" (send to all attendees), \"externalOnly\" (only non-Google attendees), or \"none\" (no emails). Default to \"none\" unless the user explicitly asks to notify or invite attendees."
+      },
+      "calendar_id": {
+        "type": "string",
+        "description": "Calendar ID to create the event on (e.g. email address from google_calendar_list_calendars). Defaults to the user's primary calendar."
+      },
+      "attachments": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "file_url": {
+              "type": "string",
+              "description": "Google Drive file URL (web_view_link from google_drive_search)"
+            },
+            "title": {
+              "type": "string",
+              "description": "Display title for the attachment"
+            }
+          },
+          "required": [
+            "file_url"
+          ]
+        },
+        "description": "Google Drive files to attach to the event. Each entry needs a file_url, which you can get from the web_view_link result of the google_drive_search tool."
+      }
+    },
+    "required": [
+      "summary",
+      "start_time",
+      "end_time"
+    ]
+  }
+}

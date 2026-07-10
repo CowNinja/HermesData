@@ -32,7 +32,7 @@ if (Stop-LlamaOnPort -Port $Port) { Start-Sleep -Seconds 1 }
 
 $args = @(
     "--model", $Model,
-    "--host", "127.0.0.1",
+    "--host", "0.0.0.0",
     "--port", "$Port",
     "--ctx-size", "$CtxSize",
     "--n-gpu-layers", "$Ngl",
@@ -46,7 +46,7 @@ Start-Process -FilePath $llamaServer -ArgumentList $args -WindowStyle Hidden
 
 for ($i = 1; $i -le 120; $i++) {
     try {
-        Invoke-RestMethod -Uri "http://127.0.0.1:$Port/v1/models" -TimeoutSec 2 -ErrorAction Stop | Out-Null
+        Invoke-RestMethod -Uri "http://0.0.0.0:$Port/v1/models" -TimeoutSec 2 -ErrorAction Stop | Out-Null
         Write-Host "Ready after $i seconds." -ForegroundColor Green
         exit 0
     } catch { Start-Sleep -Seconds 1 }

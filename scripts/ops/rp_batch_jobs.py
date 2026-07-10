@@ -63,16 +63,52 @@ def frame_to_job(
     base_seed: int,
     index: int,
 ) -> dict[str, Any]:
-    chars = validate_cast_slugs([c.strip().lower() for c in frame.characters if c.strip()])
+    raw_chars = [c.strip().lower() for c in frame.characters if c.strip()]
     explicit_variant = frame.alternate.strip().lower().replace(" ", "-") if frame.alternate else ""
-    mode = frame.mode or ("explicit" if chars else "establishing")
+    mode = frame.mode or ("explicit" if raw_chars else "establishing")
 
+    if not raw_chars and mode == "freeform":
+        scene = (frame.object_prompt or frame.scene or "").strip()
+        try:
+            scripts = Path(r"D:\HermesData\scripts")
+            if str(scripts) not in sys.path:
+                sys.path.insert(0, str(scripts))
+            from comfy_versatile_router import compose_freeform_prompt  # noqa: WPS433
+
+            prompt, neg_extra = compose_freeform_prompt(scene or "detailed artistic scene")
+        except Exception:
+            prompt = scene or "detailed artistic scene"
+            neg_extra = "worst quality, low quality, blurry, bad anatomy"
+        seed = base_seed + index * SEED_STEP
+        speed = batch_speed_profile()
+        return {
+            "slug": "freeform",
+            "label": frame.label,
+            "characters": [],
+            "prompt": prompt,
+            "seed": seed,
+            "tags": "freeform,versatile,batch",
+            "context": f"roleplay:freeform:batch:{index}",
+            "negative_extra": neg_extra,
+            "hand_detailer": False,
+            "hand_detailer_cycles": 0,
+            "steps": int(speed.get("steps") or 28),
+            "speed_profile": str(speed.get("profile") or "quality"),
+            "canon": [],
+            "location": frame.location,
+            "render_path": "monolithic",
+        }
+
+    chars = validate_cast_slugs(raw_chars)
+
+    pose_clause = str(frame.scene or "").strip()
+    outfit_clause = str(frame.object_prompt or "").strip()
     scene = enrich_scene(
-        frame.scene,
+        pose_clause,
         location=frame.location,
         characters=chars if frame.props else None,
         props=frame.props or None,
-        object_prompt=frame.object_prompt,
+        object_prompt="",
     )
 
     outfit = ""
@@ -84,6 +120,49 @@ def frame_to_job(
     render_path = render_path_for(chars)
     cfg = vr.load_visual_tags()
     regional_figures: list[dict[str, Any]] = []
+    versatile_enriched = str(mode) in ("portrait", "tease", "scene", "explicit", "exposed_partial") and bool(chars)
+    if versatile_enriched and len(chars) <= 3:
+        try:
+            scripts = Path(r"D:\HermesData\scripts")
+            if str(SANDBOX_LIB) not in sys.path:
+                sys.path.insert(0, str(SANDBOX_LIB))
+            if str(scripts) not in sys.path:
+                sys.path.insert(0, str(scripts))
+            from prompt_compose import compose_cast_enriched  # noqa: WPS433
+
+            prompt, neg_extra, tag_list = compose_cast_enriched(
+                chars,
+                user_scene=scene,
+                pose_clause=pose_clause,
+                outfit_clause=outfit_clause,
+                mode=mode,
+                canon_lock=False,
+                explicit_variant="",
+                cfg=cfg,
+            )
+            neg_prompt = f"{cfg.get('negative_base', '')}, {neg_extra}".strip(", ")
+            seed = base_seed + index * SEED_STEP
+            slug = "-".join(chars)
+            speed = batch_speed_profile()
+            return {
+                "slug": slug,
+                "label": frame.label,
+                "characters": chars,
+                "prompt": prompt,
+                "seed": seed,
+                "tags": ",".join(tag_list),
+                "context": f"roleplay:{mode}:{slug}:enriched",
+                "negative_extra": neg_prompt,
+                "hand_detailer": len(chars) == 2 and int(speed.get("hand_detailer_cycles") or 0) > 0,
+                "hand_detailer_cycles": int(speed.get("hand_detailer_cycles") or 3),
+                "steps": int(speed.get("steps") or 28),
+                "speed_profile": str(speed.get("profile") or "quality"),
+                "canon": [cast_canon_meta(c) for c in chars],
+                "location": frame.location,
+                "render_path": render_path_for(chars),
+            }
+        except Exception:
+            pass
     if render_path == "regional":
         if str(SANDBOX_LIB) not in sys.path:
             sys.path.insert(0, str(SANDBOX_LIB))
