@@ -523,7 +523,7 @@ def _flatten_tool_history_for_llama(messages: List[Dict[str, Any]]) -> List[Dict
 
     Grok-era sessions keep assistant ``tool_calls`` + ``tool`` role turns in history.
     llama-server's chat template often fails with HTTP 400 "Unable to generate parser
-    for this template" when those shapes are present — even after the request ``tools``
+    for this template" when those shapes are present - even after the request ``tools``
     array is stripped.  Idempotent: already-flat messages pass through with junk keys removed.
     """
     out: List[Dict[str, Any]] = []
@@ -536,7 +536,7 @@ def _flatten_tool_history_for_llama(messages: List[Dict[str, Any]]) -> List[Dict
             content = _extract_content(msg.get("content"))
             preview = content[:2400] + ("..." if len(content) > 2400 else "")
             if preview.strip():
-                out.append({"role": "user", "content": f"[Tool result — {name}]: {preview}"})
+                out.append({"role": "user", "content": f"[Tool result - {name}]: {preview}"})
             continue
         if role == "assistant" and msg.get("tool_calls"):
             parts: List[str] = []
@@ -595,7 +595,7 @@ def _compress_history_stub(dropped: List[Dict[str, Any]]) -> str:
         lines.append(f"- {role}: {preview}{suffix}")
     body = "\n".join(lines) if lines else "(no recoverable text in dropped turns)"
     stub = (
-        f"[TIER-AWARE CONTEXT TRIM — {len(dropped)} earlier turns compressed "
+        f"[TIER-AWARE CONTEXT TRIM - {len(dropped)} earlier turns compressed "
         f"to protect local MoE hardware]\n{body}"
     )
     try:

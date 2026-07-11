@@ -1,6 +1,7 @@
 model:
   default: grok-4.5
   provider: xai-oauth
+  # context_length: per-model via context_length_cache.yaml (grok-4.5=500k, grok-build-0.1=256k).
 fallback_providers: []
 toolsets:
 - hermes-cli
@@ -918,6 +919,11 @@ known_plugin_toolsets:
   cli:
   - spotify
 local_sovereign:
+  boot_integrity:
+    enabled: true
+    mode: fast
+    on_fail: block
+    timeout_seconds: 45
   agent_model: phronesis-sovereign-auto
   bridge_script: D:/HermesData/scripts/router_bridge.py
   default_for_tasks: false

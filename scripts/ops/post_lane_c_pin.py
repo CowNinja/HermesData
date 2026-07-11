@@ -1,1 +1,136 @@
-#!/usr/bin/env python3 """Post and pin Lane C travel ops guide to Jeff Grok Direct thread.""" from __future__ import annotations import json import os import sys import urllib.error import urllib.request from pathlib import Path ROOT = Path(r"D:\HermesData") CONFIG = ROOT / "state" / "grok-direct-discord.json" DISCORD_API = "https://discord.com/api/v10" GUIDE = """** Jeff Grok Direct Travel Ops Guide (pinned)** *Your remote command surface while away ~30 days.* **This thread = Grok Build command channel.** Bridge on your PC executes locally + queues Hermes. **Fix stack (instant no Hermes):** `heal stack` Phronesis-Heal recovery `status check` / `e2e review` health score + inbox counts `restart bridge` / `restart proxy` service recovery **Send work to Hermes (vault/files):** `tell Hermes: [task with D:\\ paths]` `go ahead` (after Grok offers to queue) Grok says `Queued for Hermes:` auto-drains immediately **Force process queue:** `drain all` run up to 5 pending inbox items now **What you'll see:** ` Bridge local ops` fixes ran on disk ` Bridge queued` inbox item + immediate drain `/ Hermes inbox` Hermes result (`tools=N`) **Lanes (don't cross-post):** **C (here)** JeffGrok planning + results **A/B** TL;DR checkpoints only (6 lines) **Canon:** `D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md` **PC must:** stay on, logged in, networked. Guardian + bridge watchdog every 5 min. **Kickstart:** `PHRONESIS v3.0 kickstart` (paste universal prompt from vault) Grok Build updated 2026-07-05""" def _load_env() -> None: sys.path.insert(0, str(ROOT / "scripts")) try: from phronesis_env import bootstrap_env bootstrap_env() except Exception: pass sys.path.insert(0, str(ROOT / "hermes-agent")) try: from hermes_cli.config import get_env_value tok = get_env_value("DISCORD_BOT_TOKEN") if tok: os.environ["DISCORD_BOT_TOKEN"] = tok.strip() except Exception: pass def _token() -> str: tok = (os.environ.get("DISCORD_BOT_TOKEN") or "").strip() if not tok: raise RuntimeError("DISCORD_BOT_TOKEN missing") return tok.split(" #", 1)[0].strip() def _api(method: str, path: str, body: dict | None = None) -> dict | list: data = json.dumps(body).encode("utf-8") if body is not None else None req = urllib.request.Request( f"{DISCORD_API}{path}", data=data, headers={ "Authorization": f"Bot {_token()}", "Content-Type": "application/json", "User-Agent": "PostLaneCPin/1.0", }, method=method, ) with urllib.request.urlopen(req, timeout=30) as resp: raw = resp.read().decode("utf-8") return json.loads(raw) if raw else {} def main() -> int: _load_env() cfg = json.loads(CONFIG.read_text(encoding="utf-8-sig")) channel_id = str(cfg.get("thread_id") or "").strip() if not channel_id: print(json.dumps({"error": "thread_id_missing"})) return 1 if len(GUIDE) > 2000: print(json.dumps({"error": "guide_too_long", "len": len(GUIDE)})) return 1 msg = _api("POST", f"/channels/{channel_id}/messages", {"content": GUIDE}) if not isinstance(msg, dict) or not msg.get("id"): print(json.dumps({"error": "post_failed", "response": msg})) return 1 message_id = str(msg["id"]) try: _api("PUT", f"/channels/{channel_id}/pins/{message_id}") pinned = True except urllib.error.HTTPError as exc: detail = exc.read().decode("utf-8", errors="replace")[:300] pinned = False pin_error = f"{exc.code}: {detail}" else: pin_error = "" out = { "ok": True, "channel_id": channel_id, "message_id": message_id, "pinned": pinned, "pin_error": pin_error, "url": f"https://discord.com/channels/{cfg.get('guild_id')}/{channel_id}/{message_id}", } print(json.dumps(out, indent=2)) return 0 if pinned else 2 if __name__ == "__main__": raise SystemExit(main())
+#!/usr/bin/env python3
+"""Post and pin Lane C travel ops guide to Jeff ↔ Grok Direct thread."""
+from __future__ import annotations
+
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(r"D:\HermesData")
+CONFIG = ROOT / "state" / "grok-direct-discord.json"
+DISCORD_API = "https://discord.com/api/v10"
+
+GUIDE = """**📌 Jeff ↔ Grok Direct — Travel Ops Guide (pinned)**
+*Your remote command surface while away ~30 days.*
+
+**This thread = Grok Build command channel.** Bridge on your PC executes locally + queues Hermes.
+
+**Fix stack (instant — no Hermes):**
+• `heal stack` — Phronesis-Heal recovery
+• `status check` / `e2e review` — health score + inbox counts
+• `restart bridge` / `restart proxy` — service recovery
+
+**Send work to Hermes (vault/files):**
+• `tell Hermes: [task with D:\\ paths]`
+• `go ahead` (after Grok offers to queue)
+• Grok says `Queued for Hermes:` → auto-drains immediately
+
+**Force process queue:**
+• `drain all` — run up to 5 pending inbox items now
+
+**What you'll see:**
+• `🔧 Bridge local ops` — fixes ran on disk
+• `⚡ Bridge queued` — inbox item + immediate drain
+• `✅/🔴 Hermes inbox` — Hermes result (`tools=N`)
+
+**Lanes (don't cross-post):**
+• **C (here)** — Jeff↔Grok planning + results
+• **A/B** — TL;DR checkpoints only (≤6 lines)
+
+**Canon:** `D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md`
+
+**PC must:** stay on, logged in, networked. Guardian + bridge watchdog every 5 min.
+
+**Kickstart:** `PHRONESIS v3.0 kickstart` (paste universal prompt from vault)
+
+— Grok Build · updated 2026-07-05"""
+
+
+def _load_env() -> None:
+    sys.path.insert(0, str(ROOT / "scripts"))
+    try:
+        from phronesis_env import bootstrap_env
+
+        bootstrap_env()
+    except Exception:
+        pass
+    sys.path.insert(0, str(ROOT / "hermes-agent"))
+    try:
+        from hermes_cli.config import get_env_value
+
+        tok = get_env_value("DISCORD_BOT_TOKEN")
+        if tok:
+            os.environ["DISCORD_BOT_TOKEN"] = tok.strip()
+    except Exception:
+        pass
+
+
+def _token() -> str:
+    tok = (os.environ.get("DISCORD_BOT_TOKEN") or "").strip()
+    if not tok:
+        raise RuntimeError("DISCORD_BOT_TOKEN missing")
+    return tok.split(" #", 1)[0].strip()
+
+
+def _api(method: str, path: str, body: dict | None = None) -> dict | list:
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(
+        f"{DISCORD_API}{path}",
+        data=data,
+        headers={
+            "Authorization": f"Bot {_token()}",
+            "Content-Type": "application/json",
+            "User-Agent": "PostLaneCPin/1.0",
+        },
+        method=method,
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        raw = resp.read().decode("utf-8")
+        return json.loads(raw) if raw else {}
+
+
+def main() -> int:
+    _load_env()
+    cfg = json.loads(CONFIG.read_text(encoding="utf-8-sig"))
+    channel_id = str(cfg.get("thread_id") or "").strip()
+    if not channel_id:
+        print(json.dumps({"error": "thread_id_missing"}))
+        return 1
+
+    if len(GUIDE) > 2000:
+        print(json.dumps({"error": "guide_too_long", "len": len(GUIDE)}))
+        return 1
+
+    msg = _api("POST", f"/channels/{channel_id}/messages", {"content": GUIDE})
+    if not isinstance(msg, dict) or not msg.get("id"):
+        print(json.dumps({"error": "post_failed", "response": msg}))
+        return 1
+
+    message_id = str(msg["id"])
+    try:
+        _api("PUT", f"/channels/{channel_id}/pins/{message_id}")
+        pinned = True
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:300]
+        pinned = False
+        pin_error = f"{exc.code}: {detail}"
+    else:
+        pin_error = ""
+
+    out = {
+        "ok": True,
+        "channel_id": channel_id,
+        "message_id": message_id,
+        "pinned": pinned,
+        "pin_error": pin_error,
+        "url": f"https://discord.com/channels/{cfg.get('guild_id')}/{channel_id}/{message_id}",
+    }
+    print(json.dumps(out, indent=2))
+    return 0 if pinned else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

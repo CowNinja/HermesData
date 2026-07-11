@@ -55,7 +55,7 @@ def main() -> int:
         [
             sys.executable,
             str(SCRIPTS / "g_to_k_safe_drain.py"),
-            "--apply",
+            "--apply", "--ai-inbox", "--ai-inbox-cap", "10",
             "--limit",
             str(LIMIT),
             "--source",
@@ -93,6 +93,12 @@ def main() -> int:
     run([sys.executable, str(SCRIPTS / "registry_fixity_batch.py"), "--limit", "50"], 600)
     run([sys.executable, str(SCRIPTS / "dlq_retry.py"), "--limit", "10"], 300)
     run([sys.executable, str(SCRIPTS / "coverage_reconcile.py"), "--max-scan", "20000"], 600)
+
+    # Foundation layers: context detective, process_status, batch enrich
+    run([sys.executable, str(SCRIPTS / "file_context_enrich.py"), "--limit", "15"], 180)
+    run([sys.executable, str(SCRIPTS / "process_status_batch.py"), "--limit", "200"], 120)
+    run([sys.executable, str(SCRIPTS / "batch_context_enrich.py"), "--limit", "30"], 180)
+    run([sys.executable, str(SCRIPTS / "bw_dedupe_resume_check.py")], 30)
 
     lines.append("")
     lines.append("Policy: no live D: My Drive; no purge; copy-only; Jeff entity interviews for queue.")

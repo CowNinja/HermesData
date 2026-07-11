@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 
 @dataclass
@@ -14,6 +14,12 @@ class RenderFrame:
     mode: str = "portrait"
     scene: str = ""
     label: str = ""
+    alternate: str = ""
+    object_prompt: str = ""
+    scene_override: str = ""
+    location: str = ""
+    props: Optional[dict] = None
+    outfit_overrides: Optional[dict] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -78,7 +84,7 @@ def build_user_cast_frames(
     group_size: int = 0,
 ) -> List[RenderFrame]:
     """Build frames. Combined for group of N, per-character otherwise."""
-    roster = roster or ["amira", "aisha"]
+    roster = roster or ["alice-al-rashid", "chloe-ramirez"]
     gs = group_size or infer_group_size(prompt)
     explicit_group = _is_explicit_group(prompt)
     lower = (prompt or "").lower()

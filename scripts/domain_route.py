@@ -18,8 +18,8 @@ RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(
             r"medical|dental|health|healthevet|myhealth|clinvar|genome|diagnosis|"
             r"lab\b|labs\b|blood|pharmacy|prescription|acth|endocrin|richardson|"
-            r"va\b|buddy statement|vital signs|invoice totals.*medical|clinic|"
-            r"secure messaging|\bdr\.?\s+[A-Z]|adrenal|nmcp|open.?emr|scymed",
+            r"\bva\s+(rating|clinic|hospital|medical|benefits)|myhealthevet|buddy statement|vital signs|invoice totals.*medical|clinic|"
+            r"secure messaging|\bdr\.?\s+[A-Z]|adrenal|nmcp|open.?emr|scymed|mirtazapine|cetirizine|mg tab",
             re.I,
         ),
         "Medical-Records",
@@ -39,7 +39,8 @@ RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(
             r"ring\b|doorbell|ringvideo|hubitat|smartthings|home.?automation|"
             r"home.?network|skynet|hubduino|st_anything|st-anything|nvr\b|"
-            r"security cam|ip camera|clickmate|warz|lewz|last empire",
+            r"security cam|ip camera|clickmate|warz|lewz|last empire|"
+            r"landroid|worx|memu|memuplay|albion|miststanding|nomads of the mist|_farms|all_farms",
             re.I,
         ),
         "Core-Personal/Projects",
@@ -49,7 +50,7 @@ RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(
             r"income|expense|tax|finance|cash|bank|receipt|gas of |\bgas\b|utility|utilities|"
             r"mortgage|insurance|invoice|payment|budget|irs\b|w-?2|1099|navy cash|"
-            r"amazon|order history|shopping|\bpurchase\b|cox\b|lowe",
+            r"amazon|order history|shopping|purchase|cox|lowe|paypal|transaction_download",
             re.I,
         ),
         "Core-Personal/Finance",
@@ -75,7 +76,7 @@ RULES: list[tuple[re.Pattern[str], str]] = [
     # Family (blood/household life — NOT friends)
     (
         re.compile(
-            r"family|letter from dad|wedding|kids|spouse|mother|father|bloom family|"
+            r"family|letter from dad|wedding|kids|spouse|bloom family|"
             r"grandma|grandpa|gary bloom|\bcondo\b",
             re.I,
         ),
@@ -84,10 +85,26 @@ RULES: list[tuple[re.Pattern[str], str]] = [
     # Education
     (
         re.compile(
-            r"school|transcript|course|education|degree|diploma|certification|training record",
+            r"school|transcript|course|education|degree|diploma|certification|training record|ecpi",
             re.I,
         ),
         "Core-Personal/Education",
+    ),
+    # Community / hobby / co-op (Jeff teaching FLL, GHW)
+    (
+        re.compile(
+            r"first lego|lego league|\bfll\b|lego racer|ghw\b|homeschool warrior|gods homeschool",
+            re.I,
+        ),
+        "Life-Archive",
+    ),
+    # Digital footprint
+    (
+        re.compile(
+            r"affidavit|facebook_affidavit|gmail filters|browser history",
+            re.I,
+        ),
+        "Digital-Footprint",
     ),
     # Housing street (not Dr title)
     (
@@ -135,17 +152,27 @@ def _entity_domain(blob: str) -> str | None:
                 dom = "Core-Personal/Friends"
             for n in row.get("names") or []:
                 key = (n or "").lower().strip()
-                if len(key) < 3:
+                # Min length + stopwords: avoid father/jeff/david false hits
+                if len(key) < 4:
                     continue
-                if key in {"notes", "note", "file", "copy", "doc", "the", "and", "for"}:
+                if key in {
+                    "notes", "note", "file", "copy", "doc", "the", "and", "for",
+                    "father", "mother", "sister", "brother", "friend", "family",
+                    "david", "sarah", "erin", "john", "mike", "admin", "user",
+                    "gary", "jeff", "jan", "jodi",  # too short alone; use full names
+                }:
                     continue
-                if len(key) <= 4:
+                # single token under 6 chars requires word boundary
+                if " " not in key and len(key) < 6:
                     if not re.search(
                         r"(?i)(?<![a-z0-9])" + re.escape(key) + r"(?![a-z0-9])", low
                     ):
                         continue
                 elif key not in low:
-                    continue
+                    # multi-word or long token: substring ok if long enough
+                    if len(key) < 8 or key not in low:
+                        if key not in low:
+                            continue
                 if best is None or len(key) > best[0]:
                     best = (len(key), dom)
     return best[1] if best else None

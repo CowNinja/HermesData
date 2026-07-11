@@ -100,6 +100,16 @@ if ($core.start_gateway) {
         }
 
         & $core.venv_python (Join-Path $scriptRoot "sovereign_preflight.py") 2>$null
+        $bootIntegrity = Join-Path $scriptRoot "gateway_boot_integrity.py"
+        if (Test-Path $bootIntegrity) {
+            & $core.venv_python $bootIntegrity --mode fast 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                $actions += "boot_integrity:FAIL"
+                Write-Heal "Boot integrity failed before gateway heal - run ops\07-stack-preflight.ps1 -Heal" "Red"
+            } else {
+                $actions += "boot_integrity:OK"
+            }
+        }
 
         $restartBlock = Test-PhronesisMaintenanceBlocked -Action gateway_restart
         if ($gwDown) {
