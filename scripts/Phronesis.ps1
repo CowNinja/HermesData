@@ -5,7 +5,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('go','start','stop','restart','heal','status','verify','dashboard','smoke','recover','boot','desktop','gateway','llama','proxy','vram','doctor','help')]
+    [ValidateSet('go','start','stop','restart','heal','status','verify','dashboard','smoke','recover','boot','desktop','gateway','llama','proxy','vram','image','doctor','help')]
     [string]$Command = 'help',
 
     [Parameter(Position = 1)]
@@ -51,6 +51,7 @@ function Show-Help {
     vram image  !imagefree - free GPU for Comfy renders (stops llama)
     vram hybrid on|off     - both stacks warm in RAM (reduced n_gpu_layers + Comfy novram)
     vram ramprefer on|off  - Comfy RAM staging experiment (--novram vs --lowvram)
+    image pause|resume|status - sovereign image pipeline gate (blocks image_generate)
     dashboard   Pretty health report
 
   WHEN THINGS ARE REALLY BROKEN:
@@ -195,6 +196,22 @@ switch ($Command) {
     }
     'proxy' {
         exit (Invoke-PhronesisScript (Join-Path $ops "03-start-proxy.ps1"))
+    }
+    'image' {
+        $sub = if ($SubCommand) { $SubCommand.ToLower() } else { 'status' }
+        $core = Get-Content (Join-Path $scriptRoot "phronesis-core.json") -Raw | ConvertFrom-Json
+        $py = $core.venv_python
+        $pausePy = Join-Path $scriptRoot "pipeline_pause.py"
+        $action = switch ($sub) {
+            'pause'  { 'pause' }
+            'resume' { 'resume' }
+            default  { 'status' }
+        }
+        & $py $pausePy $action
+        if ($action -eq 'pause') {
+            & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ops "Ensure-RP-Watchers.ps1") -Quiet | Out-Null
+        }
+        exit $LASTEXITCODE
     }
     'gateway' {
         . (Join-Path $scriptRoot "Phronesis-ForkGuard.ps1")

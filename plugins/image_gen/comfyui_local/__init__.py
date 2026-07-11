@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 _HERMES_SCRIPTS = Path(r"D:\HermesData\scripts")
 if str(_HERMES_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_HERMES_SCRIPTS))
+from pipeline_pause import image_generate_allowed, image_pipeline_paused  # noqa: E402
 from windows_subprocess import hidden_powershell_args, prefer_pythonw, run_hidden  # noqa: E402
 
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188")
@@ -173,6 +174,9 @@ def _comfy_up(timeout: float = 3.0) -> bool:
 
 def _bootstrap_comfy_for_render(max_wait_sec: int = 300) -> bool:
     """Free GPU from llama and start ComfyUI when :8188 is down (text mode)."""
+    if not image_generate_allowed():
+        logger.info("Comfy bootstrap blocked: image-pipeline-pause.json paused=true")
+        return False
     if _comfy_up():
         return True
     yield_ps1 = Path(r"D:\HermesData\scripts\Phronesis-Yield-VRAM-For-Image.ps1")
@@ -805,6 +809,20 @@ class ComfyUILocalImageGenProvider(ImageGenProvider):
         reference_image_urls: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
+        force_render = bool(kwargs.get("force") or kwargs.get("force_image"))
+        if not image_generate_allowed(force=force_render):
+            return error_response(
+                error=(
+                    "Image pipeline paused (state/image-pipeline-pause.json). "
+                    "Text/chat has GPU priority. Jeff: .\\Phronesis.ps1 image resume "
+                    "or .\\Phronesis.ps1 vram image when ready for renders."
+                ),
+                error_type="image_pipeline_paused",
+                provider="comfyui_local",
+                prompt=prompt,
+                aspect_ratio=aspect_ratio,
+            )
+
         if image_url or reference_image_urls:
             return error_response(
                 error="comfyui_local supports text-to-image only (no image_url editing)",

@@ -136,6 +136,9 @@ switch ($Mode) {
         $args = @('-StartLlama')
         if ($Quiet) { $args += '-Quiet' }
         & powershell -NoProfile -ExecutionPolicy Bypass -File $yieldText @args
+        $pausePy = Join-Path $scriptRoot "pipeline_pause.py"
+        $venvPy = (Get-Content (Join-Path $scriptRoot "phronesis-core.json") -Raw | ConvertFrom-Json).venv_python
+        if (Test-Path $pausePy) { & $venvPy $pausePy pause --reason vram_text_mode | Out-Null }
         Write-ModeState 'text'
         Show-Status
         exit $LASTEXITCODE
@@ -150,6 +153,9 @@ switch ($Mode) {
             }
         }
         Log "=== VRAM Guardian: IMAGE priority (!imagefree) ==="
+        $pausePy = Join-Path $scriptRoot "pipeline_pause.py"
+        $venvPy = (Get-Content (Join-Path $scriptRoot "phronesis-core.json") -Raw | ConvertFrom-Json).venv_python
+        if (Test-Path $pausePy) { & $venvPy $pausePy resume --reason vram_image_mode | Out-Null }
         $args = @()
         if ($Quiet) { $args += '-Quiet' }
         & powershell -NoProfile -ExecutionPolicy Bypass -File $yieldImage @args

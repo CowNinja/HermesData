@@ -273,9 +273,18 @@ function Stop-NonVenvPortOwner {
 }
 
 function Ensure-VenvHermesOnly {
+    # Light path when gateway is healthy + venv-owned: never disturb gateway tree.
+    # Prevents restart storms when Guardian/OneButton run ForkGuard on a green stack.
     $killed = @()
     $killed += @(Remove-SystemProxyForks)
     $killed += @(Stop-NonVenvPortOwner -Port 8091 -RolePattern 'sovereign_openai_proxy')
+    if ((Test-GatewayHealth) -and (Test-VenvOwnsGateway)) {
+        $dashPort = if ($Core -and $Core.ports.dashboard) { [int]$Core.ports.dashboard } else { 9119 }
+        if ((Get-PortListenerPid -Port $dashPort) -and -not (Test-DashboardHealth)) {
+            $killed += @(Stop-NonVenvPortOwner -Port $dashPort -RolePattern $HermesDashboardRolePattern)
+        }
+        return $killed.Count
+    }
     $killed += @(Remove-NonVenvGatewayDashboard)
     $gwPort = if ($Core) { [int]$Core.ports.gateway } else { 8642 }
     if (-not (Test-GatewayHealth)) {

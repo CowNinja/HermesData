@@ -13,6 +13,11 @@ $daemon = Join-Path $root "scripts\comfy_delivery_daemon.py"
 $watcher = Join-Path $root "scripts\ops\watch_comfy_delivery.py"
 $lock = Join-Path $root "state\comfy-delivery-daemon.lock"
 $renderLock = Join-Path $root "state\roleplay-render.lock"
+$pausePath = Join-Path $root "state\image-pipeline-pause.json"
+$imagePaused = $false
+if (Test-Path $pausePath) {
+    try { $imagePaused = [bool]((Get-Content $pausePath -Raw | ConvertFrom-Json).paused) } catch {}
+}
 
 function Log([string]$m) {
     if (-not $Quiet) { Write-Host $m }
@@ -54,7 +59,15 @@ function Clear-StaleLock([string]$path) {
 
 Clear-StaleLock $renderLock
 
-# --- Delivery daemon (singleton) ---
+# --- Delivery daemon (singleton; off when image pipeline paused) ---
+if ($imagePaused) {
+    $stopped = Stop-Matching 'comfy_delivery_daemon\.py' 'delivery daemon (paused)'
+    if ($stopped -gt 0) { Log "image pipeline paused - stopped delivery daemon" }
+    if (Test-Path $lock) {
+        Remove-Item $lock -Force -ErrorAction SilentlyContinue
+        Log "cleared delivery daemon lock (paused)"
+    }
+} else {
 $daemonPid = 0
 if (Test-Path $lock) {
     $raw = (Get-Content $lock -Raw -ErrorAction SilentlyContinue).Trim()
@@ -89,6 +102,7 @@ if ($ForceRestart -or -not $daemonAlive -or -not $daemonIsHermes) {
     }
 } else {
     Log "delivery daemon alive pid=$daemonPid channel=$Channel"
+}
 }
 
 # --- Folder watcher (singleton, hermes venv only) ---

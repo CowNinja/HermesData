@@ -54,9 +54,21 @@ if ($dupKilled -gt 0) {
     Write-Heal "Killed $dupKilled duplicate Phronesis llama-server" "Yellow"
 }
 
-# Inference 8090/8091
+# Inference 8090/8091 (skip 8090 heal when VRAM priority is image — Comfy owns GPU)
+$vramMode = "text"
+$vramStatePath = Join-Path (Split-Path $scriptRoot -Parent) "state\vram-priority.json"
+if (Test-Path $vramStatePath) {
+    try { $vramMode = [string]((Get-Content $vramStatePath -Raw | ConvertFrom-Json).mode) } catch {}
+}
 $needInference = $false
-if (-not (Port-Up $core.ports.router)) { $needInference = $true; $actions += "8090:DOWN" }
+if (-not (Port-Up $core.ports.router)) {
+    if ($vramMode -eq "image") {
+        $actions += "8090:DOWN_IMAGE_MODE_OK"
+    } else {
+        $needInference = $true
+        $actions += "8090:DOWN"
+    }
+}
 if (-not (Port-Up $core.ports.proxy)) { $needInference = $true; $actions += "8091:DOWN" }
 if ((Port-Up $core.ports.proxy) -and -not (Test-VenvOwns8091)) {
     $needInference = $true; $actions += "8091:NOT_VENV"
@@ -75,7 +87,7 @@ if ($core.start_gateway) {
     $gwPort = [int]$core.ports.gateway
     $hermesRoot = if ($core.hermes_root) { $core.hermes_root } else { "D:\HermesData" }
     $healMarker = Join-Path $hermesRoot "gateway\.last_heal"
-    $healCooldownSec = 90
+    $healCooldownSec = 300
 
     $gwDown = -not (Port-Up $gwPort)
     $gwBadOwner = (Port-Up $gwPort) -and -not (Test-VenvOwnsGateway) -and -not (Test-GatewayHealth)

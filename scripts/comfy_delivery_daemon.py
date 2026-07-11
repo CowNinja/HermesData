@@ -38,6 +38,7 @@ from comfy_output_patterns import (  # noqa: E402
     iter_output_pngs,
     parse_png_index,
 )
+from pipeline_pause import image_delivery_allowed, image_pipeline_paused  # noqa: E402
 
 
 def _hermes_grace_sec() -> float:
@@ -628,6 +629,8 @@ def tick(channel: str = DEFAULT_CHANNEL) -> dict:
 
 
 def _tick_locked(channel: str) -> dict:
+    if not image_delivery_allowed():
+        return {"action": "none", "reason": "image_pipeline_paused"}
     state = _load_state()
     pending = _undelivered_pngs(state)
     if not pending:
@@ -737,6 +740,9 @@ def main() -> int:
     bootstrap_state()
     while True:
         try:
+            if image_pipeline_paused():
+                time.sleep(max(30, args.interval))
+                continue
             result = tick(args.channel)
             if result.get("action") == "deliver":
                 print(json.dumps(result), flush=True)

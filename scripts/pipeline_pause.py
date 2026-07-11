@@ -28,6 +28,18 @@ def image_pipeline_paused() -> bool:
     return bool(load_pause_state().get("paused"))
 
 
+def image_generate_allowed(*, force: bool = False) -> bool:
+    """True when Hermes image_generate / Comfy bootstrap may run."""
+    if force:
+        return True
+    return not image_pipeline_paused()
+
+
+def image_delivery_allowed() -> bool:
+    """True when comfy_delivery_daemon may post PNGs to Discord."""
+    return not image_pipeline_paused()
+
+
 def set_image_pipeline_paused(
     paused: bool,
     *,
@@ -43,3 +55,25 @@ def set_image_pipeline_paused(
     }
     PAUSE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
     return state
+
+
+def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Image pipeline pause gate")
+    parser.add_argument("action", nargs="?", choices=("status", "pause", "resume"), default="status")
+    parser.add_argument("--reason", default="")
+    parser.add_argument("--note", default="")
+    args = parser.parse_args()
+    if args.action == "pause":
+        state = set_image_pipeline_paused(True, reason=args.reason or "operator_pause", note=args.note)
+    elif args.action == "resume":
+        state = set_image_pipeline_paused(False, reason=args.reason or "operator_resume", note=args.note)
+    else:
+        state = load_pause_state()
+    print(json.dumps(state, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

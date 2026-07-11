@@ -13,13 +13,22 @@ _ENTITY = _Path(r"D:\HermesData\config\entity_context.json")
 
 # Order matters — first regex match wins (after entity longest-match)
 RULES: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(r"va\s*dmv|dmv\b.*driver|temporary driving permit", re.I),
+        "Core-Personal/Finance",
+    ),
+    (
+        re.compile(r"va\s+home\s+loan|va\s+loan\s+number|va\s+mortgage", re.I),
+        "Core-Personal/Finance",
+    ),
     # Medical before housing
     (
         re.compile(
             r"medical|dental|health|healthevet|myhealth|clinvar|genome|diagnosis|"
             r"lab\b|labs\b|blood|pharmacy|prescription|acth|endocrin|richardson|"
             r"\bva\s+(rating|clinic|hospital|medical|benefits)|myhealthevet|buddy statement|vital signs|invoice totals.*medical|clinic|"
-            r"secure messaging|\bdr\.?\s+[A-Z]|adrenal|nmcp|open.?emr|scymed|mirtazapine|cetirizine|mg tab",
+            r"secure messaging|\bdr\.?\s+[A-Z]|adrenal|nmcp|open.?emr|scymed|mirtazapine|cetirizine|mg tab|"
+            r"\bcnp\b|compensation and pension|\btol\b|tricare|\bqtc\b|shpe|hnfs|vamc|cnsva|sgli|sglv",
             re.I,
         ),
         "Medical-Records",
@@ -29,7 +38,7 @@ RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(
             r"navy|navadmin|navpers|psrs?|eval\b|fitrep|dd ?form|dd\-?214|"
             r"orders|cjtf|djibouti|hoa\b|seabee|usn\b|nrotc|pcs\b|leave and earnings|"
-            r"n332|ncdoc|bhc sewell",
+            r"n332|ncdoc|bhc sewell|\bles\b|\btsp\b|thrift savings|\bnex\b|navy exchange",
             re.I,
         ),
         "Navy-Service",
@@ -40,7 +49,7 @@ RULES: list[tuple[re.Pattern[str], str]] = [
             r"ring\b|doorbell|ringvideo|hubitat|smartthings|home.?automation|"
             r"home.?network|skynet|hubduino|st_anything|st-anything|nvr\b|"
             r"security cam|ip camera|clickmate|warz|lewz|last empire|"
-            r"landroid|worx|memu|memuplay|albion|miststanding|nomads of the mist|_farms|all_farms",
+            r"landroid|worx\b|memu|memuplay|albion|miststanding|nomads of the mist|_farms|all_farms|cujo|getcujo",
             re.I,
         ),
         "Core-Personal/Projects",
@@ -50,7 +59,7 @@ RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(
             r"income|expense|tax|finance|cash|bank|receipt|gas of |\bgas\b|utility|utilities|"
             r"mortgage|insurance|invoice|payment|budget|irs\b|w-?2|1099|navy cash|"
-            r"amazon|order history|shopping|purchase|cox|lowe|paypal|transaction_download",
+            r"amazon|order history|shopping|\bpurchase\b|cox\b|lowe|paypal|transaction_download|hrsd|hrubs|abnb|imco|uimn",
             re.I,
         ),
         "Core-Personal/Finance",
@@ -68,7 +77,7 @@ RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(
             r"resume|curriculum|career|job |interview|linkedin|position|vacancy|"
             r"systems manager|network support|security engineer|systems administrator|"
-            r"cover letter|performance review|cnda",
+            r"cover letter|performance review|cnda|gdit|general dynamics",
             re.I,
         ),
         "Core-Personal/Career",

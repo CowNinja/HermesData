@@ -73,9 +73,14 @@ function Resolve-ModelConfig {
 
 Log "=== Phronesis One-Button Start ==="
 
-# --- ForkGuard FIRST (proxy + gateway + dashboard venv enforcement) ---
+# --- ForkGuard FIRST (light when :8642 healthy — never kill gateway tree) ---
+$gwPortEarly = [int]$core.ports.gateway
+$forkLight = (Port-Up $gwPortEarly) -and (Test-GatewayHealth) -and (Test-VenvOwnsGateway)
 $forkKills = Ensure-VenvHermesOnly
-if ($forkKills -gt 0) { Log "ForkGuard: removed $forkKills non-venv Hermes process(es)" }
+if ($forkKills -gt 0) {
+    $mode = if ($forkLight) { "light" } else { "full" }
+    Log "ForkGuard ($mode): removed $forkKills non-venv Hermes process(es)"
+}
 
 # --- Dedup: one Phronesis llama on router port (Ollama-safe) ---
 $dupKilled = Remove-DuplicatePhronesisLlamas -RouterPort ([int]$core.ports.router)
