@@ -1,4 +1,4 @@
-# ops INDEX (VaultWalker v0.6.2, 2026-07-09) Silo: HermesData
+# ops INDEX (VaultWalker v0.7.0, 2026-07-11) Silo: HermesData
 
 **Separation + Explicit Gates**: Agent reads this first.
 - Explicit RP material is centralized ONLY in RoleplaySandbox (block by default elsewhere).
@@ -9,5 +9,5 @@ Where To Go:
 - Add PKG + residency tags on review.
 - Only relocate on confirmed explicit-rp via local model.
 
-Files: 77
+Files: 94
 (Every directory gets an index for complete navigation and content discovery.)

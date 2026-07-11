@@ -1,4 +1,4 @@
-# gateway INDEX (VaultWalker v0.6.2, 2026-07-09) Silo: HermesData
+# gateway INDEX (VaultWalker v0.7.0, 2026-07-11) Silo: HermesData
 
 **Separation + Explicit Gates**: Agent reads this first.
 - Explicit RP material is centralized ONLY in RoleplaySandbox (block by default elsewhere).
