@@ -28,6 +28,9 @@ def main() -> int:
     ts = datetime.now(timezone.utc).isoformat()
     lines = [f"# G→K autonomous wave — {ts}", ""]
 
+    code_h, out_h = run([sys.executable, str(SCRIPTS / "pipeline_health_check.py")], 120)
+    lines.append(f"## Health exit={code_h}")
+    lines.append("```"); lines.append(out_h[-600:]); lines.append("```")
     code, out = run([sys.executable, str(SCRIPTS / "g_memorycard_inventory.py")], 180)
     lines.append(f"## Inventory exit={code}")
     lines.append("```")
@@ -86,6 +89,10 @@ def main() -> int:
     lines.append("```")
 
     run([sys.executable, str(SCRIPTS / "ingest_registry.py"), "stats"], 60)
+    run([sys.executable, str(SCRIPTS / "batch_train_derivatives.py"), "--limit", "15"], 300)
+    run([sys.executable, str(SCRIPTS / "registry_fixity_batch.py"), "--limit", "50"], 600)
+    run([sys.executable, str(SCRIPTS / "dlq_retry.py"), "--limit", "10"], 300)
+    run([sys.executable, str(SCRIPTS / "coverage_reconcile.py"), "--max-scan", "20000"], 600)
 
     lines.append("")
     lines.append("Policy: no live D: My Drive; no purge; copy-only; Jeff entity interviews for queue.")

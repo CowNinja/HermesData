@@ -39,6 +39,16 @@ except Exception:
     already_ingested_source = None
     already_have_hash = None
     ingest_register = None
+try:
+    from drain_dlq import record as dlq_record
+except Exception:
+    def dlq_record(source, dest, error):
+        pass
+try:
+    from modality_detect import detect as modality_detect
+except Exception:
+    def modality_detect(path):
+        return "unknown"
 
 TS = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 K_SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
@@ -114,10 +124,11 @@ def iter_candidates(
     limit: int,
     skip_sources: set[str] | None = None,
     skip_hashes: set[str] | None = None,
+    max_scan: int = 500_000,
 ) -> list[Path]:
     """Yield up to `limit` *new* candidates (skips known sources).
 
-    Avoids alpha-prefix thrash where every wave re-plans the same first N files.
+    Walks until `limit` new files found or max_scan files seen.
     """
     out: list[Path] = []
     if not root.exists():
@@ -125,11 +136,17 @@ def iter_candidates(
     skip_sources = skip_sources or set()
     scanned = 0
     for p in root.rglob("*"):
+        if scanned >= max_scan:
+            break
         if not p.is_file():
             continue
+        scanned += 1
         if p.name.startswith(".") or p.name.endswith(".meta.json"):
             continue
-        scanned += 1
+        if p.name.lower() in {"desktop.ini", "thumbs.db", "thumbs.db:encryptable"}:
+            continue
+        if p.suffix.lower() in {".tmp", ".crdownload", ".partial"}:
+            continue
         try:
             if p.suffix.lower() in {".7z", ".zip", ".iso", ".vmdk"} and p.stat().st_size > 50_000_000:
                 continue
@@ -147,6 +164,8 @@ def iter_candidates(
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="Actually copy (default dry-run)")
+    ap.add_argument("--ai-inbox", action="store_true", help="Local AI domain vote for _Inbox names (capped)")
+    ap.add_argument("--ai-inbox-cap", type=int, default=8, help="Max local AI domain calls per wave")
     ap.add_argument("--limit", type=int, default=40, help="Max files this wave")
     ap.add_argument(
         "--source",
@@ -173,18 +192,58 @@ def main() -> int:
         except Exception:
             pass
 
+    def safe_name(name: str, max_len: int = 120) -> str:
+        bad = '<>:"|?*'
+        for ch in bad:
+            name = name.replace(ch, "_")
+        name = name.strip(" .")
+        if len(name) > max_len:
+            stem, dot, ext = name.rpartition(".")
+            if dot and len(ext) <= 12:
+                name = stem[: max_len - len(ext) - 1] + "." + ext
+            else:
+                name = name[:max_len]
+        return name or "file"
+
+    def unique_dest(src: Path, src_root: Path, dom: str) -> Path:
+        """Avoid false skip-exists when same filename already on K from another source."""
+        try:
+            rel = src.relative_to(src_root)
+        except Exception:
+            rel = Path(src.name)
+        # sanitize each part
+        parts = [safe_name(part, 80) for part in rel.parts[:-1]] + [safe_name(rel.name, 120)]
+        rel = Path(*parts) if parts else Path(safe_name(src.name))
+        base = K_SILO / dom / "from-g-drive" / rel
+        if not base.exists():
+            return base
+        digest = __import__("hashlib").sha256(str(src).encode("utf-8", errors="replace")).hexdigest()[:8]
+        return base.with_name(safe_name(f"{base.stem}__{digest}{base.suffix}", 120))
+
     planned = []
-    per = max(args.limit // max(1, len(sources)) + 5, args.limit)
+    ai_used = 0
+    # Scan more aggressively: need `limit` candidates not already registered
     for src_root in sources:
-        for f in iter_candidates(src_root, per, skip_sources=skip_sources):
+        if len(planned) >= args.limit:
+            break
+        need = args.limit - len(planned)
+        # pull a large candidate pool then fill
+        pool = iter_candidates(src_root, max(need * 50, 5000), skip_sources=skip_sources)
+        for f in pool:
             dom = domain_for(f.name)
-            rel = f.relative_to(src_root) if f.is_relative_to(src_root) else Path(f.name)
-            dest = K_SILO / dom / "from-g-drive" / rel
+            if args.ai_inbox and dom.endswith("_Inbox") and ai_used < args.ai_inbox_cap:
+                try:
+                    from domain_ai_assist import assess as ai_assess
+                    ar = ai_assess(f.name, use_ai=True)
+                    if ar.get("final") and not str(ar.get("final")).endswith("_Inbox"):
+                        dom = ar["final"]
+                    ai_used += 1
+                except Exception:
+                    pass
+            dest = unique_dest(f, src_root, dom)
             planned.append((f, dest, dom, str(src_root)))
             if len(planned) >= args.limit:
                 break
-        if len(planned) >= args.limit:
-            break
 
     # Enforce Class 2 only (personal purge-eligible). Skip class 1/3.
     filtered = []
@@ -226,6 +285,16 @@ def main() -> int:
                 if icon is not None and already_have_hash and already_have_hash(icon, digest):
                     status = "skip-registry-hash"
                     skipped += 1
+                    # Register source alias so next waves don't re-plan same bytes
+                    if ingest_register:
+                        try:
+                            ingest_register(
+                                icon, str(src), str(dest), digest=digest,
+                                size=src.stat().st_size, domain=dom, status="copied",
+                            )
+                            icon.commit()
+                        except Exception:
+                            pass
                 else:
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     method = copy_file(src, dest)
@@ -254,6 +323,10 @@ def main() -> int:
                     copied += 1
             except Exception as e:
                 status = f"ERR {e}"
+                try:
+                    dlq_record(str(src), str(dest), str(e))
+                except Exception:
+                    pass
         elif not args.apply and icon is not None and already_ingested_source and already_ingested_source(icon, str(src)):
             status = "would-skip-registry"
             skipped += 1

@@ -15,6 +15,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(r"D:\HermesData\scripts")))
 from domain_route import domain_for  # noqa: E402
+try:
+    from ingest_registry import connect as reg_connect
+except Exception:
+    reg_connect = None
 
 INBOX = Path(
     r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\_Inbox\from-g-drive"
@@ -73,6 +77,16 @@ def main() -> int:
                             pass
                 status = "moved"
                 moved += 1
+                if reg_connect:
+                    try:
+                        icon = reg_connect()
+                        icon.execute(
+                            "UPDATE ingest SET dest_path=? WHERE dest_path=?",
+                            (str(dest), str(p)),
+                        )
+                        icon.commit()
+                    except Exception:
+                        pass
             except Exception as e:
                 status = f"ERR {e}"
         else:

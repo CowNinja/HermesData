@@ -1,7 +1,6 @@
 model:
   default: grok-4.5
   provider: xai-oauth
-  context_length: 500000
 fallback_providers: []
 toolsets:
 - hermes-cli

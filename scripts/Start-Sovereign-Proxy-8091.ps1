@@ -66,7 +66,7 @@ if (-not (Wait-ProxyVenvReady -MaxSeconds 15)) {
 
 $listener = Get-ProxyListenerPid
 try {
-    $check = Invoke-WebRequest -Uri "http://0.0.0.0:8091/health" -UseBasicParsing -TimeoutSec 5
+    $check = Invoke-WebRequest -Uri "http://127.0.0.1:8091/health" -UseBasicParsing -TimeoutSec 5
     Write-Host "Proxy UP (listener=$listener venv-chain=True) status=$($check.Content)" -ForegroundColor Green
 } catch {
     Write-Host "FATAL: health check failed after venv bind" -ForegroundColor Red
