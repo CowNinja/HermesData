@@ -10,6 +10,81 @@ import re
 from pathlib import Path
 
 GOOGLE_STUBS = {".gdoc", ".gsheet", ".gslides", ".gmap", ".gscript", ".gform"}
+IDENTITY_PATH = Path(r"D:\HermesData\config\google_account_identity.json")
+
+def load_google_identity() -> dict:
+    try:
+        return json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {"accounts": []}
+
+def normalize_gmail_local(email: str) -> tuple[str, str]:
+    """Return (normalized_local, domain). Gmail dots and +tags ignored in local."""
+    email_l = email.strip().lower()
+    if "@" not in email_l:
+        local, domain = email_l, ""
+    else:
+        local, domain = email_l.split("@", 1)
+    # plus addressing
+    if "+" in local:
+        local = local.split("+", 1)[0]
+    # Gmail/googlemail: dots optional
+    if domain in {"gmail.com", "googlemail.com", ""}:
+        local_norm = local.replace(".", "")
+    else:
+        local_norm = local
+    return local_norm, domain
+
+
+def map_email_to_account(email: str | None) -> dict:
+    if not email:
+        return {"account_id": None, "role": None, "mine": None}
+    email_l = email.strip().lower()
+    local_norm, domain = normalize_gmail_local(email_l)
+    ident = load_google_identity()
+    for a in ident.get("accounts") or []:
+        # explicit list
+        for e in a.get("emails") or []:
+            el, ed = normalize_gmail_local(e)
+            if el == local_norm and (not domain or not ed or domain == ed or domain in {"gmail.com", "googlemail.com"}):
+                return {
+                    "account_id": a.get("id"),
+                    "role": a.get("role"),
+                    "mine": True,
+                    "status": a.get("status"),
+                    "matched_as": email_l,
+                    "normalized_local": local_norm,
+                }
+        # local_normalized field
+        ln = (a.get("local_normalized") or "").replace(".", "").lower()
+        if ln and ln == local_norm:
+            return {
+                "account_id": a.get("id"),
+                "role": a.get("role"),
+                "mine": True,
+                "status": a.get("status"),
+                "matched_as": email_l,
+                "normalized_local": local_norm,
+            }
+        # id with dots stripped
+        aid = (a.get("id") or "").replace(".", "").lower()
+        if aid and aid == local_norm:
+            return {
+                "account_id": a.get("id"),
+                "role": a.get("role"),
+                "mine": True,
+                "status": a.get("status"),
+                "matched_as": email_l,
+                "normalized_local": local_norm,
+            }
+    return {
+        "account_id": None,
+        "role": "foreign_or_unknown",
+        "mine": False,
+        "email": email_l,
+        "normalized_local": local_norm,
+    }
+
 
 
 def is_google_stub(path: Path) -> bool:
@@ -26,11 +101,16 @@ def read_google_stub(path: Path) -> dict:
         m = re.search(rf'"{key}"\s*:\s*"([^"]*)"', raw)
         return m.group(1) if m else None
     doc_id = grab("doc_id") or grab("id")
+    email = grab("email")
+    acct = map_email_to_account(email)
     return {
         "stub": True,
         "doc_id": doc_id,
         "url": grab("url"),
-        "email": grab("email"),
+        "email": email,
+        "google_account_id": acct.get("account_id"),
+        "google_account_role": acct.get("role"),
+        "google_account_mine": acct.get("mine"),
         "text": "",  # no body
         "note": "local_google_stub_no_body_needs_export",
         "raw_bytes": path.stat().st_size,
@@ -158,6 +238,9 @@ def evaluate_bundle(path: str | Path, max_chars: int = 2500) -> dict:
         "content_keyword_hits": content_hits,
         "context_keyword_hits": ctx_hits,
         "is_google_stub": is_google_stub(p),
+        "google_account_id": content.get("google_account_id"),
+        "google_account_role": content.get("google_account_role"),
+        "google_account_mine": content.get("google_account_mine"),
     }
 
 

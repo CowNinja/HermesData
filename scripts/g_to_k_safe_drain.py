@@ -23,34 +23,74 @@ sys.path.insert(0, str(Path(r"D:/HermesData/scripts")))
 try:
     from touch_policy import classify as touch_classify
     from relevance_score import score_path
+    from ingest_registry import (
+        connect as ingest_connect,
+        already_ingested_source,
+        already_have_hash,
+        register as ingest_register,
+        sha256_file as ingest_sha,
+    )
 except Exception:
     def touch_classify(path, reg=None):
         return 2, "fallback"
     def score_path(path, rules=None, use_ai=False):
         return {"relevance": "train_ok", "score": 0, "class": 2}
+    ingest_connect = None
+    already_ingested_source = None
+    already_have_hash = None
+    ingest_register = None
 
 TS = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 K_SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
 STAGING = K_SILO / "_Staging-From-G-Drive"
 RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\g-to-k-drain-receipt-latest.md")
 
-# High-signal name heuristics → broad domain (open taxonomy)
-RULES: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"medical|dental|health|clinvar|genome|diagnosis|va\b|buddy statement", re.I), "Medical-Records"),
-    (re.compile(r"navy|navadmin|eval|dd ?form|orders|service", re.I), "Navy-Service"),
-    (re.compile(r"income|expense|tax|finance|cash|bank|receipt", re.I), "Core-Personal/Finance"),
-    (re.compile(r"sermon|bible|gospel|spiritual|church|corinthians", re.I), "Core-Personal/Spiritual"),
-    (re.compile(r"resume|career|job |interview|linkedin", re.I), "Core-Personal/Career"),
-    (re.compile(r"family|letter from dad|wedding|kids", re.I), "Core-Personal/Family"),
-    (re.compile(r"school|transcript|course|education|degree", re.I), "Core-Personal/Education"),
-]
+# Domain routing SSOT (expanded after MemoryCard trial lessons)
+try:
+    from domain_route import domain_for as _domain_for
+except Exception:
+    def _domain_for(name: str, path_hint: str = "") -> str:
+        return "Core-Personal/_Inbox"
 
 
-def domain_for(name: str) -> str:
-    for pat, dom in RULES:
-        if pat.search(name):
-            return dom
-    return "Core-Personal/_Inbox"
+def domain_for(name: str, path_hint: str = "") -> str:
+    """Strip routing noise; preserve real filename on disk separately."""
+    return _domain_for((name or "").strip(), path_hint)
+
+
+def copy_file(src: Path, dest: Path) -> str:
+    """Efficient copy: robocopy for large files, shutil.copy2 otherwise.
+
+    Returns method tag: robocopy|shutil
+    """
+    import subprocess
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    size = src.stat().st_size
+    # robocopy shines on larger files / Windows paths
+    if size >= 8 * 1024 * 1024:  # 8 MB+
+        # robocopy needs dir args; copy single file
+        cmd = [
+            "robocopy",
+            str(src.parent),
+            str(dest.parent),
+            src.name,
+            "/J",  # unbuffered
+            "/R:2",
+            "/W:1",
+            "/NFL",
+            "/NDL",
+            "/NJH",
+            "/NJS",
+            "/NC",
+            "/NS",
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        # robocopy exit 0-7 success
+        if r.returncode < 8 and dest.exists():
+            return "robocopy"
+        # fallback
+    shutil.copy2(src, dest)
+    return "shutil"
 
 
 def sha256_file(path: Path, limit: int = 32 * 1024 * 1024) -> str:
@@ -69,17 +109,34 @@ def sha256_file(path: Path, limit: int = 32 * 1024 * 1024) -> str:
     return h.hexdigest()
 
 
-def iter_candidates(root: Path, limit: int) -> list[Path]:
+def iter_candidates(
+    root: Path,
+    limit: int,
+    skip_sources: set[str] | None = None,
+    skip_hashes: set[str] | None = None,
+) -> list[Path]:
+    """Yield up to `limit` *new* candidates (skips known sources).
+
+    Avoids alpha-prefix thrash where every wave re-plans the same first N files.
+    """
     out: list[Path] = []
     if not root.exists():
         return out
+    skip_sources = skip_sources or set()
+    scanned = 0
     for p in root.rglob("*"):
         if not p.is_file():
             continue
-        if p.name.startswith("."):
+        if p.name.startswith(".") or p.name.endswith(".meta.json"):
             continue
-        # skip huge archives in pilot
-        if p.suffix.lower() in {".7z", ".zip", ".iso", ".vmdk"} and p.stat().st_size > 50_000_000:
+        scanned += 1
+        try:
+            if p.suffix.lower() in {".7z", ".zip", ".iso", ".vmdk"} and p.stat().st_size > 50_000_000:
+                continue
+        except Exception:
+            continue
+        sp = str(p)
+        if sp in skip_sources:
             continue
         out.append(p)
         if len(out) >= limit:
@@ -104,9 +161,22 @@ def main() -> int:
         Path(r"G:\MemoryCard_Backups\Google Drive(archive)"),
     ]
 
+    # Known sources from ingest registry → skip early (wave efficiency)
+    skip_sources: set[str] = set()
+    icon_pre = ingest_connect() if ingest_connect else None
+    if icon_pre is not None:
+        try:
+            rows = icon_pre.execute(
+                "SELECT source_path FROM ingest WHERE status IN ('copied','verified','processed')"
+            ).fetchall()
+            skip_sources = {r[0] if not hasattr(r, 'keys') else r['source_path'] for r in rows}
+        except Exception:
+            pass
+
     planned = []
+    per = max(args.limit // max(1, len(sources)) + 5, args.limit)
     for src_root in sources:
-        for f in iter_candidates(src_root, args.limit // max(1, len(sources)) + 5):
+        for f in iter_candidates(src_root, per, skip_sources=skip_sources):
             dom = domain_for(f.name)
             rel = f.relative_to(src_root) if f.is_relative_to(src_root) else Path(f.name)
             dest = K_SILO / dom / "from-g-drive" / rel
@@ -140,33 +210,53 @@ def main() -> int:
         "|-------------|--------|------|--------|",
     ]
     meta_batch = []
+    icon = ingest_connect() if ingest_connect else None
     for src, dest, dom, root in planned:
         status = "planned"
+        # Registry / filesystem guards against re-processing
         if dest.exists():
             status = "skip-exists"
             skipped += 1
+        elif icon is not None and already_ingested_source and already_ingested_source(icon, str(src)):
+            status = "skip-registry-source"
+            skipped += 1
         elif args.apply:
             try:
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dest)
                 digest = sha256_file(src)
-                meta = {
-                    "source": str(src),
-                    "source_root": root,
-                    "dest": str(dest),
-                    "domain": dom,
-                    "sha256": digest,
-                    "copied_at": TS,
-                    "policy": "copy-only-no-purge",
-                }
-                dest.with_suffix(dest.suffix + ".meta.json").write_text(
-                    json.dumps(meta, indent=2), encoding="utf-8"
-                )
-                meta_batch.append(meta)
-                status = "copied"
-                copied += 1
+                if icon is not None and already_have_hash and already_have_hash(icon, digest):
+                    status = "skip-registry-hash"
+                    skipped += 1
+                else:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    method = copy_file(src, dest)
+                    meta = {
+                        "source": str(src),
+                        "source_root": root,
+                        "dest": str(dest),
+                        "domain": dom,
+                        "sha256": digest,
+                        "size": src.stat().st_size,
+                        "copied_at": TS,
+                        "policy": "copy-only-no-purge",
+                        "copy_method": method,
+                    }
+                    dest.with_suffix(dest.suffix + ".meta.json").write_text(
+                        json.dumps(meta, indent=2), encoding="utf-8"
+                    )
+                    meta_batch.append(meta)
+                    if ingest_register:
+                        ingest_register(
+                            icon, str(src), str(dest), digest=digest,
+                            size=src.stat().st_size, domain=dom, status="copied",
+                        )
+                        icon.commit()
+                    status = "copied"
+                    copied += 1
             except Exception as e:
                 status = f"ERR {e}"
+        elif not args.apply and icon is not None and already_ingested_source and already_ingested_source(icon, str(src)):
+            status = "would-skip-registry"
+            skipped += 1
         lines.append(f"| `{src.name[:60]}` | {dom} | `{dest}` | {status} |")
 
     if args.apply and meta_batch:

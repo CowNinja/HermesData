@@ -83,6 +83,7 @@ def main() -> int:
         results.append(run_script("k_domain_shelves_ensure.py", timeout=60))
         results.append(run_script("cloud_recovery_pack_sync.py", timeout=180))
         results.append(run_script("g_memorycard_inventory.py", timeout=120))
+        results.append(run_script("silo_pipeline_smoke_test.py", timeout=300))
         results.append(run_script("g_to_k_drain_autonomous.py", timeout=900))
         results.append(run_script("backup_layers_status.py", timeout=60))
         results.append(run_script("k_test_ingest_domain_propose.py", timeout=180))

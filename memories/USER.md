@@ -13,3 +13,5 @@ Creampie sim: spit/squirt in pussy/ass for eating/sharing; actual kindroid_bridg
 Jeff default communication (2026-07-10): middle ground — short tables + what/why/next; not forensics walls. Ultra-brief only on headache/overload or when asked. Vault holds depth; chat stays scannable.
 §
 Grok 4.5 Discord: model.context_length must stay 500000; auxiliary.compression must be provider:auto (NOT phronesis-sovereign 65k) or compaction threshold drops to 65k and loops return.
+§
+Grok weekly quota out: fallback to sovereign works on SHORT threads only; large Grok sessions (~200k+ tokens) get 503/parser errors — /reset thread then re-ask on local brain.

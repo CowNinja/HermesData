@@ -518,6 +518,51 @@ def _truncate_text(text: str, max_tokens: int) -> str:
     return text[:max_chars] + f"\n...[truncated {len(text) - max_chars} chars for tier budget]"
 
 
+def _flatten_tool_history_for_llama(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Convert cloud/Grok OpenAI tool-call history into plain text for llama-server.
+
+    Grok-era sessions keep assistant ``tool_calls`` + ``tool`` role turns in history.
+    llama-server's chat template often fails with HTTP 400 "Unable to generate parser
+    for this template" when those shapes are present — even after the request ``tools``
+    array is stripped.  Idempotent: already-flat messages pass through with junk keys removed.
+    """
+    out: List[Dict[str, Any]] = []
+    for msg in messages or []:
+        if not isinstance(msg, dict):
+            continue
+        role = str(msg.get("role") or "user")
+        if role == "tool":
+            name = str(msg.get("name") or msg.get("tool_call_id") or "tool")
+            content = _extract_content(msg.get("content"))
+            preview = content[:2400] + ("..." if len(content) > 2400 else "")
+            if preview.strip():
+                out.append({"role": "user", "content": f"[Tool result — {name}]: {preview}"})
+            continue
+        if role == "assistant" and msg.get("tool_calls"):
+            parts: List[str] = []
+            visible = _assistant_visible_content(msg, allow_reasoning_fallback=False)
+            if visible:
+                parts.append(visible)
+            for tc in msg.get("tool_calls") or []:
+                if not isinstance(tc, dict):
+                    continue
+                fn = tc.get("function") if isinstance(tc.get("function"), dict) else {}
+                name = str((fn or {}).get("name") or "tool")
+                args = str((fn or {}).get("arguments") or "")[:800]
+                parts.append(f"[Called {name}({args})]")
+            out.append({"role": "assistant", "content": "\n".join(parts) if parts else "[assistant tool turn]"})
+            continue
+        content = _extract_content(msg.get("content"))
+        if role == "assistant" and not content:
+            content = _assistant_visible_content(msg)
+        if role == "system" or content.strip():
+            clean = {"role": role, "content": content}
+            if msg.get("name"):
+                clean["name"] = msg["name"]
+            out.append(clean)
+    return out if out else list(messages or [])
+
+
 def _truncate_message(msg: Dict[str, Any], max_tokens: int) -> Dict[str, Any]:
     content = _extract_content(msg.get("content"))
     return {**msg, "content": _truncate_text(content, max_tokens)}
@@ -659,6 +704,8 @@ def trim_messages_tier_aware(
     Roleplay tier bypasses trim — full unfiltered working memory preserved.
     """
     from model_resource_manager import context_budget_for_tier, input_budget_for_tier
+
+    messages = _flatten_tool_history_for_llama(messages)
 
     if _roleplay_route_requested(model, messages):
         original_tokens = sum(_message_tokens(m) for m in messages)
@@ -1474,19 +1521,45 @@ def dispatch_via_native_router(
                 result["status"] == 400
                 and "unable to generate parser" in err_text.lower()
             )
-            if grammar_fail and forward.get("tools"):
-                _log_event({"event": "grammar_retry_no_tools", "model": logical})
-                retry_forward = dict(forward)
-                retry_forward.pop("tools", None)
-                retry_forward.pop("tool_choice", None)
-                result = _dispatch_payload(retry_forward)
-                if result["status"] == 200:
-                    forward = retry_forward
-                    narrative_fast = True
-                else:
+            if grammar_fail:
+                retry_candidates: List[Dict[str, Any]] = []
+                if forward.get("tools"):
+                    no_tools = dict(forward)
+                    no_tools.pop("tools", None)
+                    no_tools.pop("tool_choice", None)
+                    retry_candidates.append(no_tools)
+                flat_msgs = _flatten_tool_history_for_llama(forward.get("messages") or [])
+                try:
+                    flat_msgs, _ = trim_messages_tier_aware(
+                        flat_msgs,
+                        gateway_model or "phronesis-sovereign-auto",
+                    )
+                except Exception:
+                    pass
+                flat_forward = {
+                    **forward,
+                    "messages": flat_msgs,
+                    "max_tokens": min(int(forward.get("max_tokens") or 512), 384),
+                    "temperature": min(float(forward.get("temperature") or 0.7), 0.85),
+                }
+                flat_forward.pop("tools", None)
+                flat_forward.pop("tool_choice", None)
+                retry_candidates.append(flat_forward)
+                recovered = False
+                for idx, retry_forward in enumerate(retry_candidates):
+                    event = "grammar_retry_no_tools" if idx == 0 and forward.get("tools") else "grammar_retry_flat_history"
+                    _log_event({"event": event, "model": logical, "attempt": idx + 1})
+                    result = _dispatch_payload(retry_forward)
+                    if result["status"] == 200:
+                        forward = retry_forward
+                        narrative_fast = True
+                        recovered = True
+                        break
+                if not recovered:
                     rb = result.get("body") or b""
+                    err_tail = rb.decode("utf-8", errors="replace") if isinstance(rb, (bytes, bytearray)) else str(rb)
                     raise RuntimeError(
-                        f"upstream returned HTTP {result['status']}: {rb[:200]!r}"
+                        f"upstream returned HTTP {result['status']}: {err_tail[:200]!r}"
                     )
             else:
                 raise RuntimeError(f"upstream returned HTTP {result['status']}: {err_text[:200]}")

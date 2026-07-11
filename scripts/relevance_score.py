@@ -96,6 +96,21 @@ def score_path(path: str | Path, rules: dict | None = None, use_ai: bool = False
         # Filename + folder/siblings are the only local signals for stubs
         reasons.append("evaluate_via_name_and_folder_context")
 
+    # Google account identity (Jeff's three only)
+    ga_id = bundle.get("google_account_id") or content.get("google_account_id")
+    ga_role = bundle.get("google_account_role") or content.get("google_account_role")
+    ga_mine = bundle.get("google_account_mine")
+    if ga_mine is True:
+        score += 20
+        reasons.append(f"jeff_google_account:{ga_id or ga_role}")
+        if ga_role == "old_disabled":
+            score += 10
+            reasons.append("lost_account_historical_footprint")
+    elif ga_mine is False and content.get("email"):
+        reasons.append("foreign_or_unknown_google_email")
+        # family helper files still silo-include (lenient); do not noise
+        reasons.append("family_or_helper_possible_include")
+
     if content_hits:
         score += 25 * min(2, len(content_hits))
         reasons.append("content_keywords:" + ",".join(content_hits[:4]))
@@ -173,6 +188,9 @@ def score_path(path: str | Path, rules: dict | None = None, use_ai: bool = False
         "content_hits": content_hits,
         "context_hits": context_hits,
         "folders": (ctx.get("folders") or [])[-4:],
+        "google_account_id": ga_id,
+        "google_account_role": ga_role,
+
     }
 
 
