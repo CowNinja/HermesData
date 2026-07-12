@@ -70,7 +70,7 @@ def grunt_health() -> Dict[str, Any]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--drain-limit", type=int, default=250)
+    ap.add_argument("--drain-limit", type=int, default=800)
     ap.add_argument("--enrich-limit", type=int, default=40)
     ap.add_argument("--train-limit", type=int, default=20)
     ap.add_argument("--reroute-limit", type=int, default=20)
@@ -122,8 +122,21 @@ def main() -> int:
     workers.extend(
         [
             (
+                # Fast recursive origin-folder sort (Amazon/CPAP/…) — no LLM
+                "rehome_bulk_origin",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "inbox_bulk_origin_rehome.py"),
+                    "--apply",
+                    "--limit",
+                    "1500",
+                    "--name-fallback",
+                ],
+                900,
+            ),
+            (
                 "rehome",
-                [sys.executable, str(SCRIPTS / "k_inbox_rehome.py"), "--apply", "--limit", "25"],
+                [sys.executable, str(SCRIPTS / "k_inbox_rehome.py"), "--apply", "--limit", "50"],
                 300,
             ),
             (
@@ -155,17 +168,17 @@ def main() -> int:
                 300,
             ),
             (
+                # Leftovers only; grunt off by default so tick never 400s-timeouts
                 "inbox_process",
                 [
                     sys.executable,
                     str(SCRIPTS / "inbox_process.py"),
                     "--apply",
                     "--limit",
-                    "60",
-                    "--grunt-cap",
-                    "8",
+                    "80",
+                    "--no-grunt",
                 ],
-                400,
+                600,
             ),
             (
                 "train",
@@ -206,6 +219,59 @@ def main() -> int:
                 180,
             )
         )
+
+    
+    workers.append(
+        (
+            "domain_indexes",
+            [sys.executable, str(SCRIPTS / "silo_domain_indexes.py")],
+            180,
+        )
+    )
+    workers.append(
+        (
+            "layout_health",
+            [sys.executable, str(SCRIPTS / "silo_layout_health.py")],
+            300,
+        )
+    )
+    workers.append(
+        (
+            "fuse_exact",
+            [sys.executable, str(SCRIPTS / "content_fuse_exact.py"), "--limit", "200"],
+            300,
+        )
+    )
+    workers.append(
+        (
+            "robust_ocr_ladder",
+            [sys.executable, str(SCRIPTS / "silo_robust_ocr_ladder.py"), "--limit", "10", "--max-pages", "4"],
+            300,
+        )
+    )
+
+    
+    workers.append(
+        (
+            "folder_dossiers",
+            [sys.executable, str(SCRIPTS / "silo_folder_dossiers.py"), "--limit", "80"],
+            180,
+        )
+    )
+    workers.append(
+        (
+            "person_file_graph",
+            [sys.executable, str(SCRIPTS / "silo_person_file_graph.py"), "--limit-files", "20000"],
+            240,
+        )
+    )
+    workers.append(
+        (
+            "timeline_harvest",
+            [sys.executable, str(SCRIPTS / "silo_timeline_harvest.py"), "--limit", "3000", "--ocr-limit", "80"],
+            180,
+        )
+    )
 
     for name, cmd, timeout in workers:
         code, out = run(cmd, timeout=timeout)

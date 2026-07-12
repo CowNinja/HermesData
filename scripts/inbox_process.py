@@ -17,6 +17,7 @@ Default dry-run. --apply moves on K only (never touches G:).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import sqlite3
@@ -186,22 +187,48 @@ def classify_file(
     octx = origin_context(path, meta)
     parents = octx.get("origin_parents") or []
     sibs = octx.get("origin_siblings") or []
-    origin_blob = " ".join(parents) + " " + " ".join(sibs[:15])
+    # compound dossier from state (neighborhood intelligence)
+    dossier_blob = ""
+    try:
+        src = octx.get("source") or ""
+        if src:
+            parent = str(Path(src).parent)
+            key = hashlib.sha256(parent.lower().encode("utf-8")).hexdigest()[:16]
+            dp = Path(r"D:/HermesData/state/folder_dossiers") / f"{key}.json"
+            if dp.is_file():
+                import json as _json
+                dd = _json.loads(dp.read_text(encoding="utf-8"))
+                dossier_blob = " ".join(dd.get("siblings_sample") or []) + " " + " ".join(dd.get("entity_hits") or [])
+                octx["dossier_key"] = key
+                octx["dossier_entities"] = dd.get("entity_hits")
+    except Exception:
+        pass
+    origin_blob = " ".join(parents) + " " + " ".join(sibs[:15]) + " " + dossier_blob
 
-    # 1 entity on name + origin folders + siblings
+    # 0 bulk origin-folder rules (same SSOT as inbox_bulk_origin_rehome)
+    try:
+        rules_path = Path(r"D:\HermesData\config\inbox_origin_rules.json")
+        if rules_path.is_file():
+            low = str(path).replace("/", "\\").lower()
+            for rule in json.loads(rules_path.read_text(encoding="utf-8")).get("rules") or []:
+                if (rule.get("confidence") or "").lower() == "defer" or not rule.get("domain"):
+                    continue
+                for sub in rule.get("match_any_path_substr") or []:
+                    if sub.lower().replace("/", "\\") in low:
+                        rid = rule.get("id")
+                        return str(rule["domain"]), "origin_rule:" + str(rid), octx
+    except Exception:
+        pass
     ed = entity_domain(name + " " + origin_blob, entities)
     if ed:
         return ed, "entity+origin", octx
-    # 2 name
     d = domain_for(name)
     if d and "Inbox" not in d:
         return d, "name_rule", octx
-    # 3 origin path + siblings (mountain sorter)
     if origin_blob.strip():
         d2 = domain_for(origin_blob + " " + name)
         if d2 and "Inbox" not in d2:
             return d2, "origin_path", octx
-    # 4 K path under Inbox
     try:
         rel = path.relative_to(INBOX)
         joined = " ".join(rel.parts[:-1]) + " " + name
@@ -210,20 +237,17 @@ def classify_file(
             return d3, "k_path_rule", octx
     except Exception:
         pass
-    # 5 content + origin
     body = peek_text(path)
     if body:
         d4 = domain_for(body[:500] + " " + name + " " + origin_blob[:400])
         if d4 and "Inbox" not in d4:
             return d4, "content_rule", octx
         if use_grunt:
-            gd = grunt_domain(
-                f"{name}\nORIGIN_PARENTS: {parents}\nSIBLINGS: {sibs[:12]}\n{body[:500]}"
-            )
+            gd = grunt_domain(name + " ORIGIN " + str(parents) + " " + str(sibs[:12]) + " " + body[:500])
             if gd:
                 return gd, "grunt+origin", octx
     elif use_grunt:
-        gd = grunt_domain(f"{name}\nORIGIN_PARENTS: {parents}\nSIBLINGS: {sibs[:12]}")
+        gd = grunt_domain(name + " ORIGIN " + str(parents) + " " + str(sibs[:12]))
         if gd:
             return gd, "grunt_name+origin", octx
     return "Core-Personal/_Inbox", "stay", octx
@@ -270,7 +294,15 @@ def main() -> int:
         stats[why] += 1
         if "Inbox" in dom:
             continue
-        dest = SILO / dom / "from-g-drive" / "_rehome-inbox" / p.name
+        # Preserve nested origin tree (anti-flat) — never flatten into _rehome-inbox
+        try:
+            rel = p.relative_to(INBOX / "from-g-drive")
+        except Exception:
+            try:
+                rel = p.relative_to(INBOX)
+            except Exception:
+                rel = Path(p.name)
+        dest = SILO / dom / "from-g-drive" / rel
         if dest.exists():
             digest = __import__("hashlib").sha256(str(p).encode()).hexdigest()[:8]
             dest = dest.with_name(f"{dest.stem}__{digest}{dest.suffix}")

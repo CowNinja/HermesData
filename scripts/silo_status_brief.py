@@ -86,6 +86,34 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")
     print(text)
+    # observability JSONL (observability skill)
+    try:
+        import urllib.request
+        entry = {
+            "timestamp": datetime.now(timezone.utc).astimezone().isoformat(),
+            "source": "silo_status_brief",
+            "registry": None,
+            "ports": {
+                "8642": port(8642),
+                "8090": port(8090),
+                "8091": port(8091),
+                "8188": port(8188),
+            },
+            "summary": "silo brief written",
+        }
+        if DB.is_file():
+            con = sqlite3.connect(str(DB))
+            entry["registry"] = con.execute("SELECT COUNT(*) FROM ingest").fetchone()[0]
+            entry["unique"] = con.execute(
+                "SELECT COUNT(DISTINCT sha256) FROM ingest WHERE sha256 IS NOT NULL AND sha256!=''"
+            ).fetchone()[0]
+            con.close()
+        jl = Path(r"D:/PhronesisVault/Operations/logs/operator-console.jsonl")
+        jl.parent.mkdir(parents=True, exist_ok=True)
+        with jl.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + chr(10))
+    except Exception:
+        pass
     return 0
 
 

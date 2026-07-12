@@ -13,6 +13,27 @@ _ENTITY = _Path(r"D:\HermesData\config\entity_context.json")
 
 # Order matters — first regex match wins (after entity longest-match)
 RULES: list[tuple[re.Pattern[str], str]] = [
+    # --- Origin-folder bulk (Paperless-style path routing; 2026-07-12) ---
+    (
+        re.compile(r"amazon\s*drive\s*\(?restored\)?|amazon drive\(restored\)", re.I),
+        "Core-Personal/Life-Archive",
+    ),
+    (
+        re.compile(
+            r"phillips?\s*dream\s*mapper|dream\s*mapper\s*cpap|dreammapper", re.I
+        ),
+        "Medical-Records",
+    ),
+    (
+        re.compile(r"ancestry\s*(genealogy|dna)?|genealogy\s*dna", re.I),
+        "Core-Personal/Family",
+    ),
+    (
+        re.compile(r"fullcontact|contactzilla|google\s*contacts", re.I),
+        "Digital-Footprint",
+    ),
+    (re.compile(r"\bifttt\b", re.I), "Digital-Footprint"),
+    (re.compile(r"cowninja\.com|\bcowninja\b", re.I), "Core-Personal/Projects"),
     # Sisters — Jeff 2026-07-12 (marital surnames)
     (
         re.compile(
