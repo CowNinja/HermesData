@@ -289,9 +289,52 @@ def should_process_deep(path: Path, state: Dict[str, Any]) -> bool:
     except:
         return True
 
+# Never plant 00-INDEX.md inside package trees / tooling (Graph orphan factories)
+INDEX_SKIP_PARTS = {
+    "node_modules",
+    ".git",
+    "__pycache__",
+    "tmp",
+    "temp",
+    ".obsidian",
+    ".smart-env",
+    ".trash",
+    "archives",
+    "site-packages",
+    "alice_venv",
+    "venv",
+    ".venv",
+    "dist-info",
+    ".dist-info",
+    "Lib",
+    "Scripts",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".tox",
+    "asar-check-tmp",
+    "asar-patch-tmp",
+}
+
+
+def _should_skip_index_dir(dirpath: Path) -> bool:
+    parts_lower = {p.lower() for p in dirpath.parts}
+    if parts_lower & {p.lower() for p in INDEX_SKIP_PARTS}:
+        return True
+    name = dirpath.name.lower()
+    if name.endswith(".dist-info") or name.endswith(".egg-info"):
+        return True
+    if name.startswith(".") and name not in {".", ".."}:
+        # skip hidden tooling dirs; keep normal vault folders
+        if name in {".github"}:
+            return True
+    return False
+
+
 def update_per_folder_indexes(root: Path, silo_name: str, state: Dict[str, Any], is_light: bool) -> int:
-    """Accurate index updates in EVERY single directory (even empty) for easy navigation and file/content location.
-    Always creates/updates 00-INDEX.md or INDEX.md with gates and Where To Go.
+    """Index updates for navigable folders (not every package subtree).
+
+    Skips venv/site-packages/node_modules so Graph is not flooded with orphan
+    00-INDEX.md files. Living CNS folders still get lightweight maps.
     """
     updated = 0
     if not root.exists():
@@ -299,13 +342,28 @@ def update_per_folder_indexes(root: Path, silo_name: str, state: Dict[str, Any],
     for dirpath in root.rglob("*"):
         if not dirpath.is_dir():
             continue
-        if any(x in str(dirpath).lower() for x in ["node_modules", ".git", "__pycache__", "tmp", ".obsidian", ".smart-env", ".trash", "archives"]):
+        if _should_skip_index_dir(dirpath):
             continue
         if not should_process_deep(dirpath, state):
             continue
-        files = [f for f in dirpath.iterdir() if f.is_file()]
+        try:
+            files = [f for f in dirpath.iterdir() if f.is_file()]
+            md_files = [f for f in files if f.suffix.lower() == ".md" and f.name.lower() not in ("00-index.md", "index.md")]
+        except OSError:
+            continue
         idx_file = dirpath / "00-INDEX.md" if not (dirpath / "INDEX.md").exists() else dirpath / "INDEX.md"
-        content = f"""# {dirpath.name} INDEX (VaultWalker v0.7.0, {datetime.now().strftime('%Y-%m-%d')}) Silo: {silo_name}
+        # Prefer wikilinks for .md so Graph gains edges when indexes are used
+        file_lines = []
+        for f in sorted(md_files, key=lambda p: p.name.lower())[:40]:
+            try:
+                rel = f.relative_to(root)
+                stem = str(rel.with_suffix("")).replace("\\", "/")
+                file_lines.append(f"- [[{stem}|{f.name}]]")
+            except ValueError:
+                file_lines.append(f"- `{f.name}`")
+        if not file_lines:
+            file_lines = [f"- (no markdown; {len(files)} other files)"]
+        content = f"""# {dirpath.name} INDEX (VaultWalker v0.7.1, {datetime.now().strftime('%Y-%m-%d')}) Silo: {silo_name}
 
 **Separation + Explicit Gates**: Agent reads this first.
 - Explicit RP material is centralized ONLY in RoleplaySandbox (block by default elsewhere).
@@ -316,14 +374,16 @@ Where To Go:
 - Add PKG + residency tags on review.
 - Only relocate on confirmed explicit-rp via local model.
 
-Files: {len(files)}
-(Every directory gets an index for complete navigation and content discovery.)
+## Files
+{chr(10).join(file_lines)}
+
+Files total: {len(files)}
 """
         try:
             with open(idx_file, "w", encoding="utf-8") as fh:
                 fh.write(content)
             updated += 1
-        except:
+        except OSError:
             continue
     return updated
 
