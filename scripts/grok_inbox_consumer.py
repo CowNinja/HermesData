@@ -24,6 +24,8 @@ PROXY_RESTART = ROOT / "scripts" / "Start-Sovereign-Proxy-8091.ps1"
 
 GATEWAY = "http://127.0.0.1:8642/v1/chat/completions"
 MODEL = "phronesis-sovereign-auto"
+MODEL_IMAGE_MODE = "grok-build-0.1"  # cloud when :8090 yielded for Comfy
+VRAM_PRIORITY_FILE = ROOT / "state" / "vram-priority.json"
 DISCORD_API = "https://discord.com/api/v10"
 
 PRIORITY_ORDER = {"P0": 0, "P1": 1, "P2": 2}
@@ -84,12 +86,31 @@ def _api_key() -> str:
     raise RuntimeError("API_SERVER_KEY missing")
 
 
+def _vram_mode() -> str:
+    try:
+        if VRAM_PRIORITY_FILE.is_file():
+            data = json.loads(VRAM_PRIORITY_FILE.read_text(encoding="utf-8-sig"))
+            return str(data.get("mode") or "text").strip().lower()
+    except Exception:
+        pass
+    return "text"
+
+
+def _collab_model() -> str:
+    """Use cloud model when Qwythos is intentionally down (VRAM image mode)."""
+    if _vram_mode() == "image":
+        return MODEL_IMAGE_MODE
+    return MODEL
+
+
 def stack_green() -> bool:
-    for url in (
+    urls = [
         "http://127.0.0.1:8091/health",
         "http://127.0.0.1:8642/health",
-        "http://127.0.0.1:8090/health",
-    ):
+    ]
+    if _vram_mode() != "image":
+        urls.append("http://127.0.0.1:8090/health")
+    for url in urls:
         try:
             with urllib.request.urlopen(url, timeout=5) as resp:
                 if resp.status != 200:
@@ -176,7 +197,7 @@ def _sharpen_prompt(request_text: str) -> str:
 
 def _call_hermes(prompt: str, session_key: str, session_id: str) -> tuple[str, str]:
     payload = {
-        "model": MODEL,
+        "model": _collab_model(),
         "messages": [
             {"role": "system", "content": CONSUMER_SYSTEM},
             {"role": "user", "content": prompt},

@@ -112,11 +112,11 @@ def main() -> int:
                     str(args.drain_limit),
                 ]
                 + (
-                    ["--ai-inbox", "--ai-inbox-cap", "8"]
+                    ["--ai-inbox", "--ai-inbox-cap", "12"]
                     if local_llm
                     else []
                 ),
-                900,
+                1800,
             )
         )
     workers.extend(
@@ -153,6 +153,19 @@ def main() -> int:
                     "--apply",
                 ],
                 300,
+            ),
+            (
+                "inbox_process",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "inbox_process.py"),
+                    "--apply",
+                    "--limit",
+                    "60",
+                    "--grunt-cap",
+                    "8",
+                ],
+                400,
             ),
             (
                 "train",

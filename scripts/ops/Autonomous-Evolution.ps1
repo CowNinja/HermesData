@@ -91,7 +91,7 @@ function Invoke-EvolutionCycle([hashtable]$st) {
         } catch {}
     }
 
-    # Pattern: Comfy down -> start (skip when image pipeline paused for sovereign router)
+    # Pattern: Comfy down -> start (skip when paused OR vram text / silo-primary)
     $pipelinePaused = $false
     $pauseFile = Join-Path $root "state\image-pipeline-pause.json"
     if (Test-Path $pauseFile) {
@@ -100,15 +100,26 @@ function Invoke-EvolutionCycle([hashtable]$st) {
             $pipelinePaused = [bool]$pauseState.paused
         } catch {}
     }
+    $vramMode = "unknown"
+    $siloPrimary = $false
+    $vramFile = Join-Path $root "state\vram-priority.json"
+    if (Test-Path $vramFile) {
+        try {
+            $vramState = Get-Content $vramFile -Raw | ConvertFrom-Json
+            $vramMode = [string]$vramState.mode
+            $siloPrimary = [bool]$vramState.silo_primary
+        } catch {}
+    }
+    $textPriority = ($vramMode -eq "text") -or $siloPrimary
     $comfyUp = $false
     try {
         Invoke-RestMethod -Uri "http://127.0.0.1:8188/system_stats" -TimeoutSec 4 | Out-Null
         $comfyUp = $true
     } catch {}
-    if ($pipelinePaused) {
+    if ($pipelinePaused -or $textPriority) {
         if ($comfyUp) {
             & "D:\ComfyUI\Comfy-Stack.ps1" stop inference -Quiet 2>&1 | Out-Null
-            $actions += "stop_comfy_paused"
+            $actions += if ($textPriority) { "stop_comfy_vram_text" } else { "stop_comfy_paused" }
         }
     } elseif (-not $comfyUp) {
         & "D:\ComfyUI\Comfy-Stack.ps1" start inference -Quiet | Out-Null

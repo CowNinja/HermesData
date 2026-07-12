@@ -98,12 +98,26 @@ def main() -> int:
             ]:
                 # Idempotent-ish: re-run is ok if no matching files left
                 results.append(run_script(s, timeout=900))
-        results.append(run_script("vault_wikilink_repair_after_distill.py", timeout=900))
         results.append(run_script("refresh_folder_indexes.py", timeout=300))
         results.append(run_script("fill_missing_indexes.py", timeout=300))
+        results.append(
+            run_script(
+                "vault_hub_backlink_pass.py",
+                ["--apply", "--limit", "400"],
+                timeout=900,
+            )
+        )
+        results.append(run_script("vault_wikilink_repair_after_distill.py", timeout=900))
     else:
-        # daily light
+        # daily light: indexes (wikilinked) → hub backlinks for living orphans → repair
         results.append(run_script("refresh_folder_indexes.py", timeout=300))
+        results.append(
+            run_script(
+                "vault_hub_backlink_pass.py",
+                ["--apply", "--limit", "150"],
+                timeout=600,
+            )
+        )
         results.append(run_script("vault_wikilink_repair_after_distill.py", timeout=600))
 
     worst = max((r.get("exit") or 0) for r in results) if results else 0

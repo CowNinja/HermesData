@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 PAUSE_PATH = Path(r"D:\HermesData\state\image-pipeline-pause.json")
+VRAM_PATH = Path(r"D:\HermesData\state\vram-priority.json")
 
 
 def _utc_now() -> str:
@@ -22,6 +23,16 @@ def load_pause_state() -> Dict[str, Any]:
         return data if isinstance(data, dict) else {"paused": False}
     except Exception:
         return {"paused": False}
+
+
+def silo_primary_active() -> bool:
+    if not VRAM_PATH.is_file():
+        return False
+    try:
+        data = json.loads(VRAM_PATH.read_text(encoding="utf-8-sig"))
+        return bool(data.get("silo_primary")) and str(data.get("mode", "")).lower() == "text"
+    except Exception:
+        return False
 
 
 def image_pipeline_paused() -> bool:
@@ -68,7 +79,16 @@ def main() -> int:
     if args.action == "pause":
         state = set_image_pipeline_paused(True, reason=args.reason or "operator_pause", note=args.note)
     elif args.action == "resume":
-        state = set_image_pipeline_paused(False, reason=args.reason or "operator_resume", note=args.note)
+        if silo_primary_active() and args.reason in ("comfy_stack_start", ""):
+            state = set_image_pipeline_paused(
+                True,
+                reason="silo_primary",
+                note="resume blocked — run .\\Phronesis.ps1 vram image first",
+            )
+        else:
+            state = set_image_pipeline_paused(
+                False, reason=args.reason or "operator_resume", note=args.note
+            )
     else:
         state = load_pause_state()
     print(json.dumps(state, indent=2))

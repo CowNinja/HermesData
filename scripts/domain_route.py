@@ -13,6 +13,17 @@ _ENTITY = _Path(r"D:\HermesData\config\entity_context.json")
 
 # Order matters — first regex match wins (after entity longest-match)
 RULES: list[tuple[re.Pattern[str], str]] = [
+    # Sisters — Jeff 2026-07-12 (marital surnames)
+    (
+        re.compile(
+            r"jodi\s+(suzanne\s+)?(bloom|edwards|eichelberger)|"
+            r"eichelberger|"
+            r"jenni\s+(debra\s+)?(bloom|harris|kamies)|"
+            r"jennifer\s+(debra\s+)?(bloom|harris|kamies)",
+            re.I,
+        ),
+        "Core-Personal/Family",
+    ),
     (
         re.compile(r"va\s*dmv|dmv\b.*driver|temporary driving permit", re.I),
         "Core-Personal/Finance",

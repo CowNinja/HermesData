@@ -69,23 +69,23 @@ def domain_for(name: str, path_hint: str = "") -> str:
 
 
 def copy_file(src: Path, dest: Path) -> str:
-    """Efficient copy: robocopy for large files, shutil.copy2 otherwise.
+    """Efficient copy: robocopy for multi-MB files, buffered shutil otherwise.
 
-    Returns method tag: robocopy|shutil
+    Returns method tag: robocopy|shutil_buf|shutil
+    Full-tree robocopy is intentionally NOT used — we must classify per file.
     """
     import subprocess
     dest.parent.mkdir(parents=True, exist_ok=True)
     size = src.stat().st_size
-    # robocopy shines on larger files / Windows paths
-    if size >= 8 * 1024 * 1024:  # 8 MB+
-        # robocopy needs dir args; copy single file
+    # robocopy: large files on Windows (unbuffered I/O)
+    if size >= 2 * 1024 * 1024:  # 2 MB+
         cmd = [
             "robocopy",
             str(src.parent),
             str(dest.parent),
             src.name,
             "/J",  # unbuffered
-            "/R:2",
+            "/R:1",
             "/W:1",
             "/NFL",
             "/NDL",
@@ -93,12 +93,20 @@ def copy_file(src: Path, dest: Path) -> str:
             "/NJS",
             "/NC",
             "/NS",
+            "/NP",
         ]
         r = subprocess.run(cmd, capture_output=True, text=True)
-        # robocopy exit 0-7 success
-        if r.returncode < 8 and dest.exists():
+        if r.returncode < 8 and dest.exists() and dest.stat().st_size == size:
             return "robocopy"
-        # fallback
+    # buffered binary copy for medium/small (faster than tiny default)
+    if size >= 64 * 1024:
+        with src.open("rb") as rf, dest.open("wb") as wf:
+            shutil.copyfileobj(rf, wf, length=8 * 1024 * 1024)
+        try:
+            shutil.copystat(src, dest)
+        except Exception:
+            pass
+        return "shutil_buf"
     shutil.copy2(src, dest)
     return "shutil"
 
@@ -175,9 +183,10 @@ def main() -> int:
     )
     args = ap.parse_args()
     # Default: historical MemoryCard GD only (NOT live D: My Drive — avoid re-dupe)
+    # ARCHIVE FIRST — live folder is ~97% done; scanning it first wasted waves on skip-exists.
     sources = [Path(s) for s in args.source] or [
-        Path(r"G:\MemoryCard_Backups\Google Drive"),
         Path(r"G:\MemoryCard_Backups\Google Drive(archive)"),
+        Path(r"G:\MemoryCard_Backups\Google Drive"),
     ]
 
     # Known sources from ingest registry → skip early (wave efficiency)
@@ -189,6 +198,21 @@ def main() -> int:
                 "SELECT source_path FROM ingest WHERE status IN ('copied','verified','processed')"
             ).fetchall()
             skip_sources = {r[0] if not hasattr(r, 'keys') else r['source_path'] for r in rows}
+        except Exception:
+            pass
+
+    # In-memory hash set — O(1) dupe checks (archive overlaps live heavily)
+    known_hashes: set[str] = set()
+    if icon_pre is not None:
+        try:
+            for (h,) in icon_pre.execute(
+                "SELECT sha256 FROM hash_seen WHERE sha256 IS NOT NULL AND sha256!=''"
+            ):
+                known_hashes.add(h)
+            for (h,) in icon_pre.execute(
+                "SELECT DISTINCT sha256 FROM ingest WHERE sha256 IS NOT NULL AND sha256!=''"
+            ):
+                known_hashes.add(h)
         except Exception:
             pass
 
@@ -222,13 +246,14 @@ def main() -> int:
 
     planned = []
     ai_used = 0
-    # Scan more aggressively: need `limit` candidates not already registered
+    # Oversample candidates: archive has many content-dupes of live GD.
+    # Plan more than limit so apply can fill real copies after hash skips.
+    plan_cap = max(args.limit * 4, args.limit + 200)
     for src_root in sources:
-        if len(planned) >= args.limit:
+        if len(planned) >= plan_cap:
             break
-        need = args.limit - len(planned)
-        # pull a large candidate pool then fill
-        pool = iter_candidates(src_root, max(need * 50, 5000), skip_sources=skip_sources)
+        need = plan_cap - len(planned)
+        pool = iter_candidates(src_root, max(need * 100, 20000), skip_sources=skip_sources)
         for f in pool:
             dom = domain_for(f.name)
             if args.ai_inbox and dom.endswith("_Inbox") and ai_used < args.ai_inbox_cap:
@@ -242,7 +267,7 @@ def main() -> int:
                     pass
             dest = unique_dest(f, src_root, dom)
             planned.append((f, dest, dom, str(src_root)))
-            if len(planned) >= args.limit:
+            if len(planned) >= plan_cap:
                 break
 
     # Enforce Class 2 only (personal purge-eligible). Skip class 1/3.
@@ -271,6 +296,8 @@ def main() -> int:
     meta_batch = []
     icon = ingest_connect() if ingest_connect else None
     for src, dest, dom, root in planned:
+        if args.apply and copied >= args.limit:
+            break
         status = "planned"
         # Registry / filesystem guards against re-processing
         if dest.exists():
@@ -282,9 +309,12 @@ def main() -> int:
         elif args.apply:
             try:
                 digest = sha256_file(src)
-                if icon is not None and already_have_hash and already_have_hash(icon, digest):
+                if digest in known_hashes or (
+                    icon is not None and already_have_hash and already_have_hash(icon, digest)
+                ):
                     status = "skip-registry-hash"
                     skipped += 1
+                    known_hashes.add(digest)
                     # Register source alias so next waves don't re-plan same bytes
                     if ingest_register:
                         try:
@@ -321,6 +351,7 @@ def main() -> int:
                         icon.commit()
                     status = "copied"
                     copied += 1
+                    known_hashes.add(digest)
             except Exception as e:
                 status = f"ERR {e}"
                 try:

@@ -32,12 +32,14 @@ from typing import Any, Dict, Tuple
 
 SCRIPTS = Path(r"D:\HermesData\scripts")
 STATE = Path(r"D:\HermesData\state\silo_continuous_state.json")
+VRAM_STATE = Path(r"D:\HermesData\state\vram-priority.json")
 STOP = Path(r"D:\HermesData\state\silo_continuous.STOP")
 LOG = Path(r"D:\PhronesisVault\Operations\logs\silo-continuous-loop-latest.md")
 
 # Thresholds (RTX 3060 12GB class)
-VRAM_GENTLE_MIB = 9000      # above → no local LLM grunt
-VRAM_PAUSE_MIB = 11500      # above → pause cook
+VRAM_GENTLE_MIB = 9000      # above → no local LLM grunt (dual-stack / Comfy hot)
+VRAM_SILO_PRIMARY_GENTLE_MIB = 11000  # Qwythos-only baseline ~9.3GB is expected
+VRAM_PAUSE_MIB = 11800      # above → pause cook
 RAM_GENTLE_PCT = 85
 RAM_PAUSE_PCT = 93
 DISK_K_MIN_GB = 50
@@ -100,6 +102,16 @@ def disk_free_gb(root: str) -> float | None:
         return None
 
 
+def silo_primary_active() -> bool:
+    if not VRAM_STATE.is_file():
+        return False
+    try:
+        data = json.loads(VRAM_STATE.read_text(encoding="utf-8-sig"))
+        return bool(data.get("silo_primary")) and str(data.get("mode", "")).lower() == "text"
+    except Exception:
+        return False
+
+
 def port_up(port: int) -> bool:
     import urllib.request
 
@@ -135,23 +147,30 @@ def assess() -> Dict[str, Any]:
     elif ram is not None and ram >= RAM_PAUSE_PCT:
         mode = "pause"
         reasons.append(f"RAM {ram}% critical")
-    elif (vram is not None and vram >= VRAM_GENTLE_MIB) or (
-        ram is not None and ram >= RAM_GENTLE_PCT
-    ) or comfy:
-        # Comfy up → assume image work possible; gentle by default when comfy listening
-        # Still allow cook, but no heavy concurrent LLM if VRAM high
-        if vram is not None and vram >= VRAM_GENTLE_MIB:
-            mode = "gentle"
-            reasons.append(f"VRAM {vram}MiB or Comfy present")
-        elif comfy and (vram is None or vram > 6000):
-            mode = "gentle"
-            reasons.append("Comfy up + VRAM mid")
-        else:
-            mode = "normal"
+    # Disk copy does NOT need GPU. Only pause when system is critically loaded.
+    # "gentle" = reduce enrich/train + disable Qwythos grunt, NOT starve drain.
+    elif ram is not None and ram >= RAM_GENTLE_PCT:
+        mode = "gentle"
+        reasons.append(f"RAM {ram}% high")
+    elif (
+        silo_primary_active()
+        and qwy
+        and not comfy
+        and vram is not None
+        and vram < VRAM_PAUSE_MIB
+    ):
+        mode = "normal"
+        reasons.append(
+            f"silo_primary Qwythos-only — VRAM {vram}MiB expected, grunt enabled"
+        )
+    elif vram is not None and vram >= (
+        VRAM_SILO_PRIMARY_GENTLE_MIB if silo_primary_active() else VRAM_GENTLE_MIB
+    ):
+        mode = "gentle"
+        reasons.append(f"VRAM {vram}MiB high — drain full, no LLM grunt")
     else:
-        mode = "aggressive" if qwy and proxy else "normal"
-        if mode == "aggressive":
-            reasons.append("resources free + Qwythos up")
+        mode = "aggressive" if (k_free or 0) > 200 else "normal"
+        reasons.append("disk free enough for stepped-up drain")
 
     return {
         "mode": mode,
@@ -167,14 +186,16 @@ def assess() -> Dict[str, Any]:
 
 
 def limits_for(mode: str) -> Dict[str, int]:
+    # Drain is disk-bound and safe at higher batch sizes; enrich stays modest.
     if mode == "aggressive":
-        return {"drain": 400, "enrich": 50, "train": 30, "reroute": 25, "sleep": 90}
+        return {"drain": 600, "enrich": 40, "train": 25, "reroute": 20, "sleep": 45}
     if mode == "gentle":
-        return {"drain": 150, "enrich": 20, "train": 10, "reroute": 10, "sleep": 300}
+        # Still copy fast; only lighten GPU-adjacent work
+        return {"drain": 450, "enrich": 15, "train": 8, "reroute": 10, "sleep": 75}
     if mode == "pause":
         return {"drain": 0, "enrich": 0, "train": 0, "reroute": 0, "sleep": 600}
     # normal
-    return {"drain": 250, "enrich": 35, "train": 20, "reroute": 15, "sleep": 180}
+    return {"drain": 500, "enrich": 30, "train": 20, "reroute": 15, "sleep": 60}
 
 
 def run_tick(limits: Dict[str, int], allow_grunt: bool) -> Dict[str, Any]:
@@ -194,7 +215,7 @@ def run_tick(limits: Dict[str, int], allow_grunt: bool) -> Dict[str, Any]:
         cmd.append("--no-grunt")
     if limits["drain"] == 0:
         cmd.append("--no-drain")
-    code, out = _run(cmd, timeout=1800)
+    code, out = _run(cmd, timeout=2400)
     try:
         # last json block
         j = out[out.rfind("{") : out.rfind("}") + 1]

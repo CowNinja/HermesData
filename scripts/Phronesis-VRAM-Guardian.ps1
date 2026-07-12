@@ -41,12 +41,21 @@ function Port-Up([int]$port) {
     return [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
 }
 
-function Write-ModeState([string]$mode) {
+function Write-ModeState([string]$mode, [switch]$SiloPrimary, [switch]$ClearSiloPrimary) {
     New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
-    @{
+    $keepSilo = $false
+    if (Test-Path $stateFile) {
+        try { $keepSilo = [bool]((Get-Content $stateFile -Raw | ConvertFrom-Json).silo_primary) } catch {}
+    }
+    $payload = @{
         mode    = $mode
         updated = (Get-Date).ToString("o")
-    } | ConvertTo-Json | Set-Content -Path $stateFile -Encoding UTF8
+    }
+    if ($SiloPrimary) { $payload.silo_primary = $true }
+    elseif ($keepSilo -and -not $ClearSiloPrimary -and $mode -eq 'text') { $payload.silo_primary = $true }
+    elseif ($ClearSiloPrimary) { $payload.silo_primary = $false }
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($stateFile, ($payload | ConvertTo-Json -Compress), $utf8NoBom)
 }
 
 function Get-ComfyVramMode {
@@ -163,7 +172,7 @@ switch ($Mode) {
             Log "Starting ComfyUI inference via Comfy-Stack..."
             & powershell -NoProfile -ExecutionPolicy Bypass -File $comfyStack start inference
         }
-        Write-ModeState 'image'
+        Write-ModeState 'image' -ClearSiloPrimary
         Show-Status
         exit 0
     }

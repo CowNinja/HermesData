@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Hermes cron entry: daily vault hygiene audit (delegates to PhronesisVault scripts)."""
+"""Hermes cron entry: daily vault hygiene audit (delegates to PhronesisVault scripts).
+
+Also runs a bounded hub-backlink pass so Daily-F is no longer proposal-only.
+"""
 from __future__ import annotations
 
 import subprocess
@@ -9,13 +12,15 @@ from pathlib import Path
 VAULT_SCRIPT = Path(r"D:\PhronesisVault\scripts\daily_vault_hygiene_audit.py")
 LINK_AUDIT = Path(r"D:\PhronesisVault\scripts\vault_link_audit.py")
 LINK_LINT = Path(r"D:\PhronesisVault\scripts\vault_link_lint.py")
+HUB_PASS = Path(r"D:\HermesData\scripts\vault_hub_backlink_pass.py")
+INDEX_REFRESH = Path(r"D:\HermesData\scripts\refresh_folder_indexes.py")
 
 
-def run(script: Path) -> int:
+def run(script: Path, extra: list[str] | None = None) -> int:
     if not script.exists():
         print(f"MISSING {script}")
         return 1
-    return subprocess.call([sys.executable, str(script)])
+    return subprocess.call([sys.executable, str(script), *(extra or [])])
 
 
 def main() -> int:
@@ -24,7 +29,18 @@ def main() -> int:
         print("VAULT_CONFIRMED FAIL")
         return 1
     print(f"VAULT_CONFIRMED={vault}")
-    # Core hygiene scripts — these MUST pass
+
+    # 1) Refresh living indexes with real [[wikilinks]] (graph edges)
+    code = run(INDEX_REFRESH)
+    if code != 0:
+        print(f"WARN: {INDEX_REFRESH.name} exited {code}")
+
+    # 2) Bounded Daily-F: attach living orphans to hubs (was proposal-only)
+    code = run(HUB_PASS, ["--apply", "--limit", "150"])
+    if code != 0:
+        print(f"WARN: {HUB_PASS.name} exited {code}")
+
+    # 3) Core hygiene audit + link audit — MUST pass
     for script in (VAULT_SCRIPT, LINK_AUDIT):
         code = run(script)
         if code != 0:
@@ -33,7 +49,10 @@ def main() -> int:
     # Link lint is advisory — report but don't fail
     code = run(LINK_LINT)
     if code != 0:
-        print(f"ADVISORY: {LINK_LINT.name} found issues (exit {code}) — see Operations/Vault-Link-Lint-latest.json")
+        print(
+            f"ADVISORY: {LINK_LINT.name} found issues (exit {code}) — "
+            "see Operations/Vault-Link-Lint-latest.json"
+        )
     print("daily-vault-hygiene OK")
     return 0
 

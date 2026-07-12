@@ -491,14 +491,22 @@ def scan_log_patterns() -> Dict[str, Any]:
     return {"hits": hits, "active_patterns": active, "samples": samples}
 
 
-def _load_vram_mode() -> str:
+def _load_vram_state() -> dict:
     if not VRAM_STATE.is_file():
-        return "unknown"
+        return {}
     try:
-        raw = json.loads(VRAM_STATE.read_text(encoding="utf-8"))
-        return str(raw.get("mode") or "unknown")
+        raw = json.loads(VRAM_STATE.read_text(encoding="utf-8-sig"))
+        return raw if isinstance(raw, dict) else {}
     except Exception:
-        return "unknown"
+        return {}
+
+
+def _load_vram_mode() -> str:
+    return str(_load_vram_state().get("mode") or "unknown")
+
+
+def _silo_primary() -> bool:
+    return bool(_load_vram_state().get("silo_primary"))
 
 
 def _maintenance_lock_active() -> Dict[str, Any]:
@@ -524,11 +532,13 @@ def vram_mode_recovery() -> Dict[str, Any]:
         return {"vram_mode": _load_vram_mode(), "skipped": True, "reason": lock.get("reason")}
 
     mode = _load_vram_mode()
+    silo_primary = _silo_primary()
+    text_priority = mode == "text" or silo_primary
     actions: list[Dict[str, Any]] = []
     yield_text = SCRIPTS / "Phronesis-Yield-VRAM-For-Text.ps1"
     comfy_stack = Path(r"D:\ComfyUI\Comfy-Stack.ps1")
 
-    if mode == "text" and _port_open(8188):
+    if text_priority and _port_open(8188):
         try:
             proc = run_hidden(
                 hidden_powershell_args(str(SCRIPTS / "Phronesis-Yield-VRAM-For-Text.ps1"), "-Quiet"),
@@ -547,7 +557,7 @@ def vram_mode_recovery() -> Dict[str, Any]:
         except Exception as exc:
             actions.append({"action": "yield_comfy_text_mode", "ok": False, "error": str(exc)})
 
-    if mode == "text" and not _port_open(8090):
+    if text_priority and not _port_open(8090):
         try:
             proc = run_hidden(
                 hidden_powershell_args(str(yield_text), "-StartLlama", "-Quiet"),
@@ -597,7 +607,13 @@ def vram_mode_recovery() -> Dict[str, Any]:
         except Exception as exc:
             actions.append({"action": "stop_comfy_pipeline_paused", "ok": False, "error": str(exc)})
 
-    if mode == "image" and not pipeline_paused and not _port_open(8188) and comfy_stack.is_file():
+    if (
+        mode == "image"
+        and not silo_primary
+        and not pipeline_paused
+        and not _port_open(8188)
+        and comfy_stack.is_file()
+    ):
         try:
             proc = run_hidden(
                 hidden_powershell_args(str(comfy_stack), "start", "inference"),
