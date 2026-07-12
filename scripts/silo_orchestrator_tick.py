@@ -245,7 +245,7 @@ def main() -> int:
     workers.append(
         (
             "robust_ocr_ladder",
-            [sys.executable, str(SCRIPTS / "silo_robust_ocr_ladder.py"), "--limit", "10", "--max-pages", "4"],
+            [sys.executable, str(SCRIPTS / "silo_robust_ocr_ladder.py"), "--limit", "8", "--max-pages", "5"],
             300,
         )
     )
@@ -269,6 +269,33 @@ def main() -> int:
         (
             "timeline_harvest",
             [sys.executable, str(SCRIPTS / "silo_timeline_harvest.py"), "--limit", "3000", "--ocr-limit", "80"],
+            180,
+        )
+    )
+
+    
+    workers.append(
+        (
+            "gray_entities_queue",
+            [sys.executable, str(SCRIPTS / "silo_gray_entities_queue.py")],
+            60,
+        )
+    )
+
+    
+    workers.append(
+        (
+            "ocr_backlog_worker",
+            [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--limit", "12"],
+            480,
+        )
+    )
+
+    
+    workers.append(
+        (
+            "pko_entity_cards",
+            [sys.executable, str(SCRIPTS / "silo_pko_entity_cards.py")],
             180,
         )
     )

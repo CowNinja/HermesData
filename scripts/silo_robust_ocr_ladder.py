@@ -336,6 +336,7 @@ def iter_candidates(roots: list[Path], limit: int) -> list[Path]:
 
 
 def main() -> int:
+    # force-reocr handled via args after parse
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--max-pages", type=int, default=6)

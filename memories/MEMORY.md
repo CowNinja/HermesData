@@ -16,6 +16,6 @@ User explicitly requires stopping freeform batch immediately for Alice; use ONLY
 §
 User experiences cognitive overload/headache while traveling; wants only cliff notes/TLDR and full autonomous identification/fixing of issues (e.g. pipeline problems) without long reports.
 §
-Phase B distill: aggressive via digest+Archive/Distillations-* only (never raw-glue logs); dual STATUS/orchestrator intentional; cron-append=per-job INDEX.
+VA churches: KPC→GBEFC→Crosswater PCA→NRBC(Nansemond,current). Crosswater photos=friends. Wertz=Phil+Amy. Silo travel autonomy+gray phone A/B/C.
 §
-RP seed campaign: 4 candidates/girl, user picks one → lock; phrase "reroll/new face" unlocks; Alice first then core cast. User dreams, agent executes tech.
+Jodi 1st marriage=Edwards only (≠Crosswater Edwards). Melvin Johnson=ITC NCDOC boss. Laura Johnson-McMullan=friend. User dreams, agent builds.
