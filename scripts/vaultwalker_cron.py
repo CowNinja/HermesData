@@ -163,9 +163,24 @@ def parse_summary_from_stdout(stdout: str) -> Dict[str, Any]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Safe VaultWalker cron runner")
-    ap.add_argument("--silos", nargs="*", default=["PhronesisVault", "HermesData", "K_PhronesisSovereign", "RoleplaySandbox"])
+    # no_agent cron cannot pass argv — defaults must finish under Hermes 240s script cap.
+    # Full multi-silo walks (K: alone ~2.7k indexes) exceed 240s and mark the job error forever.
+    default_silos = ["PhronesisVault"]
+    env_silos = os.environ.get("VAULTWALKER_SILOS", "").strip()
+    if env_silos:
+        default_silos = [s.strip() for s in env_silos.split(",") if s.strip()]
+    ap.add_argument("--silos", nargs="*", default=default_silos)
     ap.add_argument("--live", action="store_true", help="Allow live writes only if VAULTWALKER_LIVE=1")
-    ap.add_argument("--timeout", type=int, default=2400, help="Max seconds for walker process")
+    # Stay under Hermes no_agent script timeout (240s). Outer kill is 240s.
+    ap.add_argument("--timeout", type=int, default=int(os.environ.get("VAULTWALKER_TIMEOUT", "200")))
+    # Daily 04:00 job: resurface forgotten ideas (cron-safe, no mass model calls).
+    # Full model deep = manual / weekly green light only.
+    ap.add_argument(
+        "--cycle",
+        choices=["auto", "light", "deep", "resurface"],
+        default=os.environ.get("VAULTWALKER_CYCLE", "resurface").strip() or "resurface",
+        help="Passed to vaultwalker --cycle (default resurface for daily cron)",
+    )
     args = ap.parse_args()
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -174,7 +189,7 @@ def main() -> int:
     live_env = os.environ.get("VAULTWALKER_LIVE", "").strip() == "1"
     dry = not (args.live and live_env)
 
-    cmd = [sys.executable, str(WALKER), "--silos", *args.silos]
+    cmd = [sys.executable, str(WALKER), "--silos", *args.silos, "--cycle", args.cycle]
     if dry:
         cmd.append("--dry-run")
     # if walker supports --live only when not dry; ignore
@@ -182,7 +197,10 @@ def main() -> int:
     log_path = LOG_DIR / "daily_vaultwalker.log"
     started = datetime.now(timezone.utc).isoformat()
     with log_path.open("a", encoding="utf-8") as log:
-        log.write(f"\n=== vaultwalker_cron {started} dry={dry} silos={args.silos} ===\n")
+        log.write(
+            f"\n=== vaultwalker_cron {started} dry={dry} silos={args.silos} "
+            f"cycle={args.cycle} timeout={args.timeout} ===\n"
+        )
 
     try:
         proc = subprocess.run(

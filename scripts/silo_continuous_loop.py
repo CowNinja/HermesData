@@ -188,14 +188,14 @@ def assess() -> Dict[str, Any]:
 def limits_for(mode: str) -> Dict[str, int]:
     # FULL THROTTLE (Jeff 2026-07-12) — still pauses on critical resources.
     if mode == "aggressive":
-        return {"drain": 900, "enrich": 60, "train": 40, "reroute": 30, "sleep": 25}
+        return {"drain": 1200, "enrich": 60, "train": 40, "reroute": 30, "sleep": 25}
     if mode == "gentle":
         # Drain still hot; cut LLM-side only
         return {"drain": 700, "enrich": 20, "train": 12, "reroute": 15, "sleep": 45}
     if mode == "pause":
         return {"drain": 0, "enrich": 0, "train": 0, "reroute": 0, "sleep": 600}
     # normal — elevated
-    return {"drain": 800, "enrich": 45, "train": 30, "reroute": 25, "sleep": 30}
+    return {"drain": 1000, "enrich": 45, "train": 30, "reroute": 25, "sleep": 30}
 
 
 

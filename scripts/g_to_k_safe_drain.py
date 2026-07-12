@@ -182,12 +182,36 @@ def main() -> int:
         help="Source root (repeatable). Defaults to MemoryCard GD + live My Drive",
     )
     args = ap.parse_args()
-    # Default: historical MemoryCard GD only (NOT live D: My Drive — avoid re-dupe)
-    # ARCHIVE FIRST — live folder is ~97% done; scanning it first wasted waves on skip-exists.
-    sources = [Path(s) for s in args.source] or [
-        Path(r"G:\MemoryCard_Backups\Google Drive(archive)"),
-        Path(r"G:\MemoryCard_Backups\Google Drive"),
+    # Default: MemoryCard first; full-throttle adds C2 personal G: trees
+    default_sources = [
+        Path(r"G:/MemoryCard_Backups/Google Drive(archive)"),
+        Path(r"G:/MemoryCard_Backups/Google Drive"),
     ]
+    ft = Path(r"D:/HermesData/state/silo_full_throttle.json")
+    if ft.is_file():
+        try:
+            import json as _json
+            if _json.loads(ft.read_text(encoding="utf-8")).get("enabled"):
+                for extra in (
+                    "G:/NMCP_Imagery_Export",
+                    "G:/Alex",
+                    "G:/Booksbloom",
+                    "G:/Z_Jenni_kids_music",
+                    "G:/Old_music",
+                    "G:/Music RIP",
+                    "G:/OneDrive",
+                    "G:/Downloads",
+                    "G:/Spencer",
+                    "G:/SEC501_Restore",
+                    "G:/FileHistory",
+                    "G:/Head Start",
+                ):
+                    ep = Path(extra)
+                    if ep.is_dir():
+                        default_sources.append(ep)
+        except Exception:
+            pass
+    sources = [Path(s) for s in args.source] or default_sources
 
     # Known sources from ingest registry → skip early (wave efficiency)
     skip_sources: set[str] = set()
@@ -270,11 +294,29 @@ def main() -> int:
             if len(planned) >= plan_cap:
                 break
 
-    # Enforce Class 2 only (personal purge-eligible). Skip class 1/3.
+    # Class filter: 2 always; class 3 hybrid OK for approved G: personal campaigns
+    # (touch_policy defaults unknown→3 — was blocking C2 NMCP/Alex/music entirely).
+    # Still skip class 1 and relevance noise. Never Hermes/Vault/OS.
+    NEVER_ROOTS = (
+        r"D:/HermesData",
+        r"D:/PhronesisVault",
+        r"D:/ComfyUI",
+        r"C:/Windows",
+        r"C:/Program Files",
+        r"G:/Program Files",
+    )
     filtered = []
     for src, dest, dom, root in planned:
+        sp = str(src)
+        if any(sp.startswith(n) or n.lower() in sp.lower() for n in NEVER_ROOTS):
+            continue
         cls, note = touch_classify(src)
-        if cls != 2:
+        if cls == 1:
+            continue
+        if cls not in (2, 3):
+            continue
+        # class 3 only from G: personal (or explicit USB later)
+        if cls == 3 and not (sp.startswith("G:\\") or sp.startswith("G:/")):
             continue
         rel = score_path(src)
         if rel.get("relevance") == "noise":
@@ -303,6 +345,26 @@ def main() -> int:
         if dest.exists():
             status = "skip-exists"
             skipped += 1
+            # Lesson 2026-07-12: dest already on K but source not in registry
+            # → endless re-plans. Register alias so skip_sources works next wave.
+            if args.apply and icon is not None and ingest_register:
+                try:
+                    digest = sha256_file(src) if src.is_file() else ""
+                    ingest_register(
+                        icon, str(src), str(dest), digest=digest or None,
+                        size=src.stat().st_size if src.is_file() else 0,
+                        domain=dom, status="copied",
+                    )
+                    icon.commit()
+                    if digest:
+                        known_hashes.add(digest)
+                except Exception:
+                    pass
+            try:
+                from silo_multi_provenance import merge_meta
+                merge_meta(dest, src, domain=dom)
+            except Exception:
+                pass
         elif icon is not None and already_ingested_source and already_ingested_source(icon, str(src)):
             status = "skip-registry-source"
             skipped += 1
@@ -325,6 +387,11 @@ def main() -> int:
                             icon.commit()
                         except Exception:
                             pass
+                    try:
+                        from silo_multi_provenance import merge_meta
+                        merge_meta(dest, src, digest=digest, domain=dom)
+                    except Exception:
+                        pass
                 else:
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     method = copy_file(src, dest)

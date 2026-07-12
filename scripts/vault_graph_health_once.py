@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""One-shot Graph Health job for Hermes cron (no_agent).
+"""One-shot Graph Health (manual / recovery). Aligns with canonical pipeline.
 
-Order:
-  1) refresh_folder_indexes  — wikilink folder maps (parent→child edges)
-  2) vault_hub_backlink_pass --apply — living-CNS orphan → hub footers
-  3) vault_wikilink_repair_after_distill — rewrite archived targets
-  4) daily hygiene audit + link audit (measure)
+ACT then MEASURE (same order as 05:15 gardener + 06:00 hygiene):
+  1) refresh_folder_indexes
+  2) vault_hub_backlink_pass --apply
+  3) vault_wikilink_repair_after_distill
+  4) daily-vault-hygiene (measure + optional catch-up)
 
-Empty-ish stdout on success; non-zero only on hard failures.
+See: Operations/Vault-Hygiene-Pipeline-Canonical-2026-07-12.md
+Skill: productivity/vault-graph-health
 """
 from __future__ import annotations
 

@@ -98,20 +98,7 @@ def scan() -> dict:
         "alive": daemon_alive,
         "process_running": daemon_process,
     }
-    if not daemon_alive and not daemon_process:
-        issues.append({"code": "daemon_dead", "severity": "high", "pid": daemon_pid})
-
-    checks["delivery_watcher"] = _process_running("watch_comfy_delivery")
-    if not checks["delivery_watcher"]:
-        issues.append({"code": "watcher_down", "severity": "medium"})
-
-    checks["comfy_8188"] = _http_ok("http://127.0.0.1:8188/system_stats")
-    if not checks["comfy_8188"]:
-        issues.append({"code": "comfy_down", "severity": "critical"})
-
-    checks["gateway_8642"] = _http_ok("http://127.0.0.1:8642/health")
-    if not checks["gateway_8642"]:
-        issues.append({"code": "gateway_down", "severity": "high"})
+    # filled after batch_active is known — see below
 
     batch: dict = {}
     if batch_file.is_file():
@@ -120,7 +107,34 @@ def scan() -> dict:
         except Exception:
             batch = {}
     checks["batch_session"] = batch
-    if batch.get("active"):
+    batch_active = bool(batch.get("active"))
+    checks["batch_active"] = batch_active
+
+    if not daemon_alive and not daemon_process:
+        if batch_active:
+            issues.append({"code": "daemon_dead", "severity": "high", "pid": daemon_pid})
+        else:
+            issues.append({"code": "daemon_idle", "severity": "info", "pid": daemon_pid})
+
+    checks["delivery_watcher"] = _process_running("watch_comfy_delivery")
+    # When no RP batch is active, Comfy/watchers may be intentionally offline.
+    # Do not spam cron as hard errors in idle state.
+    if not checks["delivery_watcher"] and batch_active:
+        issues.append({"code": "watcher_down", "severity": "medium"})
+    elif not checks["delivery_watcher"]:
+        issues.append({"code": "watcher_idle", "severity": "info"})
+
+    checks["comfy_8188"] = _http_ok("http://127.0.0.1:8188/system_stats")
+    if not checks["comfy_8188"] and batch_active:
+        issues.append({"code": "comfy_down", "severity": "critical"})
+    elif not checks["comfy_8188"]:
+        issues.append({"code": "comfy_idle", "severity": "info"})
+
+    checks["gateway_8642"] = _http_ok("http://127.0.0.1:8642/health")
+    if not checks["gateway_8642"]:
+        issues.append({"code": "gateway_down", "severity": "high"})
+
+    if batch_active:
         delivered = int(batch.get("delivered_count") or 0)
         total = int(batch.get("total") or 0)
         start = int(batch.get("series_start_png") or 0)
@@ -194,6 +208,8 @@ def scan() -> dict:
             score -= 20
         elif sev == "medium":
             score -= 10
+        elif sev == "info":
+            score -= 0  # idle / intentional offline — not a failure
         else:
             score -= 5
     score = max(0, min(100, score))
@@ -244,7 +260,13 @@ def main() -> int:
     args = parser.parse_args()
 
     report = scan()
-    if args.fix and report.get("issues"):
+    # Only auto-start watchers when a batch is actually active
+    actionable = [
+        i
+        for i in (report.get("issues") or [])
+        if i.get("severity") in ("critical", "high", "medium")
+    ]
+    if args.fix and actionable:
         report = apply_fixes(report, channel=args.channel)
 
     REPORT.parent.mkdir(parents=True, exist_ok=True)
@@ -258,7 +280,11 @@ def main() -> int:
         if report.get("fixes_applied"):
             print(f"fixes: {', '.join(report['fixes_applied'])}")
         print(f"report: {REPORT}")
-    return 0 if report["score"] >= 70 else 1
+    # Cron contract: successful scan = 0. Hard-fail only when active batch still unhealthy.
+    batch_active = bool((report.get("checks") or {}).get("batch_active"))
+    if batch_active and report["score"] < 70:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

@@ -245,7 +245,7 @@ def main() -> int:
     workers.append(
         (
             "robust_ocr_ladder",
-            [sys.executable, str(SCRIPTS / "silo_robust_ocr_ladder.py"), "--limit", "8", "--max-pages", "5"],
+            [sys.executable, str(SCRIPTS / "silo_robust_ocr_ladder.py"), "--limit", "12", "--max-pages", "6"],
             300,
         )
     )
@@ -286,7 +286,7 @@ def main() -> int:
     workers.append(
         (
             "ocr_backlog_worker",
-            [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--limit", "12"],
+            [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--limit", "20"],
             480,
         )
     )
@@ -297,6 +297,24 @@ def main() -> int:
             "pko_entity_cards",
             [sys.executable, str(SCRIPTS / "silo_pko_entity_cards.py")],
             180,
+        )
+    )
+
+    
+    workers.append(
+        (
+            "multi_provenance",
+            [sys.executable, str(SCRIPTS / "silo_multi_provenance.py"), "--limit", "50"],
+            180,
+        )
+    )
+
+    
+    workers.append(
+        (
+            "self_heal_monitor",
+            [sys.executable, str(SCRIPTS / "silo_self_heal_monitor.py")],
+            90,
         )
     )
 

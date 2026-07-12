@@ -217,10 +217,35 @@ CFG = load_config()
 SILOS = {name: Path(s["path"]) for name, s in CFG.get("silos", {}).items()}
 GLOBAL_POLICIES = CFG.get("global", {})
 
+# Set by main() from --cycle; None = auto staggered
+FORCE_CYCLE: str | None = None
+
+
 def is_light_cycle() -> bool:
+    """LIGHT = indexes only; DEEP = model review+relocate; RESURFACE = indexes+stale surface.
+
+    --cycle light|deep|resurface|auto overrides hour-based stagger.
+    auto: hour%12 < 6 → light else resurface (never auto-deep — model path is weekly/manual).
+    """
+    if FORCE_CYCLE == "light":
+        return True
+    if FORCE_CYCLE in ("deep", "resurface"):
+        return False
     if not GLOBAL_POLICIES.get("staggered_cycles", True):
         return False
     return (datetime.now().hour % 12) < 6
+
+
+def is_resurface_only() -> bool:
+    """True when deep-ish but no local-model mass calls (cron-safe)."""
+    if FORCE_CYCLE == "resurface":
+        return True
+    if FORCE_CYCLE == "deep":
+        return False
+    if FORCE_CYCLE == "light":
+        return False
+    # auto deep window → resurface-only (safe); full model deep is explicit --cycle deep
+    return not is_light_cycle()
 
 def file_hash(path: Path) -> str:
     sha = hashlib.sha256()
@@ -475,7 +500,21 @@ def resurface_forgotten_ideas(root: Path, silo_name: str, state: Dict[str, Any])
     now = datetime.now()
     resurf_log = root / "Resurfaced-Ideas.md"
     entries = []
+    skip_parts = {
+        ".git", "node_modules", "__pycache__", ".obsidian", ".smart-env",
+        "Roleplay-Sandbox", "Alice", "alice_venv", "Archive", "site-packages",
+        "venv", ".venv", "Distillations-2026-07-10",
+    }
+    max_surface = 80
     for p in root.rglob("*.md"):
+        if stats["surfaced"] >= max_surface:
+            break
+        try:
+            parts = set(p.parts)
+            if parts & skip_parts:
+                continue
+        except Exception:
+            continue
         if not should_process_deep(p, state):
             continue
         try:
@@ -496,9 +535,9 @@ def resurface_forgotten_ideas(root: Path, silo_name: str, state: Dict[str, Any])
                     if not DRY_RUN:
                         try:
                             p.write_text(text + note, encoding="utf-8")
-                        except:
+                        except Exception:
                             pass
-        except:
+        except Exception:
             continue
     if entries:
         resurf_log.parent.mkdir(parents=True, exist_ok=True)
@@ -539,10 +578,12 @@ def evaluate_and_relocate_misplaced(root: Path, silo_name: str, dry_run: bool = 
             full_check = pstr + " " + preview.lower()
             # Prefilter: only invoke local model on potential explicit candidates
             if not any(kw in full_check for kw in EXPLICIT_RP_KEYWORDS):
-                log.append("KEPT (no explicit keyword, block default): " + str(p))
                 continue
             model_eval = local_model_file_evaluation(preview, str(p), silo_name)
             evaluated += 1
+            if evaluated > 40:
+                log.append("BUDGET: stop after 40 model evals this silo")
+                break
             if model_eval.get("class") == "explicit-rp" and silo_name != "RoleplaySandbox":
                 relocate_to_sandbox(p, dry_run)
                 moved += 1
@@ -565,20 +606,29 @@ def housekeeping_silo(name: str, root: Path) -> Dict:
     stats = {}
     state = load_persistent_state(name)
     is_light = is_light_cycle()
-    print("[VAULTWALKER] " + name + " - " + ("LIGHT" if is_light else "DEEP"))
+    resurface_only = is_resurface_only()
+    mode = "LIGHT" if is_light else ("RESURFACE" if resurface_only else "DEEP")
+    print("[VAULTWALKER] " + name + " - " + mode)
+    sys.stdout.flush()
 
     # Indexes first and accurate every pass
-    idx = update_per_folder_indexes(root, name, state, is_light)
-    cc = clean_code_non_ascii(root) if not is_light else 0
-    mr = review_and_modify_markdowns(root, "", name, state, is_light)
+    idx = update_per_folder_indexes(root, name, state, is_light or resurface_only)
+    cc = clean_code_non_ascii(root) if mode == "DEEP" else 0
+    # Model MD review only on explicit deep (not cron default)
+    mr = review_and_modify_markdowns(root, "", name, state, is_light or resurface_only)
 
-    # Relocate (explicit-only, after review) - pass DRY_RUN
-    reloc = evaluate_and_relocate_misplaced(root, name, DRY_RUN) if not is_light else {"moved": 0, "evaluated": 0}
+    # Explicit relocate only on full deep
+    if mode == "DEEP":
+        reloc = evaluate_and_relocate_misplaced(root, name, DRY_RUN)
+    else:
+        reloc = {"moved": 0, "evaluated": 0, "flagged_non_rp_explicit": 0}
 
+    # Resurface forgotten ideas on resurface + deep
     res = resurface_forgotten_ideas(root, name, state) if not is_light else {}
 
     stats["per_folder_indexes"] = idx
     stats["code_cleaned"] = cc
+    stats["cycle_mode"] = mode
     stats.update({"md_" + k: v for k, v in mr.items()})
     stats["reloc_moved"] = reloc.get("moved", 0)
     stats["reloc_evaluated"] = reloc.get("evaluated", 0)
@@ -596,12 +646,19 @@ def run_silo(name: str, root: Path) -> Tuple[str, Dict]:
     return name, stats
 
 def main():
-    global args, DRY_RUN
+    global args, DRY_RUN, FORCE_CYCLE
     parser = argparse.ArgumentParser(description="VaultWalker v0.7.0 - explicit-only silo housekeeper")
     parser.add_argument("--silos", nargs="*", default=list(SILOS.keys()))
     parser.add_argument("--dry-run", action="store_true", help="Dry run: no writes or moves")
+    parser.add_argument(
+        "--cycle",
+        choices=["auto", "light", "deep", "resurface"],
+        default="auto",
+        help="light=indexes; resurface=indexes+stale surface (cron-safe); deep=model review+relocate; auto=stagger light/resurface",
+    )
     args = parser.parse_args()
     DRY_RUN = bool(args.dry_run)
+    FORCE_CYCLE = None if args.cycle == "auto" else args.cycle
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     summary = {}

@@ -223,11 +223,13 @@ auxiliary:
     base_url: http://127.0.0.1:8091/v1
     api_key: local
     timeout: 60
+  # 2026-07-12: was phronesis-sovereign → HTTP 400 template/parser spam on bg-review
+  # (user-facing Discord still uses primary grok-4.5). Pin review to xai like primary chat.
   background_review:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: xai-oauth
+    model: grok-build-0.1
+    base_url: null
+    api_key: null
     timeout: 120
   moa_aggregator:
     provider: phronesis-sovereign
