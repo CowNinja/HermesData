@@ -318,6 +318,51 @@ def main() -> int:
         )
     )
 
+    
+    workers.append(
+        (
+            "coverage_holistic",
+            [sys.executable, str(SCRIPTS / "silo_coverage_holistic.py")],
+            200,
+        )
+    )
+
+    
+    workers.append(
+        (
+            "harvest_small_bulk",
+            [sys.executable, str(SCRIPTS / "silo_harvest_small_from_bulk_trees.py"), "--limit", "40", "--apply"],
+            120,
+        )
+    )
+
+    
+    workers.append(
+        (
+            "archive_secrets_encrypted",
+            [sys.executable, str(SCRIPTS / "silo_archive_secrets_encrypted_pipeline.py"), "--limit", "30", "--harvest"],
+            180,
+        )
+    )
+
+    
+    
+    workers.append(
+        (
+            "encrypted_unlock_assist",
+            [sys.executable, str(SCRIPTS / "silo_encrypted_unlock_assist.py"), "--limit", "25"],
+            120,
+        )
+    )
+
+    workers.append(
+        (
+            "autonomy_control_plane",
+            [sys.executable, str(SCRIPTS / "silo_autonomy_control_plane.py")],
+            60,
+        )
+    )
+
     for name, cmd, timeout in workers:
         code, out = run(cmd, timeout=timeout)
         # try parse last json object

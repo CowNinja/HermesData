@@ -22,9 +22,9 @@
         "times": 999,
         "completed": 87
       },
-      "enabled": true,
-      "state": "scheduled",
-      "paused_at": null,
+      "enabled": false,
+      "state": "paused",
+      "paused_at": "2026-07-12T19:42:13.220776-04:00",
       "paused_reason": null,
       "created_at": "2026-06-14T11:15:30.249015-04:00",
       "next_run_at": "2026-07-13T00:00:00-04:00",
@@ -76,7 +76,7 @@
       "enabled": false,
       "state": "scheduled",
       "paused_at": "2026-07-10T19:24:42.908124Z",
-      "paused_reason": "token-save-80pct-2026-07-10: pause Grok agent crons until weekly reset",
+      "paused_reason": "token-save-80pct-2026-07-10: pause Grok agent crons until weekly reset | park-inspiration-one-job-2026-07-12",
       "created_at": "2026-06-15T07:45:59.378021-04:00",
       "next_run_at": "2026-07-10T18:00:00-04:00",
       "last_run_at": "2026-07-10T12:01:49.495246-04:00",
@@ -206,15 +206,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 393
+        "completed": 397
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T15:57:56.760952-04:00",
-      "next_run_at": "2026-07-12T20:09:28.537870-04:00",
-      "last_run_at": "2026-07-12T19:09:28.537870-04:00",
+      "next_run_at": "2026-07-13T00:09:38.823606-04:00",
+      "last_run_at": "2026-07-12T23:09:38.823606-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -286,15 +286,15 @@
       "schedule_display": "0 23 * * *",
       "repeat": {
         "times": null,
-        "completed": 17
+        "completed": 18
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-24T19:15:00-04:00",
-      "next_run_at": "2026-07-12T23:00:00-04:00",
-      "last_run_at": "2026-07-11T23:01:26.179123-04:00",
+      "next_run_at": "2026-07-13T23:00:00-04:00",
+      "last_run_at": "2026-07-12T23:01:27.431097-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -453,15 +453,15 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 85
+        "completed": 86
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-07-12T23:21:28.815247-04:00",
-      "last_run_at": "2026-07-12T15:20:55.775398-04:00",
+      "next_run_at": "2026-07-13T03:23:39.274378-04:00",
+      "last_run_at": "2026-07-12T19:23:14.390715-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -502,15 +502,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 558
+        "completed": 566
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T19:59:53.051242-04:00",
-      "next_run_at": "2026-07-12T19:41:41.576274-04:00",
-      "last_run_at": "2026-07-12T19:11:41.576274-04:00",
+      "next_run_at": "2026-07-12T23:49:56.463213-04:00",
+      "last_run_at": "2026-07-12T23:19:56.463213-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -551,15 +551,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 281
+        "completed": 285
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T22:59:28.297996-04:00",
-      "next_run_at": "2026-07-12T20:06:28.371216-04:00",
-      "last_run_at": "2026-07-12T19:06:28.371216-04:00",
+      "next_run_at": "2026-07-13T00:06:38.772357-04:00",
+      "last_run_at": "2026-07-12T23:06:38.772357-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -694,15 +694,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 132
+        "completed": 134
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:15.417577-04:00",
-      "next_run_at": "2026-07-12T19:22:30.774723-04:00",
-      "last_run_at": "2026-07-12T17:22:30.774723-04:00",
+      "next_run_at": "2026-07-12T23:24:39.400659-04:00",
+      "last_run_at": "2026-07-12T21:24:39.400659-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -722,7 +722,7 @@
     {
       "id": "955961238bba",
       "name": "extract-wisdom",
-      "prompt": "",
+      "prompt": "SINGLE inspiration cron (only one job pulls new external inspiration).\n\n1) VAULT probe: ls -d D:/PhronesisVault\n2) Use x_search tool with EXACT query:\n   list:2068802754282504617 (Hermes OR \"local AI\" OR sovereign OR agent OR skill OR Obsidian OR MCP OR memory OR self-improving OR MoE OR vault OR tool)\n3) Pick 3-5 HIGH-SIGNAL posts only (ignore politics/news/macro/noise).\n4) Write D:/HermesData/data/inspiration/latest_posts.json as a JSON array of objects:\n   {user, url, timestamp, text, actionable, evaluation:{fit,strengths,weaknesses}}\n5) Run terminal:\n   python D:/HermesData/scripts/extract_x_wisdom.py --from-json D:/HermesData/data/inspiration/latest_posts.json --triage --limit 5\n6) Report one line: new=N candidates=M. If new=0 output exactly [SILENT].\n7) NEVER write stubs. NEVER deliver to WhatsApp/Telegram. Vault-only.\n8) Do not create other inspiration crons or re-enable Universal-Ingestion inspiration targets.\n",
       "skills": [],
       "skill": null,
       "model": "grok-build-0.1",
@@ -730,35 +730,37 @@
       "provider_snapshot": null,
       "model_snapshot": null,
       "base_url": null,
-      "script": "extract_x_wisdom.py",
-      "no_agent": true,
+      "script": null,
+      "no_agent": false,
       "context_from": null,
       "schedule": {
         "kind": "interval",
-        "minutes": 120,
-        "display": "every 120m"
+        "minutes": 360,
+        "display": "every 360m"
       },
-      "schedule_display": "every 120m",
+      "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 142
+        "completed": 143
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:25.077977-04:00",
-      "next_run_at": "2026-07-12T21:05:28.275803-04:00",
-      "last_run_at": "2026-07-12T19:05:28.275803-04:00",
+      "next_run_at": "2026-07-13T01:46:28.588774-04:00",
+      "last_run_at": "2026-07-12T19:46:28.588774-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
       "origin": null,
       "enabled_toolsets": [
-        "web"
+        "web",
+        "file",
+        "terminal"
       ],
-      "workdir": null,
+      "workdir": "D:\\PhronesisVault",
       "fire_claim": null,
       "pinned": true
     },
@@ -875,15 +877,15 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 708
+        "completed": 724
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T11:46:43.622278-04:00",
-      "next_run_at": "2026-07-12T19:36:28.840370-04:00",
-      "last_run_at": "2026-07-12T19:05:30.150184-04:00",
+      "next_run_at": "2026-07-12T23:37:41.675556-04:00",
+      "last_run_at": "2026-07-12T23:22:41.675556-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1002,15 +1004,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 1826
+        "completed": 1874
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-04T11:35:00-04:00",
-      "next_run_at": "2026-07-12T19:25:00-04:00",
-      "last_run_at": "2026-07-12T19:20:39.104375-04:00",
+      "next_run_at": "2026-07-12T23:25:00-04:00",
+      "last_run_at": "2026-07-12T23:20:50.147226-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1045,15 +1047,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": 999,
-        "completed": 177
+        "completed": 185
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-08T16:36:36.708213-04:00",
-      "next_run_at": "2026-07-12T19:22:52.611291-04:00",
-      "last_run_at": "2026-07-12T18:52:52.611291-04:00",
+      "next_run_at": "2026-07-12T23:32:04.743369-04:00",
+      "last_run_at": "2026-07-12T23:02:04.743369-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1089,15 +1091,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 109
+        "completed": 117
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-10T14:52:28.611336+00:00",
-      "next_run_at": "2026-07-12T19:41:43.894721-04:00",
-      "last_run_at": "2026-07-12T19:11:43.894721-04:00",
+      "next_run_at": "2026-07-12T23:49:56.862363-04:00",
+      "last_run_at": "2026-07-12T23:19:56.862363-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1516,5 +1518,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-07-12T19:21:28.842156-04:00"
+  "updated_at": "2026-07-12T23:23:39.274378-04:00"
 }

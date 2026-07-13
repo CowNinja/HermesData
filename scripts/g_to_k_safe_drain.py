@@ -155,9 +155,41 @@ def iter_candidates(
             continue
         if p.suffix.lower() in {".tmp", ".crdownload", ".partial"}:
             continue
+        # Jeff 2026-07-13: catalog-only music — skip bulk audio land
+        if p.suffix.lower() in {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".wma"}:
+            continue
+        sp_l = str(p).lower().replace("/", "\\")
+        sp_n = str(p).lower().replace("\\", "/")
+        if any(m in sp_n for m in (
+            "/old_music/", "/music rip/", "z_jenni_kids_music",
+            "/virtualbox vms/", "/hyper-v/", "/vmware/",
+        )):
+            continue
         try:
-            if p.suffix.lower() in {".7z", ".zip", ".iso", ".vmdk"} and p.stat().st_size > 50_000_000:
+            # Jeff 2026-07-13: game ISOs / disk images / huge archives = catalog-only, not land
+            if p.suffix.lower() in {".iso", ".vmdk", ".vdi", ".vhd", ".vhdx", ".qcow2", ".ova", ".img", ".nrg", ".mds", ".mdf", ".cue", ".bin"}:
                 continue
+            if p.suffix.lower() in {".7z", ".zip", ".rar"}:
+                sz = p.stat().st_size
+                low = (p.name + " " + str(p)).lower()
+                gold = any(
+                    k in low
+                    for k in (
+                        "medical", "navy", "nmcp", "records", "orders", "eval",
+                        "legal", "bcnr", "nvlsp", "export", "takeout", "mail",
+                        "dna", "genome", "journal", "bloom", "personal", "va ",
+                        "tax", "scan",
+                    )
+                )
+                # Jeff 2026-07-13: evaluate zips — keep gold/content archives; skip bulk junk
+                if sz > 500_000_000 and not gold:
+                    continue
+                if sz > 50_000_000 and not gold:
+                    # still skip large non-gold blobs (likely media/vm packs)
+                    if any(k in low for k in ("virtualbox", "vmdk", "vdi", "iso", "game", "steam", "music", "mp3")):
+                        continue
+                    if sz > 150_000_000:
+                        continue
         except Exception:
             continue
         sp = str(p)
@@ -196,9 +228,9 @@ def main() -> int:
                     "G:/NMCP_Imagery_Export",
                     "G:/Alex",
                     "G:/Booksbloom",
-                    "G:/Z_Jenni_kids_music",
-                    "G:/Old_music",
-                    "G:/Music RIP",
+                    
+                    
+                    
                     "G:/OneDrive",
                     "G:/Downloads",
                     "G:/Spencer",

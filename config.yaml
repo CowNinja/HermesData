@@ -223,13 +223,9 @@ auxiliary:
     base_url: http://127.0.0.1:8091/v1
     api_key: local
     timeout: 60
-  # 2026-07-12: was phronesis-sovereign → HTTP 400 template/parser spam on bg-review
-  # (user-facing Discord still uses primary grok-4.5). Pin review to xai like primary chat.
   background_review:
     provider: xai-oauth
     model: grok-build-0.1
-    base_url: null
-    api_key: null
     timeout: 120
   moa_aggregator:
     provider: phronesis-sovereign
@@ -777,6 +773,34 @@ discord:
         - web_search
         - image_gen
       provider: xai-oauth
+    '1525174401740312707':
+      model: phronesis-sovereign-roleplay
+      provider: phronesis-sovereign
+      base_url: http://127.0.0.1:8091/v1
+      api_key: local
+      enabled_toolsets:
+        - hermes-cli
+        - terminal
+        - file
+        - image_gen
+      context_length: 65536
+      note: Switched to local Qwythos-9B abliterated via sovereign proxy per user
+        request 2026-07-12 (token burn prevention in alice-roleplay)
+    '1525214795236773918':
+      model: phronesis-sovereign-roleplay
+      provider: phronesis-sovereign
+      base_url: http://127.0.0.1:8091/v1
+      api_key: local
+      enabled_toolsets:
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
+      context_length: 65536
+      note: Switched to local Qwythos-9B abliterated via sovereign proxy per user
+        request 2026-07-12 (token burn prevention in alice-roleplay thread 1525214795236773918)
 whatsapp:
   enabled: false
 telegram:

@@ -27,6 +27,26 @@ PRIORITY_KEYS = (
 SKIP_RE = re.compile(r"(logo|icon|wallpaper|screenshot|_00\.jpg|cnsva\.jpg)", re.I)
 
 
+
+def _dlq(path: str, err: str) -> None:
+    try:
+        from pathlib import Path as _P
+        import json as _json
+        from datetime import datetime, timezone
+
+        dlq = _P(r"D:/HermesData/state/silo_dead_letter_queue.jsonl")
+        rec = {
+            "at": datetime.now(timezone.utc).isoformat(),
+            "kind": "ocr",
+            "path": path,
+            "error": str(err)[:400],
+        }
+        with dlq.open("a", encoding="utf-8") as f:
+            f.write(_json.dumps(rec) + "\n")
+    except Exception:
+        pass
+
+
 def utc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -54,6 +74,15 @@ def score(p: Path) -> int:
     s = 0
     if p.suffix.lower() == ".pdf":
         s += 50
+    # Jeff 2026-07-13: medical imaging + DNA max priority
+    if any(k in low for k in ("nmcp_imagery", "nmcp", "/medical", "medical", "dicom", ".dcm")):
+        s += 80
+    if any(k in low for k in ("mri", "ct scan", "ct_scan", "x-ray", "xray", "x_ray", "radiolog")):
+        s += 60
+    if any(k in low for k in ("dna", "genome", "23andme", "ancestry", "labcorp", "quest")):
+        s += 55
+    if p.suffix.lower() in {".dcm", ".nii", ".nrrd"}:
+        s += 70
     if "navy" in low or "medical" in low:
         s += 25
     for k in PRIORITY_KEYS:
