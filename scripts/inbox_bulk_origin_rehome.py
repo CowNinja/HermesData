@@ -83,26 +83,23 @@ def iter_candidates(limit_scan: int, prefix: Optional[str]) -> List[Path]:
     out: List[Path] = []
     if not INBOX.is_dir():
         return out
-    root = INBOX
+    roots: List[Path] = [INBOX]
     if prefix:
-        # allow partial folder name match under inbox
         hits = [d for d in INBOX.iterdir() if d.is_dir() and prefix.lower() in d.name.lower()]
-        if len(hits) == 1:
-            root = hits[0]
-        elif hits:
-            # scan each
-            for h in hits:
-                for p in h.rglob("*"):
-                    if is_primary_file(p):
-                        out.append(p)
-                        if len(out) >= limit_scan:
-                            return out
-            return out
-    for p in root.rglob("*"):
-        if is_primary_file(p):
+        if hits:
+            roots = hits
+        else:
+            # no top-level hit: still filter during full walk by path substr
+            roots = [INBOX]
+    for root in roots:
+        for p in root.rglob("*"):
+            if not is_primary_file(p):
+                continue
+            if prefix and roots == [INBOX] and prefix.lower() not in str(p).lower():
+                continue
             out.append(p)
             if len(out) >= limit_scan:
-                break
+                return out
     return out
 
 
@@ -122,19 +119,27 @@ def move_with_sidecars(src: Path, dest: Path) -> None:
                         pass
 
 
-def update_registry(src: str, dest: str, domain: str) -> None:
-    if not DB.exists():
+def update_registry_batch(rows: List[Tuple[str, str, str]]) -> None:
+    """rows: list of (src, dest, domain)"""
+    if not DB.exists() or not rows:
         return
     try:
-        con = sqlite3.connect(str(DB))
-        con.execute(
+        con = sqlite3.connect(str(DB), timeout=120)
+        con.execute("PRAGMA busy_timeout=120000")
+        con.execute("PRAGMA journal_mode=WAL")
+        now = utc()
+        con.executemany(
             "UPDATE ingest SET domain=?, dest_path=?, last_seen=? WHERE dest_path=?",
-            (domain, dest, utc(), src),
+            [(domain, dest, now, src) for src, dest, domain in rows],
         )
         con.commit()
         con.close()
     except Exception:
         pass
+
+
+def update_registry(src: str, dest: str, domain: str) -> None:
+    update_registry_batch([(src, dest, domain)])
 
 
 def main() -> int:
@@ -209,10 +214,14 @@ def main() -> int:
     applied = 0
     errors = 0
     if args.apply:
+        reg_batch: List[Tuple[str, str, str]] = []
         for m in planned:
             try:
                 move_with_sidecars(Path(m["src"]), Path(m["dest"]))
-                update_registry(m["src"], m["dest"], m["domain"])
+                reg_batch.append((m["src"], m["dest"], m["domain"]))
+                if len(reg_batch) >= 100:
+                    update_registry_batch(reg_batch)
+                    reg_batch = []
                 # context crumb
                 try:
                     Path(str(m["dest"]) + ".context.json").write_text(
@@ -234,6 +243,8 @@ def main() -> int:
             except Exception as e:
                 m["error"] = str(e)
                 errors += 1
+        if reg_batch:
+            update_registry_batch(reg_batch)
 
     # domain tally
     from collections import Counter

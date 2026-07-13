@@ -63,6 +63,16 @@ except Exception:
         return "Core-Personal/_Inbox"
 
 
+try:
+    from silo_relevance_heuristics import land_decision, is_junk_path, gold_score
+except Exception:
+    def land_decision(path):
+        return "land"
+    def is_junk_path(path):
+        return False
+    def gold_score(path):
+        return 50
+
 def domain_for(name: str, path_hint: str = "") -> str:
     """Strip routing noise; preserve real filename on disk separately."""
     return _domain_for((name or "").strip(), path_hint)
@@ -111,6 +121,11 @@ def copy_file(src: Path, dest: Path) -> str:
     return "shutil"
 
 
+def _path_keys(s: str) -> list[str]:
+    s = str(s)
+    return list({s, s.replace("/", "\\"), s.replace("\\", "/")})
+
+
 def sha256_file(path: Path, limit: int = 32 * 1024 * 1024) -> str:
     """Content fingerprint. Large files (>20MB) use size+mtime+head for speed
     (Booksbloom ebooks) — still unique enough for land dedupe; fidelity rehash later.
@@ -152,7 +167,7 @@ def iter_candidates(
     limit: int,
     skip_sources: set[str] | None = None,
     skip_hashes: set[str] | None = None,
-    max_scan: int = 500_000,
+    max_scan: int = 2_000_000,
 ) -> list[Path]:
     """Yield up to `limit` *new* candidates (skips known sources).
 
@@ -168,13 +183,52 @@ def iter_candidates(
             break
         if not p.is_file():
             continue
-        scanned += 1
+        try:
+            _dec = land_decision(p)
+            if _dec == "skip":
+                continue
+            if _dec == "catalog":
+                continue  # full land skip; catalog job separate
+        except Exception:
+            pass
         if p.name.startswith(".") or p.name.endswith(".meta.json"):
             continue
         if p.name.lower() in {"desktop.ini", "thumbs.db", "thumbs.db:encryptable"}:
             continue
-        if p.suffix.lower() in {".tmp", ".crdownload", ".partial"}:
+        if p.suffix.lower() in {".tmp", ".crdownload", ".partial", ".jsonlz4", ".final"}:
             continue
+        # Holistic nutrition: skip OS/app junk even inside personal trees (Booksbloom Carbonite dumps)
+        _low = str(p).lower().replace(chr(92), "/")
+        if any(
+            junk in _low
+            for junk in (
+                "/appdata/",
+                "/application data/",
+                "/local settings/",
+                "carbonite restored",
+                "/diagnostics/",
+                "/temp/",
+                "/tmp/",
+                "/cache/",
+                "/caches/",
+                "/node_modules/",
+                "/.git/",
+                "/__pycache__/",
+                "/windows/system32",
+                "/program files",
+                "$recycle.bin",
+                "system volume information",
+                "thumbs.db",
+                "/inetcache/",
+                "/packages/",
+                "/microsoft/windows/",
+                "old firefox data",
+                "/firefox/",
+                ".jsonlz4",
+            )
+        ):
+            continue
+
         # Jeff 2026-07-13: catalog-only music — skip bulk audio land
         if p.suffix.lower() in {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".wma"}:
             continue
@@ -212,8 +266,13 @@ def iter_candidates(
                         continue
         except Exception:
             continue
+        scanned += 1
+        if scanned >= max_scan:
+            break
         sp = str(p)
-        if sp in skip_sources:
+        sp_win = sp.replace("/", "\\")
+        sp_nix = sp.replace("\\", "/")
+        if sp in skip_sources or sp_win in skip_sources or sp_nix in skip_sources:
             continue
         out.append(p)
         if len(out) >= limit:
@@ -329,16 +388,39 @@ def main() -> int:
     sources = [Path(s) for s in args.source] or default_sources
 
     # Known sources from ingest registry → skip early (wave efficiency)
+    # Scope skip load to active source roots (huge speed win on Booksbloom mid-tree)
     skip_sources: set[str] = set()
     icon_pre = ingest_connect() if ingest_connect else None
     if icon_pre is not None:
         try:
-            rows = icon_pre.execute(
-                "SELECT source_path FROM ingest WHERE status IN ('copied','verified','processed')"
-            ).fetchall()
-            skip_sources = {r[0] if not hasattr(r, 'keys') else r['source_path'] for r in rows}
+            if sources:
+                clauses = []
+                params: list[str] = []
+                for s in sources:
+                    root_n = str(s).replace("/", "\\").rstrip("\\")
+                    clauses.append("source_path LIKE ?")
+                    params.append(root_n + "\\%")
+                    clauses.append("source_path LIKE ?")
+                    params.append(str(s).replace("\\", "/").rstrip("/") + "/%")
+                sql = (
+                    "SELECT source_path FROM ingest WHERE status IN "
+                    "('copied','verified','processed') AND ("
+                    + " OR ".join(clauses)
+                    + ")"
+                )
+                rows = icon_pre.execute(sql, params).fetchall()
+            else:
+                rows = icon_pre.execute(
+                    "SELECT source_path FROM ingest WHERE status IN ('copied','verified','processed')"
+                ).fetchall()
+            for r in rows:
+                sp = r[0] if not hasattr(r, "keys") else r["source_path"]
+                if not sp:
+                    continue
+                for k in _path_keys(sp):
+                    skip_sources.add(k)
         except Exception:
-            pass
+                pass
 
     # In-memory hash set — O(1) dupe checks (archive overlaps live heavily)
     known_hashes: set[str] = set()
@@ -387,7 +469,7 @@ def main() -> int:
     ai_used = 0
     # Oversample candidates: archive has many content-dupes of live GD.
     # Plan more than limit so apply can fill real copies after hash skips.
-    plan_cap = max(args.limit * 4, args.limit + 200)
+    plan_cap = max(args.limit * 20, args.limit + 500)
     for src_root in sources:
         if len(planned) >= plan_cap:
             break

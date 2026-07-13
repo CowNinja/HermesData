@@ -53,24 +53,30 @@ def _pid_alive(pid: int) -> bool:
 
 
 def acquire_singleton() -> bool:
-    """Exactly one continuous land owner (single-writer for SQLite land)."""
-    import os
-
-    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    """Only one continuous land owner. Stale lock safe."""
     if LOCK.is_file():
         try:
-            old = int((LOCK.read_text(encoding="utf-8") or "0").strip().split()[0])
-            if old and old != os.getpid() and _pid_alive(old):
-                print(
-                    json.dumps(
-                        {"refused": True, "reason": "another_continuous_alive", "pid": old}
-                    )
-                )
+            pid = int(LOCK.read_text(encoding="utf-8").split()[0])
+            import subprocess
+            r = subprocess.run(
+                ["wmic", "process", "where", f"ProcessId={pid}", "get", "CommandLine"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if "silo_continuous_loop" in ((r.stdout or "") + (r.stderr or "")):
                 return False
         except Exception:
             pass
-    LOCK.write_text(str(os.getpid()) + " " + datetime.now(timezone.utc).isoformat() + chr(10), encoding="utf-8")
+        try:
+            LOCK.unlink(missing_ok=True)
+        except Exception:
+            pass
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    LOCK.write_text(
+        str(__import__("os").getpid()) + " " + datetime.now(timezone.utc).isoformat() + chr(10),
+        encoding="utf-8",
+    )
     return True
+
 
 
 def release_singleton() -> None:

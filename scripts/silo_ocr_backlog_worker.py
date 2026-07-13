@@ -74,6 +74,14 @@ def db() -> sqlite3.Connection:
     return con
 
 
+try:
+    from silo_relevance_heuristics import ocr_priority_boost, gold_score as _gold
+except Exception:
+    def ocr_priority_boost(path):
+        return 0
+    def _gold(path):
+        return 50
+
 def score(p: Path) -> int:
     low = str(p).lower()
     name = p.name.lower()
@@ -112,6 +120,18 @@ def score(p: Path) -> int:
             s += 40  # re-ocr thin
     if Path(str(p) + ".needs_ocr").is_file():
         s += 50
+    try:
+        s += ocr_priority_boost(p)
+        if _gold(p) < 20:
+            s -= 40
+    except Exception:
+        pass
+    # Jeff 2026-07-13: prefer extractable PDFs over slow image tesseract for queue drain speed
+    suf = p.suffix.lower()
+    if suf == ".pdf":
+        s += 25  # IMAGE_SLOW counterweight
+    if suf in {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".webp"}:
+        s -= 15  # still process, but after PDFs
     return s
 
 

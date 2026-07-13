@@ -53,7 +53,7 @@ def disk_file_count(root: Path, cache: dict) -> int:
     return n
 
 
-def top_incomplete(threshold: float = 0.995) -> tuple[str | None, dict]:
+def top_incomplete(threshold: float = 0.97) -> tuple[str | None, dict]:
     data = json.loads(QUEUE.read_text(encoding="utf-8"))
     items = sorted(
         data.get("land_priority_queue") or [],
