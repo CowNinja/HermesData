@@ -101,24 +101,19 @@ def main() -> int:
     # Worker swarm (script sub-agents) — sequential for GPU/disk safety on one machine
     workers: List[Tuple[str, List[str], int]] = []
     if not args.no_drain:
-        workers.append(
-            (
-                "drain",
-                [
-                    sys.executable,
-                    str(SCRIPTS / "g_to_k_safe_drain.py"),
-                    "--apply",
-                    "--limit",
-                    str(args.drain_limit),
-                ]
-                + (
-                    ["--ai-inbox", "--ai-inbox-cap", "12"]
-                    if local_llm
-                    else []
-                ),
-                1800,
+            # Focus land: only top incomplete priority folder (self-improve efficiency)
+            workers.append(
+                (
+                    "focus_land",
+                    [
+                        sys.executable,
+                        str(SCRIPTS / "silo_focus_land.py"),
+                        "--limit",
+                        str(args.drain_limit),
+                    ],
+                    1800,
+                )
             )
-        )
     workers.extend(
         [
             (
@@ -129,7 +124,7 @@ def main() -> int:
                     str(SCRIPTS / "inbox_bulk_origin_rehome.py"),
                     "--apply",
                     "--limit",
-                    "1500",
+                    "2500",
                     "--name-fallback",
                 ],
                 900,
@@ -232,7 +227,7 @@ def main() -> int:
         (
             "layout_health",
             [sys.executable, str(SCRIPTS / "silo_layout_health.py")],
-            300,
+            180,
         )
     )
     workers.append(
@@ -244,9 +239,10 @@ def main() -> int:
     )
     workers.append(
         (
-            "robust_ocr_ladder",
-            [sys.executable, str(SCRIPTS / "silo_robust_ocr_ladder.py"), "--limit", "12", "--max-pages", "6"],
-            300,
+            # superseded by ocr_backlog_worker (process-only); keep lightweight discover every tick noop
+            "ocr_discover_light",
+            [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--discover-only"],
+            120,
         )
     )
 
@@ -261,7 +257,7 @@ def main() -> int:
     workers.append(
         (
             "person_file_graph",
-            [sys.executable, str(SCRIPTS / "silo_person_file_graph.py"), "--limit-files", "20000"],
+            [sys.executable, str(SCRIPTS / "silo_person_file_graph.py"), "--limit-files", "8000"],
             240,
         )
     )
@@ -286,8 +282,8 @@ def main() -> int:
     workers.append(
         (
             "ocr_backlog_worker",
-            [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--limit", "20"],
-            480,
+            [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--process-only", "--limit", "28"],
+            600,
         )
     )
 
@@ -360,6 +356,88 @@ def main() -> int:
             "autonomy_control_plane",
             [sys.executable, str(SCRIPTS / "silo_autonomy_control_plane.py")],
             60,
+        )
+    )
+
+    workers.append(
+        (
+            "scoreboard_v2",
+            [sys.executable, str(SCRIPTS / "silo_scoreboard_v2.py")],
+            180,
+        )
+    )
+
+    workers.append(
+        (
+            "medical_navy_index",
+            [sys.executable, str(SCRIPTS / "silo_medical_navy_text_index.py"), "--limit", "40"],
+            180,
+        )
+    )
+
+    workers.append(
+        (
+            "post_ingest_qa",
+            [sys.executable, str(SCRIPTS / "silo_post_ingest_qa.py")],
+            240,
+        )
+    )
+
+    if not any(w[0]=='ocr_text_clean' for w in workers):
+        workers.append(
+            (
+                'ocr_text_clean',
+                [sys.executable, str(SCRIPTS / 'silo_ocr_text_clean.py'), '--limit', '30', '--domain', 'Medical'],
+                180,
+            )
+        )
+    if not any(w[0]=='repair_repull' for w in workers):
+        workers.append(
+            (
+                'repair_repull',
+                [sys.executable, str(SCRIPTS / 'silo_repair_re_pull.py'), '--apply', '--domain', 'Medical', '--limit', '12'],
+                240,
+            )
+        )
+    if not any(w[0]=='repair_repull_navy' for w in workers):
+        workers.append(
+            (
+                'repair_repull_navy',
+                [sys.executable, str(SCRIPTS / 'silo_repair_re_pull.py'), '--apply', '--domain', 'Navy', '--limit', '8'],
+                180,
+            )
+        )
+
+    # --- streamline cadence: odd ticks skip heavy secondary cooks ---
+    cadence_path = Path(r"D:/HermesData/state/silo_orchestrator_cadence.json")
+    try:
+        import json as _json
+        cad = _json.loads(cadence_path.read_text(encoding="utf-8")) if cadence_path.is_file() else {"n": 0}
+    except Exception:
+        cad = {"n": 0}
+    cad["n"] = int(cad.get("n") or 0) + 1
+    n = cad["n"]
+    try:
+        cadence_path.write_text(_json.dumps(cad), encoding="utf-8")
+    except Exception:
+        pass
+    heavy_even_only = {
+        "layout_health", "fuse_exact", "folder_dossiers", "person_file_graph",
+        "timeline_harvest", "pko_entity_cards", "multi_provenance",
+        "harvest_small_bulk", "archive_secrets_encrypted", "encrypted_unlock_assist",
+        "grunt_sample", "ocr_discover_light",
+    }
+    if n % 2 == 1:
+        workers = [w for w in workers if w[0] not in heavy_even_only]
+        report["cadence"] = {"n": n, "mode": "core_fast"}
+    else:
+        report["cadence"] = {"n": n, "mode": "full"}
+
+    workers.append(
+        (
+            "process_holistic",
+            [sys.executable, str(SCRIPTS / "silo_process_holistic_tick.py"), "--ocr-limit", "15", "--status-limit", "300", "--clean-limit", "25"],
+            600,
         )
     )
 

@@ -67,6 +67,9 @@ def quality(text: str, size: int) -> dict[str, Any]:
         status, reason = "needs_ocr", "little_text_large_file"
     elif len(t) < 40:
         status, reason = ("needs_ocr", "almost_no_text") if size > 3_000 else ("empty", "tiny_or_stub")
+    elif len(t) >= 800 and bad < 50:
+        # plenty of extractable text even if OCR noisy
+        status, reason = "ok_text", "long_extract"
     elif ratio < 0.40 or bad > 20:
         status, reason = "needs_ocr", "garbled_or_low_alnum"
     elif len(t) < 180 and size > 80_000:
@@ -102,16 +105,21 @@ def extract_pypdf(path: Path) -> tuple[str, list[str]]:
 
 def preprocess_image(img: Path) -> Path:
     try:
-        from PIL import Image, ImageOps, ImageFilter
+        from PIL import Image, ImageOps, ImageFilter, ImageEnhance
 
         im = Image.open(img)
         im = ImageOps.grayscale(im)
+        # upscale small pages for Tesseract
+        w, h = im.size
+        if max(w, h) < 2000:
+            im = im.resize((w * 2, h * 2), Image.Resampling.LANCZOS)
         im = ImageOps.autocontrast(im)
-        # light denoise
+        im = ImageEnhance.Contrast(im).enhance(1.4)
         try:
             im = im.filter(ImageFilter.MedianFilter(size=3))
         except Exception:
             pass
+        # skip hard binarize — destroys grey medical scan text
         tmp = img.with_name(img.stem + ".__prep.png")
         im.save(tmp)
         return tmp
@@ -122,24 +130,20 @@ def preprocess_image(img: Path) -> Path:
 def ocr_image(img: Path, tess: str) -> str:
     prep = preprocess_image(img)
     try:
-        r = subprocess.run(
-            [tess, str(prep), "stdout", "-l", "eng", "--psm", "6"],
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-        text = r.stdout or ""
-        if len(text.strip()) < 30:
-            # retry auto page segmentation
-            r2 = subprocess.run(
-                [tess, str(prep), "stdout", "-l", "eng", "--psm", "3"],
+        best = ""
+        for psm in ("6", "4", "3", "11"):
+            r = subprocess.run(
+                [tess, str(prep), "stdout", "-l", "eng", "--oem", "1", "--psm", psm],
                 capture_output=True,
                 text=True,
                 timeout=180,
             )
-            if len((r2.stdout or "").strip()) > len(text.strip()):
-                text = r2.stdout or text
-        return text
+            text = r.stdout or ""
+            if len(text.strip()) > len(best.strip()):
+                best = text
+            if len(best.strip()) >= 200:
+                break
+        return best
     finally:
         if prep != img and prep.is_file():
             try:
@@ -154,7 +158,7 @@ def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 8) -> list[Path]:
     if ppm:
         prefix = out_dir / "page"
         subprocess.run(
-            [ppm, "-png", "-r", "200", "-l", str(max_pages), str(pdf), str(prefix)],
+            [ppm, "-png", "-r", "300", "-l", str(max_pages), str(pdf), str(prefix)],
             capture_output=True,
             timeout=240,
         )
@@ -186,7 +190,7 @@ def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 8) -> list[Path]:
         for i, page in enumerate(doc):
             if i >= max_pages:
                 break
-            pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2))
+            pix = page.get_pixmap(matrix=pymupdf.Matrix(3, 3))
             dest = out_dir / f"page-{i+1:02d}.png"
             pix.save(str(dest))
             out.append(dest)

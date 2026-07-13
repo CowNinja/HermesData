@@ -47,16 +47,9 @@ def continuous_running() -> bool:
 def kick_continuous() -> str:
     if STOP.is_file():
         return "STOP present"
-    subprocess.run(
-        [
-            "powershell.exe",
-            "-NoProfile",
-            "-Command",
-            "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*silo_continuous_loop.py*' -and $_.Name -eq 'python.exe' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
-        ],
-        timeout=60,
-        capture_output=True,
-    )
+    # Jeff 2026-07-13: never kill+respawn if already running (multi-writer storm)
+    if continuous_running():
+        return "already_running"
     out = open(r"D:\HermesData\state\silo_continuous_stdout.log", "a", encoding="utf-8")
     err = open(r"D:\HermesData\state\silo_continuous_stderr.log", "a", encoding="utf-8")
     p = subprocess.Popen(

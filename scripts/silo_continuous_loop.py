@@ -34,6 +34,58 @@ SCRIPTS = Path(r"D:\HermesData\scripts")
 STATE = Path(r"D:\HermesData\state\silo_continuous_state.json")
 VRAM_STATE = Path(r"D:\HermesData\state\vram-priority.json")
 STOP = Path(r"D:\HermesData\state\silo_continuous.STOP")
+
+LOCK = Path(r"D:\HermesData\state\silo_continuous.lock")
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        import ctypes
+
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, int(pid))
+        if h:
+            k.CloseHandle(h)
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def acquire_singleton() -> bool:
+    """Exactly one continuous land owner (single-writer for SQLite land)."""
+    import os
+
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    if LOCK.is_file():
+        try:
+            old = int((LOCK.read_text(encoding="utf-8") or "0").strip().split()[0])
+            if old and old != os.getpid() and _pid_alive(old):
+                print(
+                    json.dumps(
+                        {"refused": True, "reason": "another_continuous_alive", "pid": old}
+                    )
+                )
+                return False
+        except Exception:
+            pass
+    LOCK.write_text(str(os.getpid()) + " " + datetime.now(timezone.utc).isoformat() + chr(10), encoding="utf-8")
+    return True
+
+
+def release_singleton() -> None:
+    import os
+
+    try:
+        if not LOCK.is_file():
+            return
+        txt = LOCK.read_text(encoding="utf-8").strip()
+        if txt.startswith(str(os.getpid())):
+            LOCK.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
 LOG = Path(r"D:\PhronesisVault\Operations\logs\silo-continuous-loop-latest.md")
 
 # Thresholds (RTX 3060 12GB class)
@@ -201,6 +253,28 @@ def limits_for(mode: str) -> Dict[str, int]:
 
 
 def run_tick(limits: Dict[str, int], allow_grunt: bool) -> Dict[str, Any]:
+    # Heartbeat only (never clobber full continuous state mid-tick)
+    try:
+        hb = {
+            "at": datetime.now(timezone.utc).isoformat(),
+            "phase": "tick_running",
+            "limits": limits,
+        }
+        (Path(r"D:/HermesData/state") / "silo_tick_heartbeat.json").write_text(
+            json.dumps(hb, indent=2), encoding="utf-8"
+        )
+        # merge phase into existing STATE if present
+        if STATE.is_file():
+            try:
+                cur = json.loads(STATE.read_text(encoding="utf-8"))
+                if isinstance(cur, dict):
+                    cur["phase"] = "tick_running"
+                    cur["heartbeat_at"] = hb["at"]
+                    STATE.write_text(json.dumps(cur, indent=2), encoding="utf-8")
+            except Exception:
+                pass
+    except Exception:
+        pass
     cmd = [
         sys.executable,
         str(SCRIPTS / "silo_orchestrator_tick.py"),
@@ -258,6 +332,15 @@ def main() -> int:
     ap.add_argument("--force-mode", choices=["aggressive", "normal", "gentle", "pause"])
     args = ap.parse_args()
 
+    if not acquire_singleton():
+        return 2
+    try:
+        return _main_loop(args)
+    finally:
+        release_singleton()
+
+
+def _main_loop(args) -> int:
     cycle = 0
     while True:
         if STOP.is_file():
@@ -288,6 +371,16 @@ def main() -> int:
             # enrich-only possible
             last_tick = run_tick(limits, allow_grunt=False)
 
+        # Adaptive sleep: short after long ticks (already spent wall clock cooking)
+        sleep_s = int(limits["sleep"])
+        try:
+            elapsed = float((last_tick.get("result") or {}).get("elapsed_s") or 0)
+            if elapsed >= 900:
+                sleep_s = 5  # tick already ~15m+; minimal pause
+            elif elapsed >= 400:
+                sleep_s = min(sleep_s, 10)
+        except Exception:
+            pass
         state = {
             "at": datetime.now(timezone.utc).isoformat(),
             "cycle": cycle,
@@ -295,7 +388,8 @@ def main() -> int:
             "limits": limits,
             "allow_grunt": allow_grunt,
             "last_tick": last_tick,
-            "sleep_s": limits["sleep"],
+            "sleep_s": sleep_s,
+            "phase": "idle",
         }
         write_state(state)
         print(json.dumps(state, indent=2, default=str)[:2500])
@@ -304,7 +398,7 @@ def main() -> int:
             return 0 if last_tick.get("exit", 0) == 0 or mode == "pause" else 1
         if args.max_cycles and cycle >= args.max_cycles:
             return 0
-        time.sleep(limits["sleep"])
+        time.sleep(sleep_s)
 
 
 if __name__ == "__main__":

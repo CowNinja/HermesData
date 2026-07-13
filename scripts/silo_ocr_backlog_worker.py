@@ -24,6 +24,7 @@ PRIORITY_KEYS = (
     "accident", "mva", "crash", "cortisol", "gain entry", "reenlist",
     "separation", "oshanick", "nmcp", "vamc", "tricare", "dd214", "page 13",
 )
+MAX_OCR_ATTEMPTS = 4
 SKIP_RE = re.compile(r"(logo|icon|wallpaper|screenshot|_00\.jpg|cnsva\.jpg)", re.I)
 
 
@@ -53,7 +54,12 @@ def utc() -> str:
 
 def db() -> sqlite3.Connection:
     STATE.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(str(STATE))
+    con = sqlite3.connect(str(STATE), timeout=120)
+    try:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("PRAGMA busy_timeout=120000")
+    except Exception:
+        pass
     con.execute(
         """CREATE TABLE IF NOT EXISTS ocr_queue (
             path TEXT PRIMARY KEY,
@@ -81,6 +87,11 @@ def score(p: Path) -> int:
         s += 60
     if any(k in low for k in ("dna", "genome", "23andme", "ancestry", "labcorp", "quest")):
         s += 55
+    # Text-document boost (OCR actually works well here)
+    if any(k in low for k in ("vamc meds", "myhealthevet", "prescription", "sf600", "sf-600", "progress note", "clinic note", "dd214", "navadmin", "buddy statement", "hp_scan")):
+        s += 45
+    if any(k in name for k in ("mri", "segmentation", "dicom")) and "note" not in name:
+        s -= 15
     if p.suffix.lower() in {".dcm", ".nii", ".nrrd"}:
         s += 70
     if "navy" in low or "medical" in low:
@@ -172,10 +183,21 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=12)
     ap.add_argument("--discover-only", action="store_true")
+    ap.add_argument("--process-only", action="store_true", help="skip discover upsert (avoid lock storms)")
     args = ap.parse_args()
 
     con = db()
-    found = discover()
+    open_q = con.execute(
+        "SELECT COUNT(*) FROM ocr_queue WHERE status IN ('queued','needs_ocr','error')"
+    ).fetchone()[0]
+    # Streamline: skip expensive rglob discover when cook queue already deep
+    if args.process_only:
+        found = []
+    elif open_q > 150 and not args.discover_only:
+        found = []
+        print(json.dumps({"discover_skipped": True, "open_queue": open_q}))
+    else:
+        found = discover()
     for sc, path in found[:2000]:
         con.execute(
             """INSERT INTO ocr_queue(path, score, status, chars, engine, updated_at, attempts)
@@ -198,8 +220,9 @@ def main() -> int:
     tess = mod.tesseract_bin()
     rows = con.execute(
         """SELECT path, score FROM ocr_queue
-           WHERE status IN ('queued','needs_ocr','error') AND score >= 40
-           ORDER BY score DESC, attempts ASC LIMIT ?""",
+           WHERE status IN ('queued','needs_ocr','error') AND score >= 40 AND attempts < 4
+           ORDER BY CASE status WHEN 'queued' THEN 0 WHEN 'error' THEN 1 ELSE 2 END,
+                    score DESC, attempts ASC LIMIT ?""",
         (args.limit,),
     ).fetchall()
 
@@ -213,7 +236,9 @@ def main() -> int:
             )
             continue
         try:
-            rec = mod.process_one(p, tess, True, 6)
+            # Medical/Navy scans: more pages; cheap first for others
+            max_p = 12 if any(k in str(p).lower() for k in ('medical', 'navy', 'nmcp', 'vamc')) else 6
+            rec = mod.process_one(p, tess, True, max_p)
             q = rec.get("quality") or {}
             if isinstance(q, str):
                 try:
@@ -233,13 +258,30 @@ def main() -> int:
             )
             update_registry_process(path, status, int(chars or 0))
             results.append({"path": p.name, "status": status, "chars": chars, "engine": engine})
+            con.commit()  # per-file
         except Exception as e:
-            con.execute(
-                """UPDATE ocr_queue SET status='error', updated_at=?, attempts=attempts+1 WHERE path=?""",
-                (utc(), path),
-            )
+            try:
+                con.execute(
+                    """UPDATE ocr_queue SET status='error', updated_at=?, attempts=attempts+1 WHERE path=?""",
+                    (utc(), path),
+                )
+                att = con.execute(
+                    "SELECT attempts FROM ocr_queue WHERE path=?", (path,)
+                ).fetchone()
+                if att and att[0] >= MAX_OCR_ATTEMPTS:
+                    con.execute(
+                        "UPDATE ocr_queue SET status='corrupt_retired', updated_at=? WHERE path=?",
+                        (utc(), path),
+                    )
+                    _dlq(path, f"max_attempts:{e}")
+                con.commit()  # per-file
+            except Exception:
+                pass
             results.append({"path": p.name, "status": "error", "error": str(e)[:160]})
-    con.commit()
+    try:
+        con.commit()
+    except Exception:
+        pass
 
     queued2 = con.execute(
         "SELECT COUNT(*) FROM ocr_queue WHERE status IN ('queued','needs_ocr','error')"

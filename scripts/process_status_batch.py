@@ -20,7 +20,12 @@ def main() -> int:
     if not DB.is_file():
         print("no db")
         return 2
-    con = sqlite3.connect(str(DB))
+    con = sqlite3.connect(str(DB), timeout=60)
+    try:
+        con.execute("PRAGMA busy_timeout=60000")
+        con.execute("PRAGMA journal_mode=WAL")
+    except Exception:
+        pass
     con.row_factory = sqlite3.Row
     # discover columns
     cols = [r[1] for r in con.execute("PRAGMA table_info(ingest)").fetchall()]
@@ -31,8 +36,11 @@ def main() -> int:
         except Exception as e:
             print("alter fail", e)
     rows = con.execute(
-        "SELECT rowid, dest_path, process_status FROM ingest WHERE dest_path IS NOT NULL LIMIT ?",
-        (args.limit * 5,),
+        """SELECT rowid, dest_path, process_status FROM ingest
+           WHERE dest_path IS NOT NULL
+           ORDER BY CASE WHEN process_status IS NULL OR process_status='unprocessed' THEN 0 ELSE 1 END
+           LIMIT ?""",
+        (args.limit * 8,),
     ).fetchall()
     updated = 0
     scanned = 0

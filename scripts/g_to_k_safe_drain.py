@@ -112,6 +112,26 @@ def copy_file(src: Path, dest: Path) -> str:
 
 
 def sha256_file(path: Path, limit: int = 32 * 1024 * 1024) -> str:
+    """Content fingerprint. Large files (>20MB) use size+mtime+head for speed
+    (Booksbloom ebooks) — still unique enough for land dedupe; fidelity rehash later.
+    """
+    try:
+        st = path.stat()
+        size = st.st_size
+        mtime = int(st.st_mtime)
+    except OSError:
+        size, mtime = 0, 0
+    # Fast path for large media/ebooks
+    if size > 20 * 1024 * 1024:
+        h = hashlib.sha256()
+        h.update(f"FAST|{size}|{mtime}|".encode())
+        try:
+            with path.open("rb") as f:
+                h.update(f.read(4 * 1024 * 1024))
+        except OSError:
+            pass
+        h.update(b"|FAST_HASH")
+        return h.hexdigest()
     h = hashlib.sha256()
     n = 0
     with path.open("rb") as f:
@@ -201,6 +221,69 @@ def iter_candidates(
     return out
 
 
+
+def load_priority_sources():
+    """Config-driven land order; skip catalog_only and ~complete folders."""
+    import json
+    import sqlite3
+    from pathlib import Path as _P
+
+    qpath = _P(r"D:/HermesData/config/land_priority_queue.json")
+    if not qpath.is_file():
+        return []
+    try:
+        data = json.loads(qpath.read_text(encoding="utf-8"))
+        items = data.get("land_priority_queue") or []
+        items = sorted(items, key=lambda x: -int(x.get("priority") or 0))
+        reg = _P(r"D:/HermesData/state/ingest_registry.sqlite3")
+        con = None
+        if reg.is_file():
+            try:
+                con = sqlite3.connect(str(reg), timeout=30)
+                con.execute("PRAGMA busy_timeout=30000")
+            except Exception:
+                con = None
+        out = []
+        for it in items:
+            if it.get("mode") in ("catalog_only", "never", "land_complete"):
+                continue
+            path = it.get("path")
+            if not path:
+                continue
+            root = _P(path)
+            if not root.exists():
+                continue
+            # skip nearly complete folders so chef advances to next priority
+            if con is not None:
+                try:
+                    root_n = str(root).replace("/", "\\").rstrip("\\")
+                    reg_n = con.execute(
+                        "SELECT COUNT(*) FROM ingest WHERE source_path LIKE ?",
+                        (root_n + "\\" + "%",),
+                    ).fetchone()[0]
+                    # light disk sample cap
+                    disk_n = 0
+                    for i, fp in enumerate(root.rglob("*")):
+                        if fp.is_file():
+                            disk_n += 1
+                        if i > 120000:
+                            break
+                    if disk_n > 0 and reg_n / disk_n >= 0.995:
+                        continue
+                except Exception:
+                    pass
+            out.append(root)
+        if con is not None:
+            try:
+                con.close()
+            except Exception:
+                pass
+        return out
+    except Exception:
+        return []
+
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="Actually copy (default dry-run)")
@@ -215,7 +298,7 @@ def main() -> int:
     )
     args = ap.parse_args()
     # Default: MemoryCard first; full-throttle adds C2 personal G: trees
-    default_sources = [
+    default_sources = load_priority_sources() or [
         Path(r"G:/MemoryCard_Backups/Google Drive(archive)"),
         Path(r"G:/MemoryCard_Backups/Google Drive"),
     ]

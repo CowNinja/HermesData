@@ -47,12 +47,17 @@ def continuous_running() -> bool:
 
 
 def start_continuous() -> int:
-    STOP.unlink(missing_ok=True)
+    # Do not start a second owner
+    if continuous_running():
+        return -1
+    # Respect STOP — never clear it here (Jeff / operator owns STOP)
+    if STOP.is_file():
+        return -2
     out = open(r"D:\HermesData\state\silo_continuous_stdout.log", "a", encoding="utf-8")
     err = open(r"D:\HermesData\state\silo_continuous_stderr.log", "a", encoding="utf-8")
     flags = 0x00000008 | 0x00000200
     p = subprocess.Popen(
-        [PY, SCRIPT, "--max-cycles", "0"],
+        [PY, SCRIPT, "--max-cycles", "0", "--force-mode", "aggressive"],
         cwd=r"D:\HermesData",
         stdout=out,
         stderr=err,
@@ -79,7 +84,7 @@ def main() -> int:
         log(f"ok running age={int(age)}s")
         return 0
     if running and age is not None and age >= STALE_S:
-        log(f"stale age={int(age)}s — kill+restart")
+        log(f"stale age={int(age)}s — kill then single restart")
         subprocess.run(
             [
                 "powershell.exe",
@@ -89,8 +94,14 @@ def main() -> int:
             ],
             timeout=60,
         )
+        import time as _t
+
+        _t.sleep(2)
     elif not running:
         log("not running — start")
+    else:
+        log("running age unknown — leave alone")
+        return 0
     pid = start_continuous()
     log(f"started pid={pid}")
     return 0

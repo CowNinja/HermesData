@@ -36,6 +36,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=100)
     ap.add_argument("--status", default="copied")
+    ap.add_argument("--domain", default="", help="domain LIKE filter e.g. Medical")
+    ap.add_argument("--any-status", action="store_true", help="ignore status filter")
     args = ap.parse_args()
 
     if not REG_DB.exists():
@@ -51,15 +53,19 @@ def main() -> int:
         con.execute("ALTER TABLE ingest ADD COLUMN fixity_checked_at TEXT")
         con.commit()
 
-    rows = con.execute(
-        """
-        SELECT id, source_path, dest_path, sha256 FROM ingest
-        WHERE status=? AND dest_path IS NOT NULL AND sha256 IS NOT NULL AND sha256 != ''
-        ORDER BY id DESC
-        LIMIT ?
-        """,
-        (args.status, args.limit),
-    ).fetchall()
+    if args.any_status:
+        q = "SELECT id, source_path, dest_path, sha256 FROM ingest WHERE dest_path IS NOT NULL AND sha256 IS NOT NULL AND sha256 != ''"
+        params = []
+    else:
+        q = "SELECT id, source_path, dest_path, sha256 FROM ingest WHERE status=? AND dest_path IS NOT NULL AND sha256 IS NOT NULL AND sha256 != ''"
+        params = [args.status]
+    if args.domain:
+        q += " AND domain LIKE ?"
+        params.append(f"%{args.domain}%")
+    # prefer unchecked
+    q += " AND (fixity_ok IS NULL OR fixity_ok = 0) ORDER BY CASE WHEN fixity_ok = 0 THEN 0 ELSE 1 END, id DESC LIMIT ?"
+    params.append(args.limit)
+    rows = con.execute(q, tuple(params)).fetchall()
 
     ok = bad = missing = 0
     bad_rows = []

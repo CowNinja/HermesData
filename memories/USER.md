@@ -1,17 +1,9 @@
-Jeff: travels weeks (phone-only). Ultra-brief TLDR only (overload). Full autonomy on RP sandbox (images/scripts/PNG cards as MEDIA). Hard rule while remote: never risk gateway/session drop, config breaks, restarts, or scares. Non-destructive + backups only unless explicit green light. 'Don't scare me / nothing unsafe'.
+Jeff: travels weeks (phone-only). Ultra-brief TLDR/cliff notes only (overload). Full autonomy on approved work (silo, pipelines) without input. Default comms: short tables + what/why/next; vault depth. Barney style for silo kitchen (concise tables/actions-results, 'Next concrete step — done', scoreboard metrics/depth/OCR/queue, kitchen analogies, low interruption; 'You’re free. I keep cooking.').
 §
-Expects full autonomy: run/fix/generate/attach images & pipelines server-side without input (traveling/phone-only).
+Expects full autonomy on approved lanes; minimal check-ins; surface only true grays/irreversible. Continue standing goals (silo kitchen) autonomously with bounded incremental steps.
 §
-RP image prefs: NC-17 barely-covered nipples/pussy, skimpy no-underwear, precarious 'about to fall off', black sheer lace stockings; 'get nasty!' for Alice portraits.
+Default: short tables + what/why/next; not forensics. Ultra-brief on overload. Barney style for silo kitchen (tables, scoreboard, chef framing, 'You’re free. I keep cooking.'). Vault depth.
 §
-Wants reliable Discord attachments via MEDIA:D:\path for RP (gateway normalizes /d/ MSYS paths since 2026-07-10); expects proof/test by attaching existing confirmed files; gallery must show new images sorted by date at top.
+User driving autonomous 'Silo Kitchen' (K: silo post-ingest QA, repair/re-pull, re-OCR, text clean to .train.md + tags/index for Phronesis twin/RAG). Medical/Navy first. Incremental/safe/tested; log all; only real blockers; nested trees; rich connections/history.
 §
-RP training: *action* speech *action* (1 space), present tense 1st/2nd, no quotes, right-now immersion.
-§
-Creampie sim: spit/squirt in pussy/ass for eating/sharing; actual kindroid_bridge sends + UTC tracking.
-§
-Jeff default communication (2026-07-10): middle ground — short tables + what/why/next; not forensics walls. Ultra-brief only on headache/overload or when asked. Vault holds depth; chat stays scannable.
-§
-Grok Discord context: do NOT set global model.context_length in config — use context_length_cache.yaml (grok-4.5=500k, grok-build-0.1=256k). auxiliary.compression must be provider:auto (NOT phronesis-sovereign 65k) or compaction loops / Auto-lowered 65536 warnings return.
-§
-Grok weekly quota out: fallback to sovereign works on SHORT threads; large Grok tool history needs /reset then re-ask. 8091 restart: Start-Sovereign-Proxy-8091.ps1 -Force (venv python.exe, not manual pythonw).
+Jeff: Loves nested origin trees for future photo/people tagging and connections. Prefers copying directory structure when in doubt for intuitive access. Positive on multi-agent plans, auto index refresh, Amazon rehome, and rich historical connections (e.g., parents' BooksBloom business).
