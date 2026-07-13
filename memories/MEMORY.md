@@ -17,3 +17,5 @@ VA churches: KPC→GBEFC→Crosswater PCA→NRBC(Nansemond,current). Crosswater 
 Jodi 1st marriage=Edwards only (≠Crosswater Edwards). Melvin Johnson=ITC NCDOC boss. Laura Johnson-McMullan=friend. User dreams, agent builds.
 §
 Silo kitchen work uses strict Barney format: short tables (wave | result), scoreboard (inbox/footprint/OCR ok_text/queue/Med/Navy), "Next concrete step — done", chef metaphors, "You’re free. I keep cooking." Reinforced in personal-data-silo skill.
+§
+personal-data-silo skill and lesson-to-automation ref updated 2026-07 with sustained OCR drain patterns: --process-only --limit waves on silo_ocr_backlog_worker.py chained to medical_navy_text_index + batch_train_derivatives, current metrics tracking (ok_text climb, queue/ needs_ocr dynamics), single-kitchen enforcement, Barney format reinforcement. Captured as class-level evolution per Be ACTIVE directive.

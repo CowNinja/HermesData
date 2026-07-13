@@ -241,11 +241,73 @@ def land_decision(path: str | Path) -> str:
     return "land"
 
 
+# Gold tiers (2026-07-13): twin_critical | twin_useful | archive_only | noise
+IMAGING_OCR_DEMOTE = (
+    "99_volbrain",
+    "volbrain",
+    "/dicom",
+    ".dcm",
+    "nii.gz",
+    "nrrd",
+    "segmentation",
+    "mricloud",
+    "braingps",
+    "raw_export",
+)
+
+
+def is_private_nsfw(path: str | Path) -> bool:
+    low = norm(path)
+    return any(k in low for k in (
+        "_private_nsfw", "dirty things to moan", "onlyfans", "/porn", "nsfw"
+    ))
+
+
+def gold_tier(path: str | Path) -> str:
+    """Return twin_critical | twin_useful | archive_only | noise."""
+    low = norm(path)
+    if is_junk_path(path) or gold_score(path) <= 0:
+        return "noise"
+    if is_private_nsfw(path):
+        return "archive_only"  # hold private; not twin gold
+    if any(k in low for k in IMAGING_OCR_DEMOTE) and not any(
+        k in low for k in ("note", "report", "sf600", "clinic", "progress")
+    ):
+        return "archive_only"
+    if any(
+        k in low
+        for k in (
+            "medical",
+            "navy",
+            "vamc",
+            "nmcp",
+            "sf600",
+            "ahlta",
+            "myhealthevet",
+            "booksbloom",
+            "family",
+            "navpers",
+            "dd214",
+            "dd2807",
+            "dd2808",
+        )
+    ):
+        return "twin_critical"
+    if gold_score(path) >= 25:
+        return "twin_useful"
+    return "archive_only"
+
+
 def ocr_priority_boost(path: str | Path) -> int:
-    """Extra OCR score points."""
+    """Extra OCR score points — text gold up, pure imaging down."""
+    tier = gold_tier(path)
     g = gold_score(path)
-    if g >= 80:
-        return 50
+    if tier == "noise":
+        return -80
+    if tier == "archive_only":
+        return -40  # land/shelf OK; don't starve text queue
+    if tier == "twin_critical":
+        return 55 if g >= 60 else 40
     if g >= 50:
         return 30
     if g >= 30:

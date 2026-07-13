@@ -441,6 +441,34 @@ def main() -> int:
         )
     )
 
+
+    if not any(w[0]=='inbox_ghost_repoint' for w in workers):
+        workers.append(
+            (
+                'inbox_ghost_repoint',
+                [sys.executable, str(SCRIPTS / 'silo_inbox_ghost_repoint.py'), '--batch', '3000', '--rounds', '2'],
+                240,
+            )
+        )
+
+
+    if not any(w[0]=='local_cook' for w in workers):
+        workers.append(
+            (
+                'local_cook',
+                [sys.executable, str(SCRIPTS / 'silo_local_cook_loop.py'), '--once', '--ocr-limit', '16'],
+                520,
+            )
+        )
+    if not any(w[0]=='scoreboard_pulse' for w in workers):
+        workers.append(
+            (
+                'scoreboard_pulse',
+                [sys.executable, str(SCRIPTS / 'silo_scoreboard_pulse.py')],
+                60,
+            )
+        )
+
     for name, cmd, timeout in workers:
         code, out = run(cmd, timeout=timeout)
         # try parse last json object

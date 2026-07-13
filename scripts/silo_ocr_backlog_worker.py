@@ -101,7 +101,7 @@ def score(p: Path) -> int:
     if any(k in name for k in ("mri", "segmentation", "dicom")) and "note" not in name:
         s -= 15
     if p.suffix.lower() in {".dcm", ".nii", ".nrrd"}:
-        s += 70
+        s -= 50  # archive imaging — not OCR queue priority (2026-07-13)
     if "navy" in low or "medical" in low:
         s += 25
     for k in PRIORITY_KEYS:
