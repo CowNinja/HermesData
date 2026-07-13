@@ -18,13 +18,23 @@ K_SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
 RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\ingest-registry-latest.md")
 
 
+def _connect_reg(path) -> sqlite3.Connection:
+    con = sqlite3.connect(str(path), timeout=60)
+    try:
+        con.execute("PRAGMA busy_timeout=60000")
+        con.execute("PRAGMA journal_mode=WAL")
+    except Exception:
+        pass
+    return con
+
+
 def utc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
 def connect() -> sqlite3.Connection:
     DB.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(str(DB))
+    con = _connect_reg(DB)
     con.row_factory = sqlite3.Row
     con.executescript(
         """
@@ -47,11 +57,11 @@ def connect() -> sqlite3.Connection:
         CREATE INDEX IF NOT EXISTS idx_ingest_dest ON ingest(dest_path);
         CREATE INDEX IF NOT EXISTS idx_ingest_sha ON ingest(sha256);
         CREATE TABLE IF NOT EXISTS hash_seen (
-          sha256 TEXT PRIMARY KEY,
-          first_dest TEXT,
-          count INTEGER DEFAULT 1,
-          updated TEXT
-        );
+                  sha256 TEXT PRIMARY KEY,
+                  first_dest TEXT,
+                  count INTEGER DEFAULT 1,
+                  updated TEXT
+                );
         """
     )
     con.commit()
