@@ -200,7 +200,17 @@ def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 8) -> list[Path]:
         return []
 
 
-def ocr_pdf(pdf: Path, tess: str, max_pages: int = 8) -> tuple[str, list[str]]:
+def ocr_pdf(pdf: Path, tess: str, max_pages: int = 8, short_temp_copy: bool = True) -> tuple[str, list[str]]:
+    # Poppler fails on some long Windows paths / parentheses — copy to short temp
+    _tmp_dir = None
+    if short_temp_copy:
+        import tempfile, shutil
+        s = str(pdf)
+        if len(s) > 180 or "(" in s or ")" in s:
+            _tmp_dir = Path(tempfile.mkdtemp(prefix="ocr_"))
+            short = _tmp_dir / "in.pdf"
+            shutil.copy2(pdf, short)
+            pdf = short
     notes: list[str] = []
     work = Path(tempfile.mkdtemp(prefix="silo_ocr_"))
     try:

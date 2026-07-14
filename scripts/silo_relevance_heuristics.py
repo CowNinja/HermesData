@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Silo relevance heuristics — gold vs junk for land + process.
 
-Codifies Jeff 2026-07-13 lessons:
+Codifies Jeff 2026-07-13/14 lessons:
   - Booksbloom = parents' business + family PC (TRAINING GOLD), not pure junk
+  - Mom's books / Keepers / Water / Who Should We Then Read = family twin gold
   - AppData / Carbonite / Firefox profiles = catalog-only noise
   - Light family noise OK; bulk OS/browser/cache not
-  - Medical / Navy / me / family / business = high score
+  - Medical / Navy / me / family / business = high score (Med/Navy first process)
+  - Entertainment media (DVD/mp4 rips, music libs) = INTEREST catalog only
+    (titles denote interests; binary content is NOT twin training data)
 
 Used by: g_to_k_safe_drain, focus_land, OCR scoring, scoreboard.
 """
@@ -46,6 +49,12 @@ JUNK_PATH_SUBSTR = (
     "/local storage/",
     "/session storage/",
     "/shader cache/",
+    # hardware/driver dumps — not twin training
+    "/drivers/",
+    "drivermax",
+    "windows10_install",
+    # empty/noise roots
+    "/snap/",
 )
 
 # Office/lock temps
@@ -69,6 +78,69 @@ JUNK_SUFFIXES = {
 # Allow .exe/.dll only under explicit business tools? default skip binaries for land
 BINARY_SKIP = {".dll", ".exe", ".sys", ".msi", ".so", ".dylib"}
 
+# Entertainment / interest media — catalog title/path/size only (Jeff 2026-07-14).
+# Like music libraries: denotes interests, content itself is not training data.
+# Exceptions: personal/family recordings, medical audio, Navy/business conference audio.
+ENTERTAINMENT_MEDIA_SUFFIXES = {
+    ".mp4",
+    ".mkv",
+    ".avi",
+    ".mov",
+    ".wmv",
+    ".m4v",
+    ".mpg",
+    ".mpeg",
+    ".vob",
+    ".iso",  # also disk images; personal ISOs still catalog
+    ".vmdk",
+    ".vdi",
+    ".vhd",
+    ".vhdx",
+    ".mp3",
+    ".flac",
+    ".m4a",
+    ".aac",
+    ".ogg",
+    ".wma",
+    ".aiff",
+}
+
+# Path roots that are pure entertainment catalogs (not family home video archives)
+INTEREST_MEDIA_ROOT_MARKERS = (
+    "/star_of_bethlehem",
+    "/old_music",
+    "/music rip",
+    "/z_jenni_kids_music",
+    "/old_music_library",
+)
+
+# Personal recording / training-audio exceptions (still land)
+PERSONAL_AUDIO_GOLD_MARKERS = (
+    "booksbloom",
+    "nche",
+    "conference",
+    "mixdown",
+    "interview",
+    "journal",
+    "voicemail",
+    "call_",
+    "cnsva",
+    "vamc",
+    "nmcp",
+    "medical",
+    "navy",
+    "pha",
+    "sf600",
+    "eval",
+    "fitrep",
+    "bloom_jeffrey",
+    "bloom_jan",
+    "bloom_gary",
+    "family",
+    "spencer",
+    "alex",
+)
+
 # --- Gold signals (path/name) ---
 GOLD_KEYS = (
     # me / family
@@ -79,7 +151,11 @@ GOLD_KEYS = (
     "spencer",
     "family",
     "parent",
-    # business
+    "gary",
+    "jan",
+    "jenni",
+    "ballas",
+    # business + mom books (family training)
     "booksbloom",
     "books bloom",
     "heav",
@@ -92,6 +168,9 @@ GOLD_KEYS = (
     "keeper",
     "keepersofthebooks",
     "keepers of the books",
+    "who should we then",
+    "who should we then read",
+    "water",  # mom book title signal — paired with booksbloom/parent paths in gold_score
     "wswtr",
     "wholesale",
     "retail",
@@ -187,6 +266,33 @@ def is_junk_path(path: str | Path) -> bool:
     return False
 
 
+def is_entertainment_media(path: str | Path) -> bool:
+    """True when binary media is interest-catalog only (not twin training content).
+
+    Jeff 2026-07-14: STAR_OF_BETHLEHEM mp4/DVD-class, music libraries, commercial rips.
+    Titles still denote interests → catalog path/size/name only.
+    Personal/family/medical/Navy/business recordings still land.
+    """
+    low = norm(path)
+    p = Path(path)
+    suf = p.suffix.lower()
+    if suf not in ENTERTAINMENT_MEDIA_SUFFIXES:
+        return False
+    # Personal / training audio-video exceptions
+    if any(m in low for m in PERSONAL_AUDIO_GOLD_MARKERS):
+        return False
+    # Explicit interest-media roots always catalog
+    if any(m in low for m in INTEREST_MEDIA_ROOT_MARKERS):
+        return True
+    # Commercial-ish video containers without personal markers → catalog
+    if suf in {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v", ".mpg", ".mpeg", ".vob"}:
+        return True
+    # Audio libs / disk images default catalog unless gold marker above
+    if suf in {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".wma", ".aiff", ".iso", ".vmdk", ".vdi", ".vhd", ".vhdx"}:
+        return True
+    return False
+
+
 def is_catalog_only(path: str | Path) -> bool:
     """True = record path/size only, do not full-copy."""
     if is_junk_path(path):
@@ -194,8 +300,13 @@ def is_catalog_only(path: str | Path) -> bool:
     p = Path(path)
     if p.suffix.lower() in BINARY_SKIP:
         return True
-    if p.suffix.lower() in {".iso", ".vmdk", ".vdi", ".vhd", ".vhdx", ".mp3", ".flac", ".m4a"}:
+    if is_entertainment_media(path):
         return True
+    # legacy explicit set (subset of entertainment media)
+    if p.suffix.lower() in {".iso", ".vmdk", ".vdi", ".vhd", ".vhdx", ".mp3", ".flac", ".m4a"}:
+        # personal audio gold already excluded via is_entertainment_media
+        if not any(m in norm(path) for m in PERSONAL_AUDIO_GOLD_MARKERS):
+            return True
     return False
 
 
@@ -206,6 +317,8 @@ def gold_score(path: str | Path) -> int:
     suf = Path(path).suffix.lower()
     if is_junk_path(path):
         return 0
+    if is_entertainment_media(path):
+        return 5  # interest marker only
     s = 10  # base: personal silo land is not zero
     if suf in GOLD_SUFFIXES:
         s += 25
@@ -214,16 +327,23 @@ def gold_score(path: str | Path) -> int:
     for k in GOLD_KEYS:
         if k in low or k in name:
             s += 15
-    # Booksbloom family business weight
-    if "booksbloom" in low:
+    # Booksbloom family business + mom books weight
+    if "booksbloom" in low or "keepers" in low or "who should we then" in low:
         if any(g in low for g in WEB_GOLD_SUBSTR) or "/documents/" in low or "/desktop/" in low:
             s += 30
         if "/users/" in low and "/documents/" in low:
             s += 25
+        if any(t in low for t in ("who should we then", "keepers of the books", "wswtr")):
+            s += 40  # mom-authored book titles = family twin gold
         if is_junk_path(path):
             return 0
-    # Medical / Navy hard boost
-    if any(k in low for k in ("nmcp", "vamc", "navpers", "sf600", "medical", "navy")):
+    # MemoryCard family/me trees
+    if "memorycard_backups" in low and any(
+        k in low for k in ("bloom_jeffrey", "bloom_jan", "bloom_gary", "ballas_sara", "google drive")
+    ):
+        s += 35
+    # Medical / Navy hard boost (process priority)
+    if any(k in low for k in ("nmcp", "vamc", "navpers", "sf600", "medical", "navy", "cnsva", "boone")):
         s += 40
     if suf in BINARY_SKIP:
         s = min(s, 5)
@@ -234,9 +354,13 @@ def land_decision(path: str | Path) -> str:
     """Return: land | catalog | skip."""
     if is_junk_path(path):
         return "catalog"  # path metadata only when catalog pipeline runs
-    if is_catalog_only(path):
+    if is_catalog_only(path) or is_entertainment_media(path):
         return "catalog"
     if gold_score(path) < 15 and Path(path).suffix.lower() in {".js", ".css", ".map", ".woff", ".woff2"}:
+        return "skip"
+    # empty / pure noise roots
+    low = norm(path)
+    if any(x in low for x in ("/zz-random/", "/ip-updater/", "/drivers/")) and Path(path).suffix.lower() in BINARY_SKIP:
         return "skip"
     return "land"
 
