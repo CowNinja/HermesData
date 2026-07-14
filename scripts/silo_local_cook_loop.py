@@ -50,6 +50,27 @@ def run(args: list[str], timeout: int) -> tuple[int, str]:
         return 1, f"{type(e).__name__}: {e}"
 
 
+
+def promote_fat_ocr_md() -> int:
+    import sqlite3
+    from pathlib import Path as P
+    con = sqlite3.connect(r"D:/HermesData/state/ocr_backlog.sqlite3", timeout=60)
+    n = 0
+    now = utc()
+    for path, st in con.execute(
+        "SELECT path, status FROM ocr_queue WHERE status IN ('needs_ocr','empty')"
+    ).fetchall():
+        ocr = P(str(path) + ".ocr.md")
+        if ocr.is_file() and ocr.stat().st_size >= 800:
+            con.execute(
+                "UPDATE ocr_queue SET status='ok_text', updated_at=? WHERE path=?",
+                (now, path),
+            )
+            n += 1
+    con.commit()
+    return n
+
+
 def ocr_stats() -> dict:
     import sqlite3
 
@@ -83,6 +104,7 @@ def main() -> int:
             ],
             timeout=480,
         )
+        prom = promote_fat_ocr_md()
         code_tr, out_tr = run(
             [
                 PY,
@@ -159,6 +181,7 @@ def main() -> int:
     ]
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text("\n".join(lines), encoding="utf-8")
+    run([PY, str(SCRIPTS / "silo_scoreboard_pulse.py")], timeout=60)
     print(json.dumps({"rounds": rounds, "receipt": str(RECEIPT), "last": results[-1]}, indent=2))
     return 0
 

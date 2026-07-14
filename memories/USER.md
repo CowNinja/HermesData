@@ -1,4 +1,4 @@
-Jeff: travels weeks (phone-only). Ultra-brief TLDR/cliff notes only (overload). Full autonomy on approved work (silo, pipelines) without input. Default comms: short tables + what/why/next; vault depth. Barney style for silo kitchen (concise tables/actions-results, 'Next concrete step — done', scoreboard metrics/depth/OCR/queue, kitchen analogies, low interruption; 'You’re free. I keep cooking.').
+Jeff: travels weeks (phone-only). Ultra-brief TLDR/cliff notes only (overload). Full autonomy on approved work (silo, pipelines) without input. Default comms: short tables + what/why/next; vault depth. Barney style for silo kitchen (concise tables/actions-results, 'Next concrete step — done', scoreboard metrics/depth/OCR/queue, kitchen analogies, low interruption; 'You’re free. I keep cooking.'). Short & empowering updates preferred.
 §
 Expects full autonomy on approved lanes; minimal check-ins; surface only true grays/irreversible. Continue standing goals (silo kitchen) autonomously with bounded incremental steps.
 §

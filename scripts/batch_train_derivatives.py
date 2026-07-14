@@ -7,6 +7,10 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+try:
+    from silo_relevance_heuristics import train_meta_flags as _train_meta_flags
+except Exception:
+    _train_meta_flags = None
 
 SCRIPT = Path(r"D:\HermesData\scripts\training_derivative_text.py")
 

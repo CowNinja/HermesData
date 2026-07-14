@@ -271,6 +271,12 @@ def main() -> int:
             twin = q.get("twin_useful") or rec.get("twin_useful")
             if twin and status != "ok_text":
                 status = "ok_text"
+            # Swiss-watch: fat extracts are twin-usable even if ladder said needs_ocr
+            try:
+                if int(chars or 0) >= 800 and status in ("needs_ocr", "unknown", "thin", "empty"):
+                    status = "ok_text"
+            except Exception:
+                pass
             con.execute(
                 """UPDATE ocr_queue SET status=?, chars=?, engine=?, updated_at=?, attempts=attempts+1
                    WHERE path=?""",

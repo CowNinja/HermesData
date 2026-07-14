@@ -313,3 +313,104 @@ def ocr_priority_boost(path: str | Path) -> int:
     if g >= 30:
         return 15
     return 0
+
+
+# Temporal layer (Jeff 2026-07-14): historical graph gold != current facts
+# Outdated insurance/medical cards = excellent training; may not be live-relevant.
+
+
+def temporal_relevance(path: str | Path, text_sample: str = "") -> str:
+    """Return current | historical | unknown.
+
+    historical = training + graph provenance; do NOT treat as live truth.
+    current = prefer for day-to-day answers when docs conflict.
+    """
+    import re
+
+    low = norm(path) + " " + (text_sample or "")[:2000].lower()
+    years: list[int] = []
+    for m in re.finditer(r"(?:19|20)\d{2}", low):
+        try:
+            y = int(m.group(0))
+            if 1990 <= y <= 2099:
+                years.append(y)
+        except Exception:
+            pass
+    cardish = any(
+        k in low
+        for k in (
+            "enrollment card",
+            "insurance card",
+            "id card",
+            "member id",
+            "tricare dental",
+            "insurance id",
+            "benefits card",
+        )
+    )
+    if cardish and years and max(years) <= 2022:
+        return "historical"
+    if cardish and any(k in low for k in ("expired", "old ", "prior", "cancelled", "former")):
+        return "historical"
+    if years and max(years) >= 2024:
+        return "current"
+    if any(k in low for k in ("2024", "2025", "2026", "current", "active", "latest", "updated")):
+        return "current"
+    if years and max(years) <= 2022:
+        return "historical"
+    return "unknown"
+
+
+def train_meta_flags(path: str | Path) -> dict:
+    """Flags for .train.md / index: historical graph OK, not live truth."""
+    t = temporal_relevance(path)
+    return {
+        "temporal": t,
+        "twin_training_value": "high"
+        if gold_tier(path) in ("twin_critical", "twin_useful")
+        else "medium",
+        "use_as_current_fact": t == "current",
+        "use_as_historical_graph": True,
+        "note": (
+            "Outdated insurance/medical cards = historical gold, not current advice"
+            if t == "historical"
+            else ""
+        ),
+    }
+
+
+def _year_hint(path: str | Path) -> int | None:
+    import re
+    years = []
+    for m in re.finditer(r"(?:19|20)\d{2}", norm(path)):
+        try:
+            y = int(m.group(0))
+            if 1990 <= y <= 2099:
+                years.append(y)
+        except Exception:
+            pass
+    return max(years) if years else None
+
+
+def pick_most_current(paths: list) -> dict:
+    """Among duplicate-ish docs (e.g. same insurance card, many dates), pick live vs historical.
+
+    Jeff 2026-07-14: most current = relevance for use today; older = context + training only.
+    """
+    items = []
+    for p in paths:
+        y = _year_hint(p)
+        items.append({"path": str(p), "year": y, "temporal": temporal_relevance(p)})
+    dated = [i for i in items if i["year"] is not None]
+    if dated:
+        best = max(dated, key=lambda i: i["year"])
+        current_path = best["path"]
+    else:
+        # fall back: prefer temporal==current else first
+        cur = [i for i in items if i["temporal"] == "current"]
+        current_path = cur[0]["path"] if cur else (items[0]["path"] if items else None)
+    return {
+        "live_use": current_path,
+        "historical": [i["path"] for i in items if i["path"] != current_path],
+        "rule": "most_current_for_today; older_for_graph_and_training",
+    }
