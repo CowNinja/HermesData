@@ -6,16 +6,10 @@ Gateway restore sole authority: Stack-Healing-30m → stack_healing_once.py → 
 §
 Remote: RustDesk+Tailscale daily; RDP required backup (enable-rdp-tailscale.ps1; phone 100.103.254.47).
 §
-Jeff: ultra-brief TLDR; vault holds depth. Travel: no gateway restart w/o green light. Hybrid: grok-efficiency-mode.
+Jeff: ultra-brief TLDR/cliff notes; vault holds depth. Travel: no gateway restart w/o green light. Hybrid: grok-efficiency-mode. Cognitive overload while traveling; wants only cliff notes/TLDR and full autonomous identification/fixing of issues without long reports. For sovereign router consolidation: walk through reviewing, distilling, archiving, combining, reducing number of markdowns, simplifying instructions and infrastructure; take the next concrete step; explicitly state if goal is complete or if blocked/needing input; continue autonomously across turns. Walk through fixes for issues like provider unreachable errors.
 §
 User explicitly requires stopping freeform batch immediately for Alice; use ONLY targeted registry-locked generation (e.g. --candidate alice-al-rashid) for character consistency every time.
 §
-User experiences cognitive overload/headache while traveling; wants only cliff notes/TLDR and full autonomous identification/fixing of issues (e.g. pipeline problems) without long reports.
-§
-VA churches: KPC→GBEFC→Crosswater PCA→NRBC(Nansemond,current). Crosswater photos=friends. Wertz=Phil+Amy. Silo travel autonomy+gray phone A/B/C.
-§
-Jodi 1st marriage=Edwards only (≠Crosswater Edwards). Melvin Johnson=ITC NCDOC boss. Laura Johnson-McMullan=friend. User dreams, agent builds.
-§
 Silo kitchen work uses strict Barney format: short tables (wave | result), scoreboard (inbox/footprint/OCR ok_text/queue/Med/Navy), "Next concrete step — done", chef metaphors, "You’re free. I keep cooking." Reinforced in personal-data-silo skill.
 §
-personal-data-silo skill and lesson-to-automation ref updated 2026-07 with sustained OCR drain patterns: --process-only --limit waves on silo_ocr_backlog_worker.py chained to medical_navy_text_index + batch_train_derivatives, current metrics tracking (ok_text climb, queue/ needs_ocr dynamics), single-kitchen enforcement, Barney format reinforcement. Captured as class-level evolution per Be ACTIVE directive.
+User focusing on colibri-glm52-local skill to setup/run GLM-5.2 744B MoE locally (HF int4 + NVMe expert streaming, ~25GB RAM). Redirects from rabbit holes to exact standing goal.

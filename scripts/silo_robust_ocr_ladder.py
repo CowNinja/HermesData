@@ -204,7 +204,6 @@ def ocr_pdf(pdf: Path, tess: str, max_pages: int = 8, short_temp_copy: bool = Tr
     # Poppler fails on some long Windows paths / parentheses — copy to short temp
     _tmp_dir = None
     if short_temp_copy:
-        import tempfile, shutil
         s = str(pdf)
         if len(s) > 180 or "(" in s or ")" in s:
             _tmp_dir = Path(tempfile.mkdtemp(prefix="ocr_"))
@@ -224,6 +223,8 @@ def ocr_pdf(pdf: Path, tess: str, max_pages: int = 8, short_temp_copy: bool = Tr
         return "\n\n".join(texts), notes
     finally:
         shutil.rmtree(work, ignore_errors=True)
+        if _tmp_dir is not None:
+            shutil.rmtree(_tmp_dir, ignore_errors=True)
 
 
 def write_sidecars(path: Path, text: str, rec: dict, write_train: bool) -> None:

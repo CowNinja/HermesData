@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Jan Library framework health check — resilient, double-checked inventory."""
+from __future__ import annotations
+
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+SHELF = Path(
+    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\Family\Jan-Bloom-Author"
+)
+SCRIPTS = Path(r"D:\HermesData\scripts")
+DISCORD_CID = "1526594007092826316"
+OUT = Path(r"D:\PhronesisVault\Operations\logs\jan-library-health-latest.json")
+
+
+def check() -> dict:
+    report = {
+        "at": datetime.now(timezone.utc).isoformat(),
+        "ok": True,
+        "checks": {},
+        "warnings": [],
+        "errors": [],
+    }
+
+    def flag(name: str, good: bool, detail: str, hard: bool = False):
+        report["checks"][name] = {"ok": good, "detail": detail}
+        if not good:
+            (report["errors"] if hard else report["warnings"]).append(f"{name}: {detail}")
+            if hard:
+                report["ok"] = False
+
+    # Shelf files
+    for rel in (
+        "inventory.json",
+        "chunks/jan_chunks.jsonl",
+        "chunks/jan_unified_chunks.jsonl",
+        "00-INDEX.md",
+    ):
+        p = SHELF / rel
+        flag(f"file:{rel}", p.exists() and p.stat().st_size > 50, f"size={p.stat().st_size if p.exists() else 0}", hard=True)
+
+    # Chunk counts
+    uni = SHELF / "chunks" / "jan_unified_chunks.jsonl"
+    n = 0
+    lanes = {}
+    if uni.exists():
+        with uni.open(encoding="utf-8") as f:
+            for line in f:
+                n += 1
+                try:
+                    lane = json.loads(line).get("lane", "?")
+                    lanes[lane] = lanes.get(lane, 0) + 1
+                except Exception:
+                    pass
+    flag("unified_chunks", n >= 2000, f"n={n} lanes={lanes}", hard=True)
+    flag("jan_shelf_lane", lanes.get("jan_shelf", 0) >= 1000, f"jan_shelf={lanes.get('jan_shelf')}")
+    flag("family_living", lanes.get("family_living", 0) >= 1, f"family_living={lanes.get('family_living')}")
+
+    # Scripts
+    for s in (
+        "talk_to_jan.py",
+        "jan_author_extract.py",
+        "jan_author_chunk_index.py",
+        "jan_unified_index.py",
+        "apply_jan_discord_channel.py",
+    ):
+        p = SCRIPTS / s
+        flag(f"script:{s}", p.exists(), str(p), hard=True)
+
+    # Discord wire
+    try:
+        import yaml
+
+        cfg = yaml.safe_load(
+            (Path.home() / ".hermes" / "config.yaml").read_text(encoding="utf-8")
+        )
+        d = cfg.get("discord") or {}
+        prompts = d.get("channel_prompts") or {}
+        fr = str(d.get("free_response_channels") or "")
+        flag("discord_prompt", DISCORD_CID in prompts, "channel_prompts", hard=True)
+        flag("discord_free", DISCORD_CID in fr, "free_response")
+    except Exception as e:
+        flag("discord_config", False, str(e), hard=True)
+
+    # SOUL + docs
+    for p in (
+        Path(r"D:\PhronesisVault\Operations\SOUL-Jan-Library-Agent-2026-07-14.md"),
+        Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Demo\Family-Guide-Jans-Library-2026-07-14.md"),
+        Path(r"D:\PhronesisVault\Operations\GOAL-Full-Unified-Jan-BooksBloom-Agent-2026-07-14.md"),
+    ):
+        flag(f"doc:{p.name}", p.exists() and p.stat().st_size > 100, str(p))
+
+    # Proxy soft check
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen("http://127.0.0.1:8091/v1/models", timeout=5) as r:
+            flag("llm_proxy", r.status == 200, "8091 ok")
+    except Exception as e:
+        flag("llm_proxy", False, f"down: {e}")  # soft — heuristic still works
+
+    # Retrieval smoke
+    try:
+        sys.path.insert(0, str(SCRIPTS))
+        from jan_author_chunk_index import retrieve
+
+        hits = retrieve("Who Should We Then Read thrift Mighty Whitey", k=5)
+        flag("retrieve_smoke", len(hits) >= 1, f"hits={len(hits)}", hard=True)
+    except Exception as e:
+        flag("retrieve_smoke", False, str(e), hard=True)
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return report
+
+
+def main() -> int:
+    r = check()
+    print(json.dumps(r, indent=2))
+    return 0 if r["ok"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

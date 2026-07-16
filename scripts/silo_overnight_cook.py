@@ -88,19 +88,23 @@ def cycle(ocr_limit: int, train_limit: int, index_limit: int, bb_limit: int) -> 
         ],
         timeout=480,
     )
-    # promote fat ocr.md
+    # promote fat ocr.md (chars + status — hang-fix for stuck gold tail)
     try:
         con = sqlite3.connect(r"D:/HermesData/state/ocr_backlog.sqlite3", timeout=60)
         now = utc()
         prom = 0
         for path, st in con.execute(
-            "SELECT path, status FROM ocr_queue WHERE status IN ('needs_ocr','empty')"
+            "SELECT path, status FROM ocr_queue WHERE status IN ('needs_ocr','empty','error')"
         ):
             o = Path(str(path) + ".ocr.md")
             if o.is_file() and o.stat().st_size >= 800:
+                try:
+                    chars = len(o.read_text(encoding="utf-8", errors="replace").strip())
+                except Exception:
+                    chars = int(o.stat().st_size)
                 con.execute(
-                    "UPDATE ocr_queue SET status='ok_text', updated_at=? WHERE path=?",
-                    (now, path),
+                    "UPDATE ocr_queue SET status='ok_text', chars=?, engine=COALESCE(NULLIF(engine,''), 'promote_fat'), updated_at=? WHERE path=?",
+                    (chars, now, path),
                 )
                 prom += 1
         con.commit()
@@ -120,6 +124,20 @@ def cycle(ocr_limit: int, train_limit: int, index_limit: int, bb_limit: int) -> 
         ],
         timeout=120,
     )
+    # Post-OCR twin meta stamp (bounded — never hang rglob)
+    code_st, _ = run(
+        [
+            PY,
+            str(SCRIPTS / "silo_twin_meta_stamp.py"),
+            "--limit",
+            "40",
+            "--also-navy",
+            "--also-family",
+            "--max-scan",
+            "800",
+        ],
+        timeout=120,
+    )
     code_b, out_b = run(
         [
             PY,
@@ -128,7 +146,7 @@ def cycle(ocr_limit: int, train_limit: int, index_limit: int, bb_limit: int) -> 
             "--limit",
             str(bb_limit),
         ],
-        timeout=600,
+        timeout=300,
     )
     run([PY, str(SCRIPTS / "silo_scoreboard_pulse.py")], timeout=60)
     after = ocr_stats()
@@ -137,6 +155,7 @@ def cycle(ocr_limit: int, train_limit: int, index_limit: int, bb_limit: int) -> 
         "ocr_code": code_o,
         "train_code": code_t,
         "index_code": code_i,
+        "stamp_code": code_st,
         "bb_code": code_b,
         "promoted": prom,
         "before": before,

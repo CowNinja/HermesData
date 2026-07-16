@@ -1,18 +1,143 @@
 #!/usr/bin/env python3
-"""Batch P1 training derivatives under a domain folder (idempotent)."""
+"""Batch P1 training derivatives under a domain folder (idempotent).
+
+Hang-fix 2026-07-14:
+- Fail-soft on per-file TimeoutExpired.
+- Skip thin imaging / plot junk.
+- Prefer gold path keywords.
+- max-scan cap + OCR-queue-first discovery (avoid multi-minute Medical rglob hangs).
+"""
 from __future__ import annotations
 
 import argparse
 import json
+import re
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+
 try:
     from silo_relevance_heuristics import train_meta_flags as _train_meta_flags
 except Exception:
     _train_meta_flags = None
 
 SCRIPT = Path(r"D:\HermesData\scripts\training_derivative_text.py")
+OCR_DB = Path(r"D:\HermesData\state\ocr_backlog.sqlite3")
+
+SKIP_NAME_RE = re.compile(
+    r"(anomaly|aGradient|scymed|target.?body|BMI.?plot|nutrition.?plot|"
+    r"formula|equation crop|pagebackground|pagefooter|pagetop|"
+    r"address\.png|phone\.png)",
+    re.I,
+)
+SKIP_PATH_RE = re.compile(
+    r"(HealthMatters\.io|\\images\\|/images/|thin.?imaging)",
+    re.I,
+)
+GOLD_HINT = re.compile(
+    r"(VAMC|NMCP|DD280|NAVPERS|PHA|AHLTA|TRICARE|MyHealtheVet|"
+    r"SF600|clinical|Navy|Elrod|Enterprise|SARP|disability)",
+    re.I,
+)
+
+
+def should_skip(p: Path) -> bool:
+    name = p.name
+    s = str(p)
+    if SKIP_NAME_RE.search(name) or SKIP_PATH_RE.search(s):
+        return True
+    low = name.lower()
+    if low.endswith((".jpg.ocr.md", ".jpeg.ocr.md", ".png.ocr.md", ".tif.ocr.md", ".tiff.ocr.md")):
+        if not GOLD_HINT.search(s):
+            return True
+    return False
+
+
+def mark_skip(src: Path, reason: str) -> None:
+    train = Path(str(src) + ".train.md")
+    if train.is_file():
+        return
+    try:
+        train.write_text(
+            f"---\nsource: {src}\nskipped: true\nreason: {reason}\n---\n\n[skipped]\n",
+            encoding="utf-8",
+            errors="replace",
+        )
+        Path(str(src) + ".train.meta.json").write_text(
+            json.dumps({"source": str(src), "skipped": True, "reason": reason}, indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
+def candidates_from_ocr_queue(limit: int, root: Path) -> list[Path]:
+    """Prefer ok_text sources that still lack .train.md — O(queue) not O(tree)."""
+    out: list[Path] = []
+    if not OCR_DB.is_file():
+        return out
+    root_s = str(root).lower().replace("/", "\\")
+    try:
+        con = sqlite3.connect(str(OCR_DB), timeout=30)
+        rows = con.execute(
+            "SELECT path FROM ocr_queue WHERE status='ok_text' ORDER BY chars DESC LIMIT ?",
+            (max(limit * 8, 200),),
+        ).fetchall()
+        con.close()
+    except Exception:
+        return out
+    for (path,) in rows:
+        if not path:
+            continue
+        p = Path(path)
+        if root_s not in str(p).lower().replace("/", "\\"):
+            # allow ocr.md sidecar as source when path is binary but ocr.md exists
+            pass
+        if not p.is_file():
+            # try .ocr.md sibling as text source
+            ocr_md = Path(str(p) + ".ocr.md")
+            if ocr_md.is_file():
+                p = ocr_md
+            else:
+                continue
+        if Path(str(p) + ".train.md").exists():
+            continue
+        if should_skip(p):
+            mark_skip(p, "junk_or_thin_imaging")
+            continue
+        out.append(p)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def candidates_from_walk(root: Path, limit: int, max_scan: int) -> list[Path]:
+    exts = {".pdf", ".txt", ".md", ".csv", ".json"}
+    gold: list[Path] = []
+    other: list[Path] = []
+    scanned = 0
+    for p in root.rglob("*"):
+        scanned += 1
+        if scanned > max_scan:
+            break
+        if not p.is_file():
+            continue
+        if p.suffix.lower() not in exts:
+            continue
+        if p.name.endswith(".meta.json") or ".train." in p.name:
+            continue
+        if p.name.endswith(".train.md"):
+            continue
+        if Path(str(p) + ".train.md").exists():
+            continue
+        if should_skip(p):
+            mark_skip(p, "junk_or_thin_imaging")
+            continue
+        (gold if GOLD_HINT.search(str(p)) else other).append(p)
+        if len(gold) + len(other) >= max(limit * 4, 80):
+            break
+    return (gold + other)[:limit]
 
 
 def main() -> int:
@@ -22,36 +147,55 @@ def main() -> int:
         default=r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Medical-Records",
     )
     ap.add_argument("--limit", type=int, default=40)
+    ap.add_argument("--timeout", type=int, default=60)
+    ap.add_argument("--max-scan", type=int, default=4000, help="rglob file cap fallback")
+    ap.add_argument(
+        "--walk-only",
+        action="store_true",
+        help="skip OCR-queue discovery",
+    )
     args = ap.parse_args()
     root = Path(args.root)
-    exts = {".pdf", ".txt", ".md", ".csv", ".json"}
     files: list[Path] = []
-    for p in root.rglob("*"):
-        if not p.is_file():
-            continue
-        if p.suffix.lower() not in exts:
-            continue
-        if p.name.endswith(".meta.json") or ".train." in p.name:
-            continue
-        if Path(str(p) + ".train.md").exists():
-            continue
-        files.append(p)
-        if len(files) >= args.limit:
-            break
+    source = "none"
+    if not args.walk_only:
+        files = candidates_from_ocr_queue(args.limit, root)
+        source = "ocr_queue"
+    if len(files) < args.limit:
+        need = args.limit - len(files)
+        walked = candidates_from_walk(root, need, args.max_scan)
+        # dedupe
+        seen = {str(f) for f in files}
+        for w in walked:
+            if str(w) not in seen:
+                files.append(w)
+                seen.add(str(w))
+        source = f"{source}+walk" if files else "walk"
+    files = files[: args.limit]
     ok = 0
-    # optional registry process_status
+    skipped = 0
+    timed_out = 0
     try:
         from ingest_registry import connect as reg_connect
+
         icon = reg_connect()
     except Exception:
         icon = None
     for f in files:
-        r = subprocess.run(
-            [sys.executable, str(SCRIPT), str(f)],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
+        try:
+            r = subprocess.run(
+                [sys.executable, str(SCRIPT), str(f)],
+                capture_output=True,
+                text=True,
+                timeout=args.timeout,
+            )
+        except subprocess.TimeoutExpired:
+            timed_out += 1
+            mark_skip(f, f"timeout_{args.timeout}s")
+            continue
+        except Exception as e:
+            mark_skip(f, f"error:{type(e).__name__}")
+            continue
         if r.returncode == 0:
             ok += 1
             if icon is not None:
@@ -62,12 +206,26 @@ def main() -> int:
                     )
                 except Exception:
                     pass
+        else:
+            skipped += 1
     if icon is not None:
         try:
             icon.commit()
         except Exception:
             pass
-    print(json.dumps({"root": str(root), "attempted": len(files), "ok": ok}, indent=2))
+    print(
+        json.dumps(
+            {
+                "root": str(root),
+                "source": source,
+                "attempted": len(files),
+                "ok": ok,
+                "skipped": skipped,
+                "timed_out": timed_out,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 

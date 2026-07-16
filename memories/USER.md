@@ -1,9 +1,5 @@
-Jeff: travels weeks (phone-only). Ultra-brief TLDR/cliff notes only (overload). Full autonomy on approved work (silo, pipelines) without input. Default comms: short tables + what/why/next; vault depth. Barney style for silo kitchen (concise tables/actions-results, 'Next concrete step — done', scoreboard metrics/depth/OCR/queue, kitchen analogies, low interruption; 'You’re free. I keep cooking.'). Short & empowering updates preferred.
-§
-Expects full autonomy on approved lanes; minimal check-ins; surface only true grays/irreversible. Continue standing goals (silo kitchen) autonomously with bounded incremental steps.
-§
-Default: short tables + what/why/next; not forensics. Ultra-brief on overload. Barney style for silo kitchen (tables, scoreboard, chef framing, 'You’re free. I keep cooking.'). Vault depth.
-§
 User driving autonomous 'Silo Kitchen' (K: silo post-ingest QA, repair/re-pull, re-OCR, text clean to .train.md + tags/index for Phronesis twin/RAG). Medical/Navy first. Incremental/safe/tested; log all; only real blockers; nested trees; rich connections/history.
 §
 Jeff: Loves nested origin trees for future photo/people tagging and connections. Prefers copying directory structure when in doubt for intuitive access. Positive on multi-agent plans, auto index refresh, Amazon rehome, and rich historical connections (e.g., parents' BooksBloom business).
+§
+Jeff (user): Builds Phronesis sovereign digital twin from personal data silo (Medical/Navy/Family/Booksbloom). Travels frequently (phone-only); requires ultra-brief TLDR/cliff notes on overload. Full autonomy on silo kitchen work (OCR drain, twin train/index/stamps/retrieval, Booksbloom, local cook, purge prep). Strictly prefers Barney-format kitchen updates: short tables (Action | Result), scoreboard, 'Next concrete step — done', chef metaphors, 'You’re free. I keep cooking.' No long reports or forensics in chat; full logs in vault. 'Keep Barney updates short.' 'Work incrementally with testing. Log everything locally.' Standing goal: production-perfect post-OCR twin readiness & full stack Swiss-watch optimization.

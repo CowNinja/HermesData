@@ -3,12 +3,13 @@
 
 Codifies Jeff 2026-07-13/14 lessons:
   - Booksbloom = parents' business + family PC (TRAINING GOLD), not pure junk
-  - Mom's books / Keepers / Water / Who Should We Then Read = family twin gold
+  - Mom's books / Keepers / WSWTR / Who Should We Then Read = family twin gold
   - AppData / Carbonite / Firefox profiles = catalog-only noise
   - Light family noise OK; bulk OS/browser/cache not
   - Medical / Navy / me / family / business = high score (Med/Navy first process)
   - Entertainment media (DVD/mp4 rips, music libs) = INTEREST catalog only
     (titles denote interests; binary content is NOT twin training data)
+  - Never boost bare "water" — phone autocorrect of WSWTR (Jeff 2026-07-14)
 
 Used by: g_to_k_safe_drain, focus_land, OCR scoring, scoreboard.
 """
@@ -170,7 +171,7 @@ GOLD_KEYS = (
     "keepers of the books",
     "who should we then",
     "who should we then read",
-    "water",  # mom book title signal — paired with booksbloom/parent paths in gold_score
+    # Mom books brand: WSWTR only (Jeff 2026-07-14 — "water" was phone autocorrect of wswtr)
     "wswtr",
     "wholesale",
     "retail",
@@ -327,14 +328,22 @@ def gold_score(path: str | Path) -> int:
     for k in GOLD_KEYS:
         if k in low or k in name:
             s += 15
-    # Booksbloom family business + mom books weight
-    if "booksbloom" in low or "keepers" in low or "who should we then" in low:
+    # Booksbloom family business + mom books (WSWTR / Keepers) — NOT bare "water"
+    if "booksbloom" in low or "keepers" in low or "who should we then" in low or "wswtr" in low:
         if any(g in low for g in WEB_GOLD_SUBSTR) or "/documents/" in low or "/desktop/" in low:
             s += 30
         if "/users/" in low and "/documents/" in low:
             s += 25
-        if any(t in low for t in ("who should we then", "keepers of the books", "wswtr")):
-            s += 40  # mom-authored book titles = family twin gold
+        if any(
+            t in low
+            for t in (
+                "who should we then",
+                "keepers of the books",
+                "keepersofthebooks",
+                "wswtr",
+            )
+        ):
+            s += 40  # mom-authored / family business titles = family twin gold
         if is_junk_path(path):
             return 0
     # MemoryCard family/me trees

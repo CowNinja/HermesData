@@ -375,6 +375,45 @@ def main() -> int:
         )
     )
 
+    # Post-OCR twin depth (zero Grok) — bounded stamp + local cache + status
+    workers.append(
+        (
+            "twin_meta_stamp",
+            [
+                sys.executable,
+                str(SCRIPTS / "silo_twin_meta_stamp.py"),
+                "--limit",
+                "30",
+                "--also-navy",
+                "--also-family",
+                "--max-scan",
+                "800",
+            ],
+            120,
+        )
+    )
+    workers.append(
+        (
+            "twin_retrieval_cache",
+            [sys.executable, str(SCRIPTS / "silo_twin_retrieval_cache.py")],
+            90,
+        )
+    )
+    workers.append(
+        (
+            "autonomous_status",
+            [sys.executable, str(SCRIPTS / "silo_autonomous_status.py")],
+            30,
+        )
+    )
+    workers.append(
+        (
+            "next_sources_dry",
+            [sys.executable, str(SCRIPTS / "silo_next_sources_pipeline.py")],
+            60,
+        )
+    )
+
     workers.append(
         (
             "post_ingest_qa",

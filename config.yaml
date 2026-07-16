@@ -1,11 +1,15 @@
 model:
-  default: grok-4.5
-  provider: xai-oauth
-fallback_providers: []
+  default: phronesis-sovereign-auto
+  provider: custom:phronesis-sovereign
+fallback_providers:
+- provider: custom:phronesis-sovereign
+  model: phronesis-sovereign-auto
+  base_url: http://127.0.0.1:8091/v1
+  api_mode: chat_completions
 toolsets:
-  - hermes-cli
-  - browser
-  - computer_use
+- hermes-cli
+- browser
+- computer_use
 max_live_sessions: 4
 agent:
   max_turns: 32
@@ -288,9 +292,9 @@ display:
   runtime_footer:
     enabled: false
     fields:
-      - model
-      - context_pct
-      - cwd
+    - model
+    - context_pct
+    - cwd
   copy_shortcut: auto
   pet:
     enabled: false
@@ -406,8 +410,8 @@ moa:
   presets:
     default:
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -417,8 +421,8 @@ moa:
     Default:
       enabled: true
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -429,10 +433,10 @@ moa:
     Grok:
       enabled: true
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
-        - provider: xai-oauth
-          model: grok-build-0.1
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
+      - provider: xai-oauth
+        model: grok-build-0.1
       aggregator:
         provider: xai-oauth
         model: grok-4.3
@@ -443,14 +447,14 @@ moa:
     Grok + Phronesis:
       enabled: true
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
-        - provider: xai-oauth
-          model: grok-build-0.1
-        - provider: xai-oauth
-          model: grok-composer-2.5-fast
-        - provider: xai-oauth
-          model: grok-4.3
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
+      - provider: xai-oauth
+        model: grok-build-0.1
+      - provider: xai-oauth
+        model: grok-composer-2.5-fast
+      - provider: xai-oauth
+        model: grok-4.3
       aggregator:
         provider: xai-oauth
         model: grok-4.3
@@ -461,12 +465,12 @@ moa:
     Just xAi:
       enabled: true
       reference_models:
-        - provider: xai-oauth
-          model: grok-build-0.1
-        - provider: xai-oauth
-          model: grok-composer-2.5-fast
-        - provider: xai-oauth
-          model: grok-4.3
+      - provider: xai-oauth
+        model: grok-build-0.1
+      - provider: xai-oauth
+        model: grok-composer-2.5-fast
+      - provider: xai-oauth
+        model: grok-4.3
       aggregator:
         provider: xai-oauth
         model: grok-4.3
@@ -477,12 +481,12 @@ moa:
     Grok + Free + Phronesis:
       enabled: true
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
-        - provider: xai-oauth
-          model: grok-build-0.1
-        - provider: openrouter
-          model: openrouter/free
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
+      - provider: xai-oauth
+        model: grok-build-0.1
+      - provider: openrouter
+        model: openrouter/free
       aggregator:
         provider: xai-oauth
         model: grok-4.3
@@ -491,8 +495,8 @@ moa:
       max_tokens: 4096
       fanout: per_iteration
   reference_models:
-    - provider: xai-oauth
-      model: grok-4.3
+  - provider: xai-oauth
+    model: grok-4.3
   aggregator:
     provider: xai-oauth
     model: grok-4.3
@@ -504,12 +508,12 @@ moa:
   Just xAi:
     enabled: true
     reference_models:
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-composer-2.5-fast
-      - provider: xai-oauth
-        model: grok-4.3
+    - provider: xai-oauth
+      model: grok-build-0.1
+    - provider: xai-oauth
+      model: grok-composer-2.5-fast
+    - provider: xai-oauth
+      model: grok-4.3
     aggregator:
       provider: xai-oauth
       model: grok-4.3
@@ -522,56 +526,56 @@ moa:
     primary + local grunt.'
 skills:
   disabled:
-    - ascii-video
-    - baoyu-infographic
-    - blogwatcher
-    - claude-code
-    - codex
-    - comfyui
-    - design-md
-    - gif-search
-    - google-workspace
-    - heartmula
-    - hermes-atlas
-    - hermes-atlas-discovery
-    - hermes-bundles
-    - himalaya
-    - jupyter-live-kernel
-    - manim-video
-    - maps
-    - minimal-agent-harness
-    - monitoring-dashboard-summary
-    - node-inspect-debugger
-    - notion
-    - opencode
-    - openhue
-    - p5js
-    - petdex
-    - polymarket
-    - popular-web-designs
-    - powerpoint
-    - pretext
-    - second-brain-vault
-    - segment-anything-model
-    - sketch
-    - songsee
-    - sovereign-computer-use-test
-    - teams-meeting-pipeline
-    - touchdesigner-mcp
-    - uncensored-image-generation
-    - weights-and-biases
-    - yuanbao
-    - airtable
-    - excalidraw
-    - nano-pdf
-    - songwriting-and-ai-music
-    - x-browser-poster
-    - x-post
-    - x-poster
-    - freellmapi
-    - agentmail
-    - blackbox
-    - dogfood
+  - ascii-video
+  - baoyu-infographic
+  - blogwatcher
+  - claude-code
+  - codex
+  - comfyui
+  - design-md
+  - gif-search
+  - google-workspace
+  - heartmula
+  - hermes-atlas
+  - hermes-atlas-discovery
+  - hermes-bundles
+  - himalaya
+  - jupyter-live-kernel
+  - manim-video
+  - maps
+  - minimal-agent-harness
+  - monitoring-dashboard-summary
+  - node-inspect-debugger
+  - notion
+  - opencode
+  - openhue
+  - p5js
+  - petdex
+  - polymarket
+  - popular-web-designs
+  - powerpoint
+  - pretext
+  - second-brain-vault
+  - segment-anything-model
+  - sketch
+  - songsee
+  - sovereign-computer-use-test
+  - teams-meeting-pipeline
+  - touchdesigner-mcp
+  - uncensored-image-generation
+  - weights-and-biases
+  - yuanbao
+  - airtable
+  - excalidraw
+  - nano-pdf
+  - songwriting-and-ai-music
+  - x-browser-poster
+  - x-post
+  - x-poster
+  - freellmapi
+  - agentmail
+  - blackbox
+  - dogfood
 curator:
   enabled: true
   interval_hours: 168
@@ -592,7 +596,7 @@ slack:
   allowed_channels: ''
 discord:
   require_mention: true
-  free_response_channels: 1513273692778528990,1519509288286949466,1522325123817013269
+  free_response_channels: 1513273692778528990,1519509288286949466,1522325123817013269,1526594007092826316
   allowed_channels: ''
   auto_thread: true
   thread_require_mention: false
@@ -699,6 +703,26 @@ discord:
       dump raw logs/code/results into chat. Distill all work to D:\PhronesisVault
       immediately and link. Use /new for new heavy tasks. No long histories in chat.
       Compact aggressively but protect recent turns.'
+    '1526594007092826316': 'JAN''S LIBRARY CHANNEL — Hermes curator only (never impersonate
+      Jan/Jeff/anyone).
+
+      Read and obey SOUL at D:/PhronesisVault/Operations/SOUL-Jan-Library-Agent-2026-07-14.md
+
+      For answers: run `python D:/HermesData/scripts/talk_to_jan.py "<user question
+      without /jan prefix>"` and return that grounded reply (or paraphrase warmly
+      with same citations).
+
+      Family wording: Gary in manuscripts = Daddy in family chat. Living fact: Mighty
+      Whitey retired; current van Hi-Ho Silver (2015 Chevy Express 3500, ~42-shelf
+      trailer) — label as family update not page quote.
+
+      Strip leading `/jan` if present. Ultra-brief chat OK; full substance may stay
+      in reply. No main-silo medical digressions unless asked.
+
+      Dream context: Jan hopes to merge her work into one new book someday — outline
+      from corpus only if asked; never write as her.
+
+      '
   dm_role_auth_guild: ''
   server_actions: list_guilds,server_info,list_channels,channel_info,list_roles,member_info,search_members,fetch_messages,list_pins,pin_message,unpin_message,delete_message,create_thread,add_role,remove_role
   allow_any_attachment: false
@@ -712,66 +736,66 @@ discord:
     speech_gain: 1
     ack_enabled: true
     ack_phrases:
-      - Let me look into that.
-      - One moment.
-      - Checking on that now.
-      - Give me a sec.
-      - On it.
+    - Let me look into that.
+    - One moment.
+    - Checking on that now.
+    - Give me a sec.
+    - On it.
   ignored_channels: 1523364535459774658
   channel_overrides:
     '1523156115808845926':
-      model: grok-4.5
+      model: phronesis-sovereign-auto
       enabled_toolsets:
-        - hermes-cli
-        - terminal
-        - file
-      provider: xai-oauth
+      - hermes-cli
+      - terminal
+      - file
+      provider: custom:phronesis-sovereign
     '1519144636541571133':
-      model: grok-4.5
+      model: phronesis-sovereign-auto
       enabled_toolsets:
-        - hermes-cli
-        - terminal
-        - file
-      provider: xai-oauth
+      - hermes-cli
+      - terminal
+      - file
+      provider: custom:phronesis-sovereign
     '1519509288286949466':
       model: grok-build-0.1
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       provider: xai-oauth
     '1521146755985576116':
       model: grok-build-0.1
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       provider: xai-oauth
     '1522330326733422713':
       model: grok-build-0.1
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       provider: xai-oauth
     '1523604530338730004':
       model: grok-build-0.1
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       provider: xai-oauth
     '1525174401740312707':
       model: phronesis-sovereign-roleplay
@@ -779,10 +803,10 @@ discord:
       base_url: http://127.0.0.1:8091/v1
       api_key: local
       enabled_toolsets:
-        - hermes-cli
-        - terminal
-        - file
-        - image_gen
+      - hermes-cli
+      - terminal
+      - file
+      - image_gen
       context_length: 65536
       note: Switched to local Qwythos-9B abliterated via sovereign proxy per user
         request 2026-07-12 (token burn prevention in alice-roleplay)
@@ -792,12 +816,12 @@ discord:
       base_url: http://127.0.0.1:8091/v1
       api_key: local
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       context_length: 65536
       note: Switched to local Qwythos-9B abliterated via sovereign proxy per user
         request 2026-07-12 (token burn prevention in alice-roleplay thread 1525214795236773918)
@@ -825,12 +849,12 @@ approvals:
   destructive_slash_confirm: true
   gateway_timeout: 600
 command_allowlist:
-  - delete in root path
-  - script execution via heredoc
-  - recursive delete
-  - shell command via -c/-lc flag
-  - script execution via -e/-c flag
-  - execute_code
+- delete in root path
+- script execution via heredoc
+- recursive delete
+- shell command via -c/-lc flag
+- script execution via -e/-c flag
+- execute_code
 hooks_auto_accept: false
 security:
   allow_private_urls: false
@@ -881,11 +905,11 @@ gateway:
   max_inbound_media_bytes: 134217728
   strict: false
   media_delivery_allow_dirs:
-    - D:\HermesData\audio_cache
-    - D:\HermesData
-    - D:\PhronesisVault
-    - D:\ComfyUI
-    - D:\HermesData\screenshots
+  - D:\HermesData\audio_cache
+  - D:\HermesData
+  - D:\PhronesisVault
+  - D:\ComfyUI
+  - D:\HermesData\screenshots
   trust_recent_files: true
   trust_recent_files_seconds: 600
   api_server:
@@ -941,37 +965,37 @@ grok_auth:
   prefer_subscription: true
   oauth_refresh_on_auth_fail: true
   fallback_http_codes:
-    - 401
-    - 403
-    - 404
+  - 401
+  - 403
+  - 404
   transient_retry: true
   rate_limit_retries: 2
   rate_limit_max_wait_sec: 120
   timeout_seconds: 180
 custom_providers:
-  - name: phronesis-sovereign
-    api_key: local
-    api_mode: chat_completions
-    base_url: http://127.0.0.1:8091/v1
-    context_length: 65536
-    default_model: phronesis-sovereign-auto
-    models:
-      phronesis-sovereign-auto:
-        context_length: 65536
-      phronesis-sovereign-classify:
-        context_length: 65536
-      phronesis-sovereign-code:
-        context_length: 65536
-      phronesis-sovereign-metadata:
-        context_length: 65536
+- name: phronesis-sovereign
+  api_key: local
+  api_mode: chat_completions
+  base_url: http://127.0.0.1:8091/v1
+  context_length: 65536
+  default_model: phronesis-sovereign-auto
+  models:
+    phronesis-sovereign-auto:
+      context_length: 65536
+    phronesis-sovereign-classify:
+      context_length: 65536
+    phronesis-sovereign-code:
+      context_length: 65536
+    phronesis-sovereign-metadata:
+      context_length: 65536
 fallback_model:
-  - provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+- provider: custom:phronesis-sovereign
+  model: phronesis-sovereign-auto
+  base_url: http://127.0.0.1:8091/v1
+  api_key: local
 known_plugin_toolsets:
   cli:
-    - spotify
+  - spotify
 local_sovereign:
   boot_integrity:
     enabled: true
@@ -1013,48 +1037,48 @@ local_sovereign:
     endpoints for light tasks. Full fleet management via fleetctl/model mgmt agents.
 platform_toolsets:
   api_server:
-    - file
-    - terminal
-    - web
-    - skills
-    - memory
+  - file
+  - terminal
+  - web
+  - skills
+  - memory
   cli:
-    - browser
-    - clarify
-    - code_execution
-    - computer_use
-    - cronjob
-    - delegation
-    - file
-    - homeassistant
-    - kanban
-    - memory
-    - session_search
-    - skills
-    - terminal
-    - todo
-    - tts
-    - video
-    - video_gen
-    - vision
-    - web
-    - x_search
+  - browser
+  - clarify
+  - code_execution
+  - computer_use
+  - cronjob
+  - delegation
+  - file
+  - homeassistant
+  - kanban
+  - memory
+  - session_search
+  - skills
+  - terminal
+  - todo
+  - tts
+  - video
+  - video_gen
+  - vision
+  - web
+  - x_search
   discord:
-    - file
-    - terminal
-    - web
-    - browser
-    - delegation
-    - memory
-    - skills
-    - cronjob
-    - vision
-    - image_gen
-    - kanban
-    - session_search
-    - todo
-    - tts
-    - x_search
+  - file
+  - terminal
+  - web
+  - browser
+  - delegation
+  - memory
+  - skills
+  - cronjob
+  - vision
+  - image_gen
+  - kanban
+  - session_search
+  - todo
+  - tts
+  - x_search
 image_gen:
   provider: comfyui_local
   model: pony
@@ -1066,8 +1090,8 @@ image_gen:
     resolution: 2k
 plugins:
   enabled:
-    - plur-hermes
-    - comfyui_local
+  - plur-hermes
+  - comfyui_local
 api_max_retries: 1
 api_retry_delay: 1
 rate_limit_cooldown: 30

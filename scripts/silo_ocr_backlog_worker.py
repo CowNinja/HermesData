@@ -25,6 +25,9 @@ PRIORITY_KEYS = (
     "separation", "oshanick", "nmcp", "vamc", "tricare", "dd214", "page 13",
 )
 MAX_OCR_ATTEMPTS = 4
+# Gold medical/Navy (score>=500) gets extra retries — short-temp poppler + fat-promote
+# were hanging the final tail when attempts hit 4 with chars still 0.
+MAX_OCR_ATTEMPTS_GOLD = 12
 SKIP_RE = re.compile(r"(logo|icon|wallpaper|screenshot|_00\.jpg|cnsva\.jpg)", re.I)
 
 
@@ -238,9 +241,15 @@ def main() -> int:
 
     mod = load_ladder()
     tess = mod.tesseract_bin()
+    # Gold (score>=500) may exceed attempts=4 after path/paren poppler fails;
+    # still reselect until MAX_OCR_ATTEMPTS_GOLD so final DD2807/2808 tail drains.
     rows = con.execute(
-        """SELECT path, score FROM ocr_queue
-           WHERE status IN ('queued','needs_ocr','error') AND score >= 40 AND attempts < 4
+        f"""SELECT path, score FROM ocr_queue
+           WHERE status IN ('queued','needs_ocr','error') AND score >= 40
+             AND (
+               attempts < {MAX_OCR_ATTEMPTS}
+               OR (score >= 500 AND attempts < {MAX_OCR_ATTEMPTS_GOLD})
+             )
            ORDER BY CASE status WHEN 'queued' THEN 0 WHEN 'error' THEN 1 ELSE 2 END,
                     score DESC, attempts ASC LIMIT ?""",
         (args.limit,),
@@ -294,7 +303,8 @@ def main() -> int:
                 att = con.execute(
                     "SELECT attempts FROM ocr_queue WHERE path=?", (path,)
                 ).fetchone()
-                if att and att[0] >= MAX_OCR_ATTEMPTS:
+                max_att = MAX_OCR_ATTEMPTS_GOLD if (sc or 0) >= 500 else MAX_OCR_ATTEMPTS
+                if att and att[0] >= max_att:
                     con.execute(
                         "UPDATE ocr_queue SET status='corrupt_retired', updated_at=? WHERE path=?",
                         (utc(), path),

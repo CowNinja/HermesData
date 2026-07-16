@@ -82,6 +82,26 @@ def process_one(path: Path) -> dict:
         "processed_at": utc(),
         "chars": len(text or ""),
     }
+    # Twin meta: temporal + domain tags (post-OCR readiness)
+    try:
+        from silo_relevance_heuristics import train_meta_flags, gold_tier
+
+        flags = train_meta_flags(path)
+        meta.update(flags)
+        meta["gold_tier"] = gold_tier(path)
+        s = str(path).lower().replace("\\", "/")
+        tags = []
+        if "medical" in s or "vamc" in s:
+            tags.append("medical")
+        if "navy" in s or "navpers" in s:
+            tags.append("navy")
+        if "family" in s:
+            tags.append("family")
+        if "booksbloom" in s:
+            tags.extend(["family", "business"])
+        meta["tags"] = tags or ["personal"]
+    except Exception:
+        pass
     if quality == "needs_ocr":
         meta["next"] = "ocr_pipeline"
         # still write weak extract if any

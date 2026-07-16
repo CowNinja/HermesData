@@ -193,7 +193,17 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="Write changes (default dry-run)")
     ap.add_argument("--limit", type=int, default=150, help="Max notes to touch per run")
-    ap.add_argument("--include-indexes", action="store_true", help="Also process 00-INDEX orphans")
+    ap.add_argument(
+        "--include-indexes",
+        action="store_true",
+        default=True,
+        help="Also process living 00-INDEX orphans (default True; noise folders still skipped)",
+    )
+    ap.add_argument(
+        "--skip-indexes",
+        action="store_true",
+        help="Exclude 00-INDEX/INDEX/README from hub pass",
+    )
     args = ap.parse_args()
 
     files = [
@@ -223,7 +233,9 @@ def main() -> int:
         and not in_links.get(p)
         and not is_noise(p)
     ]
-    if not args.include_indexes:
+    # Default: include living folder indexes (e.g. Operations/logs/*/00-INDEX).
+    # Noise Alice/Roleplay indexes never reach here (is_noise).
+    if args.skip_indexes or not args.include_indexes:
         orphans = [
             p
             for p in orphans
