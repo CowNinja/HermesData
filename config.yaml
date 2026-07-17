@@ -1,7 +1,17 @@
+# 2026-07-16 PERFORMANCE BYPASS: primary chat on xAI while local MoE is limited
+# (8091 proxy UP but complex agent prompts often 400; simple ping works; 8081–83 down).
+# Restore primary to custom:phronesis-sovereign when backends healthy — see
+# Operations/logs/Router-Bypass-Performance-2026-07-16.md
 model:
-  default: phronesis-sovereign-auto
-  provider: custom:phronesis-sovereign
+  default: grok-4.3
+  provider: xai-oauth
 fallback_providers:
+- provider: xai-oauth
+  model: grok-build-0.1
+  api_mode: chat_completions
+- provider: openrouter
+  model: openrouter/free
+  api_mode: chat_completions
 - provider: custom:phronesis-sovereign
   model: phronesis-sovereign-auto
   base_url: http://127.0.0.1:8091/v1
@@ -15,17 +25,18 @@ agent:
   max_turns: 32
   gateway_timeout: 1800
   restart_drain_timeout: 180
-  api_max_retries: 3
+  api_max_retries: 2
   service_tier: ''
   tool_use_enforcement: strict
   task_completion_guidance: true
   parallel_tool_call_guidance: true
   environment_probe: false
-  environment_hint: 'Phronesis Sovereign Stack: Qwythos-9B Q6_K @ 65536 ctx on llama-server:8090
-    via phronesis-sovereign proxy:8091. Model rotation is LOCKED — 9B only, no 14B
-    fallback. ALWAYS invoke terminal/file tools for factual queries (disk space, file
-    listings, system state) — never hallucinate command output. Deliver clean final
-    answers only; no scratch reasoning in replies.'
+  environment_hint: 'PERFORMANCE MODE 2026-07-16: Primary inference is xAI Grok (grok-4.3)
+    — local sovereign router :8091 is LIMITED (proxy up, complex agent templates often
+    fail; llama :8090 may serve simple pings only). Prefer terminal/file tools for
+    facts. Prefer no_agent crons/scripts over LLM loops. When local MoE is restored,
+    primary can return to phronesis-sovereign-auto. ALWAYS invoke tools for disk/files/system
+    state — never hallucinate command output. Clean final answers only.'
   coding_context: auto
   verify_on_stop: false
   gateway_timeout_warning: 900
@@ -151,45 +162,36 @@ bedrock:
     guardrail_version: ''
     stream_processing_mode: async
     trace: disabled
+# Auxiliaries: cheap/fast xAI while local router limited (2026-07-16)
 auxiliary:
   vision:
     provider: auto
     model: ''
-    timeout: 120
+    timeout: 90
     download_timeout: 30
   web_extract:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
-    timeout: 360
+    provider: xai-oauth
+    model: grok-build-0.1
+    timeout: 120
   compression:
     provider: auto
-    timeout: 360
+    timeout: 180
   skills_hub:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
-    timeout: 30
+    provider: xai-oauth
+    model: grok-build-0.1
+    timeout: 45
   approval:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: xai-oauth
+    model: grok-build-0.1
     timeout: 30
   mcp:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: xai-oauth
+    model: grok-build-0.1
     timeout: 30
   title_generation:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
-    timeout: 30
+    provider: xai-oauth
+    model: grok-build-0.1
+    timeout: 20
     language: ''
   tts_audio_tags:
     provider: auto
@@ -198,45 +200,33 @@ auxiliary:
     api_key: ''
     timeout: 30
   triage_specifier:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
-    timeout: 120
+    provider: xai-oauth
+    model: grok-build-0.1
+    timeout: 60
   kanban_decomposer:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
-    timeout: 180
+    provider: xai-oauth
+    model: grok-build-0.1
+    timeout: 90
   profile_describer:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
-    timeout: 60
+    provider: xai-oauth
+    model: grok-build-0.1
+    timeout: 45
   curator:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
-    timeout: 600
+    provider: xai-oauth
+    model: grok-build-0.1
+    timeout: 180
   monitor:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
-    timeout: 60
+    provider: xai-oauth
+    model: grok-build-0.1
+    timeout: 45
   background_review:
     provider: xai-oauth
     model: grok-build-0.1
-    timeout: 120
+    timeout: 90
   moa_aggregator:
-    provider: phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
-    timeout: 600
+    provider: xai-oauth
+    model: grok-4.3
+    timeout: 180
 display:
   compact: true
   personality: technical
@@ -384,29 +374,28 @@ memory:
   user_char_limit: 1375
   provider: ''
 delegation:
-  model: phronesis-sovereign-auto
-  provider: phronesis-sovereign
-  base_url: http://127.0.0.1:8091/v1
-  api_key: local
+  # Temporary: children on xAI while local MoE limited (was 8091 grunt)
+  model: grok-build-0.1
+  provider: xai-oauth
   api_mode: chat_completions
   inherit_mcp_toolsets: true
-  max_iterations: 30
-  child_timeout_seconds: 0
+  max_iterations: 20
+  child_timeout_seconds: 300
   reasoning_effort: low
-  max_concurrent_children: 4
+  max_concurrent_children: 3
   max_spawn_depth: 2
   orchestrator_enabled: true
   subagent_auto_approve: true
-  max_async_children: 8
-  comment: ' Non-runtime ref cleaned; runtime uses sovereign via fleet for grunt only.
-    Grok primary. Non-runtime ref cleaned; runtime uses sovereign via fleet for grunt
-    only. Grok primary.'
+  max_async_children: 6
+  comment: '2026-07-16: Grok primary + xAI children while sovereign router limited.
+    Restore provider phronesis-sovereign base_url http://127.0.0.1:8091/v1 when MoE healthy.'
 prefill_messages_file: ''
 goals:
   max_turns: 20
 moa:
   default_preset: Just xAi
-  active_preset: Grok + Free + Phronesis
+  # Avoid MoE reference fanout while local is limited (was Grok + Free + Phronesis)
+  active_preset: Just xAi
   presets:
     default:
       reference_models:

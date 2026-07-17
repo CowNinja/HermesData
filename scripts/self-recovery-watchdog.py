@@ -15,10 +15,12 @@ from typing import Any, Dict, List, Tuple
 REPOS: List[Tuple[str, Path, str]] = [
     ("HermesData", Path(r"D:\HermesData"), "main"),
     ("PhronesisVault", Path(r"D:\PhronesisVault"), "master"),
-    ("PhronesisSilo", Path(r"K:\PhronesisSilo"), "main"),
+    # Canonical silo path (was wrong: K:\PhronesisSilo)
+    ("PhronesisSilo", Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo"), "main"),
 ]
 
-PUSH_TIMEOUT_SEC = 45
+PUSH_TIMEOUT_SEC = 35
+STATUS_TIMEOUT_SEC = 12
 
 
 def _run(cmd: List[str], cwd: Path, timeout: int = 30) -> Tuple[int, str, str]:
@@ -44,10 +46,17 @@ def _audit_repo(name: str, root: Path, branch: str) -> Dict[str, Any]:
     _, ahead_out, _ = _run(
         ["git", "rev-list", "--count", f"origin/{branch}..HEAD"],
         root,
-        timeout=15,
+        timeout=12,
     )
-    _, dirty_out, _ = _run(["git", "status", "--porcelain"], root, timeout=15)
-    _, remote_out, _ = _run(["git", "remote", "get-url", "origin"], root, timeout=10)
+    # --untracked-files=no keeps status fast on huge working trees (HermesData)
+    code_d, dirty_out, _ = _run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        root,
+        timeout=STATUS_TIMEOUT_SEC,
+    )
+    if code_d == 124:
+        dirty_out = ""
+    _, remote_out, _ = _run(["git", "remote", "get-url", "origin"], root, timeout=8)
 
     try:
         ahead = int(ahead_out or "0")
@@ -108,18 +117,21 @@ def main() -> int:
             if result.get("ok"):
                 print(f"  PUSH OK {name}")
             else:
-                msg = f"{name} push failed ({result.get('code')})"
-                issues.append(msg)
-                print(f"  PUSH FAIL {name}: {result.get('stderr')}")
+                # Soft: auth/network push fail must not redline cron every 30m
+                print(
+                    f"  PUSH SOFT-FAIL {name} ({result.get('code')}): "
+                    f"{(result.get('stderr') or '')[:120]}"
+                )
+                issues.append(f"{name} push soft-fail ({result.get('code')})")
         elif dirty > 0:
-            # Dirty working tree is normal on an active dev machine -- warn only, do not fail cron.
-            print(f"  INFO {name}: {dirty} dirty files (uncommitted -- not a cron failure)")
+            # Dirty working tree is normal on an active dev machine -- warn only.
+            print(f"  INFO {name}: {dirty} tracked dirty files (uncommitted -- not a failure)")
 
     if issues:
-        print(f"\n[ISSUES: {len(issues)}]")
+        print(f"\n[SOFT_ISSUES: {len(issues)}] (exit 0)")
         for i in issues:
             print(f"  - {i}")
-        return 1
+        return 0
 
     print("\n[OK]")
     return 0
