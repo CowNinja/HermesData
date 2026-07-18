@@ -35,6 +35,12 @@ from typing import Dict, Tuple, Any, List, Set
 # Module-level flag for clean dry-run passing
 DRY_RUN = False
 VAULTWALKER_VERSION = "0.8.0"
+# five-item cook 2026-07-18 — never plant indexes in junk trees
+SKIP_INDEX_PARTS = {
+    "site-packages", "alice_venv", "node_modules", ".git", ".smart-env",
+    "__pycache__", "venv", ".venv", "Lib", "Scripts", "dist-info",
+}
+
 
 # === Explicit-only + Silo Recognition ===
 EXPLICIT_RP_KEYWORDS = [

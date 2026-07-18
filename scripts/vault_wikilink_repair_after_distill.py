@@ -116,6 +116,19 @@ def build_redirects() -> dict[str, str]:
                 if s.startswith(pref) or pref in s:
                     redirects[s] = dest
     redirects.update(EXPLICIT)
+    # ENTITY_COOK_20260718
+    _entity = {
+    "Dr-Kapoor": "Research/Silo-Entities/dr-kapoor",
+    "Dr Kapoor": "Research/Silo-Entities/dr-kapoor",
+    "dr kapoor": "Research/Silo-Entities/dr-kapoor",
+    "Dr-Foster": "Research/Silo-Entities/dr-foster",
+    "Dr Foster": "Research/Silo-Entities/dr-foster",
+    "dr foster": "Research/Silo-Entities/dr-foster",
+    "Dr-Richardson": "Research/Silo-Entities/richardson",
+    "Dr Richardson": "Research/Silo-Entities/richardson",
+    "richardson": "Research/Silo-Entities/richardson"
+}
+    redirects.update(_entity)
     return redirects
 
 

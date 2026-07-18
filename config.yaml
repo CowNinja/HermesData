@@ -1,28 +1,26 @@
 model:
-  default: grok-4.5
-  provider: xai-oauth
+  default: phronesis-sovereign-auto
+  provider: custom:phronesis-sovereign
   api_mode: chat_completions
-  # Explicit 500K window (matches context_length_cache + xAI grok-4.5). Do NOT
-  # let a small local compression model auto-lower session threshold.
-  context_length: 500000
+  context_length: 65536
+  base_url: http://127.0.0.1:8091/v1
 fallback_providers:
-  # Stay on Grok 4.5 as long as possible. Local 65K and free OR demoted.
-  - provider: xai-oauth
-    model: grok-4.5
-    api_mode: chat_completions
-  - provider: xai-oauth
-    model: grok-build-0.1
-    api_mode: chat_completions
-  - provider: openrouter
-    model: openrouter/free
-    api_mode: chat_completions
-  - provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-auto
-    api_mode: chat_completions
+- provider: xai-oauth
+  model: grok-4.5
+  api_mode: chat_completions
+- provider: xai-oauth
+  model: grok-build-0.1
+  api_mode: chat_completions
+- provider: openrouter
+  model: openrouter/free
+  api_mode: chat_completions
+- provider: custom:phronesis-sovereign
+  model: phronesis-sovereign-auto
+  api_mode: chat_completions
 toolsets:
-  - hermes-cli
-  - browser
-  - computer_use
+- hermes-cli
+- browser
+- computer_use
 max_live_sessions: 4
 agent:
   max_turns: 16
@@ -34,15 +32,11 @@ agent:
   task_completion_guidance: true
   parallel_tool_call_guidance: false
   environment_probe: false
-  environment_hint: 'RP SANDBOX BOUNDARY: Roleplay/fiction ONLY in #alice-roleplay
-    and child RP threads (Rolepl ay-Sandbox SOUL). ALL other Discord/API/CLI: FACTUAL
-    Grok 4.x — tools first, no invented f acts, no subagent fiction. UNIVERSAL STABILITY
-    (all channels/platforms, not Jan-only): Sho rt tool loops. Silo/K:/booksBloom/recovery
-    metrics -> ONLY python D:/HermesData/scripts/si lo_discord_six_numbers.py (max
-    4 tool turns). Mom writing -> talk_to_jan.py. Never patch h ermes-agent/gateway/config
-    or taskkill/restart gateway unless Jeff asks. If tools thrash o r >30s useless:
-    TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay. Stack 8090/8091 /8642.
-    Local Qwythos only as fallback or explicit grunt.'
+  environment_hint: 'Phronesis Sovereign Stack: Qwythos-9B Q6_K @ 65536 ctx on llama-server:8090
+    via phronesis-sovereign proxy:8091. Model rotation is LOCKED — 9B only, no 14B
+    fallback. ALWAYS invoke terminal/file tools for factual queries (disk space, file
+    listings, system state) — never hallucinate command output. Deliver clean final
+    answers only; no scratch reasoning in replies.'
   coding_context: auto
   verify_on_stop: false
   gateway_timeout_warning: 900
@@ -179,11 +173,11 @@ auxiliary:
     model: grok-4.5
     timeout: 120
   compression:
-    # MUST match main model context class. Local synthesis (65K) was auto-lowering
-    # grok-4.5 sessions from ~275k–500k threshold down to 65,536 (Discord errors 2026-07-18).
-    provider: xai-oauth
-    model: grok-4.5
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-synthesis
     timeout: 360
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   skills_hub:
     provider: xai-oauth
     model: grok-4.5
@@ -290,9 +284,9 @@ display:
   runtime_footer:
     enabled: false
     fields:
-      - model
-      - context_pct
-      - cwd
+    - model
+    - context_pct
+    - cwd
   copy_shortcut: auto
   pet:
     enabled: false
@@ -384,7 +378,6 @@ memory:
 delegation:
   model: grok-4.5
   provider: xai-oauth
-  # Do NOT pin local :8091 — that forced 65K-context children while model said grok-4.5
   api_mode: chat_completions
   inherit_mcp_toolsets: true
   max_iterations: 20
@@ -397,6 +390,8 @@ delegation:
   max_async_children: 6
   comment: '2026-07-17 RP boundary: orchestrator off. Factual channels exclude hermes-cli
     (embeds delegate_task). RP channels list tools explicitly.'
+  base_url: http://127.0.0.1:8091/v1
+  api_key: local
 prefill_messages_file: ''
 goals:
   max_turns: 20
@@ -406,8 +401,8 @@ moa:
   presets:
     default:
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -417,8 +412,8 @@ moa:
     Default:
       enabled: true
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -429,10 +424,10 @@ moa:
     Grok:
       enabled: true
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
-        - provider: xai-oauth
-          model: grok-build-0.1
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
+      - provider: xai-oauth
+        model: grok-build-0.1
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -443,14 +438,14 @@ moa:
     Grok + Phronesis:
       enabled: true
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
-        - provider: xai-oauth
-          model: grok-build-0.1
-        - provider: xai-oauth
-          model: grok-composer-2.5-fast
-        - provider: xai-oauth
-          model: grok-4.5
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
+      - provider: xai-oauth
+        model: grok-build-0.1
+      - provider: xai-oauth
+        model: grok-composer-2.5-fast
+      - provider: xai-oauth
+        model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -461,12 +456,12 @@ moa:
     Just xAi:
       enabled: true
       reference_models:
-        - provider: xai-oauth
-          model: grok-build-0.1
-        - provider: xai-oauth
-          model: grok-composer-2.5-fast
-        - provider: xai-oauth
-          model: grok-4.5
+      - provider: xai-oauth
+        model: grok-build-0.1
+      - provider: xai-oauth
+        model: grok-composer-2.5-fast
+      - provider: xai-oauth
+        model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -477,12 +472,12 @@ moa:
     Grok + Free + Phronesis:
       enabled: true
       reference_models:
-        - provider: custom:phronesis-sovereign
-          model: phronesis-sovereign-auto
-        - provider: xai-oauth
-          model: grok-build-0.1
-        - provider: openrouter
-          model: openrouter/free
+      - provider: custom:phronesis-sovereign
+        model: phronesis-sovereign-auto
+      - provider: xai-oauth
+        model: grok-build-0.1
+      - provider: openrouter
+        model: openrouter/free
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -491,8 +486,8 @@ moa:
       max_tokens: 4096
       fanout: per_iteration
   reference_models:
-    - provider: xai-oauth
-      model: grok-4.5
+  - provider: xai-oauth
+    model: grok-4.5
   aggregator:
     provider: xai-oauth
     model: grok-4.5
@@ -504,12 +499,12 @@ moa:
   Just xAi:
     enabled: true
     reference_models:
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-composer-2.5-fast
-      - provider: xai-oauth
-        model: grok-4.5
+    - provider: xai-oauth
+      model: grok-build-0.1
+    - provider: xai-oauth
+      model: grok-composer-2.5-fast
+    - provider: xai-oauth
+      model: grok-4.5
     aggregator:
       provider: xai-oauth
       model: grok-4.5
@@ -522,56 +517,56 @@ moa:
     primary + local grunt.'
 skills:
   disabled:
-    - ascii-video
-    - baoyu-infographic
-    - blogwatcher
-    - claude-code
-    - codex
-    - comfyui
-    - design-md
-    - gif-search
-    - google-workspace
-    - heartmula
-    - hermes-atlas
-    - hermes-atlas-discovery
-    - hermes-bundles
-    - himalaya
-    - jupyter-live-kernel
-    - manim-video
-    - maps
-    - minimal-agent-harness
-    - monitoring-dashboard-summary
-    - node-inspect-debugger
-    - notion
-    - opencode
-    - openhue
-    - p5js
-    - petdex
-    - polymarket
-    - popular-web-designs
-    - powerpoint
-    - pretext
-    - second-brain-vault
-    - segment-anything-model
-    - sketch
-    - songsee
-    - sovereign-computer-use-test
-    - teams-meeting-pipeline
-    - touchdesigner-mcp
-    - uncensored-image-generation
-    - weights-and-biases
-    - yuanbao
-    - airtable
-    - excalidraw
-    - nano-pdf
-    - songwriting-and-ai-music
-    - x-browser-poster
-    - x-post
-    - x-poster
-    - freellmapi
-    - agentmail
-    - blackbox
-    - dogfood
+  - ascii-video
+  - baoyu-infographic
+  - blogwatcher
+  - claude-code
+  - codex
+  - comfyui
+  - design-md
+  - gif-search
+  - google-workspace
+  - heartmula
+  - hermes-atlas
+  - hermes-atlas-discovery
+  - hermes-bundles
+  - himalaya
+  - jupyter-live-kernel
+  - manim-video
+  - maps
+  - minimal-agent-harness
+  - monitoring-dashboard-summary
+  - node-inspect-debugger
+  - notion
+  - opencode
+  - openhue
+  - p5js
+  - petdex
+  - polymarket
+  - popular-web-designs
+  - powerpoint
+  - pretext
+  - second-brain-vault
+  - segment-anything-model
+  - sketch
+  - songsee
+  - sovereign-computer-use-test
+  - teams-meeting-pipeline
+  - touchdesigner-mcp
+  - uncensored-image-generation
+  - weights-and-biases
+  - yuanbao
+  - airtable
+  - excalidraw
+  - nano-pdf
+  - songwriting-and-ai-music
+  - x-browser-poster
+  - x-post
+  - x-poster
+  - freellmapi
+  - agentmail
+  - blackbox
+  - dogfood
 curator:
   enabled: true
   interval_hours: 168
@@ -763,8 +758,11 @@ discord:
       \ python D:/HermesData/scripts/talk_to_jan.py \"<user question>\"\nAnswer ONLY\
       \ from that output with real citations. Else TOOL_FAILED.\n\nWSWTR = Who Should\
       \ We Then Read? only.\nGuests (Phil/wife, Ron/Betty, …) are listeners, not authors.\n\
-      TTS (local, no Grok): run python D:/HermesData/scripts/jan_tts_summary.py --question <q> --post-discord 1526594007092826316 OR python D:/HermesData/scripts/local_edge_tts.py --text <text>. Then cite the script JSON path/MEDIA. Never claim no TTS if the script works. If script fails: AUDIO_NOT_GENERATED + text.\nStyle:\
-      \ calm warm librarian. No manic DJ, no physics, no ontology fiction.\n\n\nRUNTIME\
+      TTS (local, no Grok): run python D:/HermesData/scripts/jan_tts_summary.py --question\
+      \ <q> --post-discord 1526594007092826316 OR python D:/HermesData/scripts/local_edge_tts.py\
+      \ --text <text>. Then cite the script JSON path/MEDIA. Never claim no TTS if\
+      \ the script works. If script fails: AUDIO_NOT_GENERATED + text.\nStyle: calm\
+      \ warm librarian. No manic DJ, no physics, no ontology fiction.\n\n\nRUNTIME\
       \ SAFETY (Discord stability):\n- Prefer talk_to_jan.py + vault reads. Keep tool\
       \ loops short (~8 tool turns max).\n- Do NOT patch/write D:/HermesData/hermes-agent/*,\
       \ gateway*, config.yaml, or process-kill gateway.\n- Do NOT start multi-hour\
@@ -817,11 +815,11 @@ discord:
     speech_gain: 1
     ack_enabled: true
     ack_phrases:
-      - Let me look into that.
-      - One moment.
-      - Checking on that now.
-      - Give me a sec.
-      - On it.
+    - Let me look into that.
+    - One moment.
+    - Checking on that now.
+    - Give me a sec.
+    - On it.
   ignored_channels: 1523364535459774658
   channel_overrides:
     '1523156115808845926':
@@ -855,8 +853,8 @@ discord:
         or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:
         TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay.'
       enabled_toolsets:
-        - terminal
-        - file
+      - terminal
+      - file
     '1519144636541571133':
       model: grok-4.5
       provider: xai-oauth
@@ -888,47 +886,47 @@ discord:
         or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:
         TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay.'
       enabled_toolsets:
-        - terminal
-        - file
+      - terminal
+      - file
     '1519509288286949466':
       model: grok-4.5
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       provider: xai-oauth
     '1521146755985576116':
       model: grok-4.5
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       provider: xai-oauth
     '1522330326733422713':
       model: grok-4.5
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       provider: xai-oauth
     '1523604530338730004':
       model: grok-4.5
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       provider: xai-oauth
     '1525174401740312707':
       model: phronesis-sovereign-roleplay
@@ -936,10 +934,10 @@ discord:
       base_url: http://127.0.0.1:8091/v1
       api_key: local
       enabled_toolsets:
-        - hermes-cli
-        - terminal
-        - file
-        - image_gen
+      - hermes-cli
+      - terminal
+      - file
+      - image_gen
       context_length: 65536
       note: Switched to local Qwythos-9B abliterated via sovereign proxy per user
         request 2026-07-12 (token burn prevention in alice-roleplay)
@@ -949,12 +947,12 @@ discord:
       base_url: http://127.0.0.1:8091/v1
       api_key: local
       enabled_toolsets:
-        - hermes-cli
-        - browser
-        - terminal
-        - file
-        - web_search
-        - image_gen
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
       context_length: 65536
       note: Switched to local Qwythos-9B abliterated via sovereign proxy per user
         request 2026-07-12 (token burn prevention in alice-roleplay thread 1525214795236773918)
@@ -974,8 +972,8 @@ discord:
         \ only (never gateway).\nUNIVERSAL STABILITY: short tool loops; Mom→talk_to_jan.py;\
         \ RP only #alice-roleplay; no gateway patch/restart unless Jeff asks."
       enabled_toolsets:
-        - terminal
-        - file
+      - terminal
+      - file
     '1524846849360531456':
       model: grok-4.5
       provider: xai-oauth
@@ -1005,9 +1003,9 @@ discord:
         UNIVERSAL STABILITY: short tool loops; Mom→talk_to_jan.py; RP only #alice-roleplay;
         never patch gateway/config unless Jeff asks.'
       enabled_toolsets:
-        - terminal
-        - file
-        - web_search
+      - terminal
+      - file
+      - web_search
     '1526594007092826316':
       model: grok-4.5
       provider: xai-oauth
@@ -1036,14 +1034,52 @@ discord:
         \ or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:\
         \ TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay."
       enabled_toolsets:
-        - terminal
-        - file
+      - terminal
+      - file
 local_sovereign:
   boot_integrity:
     enabled: false
     mode: fast
     on_fail: warn
     timeout_seconds: 20
+  opportunistic_fleet:
+    # SSOT gate (2026-07-18): explicit false. Agent requires BOTH this AND
+    # fleet_registry.yaml policy.enabled for routing. Registry alone stays shadow.
+    enabled: false
+    registry: D:/HermesData/config/fleet_registry.yaml
+    prefer_free_before_grok: true
+    augment_local_with_context: true
+    fallback_on_local_fail: true
+    proactive_realtime_triggers: true
+    proactive_offload: true
+  gateway_name: phronesis-moe-gateway
+  subagent_default_model: phronesis-sovereign-code
+  subagent_synthesis_model: phronesis-sovereign-synthesis
+  subagent_classify_model: phronesis-sovereign-classify
+  per_step_routing: true
+  mode: unified_8090
+  router_mode: unified_8090
+  tiers:
+    unified: 8090
+    hot: 8090
+    warm: 8090
+    classifier: 8090
+    proxy: 8091
 onboarding:
   seen:
     busy_input_prompt: true
+fallback_model:
+- provider: custom:phronesis-sovereign
+  model: phronesis-sovereign-auto
+  base_url: http://127.0.0.1:8091/v1
+  api_key: local
+grok_auth:
+  prefer_subscription: true
+  oauth_refresh_on_auth_fail: true
+  fallback_http_codes:
+  - 401
+  - 403
+  - 404
+  transient_retry: true
+  rate_limit_retries: 2
+  rate_limit_max_wait_sec: 120

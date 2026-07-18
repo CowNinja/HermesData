@@ -13,3 +13,7 @@ Silo kitchen (silo thread): six_numbers only for metrics; max 4 tool turns; Barn
 Alice: ONLY targeted registry-locked generation (--candidate …). Mom: talk_to_jan.py only. Post-crash: ACK-ONLINE + one restore line.
 §
 Hybrid: driver=Grok rare; grunt=Qwythos; muscle=scripts. Policy: Hybrid-Local-Grok-Token-Policy-CANONICAL-2026-07-17.
+§
+Second-brain tools infra (2026-07): PhronesisVault CSS category colors + Style Settings disk-installable; Iconize deprecated—skip. Graph colorGroups path+tag; Templates/ stamps; vault_domain_tag_lint.py; no mass retag without Jeff gate. Playbook Setup/Obsidian-Category-Colors-and-Tags; thread charter Operations/Second-Brain-Tools-Infra-Thread-2026-07-18.
+§
+Model bench L06 FIXED 2026-07-18: agent --benchmark-active/_run_active_resident_benchmark → benchmark_model.py on :8090 (:8091 fb). Never tier --tier hot/8081. Smoke/bench accept reasoning_content. Skill+companion rev7.2+; full-tick green (C00/F03 only).

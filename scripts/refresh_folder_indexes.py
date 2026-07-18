@@ -68,6 +68,8 @@ HOT_PATHS: dict[str, list[str]] = {
         "| Entity PKO wiki | [[Research/Silo-Entities/00-INDEX]] |",
         "| Second-brain × silo contract | [[Operations/Silo-Second-Brain-Loop-Utilization-CANONICAL-2026-07-13]] |",
         "| Ops digests / canons | [[Operations/00-INDEX]] (hot-path table at top) |",
+        "| Second-brain tools (colors/tags) | [[Setup/Obsidian-Category-Colors-and-Tags]] · [[Dashboard/Domain-Tag-Dashboard]] · [[Operations/Second-Brain-Tools-Infra-Thread-2026-07-18]] |",
+        "| Domain tag lint | `Operations/logs/domain-tag-lint-latest.md` |",
         "| Live silo brief | `Operations/logs/silo-status-brief-latest.md` |",
         "| D↔K harmony | [[D-K-Harmony]] |",
         "| Medical care web | [[Research/Silo-Entities/Medical-Care-Web-2017-2018]] |",
@@ -89,6 +91,8 @@ HOT_PATHS: dict[str, list[str]] = {
         "| **Hybrid Grok/local tokens** | [[Operations/Hybrid-Local-Grok-Token-Policy-CANONICAL-2026-07-17]] |",
         "| **Gateway restore** | [[Operations/SINGLE-GATEWAY-RESTORE]] |",
         "| **Silo kitchen thread handoff** | [[Operations/logs/silo-thread-merge-handoff-2026-07-18]] |",
+        "| **Second-brain tools thread** (colors/tags/X) | [[Operations/Second-Brain-Tools-Infra-Thread-2026-07-18]] · [[Setup/Obsidian-Category-Colors-and-Tags]] |",
+        "| **Five-actions receipt 2026-07-18** | [[Operations/logs/Second-Brain-Tools-Five-Actions-2026-07-18]] |",
         "",
         "Rule: **K: = raw** · **vault entity wiki = compiled**. Continuous drain stays scripts; second-brain is capped semantic densify.",
         "**Thread rule:** silo land/cook/six_numbers → Data silo agent; Grok lane → architecture/judgment only.",
@@ -203,7 +207,57 @@ def render_index(folder: Path) -> str:
     dirs, files, n_dirs, n_files = list_entries(folder)
     rel = rel_key(folder)
     title = "PhronesisVault — Root INDEX" if folder == VAULT else f"{folder.name} — INDEX"
+    # Domain tags so category colors / Bases survive index refresh
+    domain_map = {
+        ".": ["domain/setup", "type/index"],
+        "Operations": ["domain/ops", "type/index"],
+        "Operations/logs": ["domain/ops", "type/index"],
+        "Operations/Growth-Blueprints": ["domain/ops", "type/index"],
+        "Operations/Audits": ["domain/ops", "type/index"],
+        "Research": ["domain/research", "type/index"],
+        "Research/Silo-Entities": ["domain/silo", "domain/twin", "type/index"],
+        "Research/Silo-Entities/orgs": ["domain/silo", "domain/twin", "type/index"],
+        "Research/Silo-Entities/queries": ["domain/silo", "domain/twin", "type/index"],
+        "Digital-Twin": ["domain/twin", "type/index"],
+        "Digital-Twin/receipts": ["domain/twin", "type/index"],
+        "Setup": ["domain/setup", "type/index"],
+        "Dashboard": ["domain/setup", "type/index"],
+        "Bases": ["domain/setup", "type/index"],
+        "MOCs": ["domain/setup", "type/index"],
+        "Guides": ["domain/setup", "type/index"],
+        "Agents": ["domain/agents", "type/index"],
+        "Discord": ["domain/discord", "type/index"],
+        "WisdomKeeper": ["domain/wisdom", "type/index"],
+        "SkillForge": ["domain/wisdom", "type/index"],
+        "AI-Zone": ["domain/ai", "type/index"],
+        "Integrations": ["domain/ai", "type/index"],
+        "Security": ["domain/ops", "type/index"],
+        "Resilience": ["domain/ops", "type/index"],
+        "Meta": ["domain/setup", "type/index"],
+        "cns": ["domain/setup", "type/index"],
+        "AI-Computer-Management": ["domain/ops", "type/index"],
+        "AI-Computer-Management/Current-State": ["domain/ops", "type/index"],
+        "docs/agent-coordination": ["domain/ops", "type/index"],
+        "Revenue": ["domain/ops", "type/index"],
+    }
+    # Inherit parent domain for unlisted subfolders under known roots
+    tags = domain_map.get(rel)
+    if not tags:
+        for prefix, tgs in sorted(domain_map.items(), key=lambda x: -len(x[0])):
+            if prefix != "." and (rel == prefix or rel.startswith(prefix + "/")):
+                tags = list(tgs)
+                if "type/index" not in tags:
+                    tags.append("type/index")
+                break
+    if not tags:
+        tags = ["type/index"]
+    tag_yaml = "\n".join(f"  - {t}" for t in tags)
     lines = [
+        "---",
+        "tags:",
+        tag_yaml,
+        "---",
+        "",
         f"# {title}",
         "",
         f"**Path:** `{rel}`  ",
@@ -304,7 +358,15 @@ def render_silo_entities_preserving_table(old: str) -> str:
     m = re.search(r"(\| Person \|.*)", old, flags=re.S)
     table = m.group(1).rstrip() if m else ""
     dirs, files, n_dirs, n_files = list_entries(VAULT / "Research" / "Silo-Entities", max_files=200)
+    # Domain tags must survive every refresh (lint green)
     lines = [
+        "---",
+        "tags:",
+        "  - domain/silo",
+        "  - domain/twin",
+        "  - type/index",
+        "---",
+        "",
         f"# Silo entity cards — {TS}",
         "",
         "Rich PKO pages from `entity_context` + graph + registry. **Re-run** `silo_pko_entity_cards.py` to retrofill.",

@@ -34,6 +34,13 @@ def _utc_now() -> str:
 
 def _log(event: Dict[str, Any]) -> None:
     try:
+        try:
+            from jsonl_log_rotator import append_jsonl as _rot_append
+
+            _rot_append(MEMORY_LOG, event, mode="rename", stamp=True)
+            return
+        except Exception:
+            pass
         MEMORY_LOG.parent.mkdir(parents=True, exist_ok=True)
         with open(MEMORY_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")

@@ -56,8 +56,6 @@ UNIFIED_ROUTER_CHAT = f"http://127.0.0.1:{UNIFIED_ROUTER_PORT}/v1/chat/completio
 UPSTREAM_TIMEOUT_SEC = int(os.environ.get("SOVEREIGN_PROXY_UPSTREAM_TIMEOUT", "1800"))
 PROXY_LOG = Path(r"D:\PhronesisVault\Operations\logs\sovereign-proxy.jsonl")
 GENERATION_PROVENANCE_LOG = Path(r"D:\PhronesisVault\Operations\logs\generation-provenance-trace.jsonl")
-# Live activity stamp for /health (unified :8090 path must write; was stale at 2026-07-08).
-LRU_ROUTER_STATE = Path(r"D:\PhronesisVault\Operations\logs\lru-router-state.json")
 
 NARRATIVE_FAST_MARKERS = (
     "roleplay_mode:",
@@ -478,53 +476,6 @@ def _log_generation_provenance(event: Dict[str, Any]) -> None:
         _rotate_if_needed(GENERATION_PROVENANCE_LOG)
         with open(GENERATION_PROVENANCE_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
-    except Exception:
-        pass
-
-
-def _touch_last_dispatch(
-    *,
-    logical_model: str = "",
-    task_type: str = "",
-    tier: str = "",
-    backend: str = "",
-) -> None:
-    """Update lru-router-state.json so /health last_dispatch reflects real traffic.
-
-    Pre-unified LRU path wrote this file; native :8090 dispatch did not, so panels
-    showed last_dispatch frozen at 2026-07-08 while provenance was live (audit 2026-07-18).
-    Never block inference on stamp I/O.
-    """
-    try:
-        state: Dict[str, Any] = {}
-        if LRU_ROUTER_STATE.is_file():
-            try:
-                loaded = json.loads(LRU_ROUTER_STATE.read_text(encoding="utf-8"))
-                if isinstance(loaded, dict):
-                    state = loaded
-            except Exception:
-                state = {}
-        now = _utc_now()
-        state["last_dispatch"] = now
-        if logical_model:
-            state["last_logical_model"] = logical_model
-            preload = state.get("last_preload")
-            if not isinstance(preload, dict):
-                preload = {}
-            preload[str(logical_model)] = now
-            state["last_preload"] = preload
-        if task_type:
-            state["last_task_type"] = task_type
-        if tier:
-            state["last_tier"] = tier
-        if backend:
-            state["last_backend"] = backend
-        state["session_active"] = True
-        state["updated_by"] = "sovereign_openai_proxy"
-        LRU_ROUTER_STATE.parent.mkdir(parents=True, exist_ok=True)
-        tmp = LRU_ROUTER_STATE.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
-        tmp.replace(LRU_ROUTER_STATE)
     except Exception:
         pass
 
@@ -2065,10 +2016,9 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             }
             try:
                 payload["stack"] = matrix
-                if LRU_ROUTER_STATE.is_file():
-                    payload["last_dispatch"] = json.loads(
-                        LRU_ROUTER_STATE.read_text(encoding="utf-8")
-                    )
+                state_path = Path(r"D:\PhronesisVault\Operations\logs\lru-router-state.json")
+                if state_path.is_file():
+                    payload["last_dispatch"] = json.loads(state_path.read_text(encoding="utf-8"))
             except Exception:
                 pass
             try:
@@ -2481,13 +2431,6 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 "total_tokens": usage_in + usage_out,
             },
         })
-        # Keep /health last_dispatch live (not frozen LRU from pre-unified path).
-        _touch_last_dispatch(
-            logical_model=str(resolved_model or model or ""),
-            task_type=str(routing.get("task_type") or resolve_task_type(model) or ""),
-            tier=str(result.get("tier") or ""),
-            backend=str(prov.get("selected_backend") or ""),
-        )
         try:
             backend = str(prov.get("selected_backend") or "native_8090")
             if backend in ("native_8090", "native_8090_cached", "vault_v0.11", "ollama"):

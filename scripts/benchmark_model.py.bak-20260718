@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+"""
+Phronesis Model Benchmark Harness — v1.0
+Tests tool-calling fidelity, code accuracy, instruction following, speed.
+Run against any OpenAI-compatible GGUF server endpoint.
+
+Usage:
+    python benchmark_model.py --endpoint http://127.0.0.1:8091/v1 --name qwen14b-abliterated-q4
+"""
+import json, time, sys, os, requests, argparse
+
+class BenchmarkSuite:
+    def __init__(self, endpoint: str, api_key: str = "local", model: str = None):
+        self.base = endpoint.rstrip("/")
+        self.api_key = api_key
+        self.model = model
+        self.results = {"model": model, "endpoint": endpoint, "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"), "tests": []}
+
+    def _chat(self, messages: list, tools: list = None, max_tokens: int = 512, temperature: float = 0.3):
+        payload = {"model": self.model, "messages": messages, "max_tokens": max_tokens, "temperature": temperature}
+        if tools:
+            payload["tools"] = tools
+        t0 = time.time()
+        try:
+            r = requests.post(f"{self.base}/chat/completions", json=payload, timeout=60)
+            r.raise_for_status()
+            latency = round(time.time() - t0, 2)
+            data = r.json()
+            msg = data.get("choices", [{}])[0].get("message", {})
+            return {"ok": True, "latency": latency, "message": msg, "finish_reason": data.get("choices", [{}])[0].get("finish_reason")}
+        except Exception as e:
+            return {"ok": False, "error": str(e), "latency": round(time.time() - t0, 2)}
+
+    def test_tool_calling(self, name: str, prompt: str, expected_tool_name: str):
+        tools = [{
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get current weather for a city",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"city": {"type": "string", "description": "City name"}, "units": {"type": "string", "enum": ["celsius", "fahrenheit"]}},
+                    "required": ["city"]
+                }
+            }
+        }, {
+            "type": "function",
+            "function": {
+                "name": "search_files",
+                "description": "Search files by name or content",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}, "path": {"type": "string"}, "max_results": {"type": "integer"}},
+                    "required": ["query"]
+                }
+            }
+        }]
+        result = self._chat([{"role": "user", "content": prompt}], tools=tools)
+        if not result["ok"]:
+            self.results["tests"].append({"name": name, "pass": False, "error": result.get("error"), "latency": result["latency"]})
+            return
+        msg = result["message"]
+        tool_calls = msg.get("tool_calls", [])
+        correct = False
+        call_details = None
+        if tool_calls:
+            fn_name = tool_calls[0].get("function", {}).get("name", "")
+            args_raw = tool_calls[0].get("function", {}).get("arguments", "{}")
+            correct = fn_name == expected_tool_name
+            call_details = {"function": fn_name, "arguments": args_raw}
+        elif expected_tool_name is None:
+            correct = True
+        record = {"name": name, "pass": correct, "latency": result["latency"], "finish_reason": result["finish_reason"], "tool_calls": call_details}
+        if not correct:
+            record["response"] = msg.get("content", "")[:300]
+        self.results["tests"].append(record)
+
+    def test_code_generation(self, name: str, prompt: str, must_contain: list):
+        result = self._chat([{"role": "user", "content": prompt}], max_tokens=1024)
+        if not result["ok"]:
+            self.results["tests"].append({"name": name, "pass": False, "error": result.get("error"), "latency": result["latency"]})
+            return
+        content = result["message"].get("content", "")
+        passes = all(kw in content for kw in must_contain)
+        self.results["tests"].append({"name": name, "pass": passes, "latency": result["latency"], "response_length": len(content), "has_code": "```" in content})
+
+    def test_instruction_following(self, name: str, prompt: str, response_must_contain: list):
+        result = self._chat([{"role": "user", "content": prompt}], max_tokens=256)
+        if not result["ok"]:
+            self.results["tests"].append({"name": name, "pass": False, "error": result.get("error"), "latency": result["latency"]})
+            return
+        content = result["message"].get("content", "").lower()
+        passes = all(kw.lower() in content for kw in response_must_contain)
+        self.results["tests"].append({"name": name, "pass": passes, "latency": result["latency"], "response_prefix": content[:100]})
+
+    def run_all(self):
+        print(f"\n{'='*60}")
+        print(f"Benchmark: {self.model} @ {self.base}")
+        print(f"{'='*60}")
+
+        # Tool calling tests
+        print("\n--- Tool Calling ---")
+        self.test_tool_calling("weather_tool", "What's the weather in Tokyo?", "get_weather")
+        self.test_tool_calling("search_tool", "Find all Python files in the project", "search_files")
+        self.test_tool_calling("no_tool", "Hello, how are you?", None)  # Should NOT call a tool
+        self.test_tool_calling("multi_tool_weather", "I need the weather for London and Paris", "get_weather")
+
+        # Code generation
+        print("\n--- Code Generation ---")
+        self.test_code_generation("list_comprehension", "Write a Python list comprehension to square numbers 1-10", ["list", "comprehension", "**2", "range"])
+        self.test_code_generation("fibonacci", "Write a Python function to calculate the nth Fibonacci number", ["def", "fibonacci", "if", "return"])
+        self.test_code_generation("api_call", "Write Python code using requests to GET data from an API endpoint", ["requests", "get", "import", ".json"])
+        self.test_code_generation("class_schema", "Define a Python dataclass for a Book with title, author, year", ["dataclass", "title", "author", "class", "Book"])
+
+        # Instruction following
+        print("\n--- Instruction Following ---")
+        self.test_instruction_following("json_only", "Output ONLY valid JSON with fields: name, age, city. No other text.", ["name", "age", "city"])
+
+        # Speed test
+        print("\n--- Speed ---")
+        speeds = []
+        for i in range(3):
+            result = self._chat([{"role": "user", "content": "Write a short poem about artificial intelligence. Maximum 4 lines."}], max_tokens=256, temperature=0.7)
+            if result["ok"]:
+                tps = len(result["message"].get("content", "").split()) / max(result["latency"], 0.1)
+                speeds.append(tps)
+            print(f"  Run {i+1}: {result.get('latency','?'):.1f}s → {len(result.get('message',{}).get('content','').split())} words")
+        avg_speed = sum(speeds)/len(speeds) if speeds else 0
+        self.results["speed_tps"] = round(avg_speed, 2)
+        print(f"  Average speed: {avg_speed:.1f} words/sec")
+
+        # Summary
+        passed = sum(1 for t in self.results["tests"] if t["pass"])
+        total = len(self.results["tests"])
+        print(f"\n{'='*60}")
+        print(f"RESULTS: {passed}/{total} passed ({round(100*passed/total)}%)")
+        print(f"{'='*60}\n")
+        return self.results
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--endpoint", default="http://127.0.0.1:8091/v1", help="OpenAI-compatible endpoint")
+    parser.add_argument("--name", default="qwen14b-abliterated-q4", help="Model name for results")
+    parser.add_argument("--model", default="phronesis-sovereign-auto", help="Model ID sent in API call")
+    parser.add_argument("--output", help="Output file for results JSON")
+    args = parser.parse_args()
+
+    suite = BenchmarkSuite(endpoint=args.endpoint, model=args.model)
+    results = suite.run_all()
+
+    if args.output:
+        with open(args.output, "w") as f:
+            json.dump(results, f, indent=2)
+        print(f"Results saved to {args.output}")
+    else:
+        print(json.dumps(results, indent=2))
+
+if __name__ == "__main__":
+    main()

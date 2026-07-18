@@ -206,15 +206,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 530
+        "completed": 534
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T15:57:56.760952-04:00",
-      "next_run_at": "2026-07-18T14:09:59.781542-04:00",
-      "last_run_at": "2026-07-18T13:09:59.781542-04:00",
+      "next_run_at": "2026-07-18T18:10:22.546367-04:00",
+      "last_run_at": "2026-07-18T17:10:22.546367-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -453,15 +453,15 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 119
+        "completed": 120
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-07-18T17:30:00.417168-04:00",
-      "last_run_at": "2026-07-18T09:29:15.452245-04:00",
+      "next_run_at": "2026-07-18T21:32:23.249495-04:00",
+      "last_run_at": "2026-07-18T13:31:41.279301-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -502,15 +502,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 820
+        "completed": 828
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T19:59:53.051242-04:00",
-      "next_run_at": "2026-07-18T13:31:20.521812-04:00",
-      "last_run_at": "2026-07-18T13:01:20.521812-04:00",
+      "next_run_at": "2026-07-18T17:40:47.039287-04:00",
+      "last_run_at": "2026-07-18T17:10:47.039287-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -551,15 +551,15 @@
       "schedule_display": "every 60m",
       "repeat": {
         "times": null,
-        "completed": 419
+        "completed": 423
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-28T22:59:28.297996-04:00",
-      "next_run_at": "2026-07-18T14:27:00.495751-04:00",
-      "last_run_at": "2026-07-18T13:27:00.495751-04:00",
+      "next_run_at": "2026-07-18T18:27:23.201034-04:00",
+      "last_run_at": "2026-07-18T17:27:23.201034-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -694,15 +694,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 201
+        "completed": 203
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:15.417577-04:00",
-      "next_run_at": "2026-07-18T14:26:54.277820-04:00",
-      "last_run_at": "2026-07-18T12:26:54.277820-04:00",
+      "next_run_at": "2026-07-18T18:28:15.614005-04:00",
+      "last_run_at": "2026-07-18T16:28:15.614005-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -741,15 +741,15 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 164
+        "completed": 165
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-29T11:29:25.077977-04:00",
-      "next_run_at": "2026-07-18T15:03:57.505142-04:00",
-      "last_run_at": "2026-07-18T09:03:57.505142-04:00",
+      "next_run_at": "2026-07-18T21:05:33.749222-04:00",
+      "last_run_at": "2026-07-18T15:05:33.749222-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -877,15 +877,15 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 1221
+        "completed": 1237
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-02T11:46:43.622278-04:00",
-      "next_run_at": "2026-07-18T13:34:00.695302-04:00",
-      "last_run_at": "2026-07-18T13:19:00.695302-04:00",
+      "next_run_at": "2026-07-18T17:45:23.857399-04:00",
+      "last_run_at": "2026-07-18T17:30:23.857399-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1004,15 +1004,15 @@
       "schedule_display": "*/5 * * * *",
       "repeat": {
         "times": null,
-        "completed": 3467
+        "completed": 3517
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-04T11:35:00-04:00",
-      "next_run_at": "2026-07-18T13:35:00-04:00",
-      "last_run_at": "2026-07-18T13:25:00.538536-04:00",
+      "next_run_at": "2026-07-18T17:35:00-04:00",
+      "last_run_at": "2026-07-18T17:30:24.207372-04:00",
       "last_status": "error",
       "last_error": "Script exited with code 1",
       "last_delivery_error": null,
@@ -1047,15 +1047,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": 999,
-        "completed": 439
+        "completed": 447
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-08T16:36:36.708213-04:00",
-      "next_run_at": "2026-07-18T13:35:18.015039-04:00",
-      "last_run_at": "2026-07-18T13:05:18.015039-04:00",
+      "next_run_at": "2026-07-18T17:43:40.446947-04:00",
+      "last_run_at": "2026-07-18T17:13:40.446947-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1091,15 +1091,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 371
+        "completed": 379
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-10T14:52:28.611336+00:00",
-      "next_run_at": "2026-07-18T13:35:18.377640-04:00",
-      "last_run_at": "2026-07-18T13:05:18.377640-04:00",
+      "next_run_at": "2026-07-18T17:43:40.868745-04:00",
+      "last_run_at": "2026-07-18T17:13:40.868745-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1493,15 +1493,15 @@
       "schedule_display": "0 14 * * *",
       "repeat": {
         "times": null,
-        "completed": 6
+        "completed": 7
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-12T17:42:18.681281-04:00",
-      "next_run_at": "2026-07-18T14:00:00-04:00",
-      "last_run_at": "2026-07-17T14:04:03.845669-04:00",
+      "next_run_at": "2026-07-19T14:00:00-04:00",
+      "last_run_at": "2026-07-18T14:03:52.141956-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1562,7 +1562,144 @@
       "enabled_toolsets": null,
       "workdir": null,
       "fire_claim": null
+    },
+    {
+      "id": "5afddd546ec2",
+      "name": "Model-Mgmt-Light-Tick",
+      "prompt": "no_agent script-only model management light tick. Silent local deliver of --tick --summary stdout.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "base_url": null,
+      "script": "model_mgmt_light_cron.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 */6 * * *",
+        "display": "0 */6 * * *"
+      },
+      "schedule_display": "0 */6 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 1
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-18T15:10:42.663514-04:00",
+      "next_run_at": "2026-07-18T18:00:00-04:00",
+      "last_run_at": "2026-07-18T16:22:38.203881-04:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "discord",
+        "chat_id": "1526952913413607454",
+        "chat_name": "Phronesis Citadel / #hermes / Sovereign model and model Management agent",
+        "thread_id": "1526952913413607454",
+        "user_id": "1302338152396230750"
+      },
+      "enabled_toolsets": null,
+      "workdir": "D:\\HermesData",
+      "fire_claim": null
+    },
+    {
+      "id": "5f73c5cf061a",
+      "name": "Model-Mgmt-Full-Tick",
+      "prompt": "no_agent script-only model management full tick. Silent local deliver of --full-tick --summary stdout.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "base_url": null,
+      "script": "model_mgmt_full_cron.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 3 * * *",
+        "display": "0 3 * * *"
+      },
+      "schedule_display": "0 3 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-18T15:10:43.684735-04:00",
+      "next_run_at": "2026-07-19T03:00:00-04:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "discord",
+        "chat_id": "1526952913413607454",
+        "chat_name": "Phronesis Citadel / #hermes / Sovereign model and model Management agent",
+        "thread_id": "1526952913413607454",
+        "user_id": "1302338152396230750"
+      },
+      "enabled_toolsets": null,
+      "workdir": "D:\\HermesData"
+    },
+    {
+      "id": "c803d7ac3261",
+      "name": "JSONL-Log-Rotator-6h",
+      "prompt": "no_agent silent fat-log rotator for Phronesis/Hermes known logs. Empty stdout when under limit.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "base_url": null,
+      "script": "jsonl_log_rotator_cron.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 */6 * * *",
+        "display": "0 */6 * * *"
+      },
+      "schedule_display": "0 */6 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 1
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-18T16:22:54.715339-04:00",
+      "next_run_at": "2026-07-18T18:00:00-04:00",
+      "last_run_at": "2026-07-18T16:23:20.713177-04:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": {
+        "platform": "discord",
+        "chat_id": "1526952913413607454",
+        "chat_name": "Phronesis Citadel / #Sovereign model and model Management agent",
+        "thread_id": "1526952913413607454",
+        "user_id": "1302338152396230750"
+      },
+      "enabled_toolsets": null,
+      "workdir": "D:\\HermesData",
+      "fire_claim": null
     }
   ],
-  "updated_at": "2026-07-18T13:30:00.446922-04:00"
+  "updated_at": "2026-07-18T17:32:23.249495-04:00"
 }

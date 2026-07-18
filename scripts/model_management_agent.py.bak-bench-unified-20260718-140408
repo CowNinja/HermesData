@@ -73,9 +73,6 @@ BENCHMARK_STALE_DAYS = 14
 BENCHMARK_PASS_RATE_MIN = 70.0
 BENCHMARK_COMPOSITE_MIN = 55.0
 MAX_REMEDIATION_ACTIONS_PER_TICK = 4
-# Local smoke SLO (RTX 3060 12GB + 9B Q6): warn when OK but slow; not a hard fail.
-SMOKE_LATENCY_WARN_MS = 15000
-SMOKE_LATENCY_INFO_MS = 8000
 
 # Script toolbox (existing -- orchestrated, not duplicated)
 TOOLBOX = {
@@ -87,10 +84,7 @@ TOOLBOX = {
     "fleet_curator": SCRIPTS / "opportunistic_fleet_agent.py",
     "resource_mgr": SCRIPTS / "model_resource_manager.py",
     "priority_curator": SCRIPTS / "model_priority_curator.py",
-    # Tier harness (808x / ephemeral) — NOT for unified resident stack
     "benchmark_harness": SCRIPTS / "model_benchmark_harness.py",
-    # Resident OpenAI-compat suite against live :8090/:8091 (L06 clear path)
-    "benchmark_resident": SCRIPTS / "benchmark_model.py",
     "fleetctl": VAULT_SCRIPTS / "fleetctl.py",
 }
 
@@ -100,13 +94,6 @@ def _utc_now() -> str:
 
 
 def _log(event: Dict[str, Any]) -> None:
-    try:
-        from jsonl_log_rotator import append_jsonl as _rot_append
-
-        _rot_append(LOG_PATH, event, mode="rename", stamp=True)
-        return
-    except Exception:
-        pass
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps({"timestamp": _utc_now(), **event}) + "\n")
@@ -124,20 +111,14 @@ def _load_json(path: Path) -> Dict[str, Any]:
 def _operator_commands(issue_codes: List[str]) -> Dict[str, str]:
     """Reliable CLI one-liners -- PS-pipe-safe."""
     py = str(_resolve_venv_python())
-    # SSOT: Python bridge entries preferred (Hermes no_agent). PS wrappers remain for manual ops.
     cmds = {
         "tick": r"D:\HermesData\scripts\run-model-management-agent.ps1 -Tick",
         "full_tick": r"D:\HermesData\scripts\run-model-management-agent.ps1 -FullTick",
-        "cron_light": f'"{py}" D:\\HermesData\\scripts\\model_mgmt_light_cron.py',
-        "cron_full": f'"{py}" D:\\HermesData\\scripts\\model_mgmt_full_cron.py',
-        "cron_light_ps": r"D:\HermesData\scripts\model_management_cron.ps1 -Mode light",
-        "cron_full_ps": r"D:\HermesData\scripts\model_management_cron.ps1 -Mode full",
+        "cron_light": r"D:\HermesData\scripts\model_management_cron.ps1 -Mode light",
+        "cron_full": r"D:\HermesData\scripts\model_management_cron.ps1 -Mode full",
         "summary": f'"{py}" D:\\HermesData\\scripts\\model_management_agent.py --tick --summary',
-        "benchmark_active": f'"{py}" D:\\HermesData\\scripts\\model_management_agent.py --benchmark-active --summary',
-        "rotate_logs": f'"{py}" D:\\HermesData\\scripts\\jsonl_log_rotator_cron.py',
         "panel": f'"{py}" D:\\PhronesisVault\\scripts\\app_hooks.py',
         "ps_pipe_warning": "Never pipe full agent JSON through Select-Object -First N -- use --summary",
-        "hermes_jobs": "Model-Mgmt-Light-Tick 5afddd546ec2 | Full 5f73c5cf061a | JSONL-Log-Rotator-6h c803d7ac3261",
     }
     if "L09" in issue_codes:
         cmds["reconcile_drift"] = (
@@ -150,18 +131,11 @@ def _operator_commands(issue_codes: List[str]) -> Dict[str, str]:
 
 
 def _parse_session_health_patterns() -> List[str]:
-    """Extract recent failure patterns from Session-Health-Log for agent reflection.
-
-    Only the last ~16KB is scanned. The vault Session-Health-Log is cumulative;
-    whole-file substring matches permanently false-positive (proxy/fork/drift)
-    and polluted next_tick_hints even when the live stack was GREEN (audit 2026-07-18).
-    """
+    """Extract recurring failure patterns from Session-Health-Log for agent reflection."""
     if not SESSION_HEALTH_LOG.is_file():
         return []
     try:
-        raw = SESSION_HEALTH_LOG.read_bytes()
-        # Tail window — ignore ancient incident prose.
-        text = raw[-16384:].decode("utf-8", errors="replace").lower()
+        text = SESSION_HEALTH_LOG.read_text(encoding="utf-8", errors="replace").lower()
     except Exception:
         return []
     patterns: List[str] = []
@@ -240,8 +214,7 @@ def _self_reflection(
         ),
         "operator_commands": _operator_commands(codes),
     }
-    # Live port truth only for proxy hint (historical Session-Health-Log must not drive ops).
-    if not (stack.get("8091") or {}).get("up"):
+    if "proxy flapping" in " ".join(patterns) or not (stack.get("8091") or {}).get("up"):
         reflection["next_tick_hints"].append("Prioritize proxy stability -- ForkGuard + heal")
     if codes and status == "amber":
         reflection["next_tick_hints"].append("Review issue codes -- operator reconcile if L09 ini drift")
@@ -316,133 +289,6 @@ def _run_python(script: Path, args: List[str], timeout: int = 120) -> Dict[str, 
 
 def _run_warm_action(action: str) -> Dict[str, Any]:
     return _run_python(TOOLBOX["warm_actions"], [action], timeout=180)
-
-
-def _probe_http_up(port: int, path: str = "/health", timeout: float = 3.0) -> bool:
-    """True if local port answers (health or models)."""
-    for p in (path, "/v1/models"):
-        try:
-            req = urllib.request.Request(
-                f"http://127.0.0.1:{port}{p}",
-                method="GET",
-                headers={"Accept": "application/json"},
-            )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                if 200 <= int(resp.status) < 500:
-                    return True
-        except Exception:
-            continue
-    return False
-
-
-def _run_active_resident_benchmark(*, timeout: int = 900) -> Dict[str, Any]:
-    """Bench the LIVE unified resident on :8090 (fallback :8091).
-
-    RTX 3060 12GB doctrine: never spin a second GGUF / never target legacy
-    tier ports 8081/8082. Writes L06-matchable JSON under benchmark-results.
-    """
-    core = _load_json(CORE_PATH)
-    active_path = str(core.get("model") or "")
-    active_file = Path(active_path).name if active_path else ""
-    if not active_file:
-        active_file = str(core.get("model_label") or "active-resident")
-
-    # Prefer llama-server direct; proxy is OK if 8090 briefly flapping
-    if _probe_http_up(8090):
-        port = 8090
-    elif _probe_http_up(8091):
-        port = 8091
-    else:
-        return {
-            "ok": False,
-            "error": "no_resident_endpoint",
-            "message": "Neither :8090 nor :8091 answering — start-llama/heal first",
-            "action": "benchmark-active",
-        }
-
-    BENCHMARK_DIR.mkdir(parents=True, exist_ok=True)
-    # Stable stem preferred for L06 matcher + human ops
-    stem = "qwythos-9b-abliterated-q6" if "qwythos" in active_file.lower() else Path(active_file).stem
-    # Strip weird chars for filename
-    stem = "".join(c if c.isalnum() or c in "-_" else "-" for c in stem)[:80]
-    out_path = BENCHMARK_DIR / f"{stem}.json"
-
-    script = TOOLBOX["benchmark_resident"]
-    if not script.is_file():
-        return {"ok": False, "error": "script_missing", "path": str(script)}
-
-    py = _resolve_venv_python()
-    args = [
-        str(py),
-        str(script),
-        "--endpoint",
-        f"http://127.0.0.1:{port}/v1",
-        "--model",
-        "DEFAULT",
-        "--name",
-        active_file,
-        "--output",
-        str(out_path),
-        "--timeout",
-        "120",
-    ]
-    try:
-        proc = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            cwd=str(script.parent),
-        )
-    except subprocess.TimeoutExpired as exc:
-        return {"ok": False, "error": "timeout", "message": str(exc), "port": port}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc), "port": port}
-
-    raw = ((proc.stdout or "") + "\n" + (proc.stderr or "")).strip()
-    data = _load_json(out_path) if out_path.is_file() else {}
-    # Ensure L06 model key is the GGUF filename even if harness wrote API id
-    if data and active_file:
-        if str(data.get("model") or "") != active_file:
-            data["model"] = active_file
-            data["endpoint"] = f"http://127.0.0.1:{port}/v1"
-            try:
-                out_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            except Exception:
-                pass
-
-    tests = data.get("tests") or []
-    passed = sum(1 for t in tests if t.get("pass"))
-    total = len(tests)
-    pass_rate = data.get("pass_rate")
-    if pass_rate is None and total:
-        pass_rate = round(100.0 * passed / total, 1)
-
-    # Suite prints human text (not JSON-only); exit 0 + file with tests = success
-    ok = out_path.is_file() and total > 0 and proc.returncode == 0
-    if not ok and out_path.is_file() and total > 0:
-        # Some shells may non-zero on warnings — accept file with tests
-        ok = True
-
-    result = {
-        "ok": ok,
-        "action": "benchmark-active",
-        "port": port,
-        "endpoint": f"http://127.0.0.1:{port}/v1",
-        "model_file": active_file,
-        "output": str(out_path),
-        "pass_rate": pass_rate,
-        "passed": passed,
-        "total": total,
-        "speed_tps": data.get("speed_tps"),
-        "timestamp": data.get("timestamp"),
-        "returncode": proc.returncode,
-        "log_tail": raw[-1500:] if raw else "",
-    }
-    _log({"event": "benchmark_active_resident", **{k: v for k, v in result.items() if k != "log_tail"}})
-    return result
 
 
 def _parse_benchmark_file(data: Dict[str, Any], fname: str) -> Dict[str, Any]:
@@ -642,23 +488,14 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
 
     bench_meta: Optional[Dict[str, Any]] = None
     if BENCHMARK_DIR.is_dir():
-        # Prefer newest matching file (mtime) so L06 uses fresh resident runs
-        candidates: List[Tuple[float, Path, Dict[str, Any]]] = []
         for path in BENCHMARK_DIR.glob("*.json"):
             data = _load_json(path)
-            model_key = str(data.get("model") or path.stem).lower()
+            model_key = str(data.get("model") or "").lower()
             if active_file.lower() in model_key or (
                 "qwythos" in model_key and "qwythos" in active_file.lower()
             ):
-                try:
-                    mtime = path.stat().st_mtime
-                except OSError:
-                    mtime = 0.0
-                candidates.append((mtime, path, data))
-        if candidates:
-            candidates.sort(key=lambda x: x[0], reverse=True)
-            _, best_path, best_data = candidates[0]
-            bench_meta = _parse_benchmark_file(best_data, best_path.name)
+                bench_meta = _parse_benchmark_file(data, path.name)
+                break
 
     age = _benchmark_age_days(bench_meta)
     if bench_meta is None:
@@ -712,42 +549,6 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
                 "fix": "start-llama",
             }
         )
-    elif node.get("up") and smoke.get("ok"):
-        # SLO: success but slow — warn/info only (does not flip stack RED).
-        try:
-            lat = int(smoke.get("latency_ms") or 0)
-        except (TypeError, ValueError):
-            lat = 0
-        smoke["slo_warn_ms"] = SMOKE_LATENCY_WARN_MS
-        smoke["slo_info_ms"] = SMOKE_LATENCY_INFO_MS
-        if lat >= SMOKE_LATENCY_WARN_MS:
-            smoke["slo"] = "warn"
-            issues.append(
-                {
-                    "code": "L07S",
-                    "severity": "low",
-                    "message": (
-                        f"Local smoke slow ({lat}ms >= {SMOKE_LATENCY_WARN_MS}ms SLO) "
-                        f"— GPU busy/thermal/ctx pressure; inference still OK"
-                    ),
-                    "fix": "none",
-                }
-            )
-        elif lat >= SMOKE_LATENCY_INFO_MS:
-            smoke["slo"] = "info"
-            issues.append(
-                {
-                    "code": "L07S",
-                    "severity": "info",
-                    "message": (
-                        f"Local smoke elevated ({lat}ms >= {SMOKE_LATENCY_INFO_MS}ms info) "
-                        f"— under warn budget {SMOKE_LATENCY_WARN_MS}ms"
-                    ),
-                    "fix": "none",
-                }
-            )
-        else:
-            smoke["slo"] = "ok"
 
     return {
         "active_file": active_file,
@@ -1102,8 +903,7 @@ def remediate(
         elif fix_id == "auto-disable-cloud":
             result = _run_python(TOOLBOX["fleet_curator"], ["--auto-fix"], timeout=90)
         elif fix_id == "benchmark-active":
-            # Unified stack: bench resident :8090/:8091 — never legacy tier :8081
-            result = _run_active_resident_benchmark(timeout=900)
+            result = _run_python(TOOLBOX["benchmark_harness"], ["--tier", "hot"], timeout=600)
         else:
             continue
 
@@ -1303,11 +1103,7 @@ def main() -> int:
     parser.add_argument("--full-tick", action="store_true", help="Full assess incl. cloud probes")
     parser.add_argument("--remediate", action="store_true", help="Remediate only")
     parser.add_argument("--dry-run", action="store_true", help="Report fixes without applying")
-    parser.add_argument(
-        "--benchmark-active",
-        action="store_true",
-        help="Resident bench: benchmark_model.py on live :8090/:8091 (never tier :8081)",
-    )
+    parser.add_argument("--benchmark-active", action="store_true", help="Run harness on active tier")
     parser.add_argument(
         "--summary",
         action="store_true",
@@ -1316,7 +1112,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.benchmark_active:
-        result = _run_active_resident_benchmark(timeout=900)
+        result = _run_python(TOOLBOX["benchmark_harness"], ["--tier", "hot"], timeout=900)
         print(json.dumps(result, indent=2))
         return 0 if result.get("ok") else 1
 

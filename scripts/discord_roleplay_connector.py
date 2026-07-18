@@ -194,7 +194,6 @@ def log_discord_ingest_trace(
     extra: Optional[Dict[str, Any]] = None,
 ) -> None:
     try:
-        TRACE_LOG.parent.mkdir(parents=True, exist_ok=True)
         entry = {
             "timestamp": _utc_now(),
             "stage": stage,
@@ -205,6 +204,14 @@ def log_discord_ingest_trace(
             "meta": meta or {},
             "extra": extra or {},
         }
+        try:
+            from jsonl_log_rotator import append_jsonl as _rot_append
+
+            _rot_append(TRACE_LOG, entry, mode="rename", stamp=False)
+            return
+        except Exception:
+            pass
+        TRACE_LOG.parent.mkdir(parents=True, exist_ok=True)
         with open(TRACE_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:

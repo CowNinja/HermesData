@@ -57,6 +57,14 @@ def utc_now() -> str:
 
 
 def append_jsonl(path: Path, entry: Dict[str, Any]) -> None:
+    """Append one JSONL row; rotate operator-console before write when fat."""
+    try:
+        from jsonl_log_rotator import append_jsonl as _rot_append
+
+        _rot_append(path, entry, mode="rename", stamp=False)
+        return
+    except Exception:
+        pass
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, default=str) + "\n")
