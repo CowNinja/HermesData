@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """Safe VaultWalker cron entrypoint (travel-safe, expandable, feedback loop).
 
+v1.1 / walker 0.8.0 (2026-07-17):
+- Default silo = PhronesisVault ONLY (second-brain / Obsidian CNS)
+- Other worlds opt-in via --silos or VAULTWALKER_SILOS
+- True dry-run in walker (no index/note/move writes)
+- Living hub indexes owned by refresh_folder_indexes.py
+
 Design goals (Jeff grand vision):
-- Walk silos, refresh per-folder indexes, resurface forgotten ideas
-- Classify with local Qwythos via :8091 (inside vaultwalker)
+- Walk second brain, sparse maps, resurface forgotten ideas
+- Classify with local Qwythos via :8091 (inside vaultwalker, deep only)
 - Default DRY-RUN: no moves / no destructive writes unless VAULTWALKER_LIVE=1
 - Feedback scorecard after every run for adjustments
 - Config-driven silos (data_silos.yaml) for infinite expandability
@@ -242,7 +248,7 @@ def main() -> int:
         "walker_status": parsed.get("status"),
         "silo_stats": silo_stats,
         "feedback": feedback,
-        "version": "vaultwalker_cron/1.0",
+        "version": "vaultwalker_cron/1.1",
     }
 
     FEEDBACK_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")

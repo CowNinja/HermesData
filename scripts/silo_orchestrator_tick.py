@@ -256,7 +256,8 @@ def main() -> int:
         (
             "domain_indexes",
             [sys.executable, str(SCRIPTS / "silo_domain_indexes.py")],
-            180,
+            # 2026-07-18: was 180s → exit 124 full-rglob; script now caps scan
+            300,
         )
     )
     workers.append(

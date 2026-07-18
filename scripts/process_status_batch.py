@@ -62,7 +62,17 @@ def main() -> int:
             status = "ocr_queued"
         elif Path(str(p) + ".ocr.md").is_file():
             status = "extracted"
-        elif p.suffix.lower() in {".txt", ".md", ".csv", ".json"} and p.stat().st_size > 0:
+        elif p.suffix.lower() in {
+            ".txt",
+            ".md",
+            ".csv",
+            ".json",
+            ".html",
+            ".htm",
+            ".eml",
+            ".rtf",
+        } and p.stat().st_size > 0:
+            # 2026-07-18: takeout HTML is natively text — mark extracted for train
             status = "extracted"
         cur = r["process_status"] if "process_status" in r.keys() else None
         if cur != status:

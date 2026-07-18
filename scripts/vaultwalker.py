@@ -147,24 +147,25 @@ def get_silo_for_content(path: Path, preview: str = "") -> str:
 def relocate_to_sandbox(src: Path, dry_run: bool = False) -> str:
     """Move confirmed explicit RP material exclusively to RoleplaySandbox (central location)."""
     target_dir = Path(r"D:\PhronesisVault\Roleplay-Sandbox\data\misplaced_from_vaultwalker")
-    target_dir.mkdir(parents=True, exist_ok=True)
     dest = target_dir / src.name
-    if dest.exists():
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        dest = target_dir / (src.stem + "_" + ts + src.suffix)
     log_msg = "RELOCATE: " + str(src) + " -> " + str(dest)
     if not dry_run:
         try:
             import shutil
+            target_dir.mkdir(parents=True, exist_ok=True)
+            if dest.exists():
+                ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                dest = target_dir / (src.stem + "_" + ts + src.suffix)
+                log_msg = "RELOCATE: " + str(src) + " -> " + str(dest)
             shutil.move(str(src), str(dest))
             log_msg += " [MOVED]"
+            audit = target_dir / "relocation_audit.md"
+            with open(audit, "a", encoding="utf-8") as f:
+                f.write("## " + datetime.now().isoformat() + " - " + log_msg + "\n")
         except Exception as e:
             log_msg += " [ERROR: " + str(e)[:70] + "]"
     else:
         log_msg += " [DRY-RUN]"
-    audit = target_dir / "relocation_audit.md"
-    with open(audit, "a", encoding="utf-8") as f:
-        f.write("## " + datetime.now().isoformat() + " - " + log_msg + "\n")
     print("[VAULTWALKER-RELOCATE] " + log_msg)
     return log_msg
 
@@ -345,13 +346,15 @@ def load_persistent_state(silo_name: str) -> Dict[str, Any]:
 def save_persistent_state(silo_name: str, state: Dict[str, Any]) -> None:
     if not GLOBAL_POLICIES.get("persistent_state", True):
         return
+    if DRY_RUN:
+        return  # dry-run must not advance mtime/hash cache
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     state_file = STATE_DIR / (silo_name.lower() + "_state.json")
     state["last_updated"] = datetime.now().isoformat()
     try:
         with open(state_file, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
-    except:
+    except Exception:
         pass
 
 def should_process_deep(path: Path, state: Dict[str, Any]) -> bool:
@@ -364,9 +367,10 @@ def should_process_deep(path: Path, state: Dict[str, Any]) -> bool:
         h = file_hash(path) if path.is_file() else "dir"
         if last.get("mtime") == mtime and last.get("hash") == h:
             return False
+        # Only mutate in-memory state; disk write gated by save_persistent_state (skips dry-run)
         state.setdefault("folders", {})[key] = {"mtime": mtime, "hash": h}
         return True
-    except:
+    except Exception:
         return True
 
 # Never plant 00-INDEX.md inside package trees / tooling (Graph orphan factories)
@@ -630,24 +634,32 @@ topic: general
     return stats
 
 def resurface_forgotten_ideas(root: Path, silo_name: str, state: Dict[str, Any]) -> Dict:
+    """Surface stale/low-link notes into a CNS log. True dry-run: no writes."""
     stats = {"stale_found": 0, "surfaced": 0, "examples": []}
     if not root.exists():
         return stats
     now = datetime.now()
-    resurf_log = root / "Resurfaced-Ideas.md"
+    # Keep resurface log under Operations/logs for second-brain focus
+    if silo_name == PRIMARY_SILO:
+        resurf_log = root / "Operations" / "logs" / "vaultwalker-resurfaced-latest.md"
+    else:
+        resurf_log = root / "Resurfaced-Ideas.md"
     entries = []
     skip_parts = {
         ".git", "node_modules", "__pycache__", ".obsidian", ".smart-env",
         "Roleplay-Sandbox", "Alice", "alice_venv", "Archive", "site-packages",
-        "venv", ".venv", "Distillations-2026-07-10",
+        "venv", ".venv", "Distillations-2026-07-10", "00-INDEX.md",
     }
-    max_surface = 80
+    max_surface = int(GLOBAL_POLICIES.get("max_resurface_per_cycle", 80) or 80)
     for p in root.rglob("*.md"):
         if stats["surfaced"] >= max_surface:
             break
         try:
             parts = set(p.parts)
             if parts & skip_parts:
+                continue
+            # Skip index maps themselves
+            if p.name.lower() in ("00-index.md", "index.md"):
                 continue
         except Exception:
             continue
@@ -659,27 +671,33 @@ def resurface_forgotten_ideas(root: Path, silo_name: str, state: Dict[str, Any])
             text = p.read_text(encoding="utf-8", errors="ignore")
             links = text.count("[[")
             if days_old > STALE_DAYS or (links < 2 and len(text) > 250 and "archive" not in str(p).lower()):
-                rel = str(p.relative_to(root))
-                entry = "- [[" + rel + "]] (~" + str(days_old) + "d, " + str(links) + " links)"
+                rel = str(p.relative_to(root)).replace("\\", "/")
+                entry = "- [[" + rel.replace(".md", "") + "]] (~" + str(days_old) + "d, " + str(links) + " links)"
                 stats["stale_found"] += 1
                 stats["surfaced"] += 1
                 if len(stats["examples"]) < 5:
                     stats["examples"].append(rel)
                 entries.append(entry)
-                if "Resurfaced by VaultWalker" not in text:
-                    note = "\n\n> Resurfaced forgotten idea (" + now.strftime("%Y-%m-%d") + ") per post guidance.\n"
-                    if not DRY_RUN:
-                        try:
-                            p.write_text(text + note, encoding="utf-8")
-                        except Exception:
-                            pass
+                # Do NOT append inline notes to every stale file (noise). Log only.
         except Exception:
             continue
     if entries:
-        resurf_log.parent.mkdir(parents=True, exist_ok=True)
-        with open(resurf_log, "a", encoding="utf-8") as f:
-            f.write("\n## " + now.isoformat() + " - " + str(len(entries)) + " ideas\n")
-            f.write("\n".join(entries[:8]) + "\n")
+        header = (
+            f"# VaultWalker Resurface — {now.strftime('%Y-%m-%d %H:%M')}\n\n"
+            f"**Silo:** {silo_name} · **Version:** {VAULTWALKER_VERSION} · "
+            f"**Mode:** {'DRY-RUN' if DRY_RUN else 'LIVE'}\n\n"
+            f"Stale/low-link candidates (cap {max_surface}). "
+            f"Living CNS focus: D:\\PhronesisVault only by default.\n\n"
+        )
+        body = header + "\n".join(entries[:max_surface]) + "\n"
+        if DRY_RUN:
+            print(f"[VAULTWALKER] resurface dry-run candidates={len(entries)} (no write)")
+        else:
+            try:
+                resurf_log.parent.mkdir(parents=True, exist_ok=True)
+                resurf_log.write_text(body, encoding="utf-8")
+            except OSError as e:
+                print(f"[VAULTWALKER] resurface log write fail: {e}")
     return stats
 
 def evaluate_and_relocate_misplaced(root: Path, silo_name: str, dry_run: bool = False) -> Dict:
@@ -728,15 +746,20 @@ def evaluate_and_relocate_misplaced(root: Path, silo_name: str, dry_run: bool = 
                 flagged += 1
                 msg = "FLAGGED explicit-non-rp (kept in " + silo_name + " - unrelated to RP): " + str(p) + " | " + model_eval.get("reason", "")
                 log.append(msg)
-                audit = Path(r"D:\PhronesisVault\Roleplay-Sandbox\data\misplaced_from_vaultwalker\relocation_audit.md")
-                audit.parent.mkdir(parents=True, exist_ok=True)
-                with open(audit, "a", encoding="utf-8") as f:
-                    f.write("## " + datetime.now().isoformat() + " - " + msg + "\n")
+                if not dry_run:
+                    audit = Path(r"D:\PhronesisVault\Roleplay-Sandbox\data\misplaced_from_vaultwalker\relocation_audit.md")
+                    try:
+                        audit.parent.mkdir(parents=True, exist_ok=True)
+                        with open(audit, "a", encoding="utf-8") as f:
+                            f.write("## " + datetime.now().isoformat() + " - " + msg + "\n")
+                    except OSError:
+                        pass
             else:
                 log.append("KEPT (block default): " + str(p) + " class=" + model_eval.get("class", ""))
-        except:
+        except Exception:
             continue
     return {"moved": moved, "evaluated": evaluated, "flagged_non_rp_explicit": flagged, "log": log[:8]}
+
 
 def housekeeping_silo(name: str, root: Path) -> Dict:
     stats = {}
@@ -744,7 +767,7 @@ def housekeeping_silo(name: str, root: Path) -> Dict:
     is_light = is_light_cycle()
     resurface_only = is_resurface_only()
     mode = "LIGHT" if is_light else ("RESURFACE" if resurface_only else "DEEP")
-    print("[VAULTWALKER] " + name + " - " + mode)
+    print("[VAULTWALKER] " + name + " - " + mode + " v" + VAULTWALKER_VERSION + (" DRY-RUN" if DRY_RUN else " LIVE"))
     sys.stdout.flush()
 
     # Indexes first and accurate every pass
@@ -765,6 +788,8 @@ def housekeeping_silo(name: str, root: Path) -> Dict:
     stats["per_folder_indexes"] = idx
     stats["code_cleaned"] = cc
     stats["cycle_mode"] = mode
+    stats["vaultwalker_version"] = VAULTWALKER_VERSION
+    stats["dry_run"] = DRY_RUN
     stats.update({"md_" + k: v for k, v in mr.items()})
     stats["reloc_moved"] = reloc.get("moved", 0)
     stats["reloc_evaluated"] = reloc.get("evaluated", 0)
@@ -772,19 +797,32 @@ def housekeeping_silo(name: str, root: Path) -> Dict:
     if res:
         stats.update({"res_" + k: v for k, v in res.items()})
 
+    # State always may update mtime cache (local HermesData only — not vault content)
     save_persistent_state(name, state)
     return stats
 
 def run_silo(name: str, root: Path) -> Tuple[str, Dict]:
     if not root.exists():
         return name, {"error": "not mounted"}
-    stats = housekeeping_silo(name, root)
+    try:
+        stats = housekeeping_silo(name, root)
+    except Exception as e:
+        print(f"[VAULTWALKER] ERROR {name}: {type(e).__name__}: {e}")
+        return name, {"error": f"{type(e).__name__}: {e}"}
     return name, stats
 
 def main():
     global args, DRY_RUN, FORCE_CYCLE
-    parser = argparse.ArgumentParser(description="VaultWalker v0.7.0 - explicit-only silo housekeeper")
-    parser.add_argument("--silos", nargs="*", default=list(SILOS.keys()))
+    parser = argparse.ArgumentParser(
+        description=f"VaultWalker v{VAULTWALKER_VERSION} — PhronesisVault second-brain housekeeper"
+    )
+    # v0.8 default: PhronesisVault only (other silos opt-in)
+    parser.add_argument(
+        "--silos",
+        nargs="*",
+        default=list(DEFAULT_SILOS),
+        help=f"Silos to walk (default: {DEFAULT_SILOS}). Opt-in multi-world via names.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Dry run: no writes or moves")
     parser.add_argument(
         "--cycle",
@@ -797,15 +835,53 @@ def main():
     FORCE_CYCLE = None if args.cycle == "auto" else args.cycle
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    summary = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
-        futures = {ex.submit(run_silo, n, SILOS[n]): n for n in args.silos if n in SILOS}
-        for fut in concurrent.futures.as_completed(futures):
-            name, stats = fut.result()
-            summary[name] = stats
-            print("[VAULTWALKER] " + name + " done: " + str({k: v for k, v in stats.items() if not isinstance(v, (list, dict))}))
+    silo_list = [n for n in args.silos if n in SILOS]
+    unknown = [n for n in args.silos if n not in SILOS]
+    if unknown:
+        print(f"[VAULTWALKER] unknown silos skipped: {unknown}")
+    if not silo_list:
+        print("[VAULTWALKER] no valid silos; defaulting to PhronesisVault")
+        silo_list = [PRIMARY_SILO] if PRIMARY_SILO in SILOS else []
 
-    print(json.dumps({"status": "complete", "summary": summary}, indent=2))
+    print(
+        f"[VAULTWALKER] v{VAULTWALKER_VERSION} focus={PRIMARY_SILO} "
+        f"silos={silo_list} cycle={args.cycle} dry_run={DRY_RUN}"
+    )
+    summary = {}
+    # Single-silo default: no need for heavy thread pool; keep pool for multi opt-in
+    workers = min(3, max(1, len(silo_list)))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(run_silo, n, SILOS[n]): n for n in silo_list}
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                name, stats = fut.result()
+            except Exception as e:
+                name = futures[fut]
+                stats = {"error": f"{type(e).__name__}: {e}"}
+            summary[name] = stats
+            print(
+                "[VAULTWALKER] "
+                + name
+                + " done: "
+                + str({k: v for k, v in stats.items() if not isinstance(v, (list, dict))})
+            )
+
+    print(
+        json.dumps(
+            {
+                "status": "complete",
+                "meta": {
+                    "version": VAULTWALKER_VERSION,
+                    "primary_silo": PRIMARY_SILO,
+                    "dry_run": DRY_RUN,
+                    "cycle": args.cycle,
+                },
+                "summary": summary,
+            },
+            indent=2,
+            default=str,
+        )
+    )
 
 if __name__ == "__main__":
     main()

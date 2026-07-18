@@ -113,7 +113,8 @@ def candidates_from_ocr_queue(limit: int, root: Path) -> list[Path]:
 
 
 def candidates_from_walk(root: Path, limit: int, max_scan: int) -> list[Path]:
-    exts = {".pdf", ".txt", ".md", ".csv", ".json"}
+    # 2026-07-18: include takeout/html/email — Google_Backups land wave is mostly .html
+    exts = {".pdf", ".txt", ".md", ".csv", ".json", ".html", ".htm", ".eml", ".msg", ".rtf"}
     gold: list[Path] = []
     other: list[Path] = []
     scanned = 0
@@ -140,6 +141,59 @@ def candidates_from_walk(root: Path, limit: int, max_scan: int) -> list[Path]:
     return (gold + other)[:limit]
 
 
+def candidates_from_registry(root: Path, limit: int) -> list[Path]:
+    """Prefer recent unprocessed lands under root (O(registry) not full-tree).
+
+    Overnight 2026-07-18 lesson: Google_Backups HTML never hit OCR queue and
+    walk defaulted to Medical-only PDF/txt — train stayed at attempted=0.
+    """
+    out: list[Path] = []
+    reg = Path(r"D:/HermesData/state/ingest_registry.sqlite3")
+    if not reg.is_file():
+        return out
+    root_n = str(root).replace("/", "\\").rstrip("\\")
+    try:
+        con = sqlite3.connect(str(reg), timeout=30)
+        con.execute("PRAGMA busy_timeout=30000")
+        rows = con.execute(
+            """
+            SELECT dest_path FROM ingest
+            WHERE dest_path LIKE ?
+              AND (process_status IS NULL OR process_status IN
+                   ('unprocessed','extracted','context_enriched','ocr_queued'))
+            ORDER BY COALESCE(first_seen, last_seen) DESC
+            LIMIT ?
+            """,
+            (root_n + "\\%", max(limit * 12, 120)),
+        ).fetchall()
+        con.close()
+    except Exception:
+        return out
+    exts = {".pdf", ".txt", ".md", ".csv", ".json", ".html", ".htm", ".eml", ".msg", ".rtf"}
+    for (dest,) in rows:
+        if not dest:
+            continue
+        p = Path(dest)
+        if not p.is_file():
+            continue
+        if p.suffix.lower() not in exts and not Path(str(p) + ".ocr.md").is_file():
+            # allow binary+ocr sidecar
+            ocr_md = Path(str(p) + ".ocr.md")
+            if ocr_md.is_file():
+                p = ocr_md
+            else:
+                continue
+        if Path(str(p) + ".train.md").exists():
+            continue
+        if should_skip(p):
+            mark_skip(p, "junk_or_thin_imaging")
+            continue
+        out.append(p)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -158,19 +212,34 @@ def main() -> int:
     root = Path(args.root)
     files: list[Path] = []
     source = "none"
-    if not args.walk_only:
-        files = candidates_from_ocr_queue(args.limit, root)
-        source = "ocr_queue"
+    # 1) registry-recent (fast, covers new HTML land waves)
+    reg_files = candidates_from_registry(root, args.limit)
+    if reg_files:
+        files.extend(reg_files)
+        source = "registry"
+    # 2) OCR queue gold
+    if not args.walk_only and len(files) < args.limit:
+        ocr_files = candidates_from_ocr_queue(args.limit - len(files), root)
+        seen = {str(f) for f in files}
+        for w in ocr_files:
+            if str(w) not in seen:
+                files.append(w)
+                seen.add(str(w))
+        if ocr_files:
+            source = f"{source}+ocr_queue" if source != "none" else "ocr_queue"
+    # 3) walk fallback
     if len(files) < args.limit:
         need = args.limit - len(files)
         walked = candidates_from_walk(root, need, args.max_scan)
-        # dedupe
         seen = {str(f) for f in files}
         for w in walked:
             if str(w) not in seen:
                 files.append(w)
                 seen.add(str(w))
-        source = f"{source}+walk" if files else "walk"
+        if walked:
+            source = f"{source}+walk" if source != "none" else "walk"
+    if source == "none":
+        source = "empty"
     files = files[: args.limit]
     ok = 0
     skipped = 0

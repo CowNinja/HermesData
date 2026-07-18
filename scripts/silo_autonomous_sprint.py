@@ -138,11 +138,22 @@ def depth_cycle(stamp_limit: int, index_limit: int, train_limit: int) -> dict:
         run([PY, str(SCRIPTS / "silo_ocr_tail_hard.py")], 90)
     else:
         codes["ocr"] = 0
-    # train (OCR-queue first, max-scan) — short
+    # train (OCR-queue + registry-recent HTML; rotate shelves — 2026-07-18)
+    train_roots = [
+        r"K:/Phronesis-Sovereign/Personal-Digital-Silo/Core-Personal/Family",
+        r"K:/Phronesis-Sovereign/Personal-Digital-Silo/Medical-Records",
+        r"K:/Phronesis-Sovereign/Personal-Digital-Silo/Navy-Service",
+        r"K:/Phronesis-Sovereign/Personal-Digital-Silo/Core-Personal/Life-Archive",
+        r"K:/Phronesis-Sovereign/Personal-Digital-Silo/Core-Personal/_Inbox",
+        r"K:/Phronesis-Sovereign/Personal-Digital-Silo/Core-Personal/Friends",
+    ]
+    train_root = train_roots[int(time.time() // 60) % len(train_roots)]
     codes["train"], out_tr = run(
         [
             PY,
             str(SCRIPTS / "batch_train_derivatives.py"),
+            "--root",
+            train_root,
             "--limit",
             str(min(train_limit, 20)),
             "--timeout",
