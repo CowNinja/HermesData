@@ -27,7 +27,8 @@ agent:
   service_tier: ''
   tool_use_enforcement: strict
   task_completion_guidance: true
-  parallel_tool_call_guidance: true
+  # false: fewer concurrent tool storms (search_files xN) that correlate with silent gateway death
+  parallel_tool_call_guidance: false
   environment_probe: false
   environment_hint: 'RP SANDBOX BOUNDARY: Roleplay/fiction ONLY in #alice-roleplay and child RP threads (Rolepl
     ay-Sandbox SOUL). ALL other Discord/API/CLI: FACTUAL Grok 4.x — tools first, no invented f
@@ -912,10 +913,11 @@ UNIVERSAL STABILITY (all channels/platforms, not Jan-only): Short tool loops. Si
       - file
 
 local_sovereign:
-  # Concurrent restarts were timing out integrity (45s) and BLOCKING gateway start → Discord mute.
+  # Disabled at boot: integrity subprocess timeouts blocked gateway start and caused Discord drop storms.
+  # Run integrity via preflight/heal offline, not on every gateway spawn.
   boot_integrity:
-    enabled: true
+    enabled: false
     mode: fast
     on_fail: warn
-    timeout_seconds: 25
+    timeout_seconds: 20
 

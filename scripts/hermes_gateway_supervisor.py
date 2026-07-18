@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""Hermes gateway process supervisor — permanent Discord stability layer.
+"""Hermes gateway supervisor v2 — primary Discord :8642 restarter.
 
-Why this exists (2026-07-17):
-  PowerShell keepalive can die or hang on Get-NetTCPConnection during long
-  Discord turns. When both gateway and keepalive die, Discord stays mute until
-  a human restarts. This supervisor is a detached pythonw loop that:
+Root causes of repeated drops (2026-07-17):
+  1. Gateway process dies mid-turn (silent) — no traceback
+  2. Dual starters (keepalive + supervisor + heal) race → "runtime lock already held"
+  3. list_gateway_pids returned dead PIDs → boot_wait forever / no restart
+  4. Supervisor + keepalive themselves die → no recovery until human
 
-  1. Probes HTTP :8642/health every INTERVAL_SEC (no PS, no CIM)
-  2. Clears stale gateway.pid/lock when claimed PID is dead
-  3. Starts -m gateway.run via venv pythonw when down
-  4. Logs every tick so silence = supervisor itself is dead
-  5. Single-instance via lock file
-
-Usage:
-  pythonw D:\\HermesData\\scripts\\hermes_gateway_supervisor.py
-  python  D:\\HermesData\\scripts\\hermes_gateway_supervisor.py --once
+Policy:
+  - This process is the ONLY automatic gateway starter
+  - Alive-only PID checks; kill hung/non-health trees before start
+  - Skip boot integrity (PHRONESIS_BOOT_INTEGRITY=0) for fast reliable start
+  - Never exit the loop on recoverable errors
+  - Heartbeat file for meta-watchdog
 """
 from __future__ import annotations
 
@@ -25,7 +23,6 @@ import socket
 import subprocess
 import sys
 import time
-import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,10 +34,11 @@ STATE = ROOT / "state"
 LOCK = STATE / "gateway-supervisor.lock"
 HEARTBEAT = STATE / "gateway-supervisor-heartbeat.json"
 PORT = 8642
-INTERVAL_SEC = 15
-BOOT_WAIT_SEC = 70
+INTERVAL_SEC = 12
+BOOT_WAIT_SEC = 55
 VENV_PYW = ROOT / "hermes-agent" / "venv" / "Scripts" / "pythonw.exe"
 VENV_PY = ROOT / "hermes-agent" / "venv" / "Scripts" / "python.exe"
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
 
 
 def _utc() -> str:
@@ -61,6 +59,10 @@ def log(msg: str) -> None:
         pass
 
 
+def _flags() -> int:
+    return CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
+
 def pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -70,6 +72,7 @@ def pid_alive(pid: int) -> bool:
             capture_output=True,
             text=True,
             timeout=12,
+            creationflags=_flags(),
         )
         out = (r.stdout or "").strip()
         return str(pid) in out and "No tasks" not in out
@@ -82,7 +85,7 @@ def health_ok(timeout: float = 3.0) -> bool:
         req = urllib.request.Request(
             f"http://127.0.0.1:{PORT}/health",
             method="GET",
-            headers={"User-Agent": "hermes-gateway-supervisor/1.0"},
+            headers={"User-Agent": "hermes-gateway-supervisor/2.0"},
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return 200 <= int(resp.status) < 300
@@ -115,8 +118,21 @@ def clear_stale_markers() -> list[str]:
                     pid = int(raw.split()[0])
                 except Exception:
                     pid = 0
-            if pid and pid_alive(pid):
+            # Keep only if process alive AND health OK (ghost "running" state is poison)
+            if pid and pid_alive(pid) and health_ok(timeout=1.5):
                 continue
+            if pid and pid_alive(pid) and not health_ok(timeout=1.5):
+                # hung process holding lock without serving
+                try:
+                    subprocess.run(
+                        ["taskkill", "/F", "/PID", str(pid)],
+                        capture_output=True,
+                        timeout=15,
+                        creationflags=_flags(),
+                    )
+                    cleared.append(f"killed_hung_{pid}")
+                except Exception:
+                    pass
             path.unlink(missing_ok=True)
             cleared.append(name)
         except Exception:
@@ -129,22 +145,17 @@ def clear_stale_markers() -> list[str]:
 
 
 def list_gateway_pids() -> list[int]:
-    """Live python gateway processes only (not powershell that mentions gateway)."""
+    """Live python gateway PIDs only (alive + cmdline match)."""
     ps = (
-        "Get-CimInstance Win32_Process | "
-        "Where-Object { $_.Name -match 'python(w)?\\.exe' -and $_.CommandLine -and "
-        "($_.CommandLine -match '-m\\s+gateway\\.run' -or "
+        "Get-CimInstance Win32_Process | Where-Object { "
+        "$_.Name -match 'python(w)?\\.exe' -and $_.CommandLine -and ("
+        "$_.CommandLine -match '-m\\s+gateway\\.run' -or "
         "$_.CommandLine -match 'hermes_cli\\.main.*gateway' -or "
-        "$_.CommandLine -match 'hermes-agent[\\\\/]gateway[\\\\/]run\\.py') } | "
-        "ForEach-Object { $_.ProcessId }"
+        "$_.CommandLine -match 'hermes-agent[\\\\/]gateway[\\\\/]run\\.py'"
+        ") } | ForEach-Object { $_.ProcessId }"
     )
     pids: list[int] = []
     try:
-        flags = (
-            getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-            if sys.platform == "win32"
-            else 0
-        )
         r = subprocess.run(
             [
                 "powershell.exe",
@@ -157,22 +168,48 @@ def list_gateway_pids() -> list[int]:
             ],
             capture_output=True,
             text=True,
-            timeout=30,
-            creationflags=flags,
+            timeout=25,
+            creationflags=_flags(),
         )
         for line in (r.stdout or "").splitlines():
             line = line.strip()
             if line.isdigit():
-                pids.append(int(line))
-    except Exception:
-        pass
-    return pids
+                pid = int(line)
+                if pid_alive(pid):
+                    pids.append(pid)
+    except Exception as exc:
+        log(f"list_gateway_pids err: {exc}")
+    return sorted(set(pids))
+
+
+def kill_gateway_tree() -> list[int]:
+    killed = []
+    for pid in list_gateway_pids():
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/PID", str(pid)],
+                capture_output=True,
+                timeout=15,
+                creationflags=_flags(),
+            )
+            killed.append(pid)
+        except Exception:
+            pass
+    time.sleep(1.5)
+    clear_stale_markers()
+    return killed
 
 
 def start_gateway() -> bool:
     clear_stale_markers()
     if health_ok():
         return True
+    # If something is half-alive without health, kill it first (avoids lock race)
+    existing = list_gateway_pids()
+    if existing:
+        log(f"prestart kill hung/partial pids={existing}")
+        kill_gateway_tree()
+
     pyw = VENV_PYW if VENV_PYW.is_file() else VENV_PY
     if not pyw.is_file():
         log(f"ERR no pythonw at {pyw}")
@@ -182,7 +219,8 @@ def start_gateway() -> bool:
     env["HERMES_CONFIG_PATH"] = str(ROOT / "config.yaml")
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env["HERMES_GATEWAY_DETACHED"] = "1"
-    # Integrity timeout must not block gateway start (universal Discord stability).
+    # Skip integrity gate entirely — timeouts blocked starts and caused drop storms
+    env["PHRONESIS_BOOT_INTEGRITY"] = "0"
     env["PHRONESIS_BOOT_INTEGRITY_MODE"] = "fast"
     env["PHRONESIS_BOOT_INTEGRITY_FAIL"] = "warn"
     creation = 0
@@ -190,7 +228,7 @@ def start_gateway() -> bool:
         creation = (
             getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
             | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
-            | 0x08000000
+            | CREATE_NO_WINDOW
         )
     try:
         subprocess.Popen(
@@ -214,16 +252,18 @@ def start_gateway() -> bool:
             return True
         time.sleep(2)
     log("ERR start timed out waiting for /health")
+    # failed start may leave lock — clean
+    kill_gateway_tree()
     return False
 
 
-def write_heartbeat(ok: bool, extra: dict | None = None) -> None:
+def write_heartbeat(status: str, extra: dict | None = None) -> None:
     try:
         STATE.mkdir(parents=True, exist_ok=True)
         payload = {
             "pid": os.getpid(),
             "ts": _utc(),
-            "ok": ok,
+            "status": status,
             "health": health_ok(timeout=2.0),
             "port": port_listen(),
             "gw_pids": list_gateway_pids(),
@@ -231,6 +271,7 @@ def write_heartbeat(ok: bool, extra: dict | None = None) -> None:
         if extra:
             payload.update(extra)
         HEARTBEAT.write_text(json.dumps(payload), encoding="utf-8")
+        LOCK.write_text(f"{os.getpid()} {_utc()}", encoding="utf-8")
     except Exception:
         pass
 
@@ -240,7 +281,7 @@ def acquire_lock() -> bool:
     if LOCK.is_file():
         try:
             old = int(LOCK.read_text(encoding="utf-8").strip().split()[0])
-            if old > 0 and pid_alive(old):
+            if old > 0 and old != os.getpid() and pid_alive(old):
                 log(f"exit: another supervisor alive pid={old}")
                 return False
         except Exception:
@@ -260,38 +301,35 @@ def release_lock() -> None:
 
 
 def tick() -> str:
-    cleared = clear_stale_markers()
-    if cleared:
-        log(f"cleared_stale {cleared}")
-    ok = health_ok()
-    if ok:
-        write_heartbeat(True)
-        return "OK"
-    # Boot race: process already starting — wait, do not dual-spawn.
-    existing = list_gateway_pids()
-    if existing:
-        log(f"boot_wait pids={existing} (no dual start)")
-        deadline = time.time() + BOOT_WAIT_SEC
-        while time.time() < deadline:
-            if health_ok():
-                write_heartbeat(True, {"waited_boot": True})
-                return "OK_after_boot_wait"
-            time.sleep(2)
-        log(f"boot_wait expired; killing hung pids={existing}")
-        for pid in existing:
-            try:
-                subprocess.run(
-                    ["taskkill", "/F", "/PID", str(pid)],
-                    capture_output=True,
-                    timeout=15,
-                )
-            except Exception:
-                pass
-        time.sleep(2)
-    log("DOWN health=False -> start_gateway")
-    started = start_gateway()
-    write_heartbeat(started, {"recovered": started})
-    return "RECOVERED" if started else "FAIL"
+    try:
+        cleared = clear_stale_markers()
+        if cleared:
+            log(f"cleared_stale {cleared}")
+        if health_ok():
+            write_heartbeat("OK")
+            return "OK"
+
+        existing = list_gateway_pids()
+        if existing:
+            # Process alive but no health — wait briefly for boot
+            log(f"unhealthy_alive pids={existing} wait_boot")
+            deadline = time.time() + min(BOOT_WAIT_SEC, 25)
+            while time.time() < deadline:
+                if health_ok():
+                    write_heartbeat("OK_after_boot_wait")
+                    return "OK_after_boot_wait"
+                time.sleep(2)
+            log(f"hung tree kill pids={existing}")
+            kill_gateway_tree()
+
+        log("DOWN -> start_gateway")
+        ok = start_gateway()
+        write_heartbeat("RECOVERED" if ok else "FAIL")
+        return "RECOVERED" if ok else "FAIL"
+    except Exception as exc:
+        log(f"tick_err {type(exc).__name__}: {exc}")
+        write_heartbeat("ERR", {"error": str(exc)})
+        return f"ERR:{exc}"
 
 
 def main() -> int:
@@ -301,22 +339,17 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.once:
-        log(f"once tick result={tick()}")
+        log(f"once result={tick()}")
         return 0 if health_ok() else 1
 
     if not acquire_lock():
         return 0
-    log(f"supervisor loop start pid={os.getpid()} interval={args.interval}s")
+    log(f"supervisor v2 start pid={os.getpid()} interval={args.interval}s")
     try:
         while True:
             try:
                 result = tick()
                 log(result)
-                # refresh lock
-                try:
-                    LOCK.write_text(f"{os.getpid()} {_utc()}", encoding="utf-8")
-                except Exception:
-                    pass
             except Exception as exc:
                 log(f"LOOP_ERR {exc}")
             time.sleep(max(5, int(args.interval)))

@@ -1,40 +1,39 @@
 #!/usr/bin/env python3
 """
-VaultWalker v0.8.0 — PhronesisVault (second-brain / Obsidian CNS) primary.
+VaultWalker v0.7.0 - Rebuilt clean, explicit-only gates, rock solid.
 
-Focus (2026-07-17 streamlining):
-- Default silo = PhronesisVault only (world 2 second brain). Other silos opt-in via --silos.
-- Living hub indexes owned by refresh_folder_indexes.py — NEVER clobber rich 00-INDEX.
-- Lean missing-folder maps only; skip Roleplay-Sandbox / Alice / package trees for index plant.
-- True dry-run: no file writes (indexes, notes, moves).
-- Explicit-only relocate still deep-only; block-by-default.
-- Research basis: Karpathy LLM-Wiki lint; Zoottelkeeper per-folder maps; BASB light organize;
-  vault failure-modes note (refresh wiping hubs); Obsidian graph = wikilinks not folder spam.
+Simple, clean, ASCII-only.
+Uses existing local model (qwythos 9b abliterated via sovereign router) for intelligent evaluation at every step:
+- Classify (explicit-rp vs explicit-non-rp vs non)
+- Actions: relocate, keep, flag_review, distill_compact, split_atomic, trim
+- Residency + policy tagging
+- Block by default. Only move confirmed explicit RP material to RoleplaySandbox (central location).
+- Edge cases respected: explicit but unrelated to roleplay kept in original silo + audited.
 
-Run:
-  python D:/HermesData/scripts/vaultwalker.py --dry-run --cycle resurface
-  python D:/HermesData/scripts/vaultwalker.py --silos PhronesisVault --cycle light
-  VAULTWALKER_LIVE=1 via vaultwalker_cron.py --live  # intentional only
+Indexes updated in **every single directory** (even empty) for complete navigation and easy file/content location.
+Audit always produced.
+Aligned with user directives + prior research (data fabric style separation + AI at every step).
+
+Optimized for scale: prefilter keywords before model calls; skips binaries/large files; incremental state.
+
+Run: python "D:/HermesData/scripts/vaultwalker.py" [--dry-run] [--silos ...]
 """
 
 import argparse
 import concurrent.futures
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
-import tempfile
 import unicodedata
 import yaml  # for full data_silos.yaml loading
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Tuple, Any, List, Set
+from typing import Dict, Tuple, Any
 
 # Module-level flag for clean dry-run passing
 DRY_RUN = False
-VAULTWALKER_VERSION = "0.8.0"
 
 # === Explicit-only + Silo Recognition ===
 EXPLICIT_RP_KEYWORDS = [
@@ -172,43 +171,13 @@ def relocate_to_sandbox(src: Path, dry_run: bool = False) -> str:
 LOG_DIR = Path(r"D:\HermesData\logs")
 STATE_DIR = Path(r"D:\HermesData\data\vaultwalker\state")
 STALE_DAYS = 60
-# Primary second-brain (Obsidian CNS). Other worlds remain opt-in.
-PRIMARY_SILO = "PhronesisVault"
-DEFAULT_SILOS = [PRIMARY_SILO]
-
-# Subtrees inside PhronesisVault that are NOT living second-brain index targets
-CNS_INDEX_SKIP_PARTS: Set[str] = {
-    "Roleplay-Sandbox",
-    "Alice",  # character assets / not ops CNS
-    "alice_venv",
-    "Archive",  # shelf; don't thrash distill wave indexes every cycle
-    "Distillations-2026-07-10",
-    "gallery",
-    "ComfyUI",
-}
-
-# Markers that mean refresh_folder_indexes (or human) owns this map — do not clobber
-RICH_INDEX_MARKERS = (
-    "**Path:**",
-    "Hot path",
-    "Hot paths",
-    "## Purpose",
-    "**Purpose:**",
-    "Agent instructions",
-    "Living CNS",
-    "HOT_PATH",
-)
-
 
 def load_config() -> Dict:
-    """Load full config from data_silos.yaml for silos + policies.
-
-    v0.8: primary focus PhronesisVault; max_depth; preserve_rich_indexes.
-    """
+    """Load full config from data_silos.yaml for all 4 silos + policies."""
     cfg_path = Path(r"D:\HermesData\config\data_silos.yaml")
     try:
         with open(cfg_path, "r", encoding="utf-8") as f:
-            full = yaml.safe_load(f) or {}
+            full = yaml.safe_load(f)
     except Exception:
         full = {}
 
@@ -220,19 +189,9 @@ def load_config() -> Dict:
             "non_ascii_code_clean": s.get("non_ascii_code_clean", False),
             "md_review": s.get("md_review", True),
             "ollama_model": s.get("ollama_model", "qwythos-9b-abliterated"),
-            "type": s.get("type", ""),
         }
 
-    # Ensure expected silos exist for opt-in multi-world runs
-    if "PhronesisVault" not in silos_cfg:
-        silos_cfg["PhronesisVault"] = {
-            "path": r"D:\PhronesisVault",
-            "update_per_folder_indexes": True,
-            "non_ascii_code_clean": False,
-            "md_review": True,
-            "ollama_model": "qwythos-9b-abliterated",
-            "type": "cns_mirror",
-        }
+    # Ensure all expected
     if "K_PhronesisSovereign" not in silos_cfg:
         silos_cfg["K_PhronesisSovereign"] = {
             "path": r"K:\Phronesis-Sovereign",
@@ -240,37 +199,23 @@ def load_config() -> Dict:
             "non_ascii_code_clean": False,
             "md_review": False,
             "ollama_model": "qwythos-9b-abliterated",
-            "type": "ssot_silo",
         }
 
     global_cfg = full.get("global", {})
-    # Flatten nested iteration_policies if present
-    iter_pol = global_cfg.get("iteration_policies") or {}
-    for k, v in iter_pol.items():
-        global_cfg.setdefault(k, v)
     global_cfg.setdefault("persistent_state", True)
     global_cfg.setdefault("staggered_cycles", True)
     global_cfg.setdefault("local_models", True)
     global_cfg.setdefault("dry_run_default", True)
-    global_cfg.setdefault("max_depth", 6)
-    global_cfg.setdefault("preserve_rich_indexes", True)
-    global_cfg.setdefault("primary_silo", PRIMARY_SILO)
-    global_cfg.setdefault("vaultwalker_default_silos", list(DEFAULT_SILOS))
-    # Cap folders processed per cycle (cron/travel safety)
-    global_cfg.setdefault("max_index_updates_per_cycle", 200)
-    global_cfg.setdefault("max_resurface_per_cycle", 80)
 
     return {
-        "version": VAULTWALKER_VERSION,
+        "version": "0.6.2",
         "global": global_cfg,
         "silos": silos_cfg,
     }
 
 CFG = load_config()
-SILOS = {name: Path(s["path"]) for name, s in CFG.get("silos", {}).items() if s.get("path")}
+SILOS = {name: Path(s["path"]) for name, s in CFG.get("silos", {}).items()}
 GLOBAL_POLICIES = CFG.get("global", {})
-STALE_DAYS = int(GLOBAL_POLICIES.get("stale_days", STALE_DAYS) or STALE_DAYS)
-MAX_DEPTH = int(GLOBAL_POLICIES.get("max_depth", 6) or 6)
 
 # Set by main() from --cycle; None = auto staggered
 FORCE_CYCLE: str | None = None
@@ -396,120 +341,45 @@ INDEX_SKIP_PARTS = {
 }
 
 
-def _should_skip_index_dir(dirpath: Path, root: Path | None = None) -> bool:
+def _should_skip_index_dir(dirpath: Path) -> bool:
     parts_lower = {p.lower() for p in dirpath.parts}
     if parts_lower & {p.lower() for p in INDEX_SKIP_PARTS}:
-        return True
-    # Second-brain focus: skip walled garden + character asset trees for index plant
-    if parts_lower & {p.lower() for p in CNS_INDEX_SKIP_PARTS}:
         return True
     name = dirpath.name.lower()
     if name.endswith(".dist-info") or name.endswith(".egg-info"):
         return True
     if name.startswith(".") and name not in {".", ".."}:
         # skip hidden tooling dirs; keep normal vault folders
-        if name not in {".github"}:
+        if name in {".github"}:
             return True
-    # Depth cap relative to silo root
-    if root is not None:
-        try:
-            rel = dirpath.relative_to(root)
-            if len(rel.parts) > MAX_DEPTH:
-                return True
-        except ValueError:
-            pass
     return False
 
 
-def _is_rich_index(text: str) -> bool:
-    """True if owned by refresh_folder_indexes / human hub — never overwrite."""
-    if not GLOBAL_POLICIES.get("preserve_rich_indexes", True):
-        return False
-    head = text[:1200]
-    return any(m in head for m in RICH_INDEX_MARKERS)
-
-
-def _atomic_write_text(path: Path, content: str) -> bool:
-    """Atomic-ish write; respects DRY_RUN. Returns True if wrote (or would write)."""
-    if DRY_RUN:
-        return True
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # Write temp then replace for resilience on Windows
-        fd, tmp_name = tempfile.mkstemp(prefix=".vw_", suffix=".tmp", dir=str(path.parent))
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(content)
-            os.replace(tmp_name, str(path))
-        except Exception:
-            try:
-                os.unlink(tmp_name)
-            except OSError:
-                pass
-            # Fallback non-atomic
-            path.write_text(content, encoding="utf-8")
-        return True
-    except OSError:
-        return False
-
-
 def update_per_folder_indexes(root: Path, silo_name: str, state: Dict[str, Any], is_light: bool) -> int:
-    """Sparse second-brain maps: fill gaps only; never clobber rich hubs.
+    """Index updates for navigable folders (not every package subtree).
 
-    Living CNS hubs: refresh_folder_indexes.py (Hot paths + Purpose).
-    VaultWalker: create lean 00-INDEX only when missing or when an old
-    VaultWalker-stamped generic map is present (safe refresh of our own stamp).
+    Skips venv/site-packages/node_modules so Graph is not flooded with orphan
+    00-INDEX.md files. Living CNS folders still get lightweight maps.
     """
     updated = 0
-    skipped_rich = 0
-    skipped_budget = 0
     if not root.exists():
         return 0
-    max_updates = int(GLOBAL_POLICIES.get("max_index_updates_per_cycle", 200) or 200)
     for dirpath in root.rglob("*"):
-        if updated >= max_updates:
-            skipped_budget += 1
-            break
         if not dirpath.is_dir():
             continue
-        if _should_skip_index_dir(dirpath, root):
+        if _should_skip_index_dir(dirpath):
             continue
         if not should_process_deep(dirpath, state):
             continue
         try:
             files = [f for f in dirpath.iterdir() if f.is_file()]
-            md_files = [
-                f
-                for f in files
-                if f.suffix.lower() == ".md"
-                and f.name.lower() not in ("00-index.md", "index.md")
-            ]
+            md_files = [f for f in files if f.suffix.lower() == ".md" and f.name.lower() not in ("00-index.md", "index.md")]
         except OSError:
             continue
-
-        # Prefer existing INDEX.md if present (human/legacy)
-        if (dirpath / "INDEX.md").exists():
-            idx_file = dirpath / "INDEX.md"
-        else:
-            idx_file = dirpath / "00-INDEX.md"
-
-        if idx_file.exists():
-            try:
-                existing = idx_file.read_text(encoding="utf-8", errors="ignore")
-            except OSError:
-                continue
-            if _is_rich_index(existing):
-                skipped_rich += 1
-                continue
-            # Only rewrite our own generic stamps (or empty stubs)
-            if "VaultWalker" not in existing[:200] and len(existing.strip()) > 80:
-                # Unknown hand-written index — preserve
-                skipped_rich += 1
-                continue
-
-        # Prefer wikilinks for .md so Graph gains edges
+        idx_file = dirpath / "00-INDEX.md" if not (dirpath / "INDEX.md").exists() else dirpath / "INDEX.md"
+        # Prefer wikilinks for .md so Graph gains edges when indexes are used
         file_lines = []
-        for f in sorted(md_files, key=lambda p: p.name.lower())[:30]:
+        for f in sorted(md_files, key=lambda p: p.name.lower())[:40]:
             try:
                 rel = f.relative_to(root)
                 stem = str(rel.with_suffix("")).replace("\\", "/")
@@ -517,35 +387,29 @@ def update_per_folder_indexes(root: Path, silo_name: str, state: Dict[str, Any],
             except ValueError:
                 file_lines.append(f"- `{f.name}`")
         if not file_lines:
-            if not md_files and len(files) == 0:
-                # empty dir — skip planting noise
-                continue
             file_lines = [f"- (no markdown; {len(files)} other files)"]
+        content = f"""# {dirpath.name} INDEX (VaultWalker v0.7.1, {datetime.now().strftime('%Y-%m-%d')}) Silo: {silo_name}
 
+**Separation + Explicit Gates**: Agent reads this first.
+- Explicit RP material is centralized ONLY in RoleplaySandbox (block by default elsewhere).
+- Use local model (qwythos 9b abliterated) for classification on every evaluation.
+
+Where To Go:
+- Check mtime > {STALE_DAYS}d for resurfacing.
+- Add PKG + residency tags on review.
+- Only relocate on confirmed explicit-rp via local model.
+
+## Files
+{chr(10).join(file_lines)}
+
+Files total: {len(files)}
+"""
         try:
-            rel_dir = str(dirpath.relative_to(root)).replace("\\", "/")
-        except ValueError:
-            rel_dir = dirpath.name
-
-        content = (
-            f"# {dirpath.name} — INDEX\n\n"
-            f"**Path:** `{rel_dir}`  \n"
-            f"**Updated:** {datetime.now().strftime('%Y-%m-%d')}  \n"
-            f"**Silo:** {silo_name} (VaultWalker {VAULTWALKER_VERSION})  \n"
-            f"**Role:** second-brain map — agent reads this before deep scan.\n\n"
-            f"## Files\n"
-            f"{chr(10).join(file_lines)}\n\n"
-            f"Files total: {len(files)} · md: {len(md_files)}\n"
-            f"\n> Living hubs with Hot paths are owned by `refresh_folder_indexes.py` "
-            f"— do not clobber.\n"
-        )
-
-        if _atomic_write_text(idx_file, content):
+            with open(idx_file, "w", encoding="utf-8") as fh:
+                fh.write(content)
             updated += 1
-    if skipped_rich:
-        print(f"[VAULTWALKER] {silo_name} preserved rich indexes: {skipped_rich}")
-    if skipped_budget:
-        print(f"[VAULTWALKER] {silo_name} index budget cap hit ({max_updates})")
+        except OSError:
+            continue
     return updated
 
 def clean_code_non_ascii(root: Path) -> int:

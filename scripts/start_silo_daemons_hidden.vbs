@@ -12,5 +12,6 @@ If fso.FileExists(root & "\state\silo_continuous.STOP") = False Then
   sh.Run """" & pyw & """ """ & launcher & """ -- """ & py & """ """ & root & "\scripts\silo_continuous_loop.py"" --max-cycles 0 --force-mode aggressive", 0, False
 End If
 If fso.FileExists(root & "\state\silo_autonomous.STOP") = False Then
-  sh.Run """" & pyw & """ """ & launcher & """ -- """ & py & """ """ & root & "\scripts\silo_autonomous_sprint.py"" --hours 4 --sleep 40 --smoke", 0, False
+  ' Overnight default 8h depth cook (2026-07-18 Jeff sleep cook)
+  sh.Run """" & pyw & """ """ & launcher & """ -- """ & py & """ """ & root & "\scripts\silo_autonomous_sprint.py"" --hours 8 --sleep 25 --smoke", 0, False
 End If

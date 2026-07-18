@@ -1,4 +1,3 @@
-' Detached Hermes gateway supervisor (pythonw) — survives parent shells.
 Option Explicit
 Dim sh, pyw, script
 Set sh = CreateObject("WScript.Shell")

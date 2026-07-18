@@ -44,69 +44,51 @@ Write-Keepalive "keepalive loop started (interval=${IntervalSec}s) pid=$PID"
 try {
     while ($true) {
         try {
+            # Keepalive is SECONDARY: ensure Red-style gateway-SERVICE + meta stay alive.
+            # Do NOT start gateway.run here (dual-start / job-kill storms).
+            $svcLock = Join-Path $hermesRoot "state\gateway-service.lock"
+            $metaLock = Join-Path $hermesRoot "state\gateway-meta-watchdog.lock"
+            $svcAlive = $false
+            $metaAlive = $false
+            if (Test-Path $svcLock) {
+                try {
+                    $spid = [int]((Get-Content $svcLock -Raw).Trim().Split()[0])
+                    $svcAlive = [bool](Get-Process -Id $spid -ErrorAction SilentlyContinue)
+                } catch {}
+            }
+            if (Test-Path $metaLock) {
+                try {
+                    $mpid = [int]((Get-Content $metaLock -Raw).Trim().Split()[0])
+                    $metaAlive = [bool](Get-Process -Id $mpid -ErrorAction SilentlyContinue)
+                } catch {}
+            }
+            if (-not $svcAlive) {
+                Write-Keepalive "gateway-service DEAD -> Start-Gateway-Service-Hidden.vbs"
+                $vbs = Join-Path $root "Start-Gateway-Service-Hidden.vbs"
+                if (Test-Path $vbs) {
+                    Start-Process -FilePath "wscript.exe" -ArgumentList @("//B", $vbs) -WindowStyle Hidden | Out-Null
+                }
+            }
+            if (-not $metaAlive) {
+                Write-Keepalive "meta DEAD -> Start-Gateway-MetaWatchdog-Hidden.vbs"
+                $mvbs = Join-Path $root "Start-Gateway-MetaWatchdog-Hidden.vbs"
+                if (Test-Path $mvbs) {
+                    Start-Process -FilePath "wscript.exe" -ArgumentList @("//B", $mvbs) -WindowStyle Hidden | Out-Null
+                }
+            }
             $port = Get-GatewayPort
             $listen = [bool](Get-PortListenerPid -Port $port)
             $health = $false
             try { $health = [bool](Test-GatewayHealth) } catch { $health = $false }
-
-            # HARD RULE: if port is down, always attempt restore. Never SKIP for
-            # discord_turn_in_flight when there is nothing listening (silent crash case).
-            $block = $null
-            if ($listen) {
-                $block = Test-PhronesisMaintenanceBlocked -Action gateway_heal
-            } else {
-                $block = @{ blocked = $false; reason = "port_down_force_heal" }
-            }
-
-            if ($block.blocked) {
-                Write-Keepalive "SKIP ($($block.reason)) listen=$listen health=$health"
-            } else {
-                $cleared = @(Clear-StaleGatewayMarkers)
-                if ($cleared.Count -gt 0) {
-                    Write-Keepalive "cleared_stale markers=$($cleared.Count)"
-                }
-                $venv = $false
-                try { $venv = [bool](Test-VenvOwnsGateway) } catch { $venv = $false }
-
-                if ($listen -and $health) {
-                    Write-Keepalive "OK health=True listen=True venv=$venv"
-                    # Heartbeat for Guardian/Heal to detect live keepalive
-                    try {
-                        $hb = Join-Path $hermesRoot "state\gateway-keepalive-heartbeat.json"
-                        @{ pid = $PID; ts = (Get-Date).ToString('o'); ok = $true } | ConvertTo-Json |
-                            Set-Content -Path $hb -Encoding utf8
-                    } catch {}
-                } else {
-                    Write-Keepalive "DOWN listen=$listen health=$health venv=$venv reason=$($block.reason) -> Start-VenvGateway"
-                    try {
-                        Start-VenvGateway
-                    } catch {
-                        Write-Keepalive "Start-VenvGateway ERR: $($_.Exception.Message)"
-                    }
-                    $ready = $false
-                    try { $ready = Wait-GatewayReady -MaxSeconds 50 } catch { $ready = $false }
-                    if ($ready) {
-                        Write-Keepalive "RECOVERED venv=$(Test-VenvOwnsGateway)"
-                    } else {
-                        try {
-                            # Hidden: never flash a second console from keepalive recover path
-                            & powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File (Join-Path $root "Phronesis.ps1") gateway start 2>&1 | Out-Null
-                        } catch {
-                            Write-Keepalive "Phronesis start ERR: $($_.Exception.Message)"
-                        }
-                        try { $ready = Wait-GatewayReady -MaxSeconds 40 } catch { $ready = $false }
-                        if ($ready) {
-                            Write-Keepalive "RECOVERED_via_phronesis"
-                        } else {
-                            Write-Keepalive "RECOVER FAIL listen=$([bool](Get-PortListenerPid -Port $port)) health=$(Test-GatewayHealth)"
-                        }
-                    }
-                }
-            }
+            Write-Keepalive "OK service=$svcAlive meta=$metaAlive listen=$listen health=$health"
+            try {
+                $hb = Join-Path $hermesRoot "state\gateway-keepalive-heartbeat.json"
+                @{ pid = $PID; ts = (Get-Date).ToString('o'); service = $svcAlive; meta = $metaAlive; health = $health } |
+                    ConvertTo-Json | Set-Content -Path $hb -Encoding utf8
+            } catch {}
         } catch {
             Write-Keepalive "LOOP_ERR: $($_.Exception.Message)"
         }
-        # Refresh lock heartbeat
         try { Set-Content -Path $kaLock -Value "$PID $(Get-Date -Format o)" -NoNewline } catch {}
         Start-Sleep -Seconds $IntervalSec
     }

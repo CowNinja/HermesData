@@ -33,6 +33,14 @@ JUNK_PATH_SUBSTR = (
     "/__pycache__/",
     "/windows/system32",
     "/program files",
+    "/program files (x86)",
+    "/programdata/",
+    "/program data/",
+    "/windows/winsxs",
+    "/windows/installer",
+    "/twrp_backup/",
+    "/twrp img",
+    "/recovery/",
     "$recycle.bin",
     "system volume information",
     "thumbs.db",
@@ -56,6 +64,9 @@ JUNK_PATH_SUBSTR = (
     "windows10_install",
     # empty/noise roots
     "/snap/",
+    # MemoryCard phone OS dumps (overnight 2026-07-18 lesson)
+    "/amdkmafd/",
+    "/amdkmpfd/",
 )
 
 # Office/lock temps
