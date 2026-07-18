@@ -2,24 +2,36 @@
 """Focus land: drain only the highest-priority incomplete folder.
 
 Self-improve efficiency: don't re-walk completed trees; put full throttle
-on the current top item (Medical→Alex→Booksbloom…).
+on the current top item (Medical→Alex→Booksbloom…→Jeff gold subpaths).
 Caches disk file counts to avoid full-tree scans every tick.
+
+2026-07-18: empty-plan auto-advance — if drain copies 0 (remainder is
+catalog/junk/already-on-K), mark source land_complete after N strikes so
+chef advances (disk% can stall below 97% when many files are catalog-only).
 """
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 QUEUE = Path(r"D:\HermesData\config\land_priority_queue.json")
 REG = Path(r"D:\HermesData\state\ingest_registry.sqlite3")
 CACHE = Path(r"D:\HermesData\state\land_folder_disk_cache.json")
+EMPTY_STATE = Path(r"D:\HermesData\state\focus_land_empty_plan.json")
+RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\g-to-k-drain-receipt-latest.md")
 SCRIPTS = Path(r"D:\HermesData\scripts")
 PY = sys.executable
 CACHE_TTL_S = 6 * 3600  # re-count every 6h
+
+
+def utc() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def load_cache() -> dict:
@@ -51,6 +63,72 @@ def disk_file_count(root: Path, cache: dict) -> int:
     cache[key] = {"n": n, "at": now}
     save_cache(cache)
     return n
+
+
+def load_empty_state() -> dict:
+    if EMPTY_STATE.is_file():
+        try:
+            return json.loads(EMPTY_STATE.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def save_empty_state(d: dict) -> None:
+    EMPTY_STATE.parent.mkdir(parents=True, exist_ok=True)
+    EMPTY_STATE.write_text(json.dumps(d, indent=2), encoding="utf-8")
+
+
+def mark_queue_complete(item_id: str, note: str) -> bool:
+    """Set mode=land_complete on queue item id (timestamped bak)."""
+    if not QUEUE.is_file() or not item_id:
+        return False
+    try:
+        bak = QUEUE.with_suffix(
+            QUEUE.suffix + f".bak-focus-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+        )
+        raw = QUEUE.read_text(encoding="utf-8")
+        if not bak.exists():
+            bak.write_text(raw, encoding="utf-8")
+        data = json.loads(raw)
+        changed = False
+        for it in data.get("land_priority_queue") or []:
+            if it.get("id") == item_id:
+                it["mode"] = "land_complete"
+                it["completed_at"] = utc()
+                prev = (it.get("note") or "").strip()
+                it["note"] = (prev + f" | auto-complete: {note}").strip(" |")
+                it["updated"] = "2026-07-18"
+                changed = True
+                break
+        if changed:
+            data["updated"] = utc()
+            QUEUE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return changed
+    except Exception:
+        return False
+
+
+def parse_drain_receipt() -> dict:
+    """Read latest drain receipt for copied/skipped/planned."""
+    out = {"copied": None, "skipped": None, "planned": None}
+    if not RECEIPT.is_file():
+        return out
+    try:
+        text = RECEIPT.read_text(encoding="utf-8", errors="replace")
+        m = re.search(
+            r"\*\*Copied:\*\*\s*(\d+)\s*·\s*\*\*Skipped:\*\*\s*(\d+)\s*·\s*\*\*Planned rows:\*\*\s*(\d+)",
+            text,
+        )
+        if m:
+            out = {
+                "copied": int(m.group(1)),
+                "skipped": int(m.group(2)),
+                "planned": int(m.group(3)),
+            }
+    except Exception:
+        pass
+    return out
 
 
 def top_incomplete(threshold: float = 0.97) -> tuple[str | None, dict]:
@@ -98,6 +176,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=900)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--empty-plan-strikes",
+        type=int,
+        default=2,
+        help="consecutive empty/zero-copy waves before auto land_complete",
+    )
     args = ap.parse_args()
 
     path, info = top_incomplete()
@@ -117,6 +201,51 @@ def main() -> int:
         path,
     ]
     r = subprocess.run(cmd, cwd=str(SCRIPTS))
+    # Empty-plan auto-advance only when NOTHING left to plan (not skip-heavy mid-tree).
+    # Skip-only waves reset progress tracking but do NOT complete — next wave may
+    # still find landable files deeper (hash/skip_sources catch-up).
+    receipt = parse_drain_receipt()
+    empty = (
+        receipt.get("copied") == 0
+        and receipt.get("planned") == 0
+        and r.returncode == 0
+    )
+    st = load_empty_state()
+    key = str(info.get("id") or path)
+    if empty:
+        ent = st.get(key) or {"strikes": 0}
+        ent["strikes"] = int(ent.get("strikes") or 0) + 1
+        ent["at"] = utc()
+        ent["last_receipt"] = receipt
+        ent["reason"] = "empty_plan"
+        st[key] = ent
+        save_empty_state(st)
+        if ent["strikes"] >= args.empty_plan_strikes:
+            note = f"empty_plan x{ent['strikes']} receipt={receipt}"
+            ok = mark_queue_complete(str(info.get("id") or ""), note)
+            print(
+                json.dumps(
+                    {
+                        "auto_advance": ok,
+                        "id": info.get("id"),
+                        "strikes": ent["strikes"],
+                        "receipt": receipt,
+                    },
+                    indent=2,
+                )
+            )
+            st[key] = {"strikes": 0, "at": utc(), "advanced": ok}
+            save_empty_state(st)
+    else:
+        # productive or skip-catchup wave — reset empty strikes
+        if key in st and int((st.get(key) or {}).get("strikes") or 0) > 0:
+            st[key] = {
+                "strikes": 0,
+                "at": utc(),
+                "last_receipt": receipt,
+                "reset": "productive_or_skip_wave",
+            }
+            save_empty_state(st)
     return r.returncode
 
 

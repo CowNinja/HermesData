@@ -53,28 +53,53 @@ def chunk_text(text: str, size: int = 850, overlap: int = 140) -> list[str]:
 
 
 def build_index() -> int:
-    text_dir = SHELF / "text"
+    """Chunk text/ and text_wpd/ shelves into jan_chunks.jsonl."""
+    text_dirs = [SHELF / "text", SHELF / "text_wpd"]
     CHUNKS.parent.mkdir(parents=True, exist_ok=True)
     n = 0
+    seen_body_prefix: set[str] = set()
     with CHUNKS.open("w", encoding="utf-8") as f:
-        for p in sorted(text_dir.glob("*.txt")):
-            raw = p.read_text(encoding="utf-8", errors="ignore")
-            source = ""
-            if raw.startswith("SOURCE:"):
-                source = raw.splitlines()[0].replace("SOURCE:", "").strip()
-            body = clean_body(raw)
-            for i, ch in enumerate(chunk_text(body)):
-                rec = {
-                    "id": f"{p.stem}_{i}",
-                    "file": str(p),
-                    "source": source or str(p),
-                    "title": Path(source).name if source else p.name,
-                    "i": i,
-                    "text": ch,
-                }
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-                n += 1
-    print(json.dumps({"chunks": n, "path": str(CHUNKS)}))
+        for text_dir in text_dirs:
+            if not text_dir.is_dir():
+                continue
+            for p in sorted(text_dir.glob("*.txt")):
+                try:
+                    raw = p.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    continue
+                if len(raw) < 200:
+                    continue  # skip thin failed WPD shells
+                source = ""
+                method = ""
+                if raw.startswith("SOURCE:"):
+                    lines = raw.splitlines()
+                    source = lines[0].replace("SOURCE:", "").strip()
+                    for ln in lines[1:8]:
+                        if ln.startswith("METHOD:"):
+                            method = ln.replace("METHOD:", "").strip()
+                body = clean_body(raw)
+                if len(body) < 120:
+                    continue
+                # light dedup across text/ vs text_wpd near-duplicates
+                prefix = body[:240].lower()
+                if prefix in seen_body_prefix:
+                    continue
+                seen_body_prefix.add(prefix)
+                lane = "jan_wpd" if text_dir.name == "text_wpd" else "jan_shelf"
+                for i, ch in enumerate(chunk_text(body)):
+                    rec = {
+                        "id": f"{p.stem}_{i}",
+                        "file": str(p),
+                        "source": source or str(p),
+                        "title": Path(source).name if source else p.name,
+                        "i": i,
+                        "text": ch,
+                        "lane": lane,
+                        "method": method,
+                    }
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                    n += 1
+    print(json.dumps({"chunks": n, "path": str(CHUNKS), "dirs": [str(d) for d in text_dirs]}))
     return n
 
 

@@ -505,20 +505,104 @@ def temporal_relevance(path: str | Path, text_sample: str = "") -> str:
     return "unknown"
 
 
+def twin_scopes(path: str | Path) -> list[str]:
+    """Which twin/project corpora this file may feed (Jeff 2026-07-18).
+
+    Broad land stays on; filtering is at *use* time via metadata, not at land.
+    Scopes are additive — family context can be both jeff_context and mom_twin.
+    """
+    low = norm(path)
+    scopes: list[str] = []
+    # Jeff primary twin — medical/navy/me trees
+    if any(
+        k in low
+        for k in (
+            "medical",
+            "navy",
+            "nmcp",
+            "vamc",
+            "navpers",
+            "sf600",
+            "ahlta",
+            "myhealthevet",
+            "dd214",
+            "dd280",
+            "bloom_jeffrey",
+            "/jeffrey",
+            "jeff ",
+            "cnsva",
+            "boone",
+        )
+    ):
+        scopes.append("jeff_twin")
+    # Mom / BooksBloom business twin
+    if any(
+        k in low
+        for k in (
+            "booksbloom",
+            "bloom_jan",
+            "jan l. bloom",
+            "jan bloom",
+            "keepers of the books",
+            "keepersofthebooks",
+            "wswtr",
+            "who should we then",
+            "egan",  # family business PC user often mom-side work
+        )
+    ):
+        scopes.append("mom_twin")
+    # Dad / Gary
+    if any(k in low for k in ("bloom_gary", "gary a. bloom", "gary bloom")):
+        scopes.append("dad_context")
+    # Family graph (training about Jeff's life, not always first-person Jeff)
+    if any(
+        k in low
+        for k in (
+            "/family/",
+            "core-personal/family",
+            "ballas_sara",
+            "sara l. ballas",
+            "spencer",
+            "alex s. mcbride",
+        )
+    ):
+        scopes.append("family_context")
+    # Friends / social graph
+    if any(k in low for k in ("/friends/", "core-personal/friends")):
+        scopes.append("friends_context")
+    # Career / professional residual
+    if any(k in low for k in ("/career/", "meba", "sec501")):
+        scopes.append("career_context")
+    # Default: still silo-useful archive if nothing matched but not noise
+    if not scopes and gold_tier(path) != "noise":
+        scopes.append("life_archive")
+    return scopes
+
+
 def train_meta_flags(path: str | Path) -> dict:
-    """Flags for .train.md / index: historical graph OK, not live truth."""
+    """Flags for .train.md / index: historical graph OK, not live truth.
+
+    Jeff 2026-07-18: multi-twin silo — scopes let later projects select
+    jeff_twin vs mom_twin vs family_context without re-landing.
+    """
     t = temporal_relevance(path)
+    tier = gold_tier(path)
+    scopes = twin_scopes(path)
     return {
         "temporal": t,
+        "gold_tier": tier,
+        "twin_scopes": scopes,
         "twin_training_value": "high"
-        if gold_tier(path) in ("twin_critical", "twin_useful")
+        if tier in ("twin_critical", "twin_useful")
         else "medium",
         "use_as_current_fact": t == "current",
         "use_as_historical_graph": True,
+        # Primary subject hint for retrieval routing
+        "primary_scope": scopes[0] if scopes else "life_archive",
         "note": (
             "Outdated insurance/medical cards = historical gold, not current advice"
             if t == "historical"
-            else ""
+            else "Multi-scope OK: filter at train/retrieve time, not at land"
         ),
     }
 

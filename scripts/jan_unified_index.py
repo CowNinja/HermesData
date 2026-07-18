@@ -22,18 +22,26 @@ JAN_CHUNKS = Path(
 UNIFIED = Path(
     r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\Family\Jan-Bloom-Author\chunks\jan_unified_chunks.jsonl"
 )
+# Gold text only — antiword/docx extracts live here (avoid huge Documents rglob).
 BB_ROOTS = [
     Path(
-        r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\Projects\from-g-drive"
+        r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\Projects\from-g-drive\Booksbloom\_gold_extracts"
     ),
 ]
 GOLD_KEYS = (
     "wswtr",
     "who should we then",
     "keepers of the books",
+    "keepers",
     "booksbloom",
     "jan bloom",
     "living books",
+    "jxn",
+    "handout",
+    "booksforboys",
+    "books for girls",
+    "businessbythebooks",
+    "_gold_extracts",
 )
 SKIP = (
     "appdata",
@@ -126,32 +134,44 @@ def load_jan() -> list[dict]:
 
 
 def harvest_bb(limit_files: int = 400) -> list[dict]:
-    rows = []
+    """Harvest gold text only (.md/.txt/.train.md). Prefer _gold_extracts + Documents."""
+    rows: list[dict] = []
     n_files = 0
+    seen: set[str] = set()
     for root in BB_ROOTS:
         if not root.exists():
             continue
-        for p in root.rglob("*"):
-            if not p.is_file():
+        # Prefer explicit gold extracts first (sorted by size desc via later pass)
+        files = [p for p in root.rglob("*") if p.is_file()]
+        files.sort(key=lambda p: (0 if "_gold_extracts" in str(p) else 1, -p.stat().st_size if p.exists() else 0))
+        for p in files:
+            low = str(p).lower()
+            if not (
+                low.endswith(".train.md")
+                or p.suffix.lower() in {".txt", ".md"}
+            ):
                 continue
-            if p.suffix.lower() not in {".txt", ".md", ".train.md"} and not str(
-                p
-            ).lower().endswith(".train.md"):
-                # allow .md/.txt only for harvest speed/quality
-                if p.suffix.lower() not in {".txt", ".md"}:
-                    continue
-            if not is_gold_path(p):
+            if ".context.train.md" in low or ".context.json" in low:
                 continue
-            n_files += 1
-            if n_files > limit_files:
-                return rows
+            if not is_gold_path(p) and "_gold_extracts" not in low:
+                continue
+            # Dedup by filename stem-ish
+            key = p.name.lower()
+            if key in seen:
+                continue
             try:
                 raw = p.read_text(encoding="utf-8", errors="ignore")
             except Exception:
                 continue
             if len(raw) < 100:
                 continue
-            for i, ch in enumerate(chunk_text(raw[:120_000])):
+            seen.add(key)
+            n_files += 1
+            if n_files > limit_files:
+                return rows
+            # Allow more of large WSWTR extracts
+            cap = 400_000 if "wswtr" in low or "2wswtr" in low else 120_000
+            for i, ch in enumerate(chunk_text(raw[:cap])):
                 rows.append(
                     {
                         "id": f"bb_{p.stem}_{i}_{n_files}",

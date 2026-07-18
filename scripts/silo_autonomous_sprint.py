@@ -274,7 +274,7 @@ def main() -> int:
             ),
             encoding="utf-8",
         )
-        log(f"cycle {n} done ocr_open={heal.get('ocr_open')} cook={depth.get('cook_code')}")
+        log(f"cycle {n} done ocr_open={heal.get('ocr_open')} cook={depth.get('cook_code')} train_tail={(depth.get('train_tail') or '')[:80]}")
         if args.once or not deadline:
             break
         if datetime.now(timezone.utc) >= deadline:

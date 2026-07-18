@@ -24,6 +24,7 @@ from jan_author_chunk_index import retrieve  # noqa: E402
 SOUL = Path(r"D:\PhronesisVault\Operations\SOUL-Jan-Library-Agent-2026-07-14.md")
 PUBLIC = Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Public-Context-2026-07-14.md")
 FAMILY = Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Family-Living-Facts-2026-07-14.md")
+WORKSHOPS = Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Workshop-Catalog-2026-07-18.md")
 OUT_LAST = Path(r"D:\PhronesisVault\Operations\logs\talk-to-jan-last.md")
 OUT_AUDIT = Path(r"D:\PhronesisVault\Operations\logs\talk-to-jan-audit.jsonl")
 PROXY = "http://127.0.0.1:8091/v1/chat/completions"
@@ -36,7 +37,7 @@ def load_soul() -> str:
 
 
 def load_public() -> str:
-    # 2026-07-17: raised 2500→4500 so expanded booksbloom.com public pack fits
+    # Thin labeled packs only (vault CNS). Raised caps carefully for faithfulness.
     bits = []
     if PUBLIC.exists():
         bits.append(PUBLIC.read_text(encoding="utf-8", errors="ignore")[:4500])
@@ -44,6 +45,11 @@ def load_public() -> str:
         bits.append(
             "FAMILY LIVING FACTS (label as family update, never as manuscript quote):\n"
             + FAMILY.read_text(encoding="utf-8", errors="ignore")[:3000]
+        )
+    if WORKSHOPS.exists():
+        bits.append(
+            "WORKSHOP CATALOG (from K gold extracts; label as business/workshop docs, not novel prose):\n"
+            + WORKSHOPS.read_text(encoding="utf-8", errors="ignore")[:3500]
         )
     return "\n\n".join(bits)
 

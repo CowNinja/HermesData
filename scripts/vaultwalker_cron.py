@@ -40,7 +40,102 @@ FEEDBACK_JSON = LOG_DIR / "vaultwalker-last-run.json"
 FEEDBACK_JSONL = LOG_DIR / "vaultwalker-runs.jsonl"
 FEEDBACK_MD = Path(r"D:\PhronesisVault\Operations\logs\vaultwalker-feedback-latest.md")
 VISION_DOC = "Operations/Grand-Vision-Silo-Gardener-and-Hermes-Continuity-2026-07-10.md"
+# Jeff 15C 2026-07-18: cron MAY live under guardrails — default file unarmed
+AUTO_LIVE = STATE_DIR / "vaultwalker_auto_live.json"
+TRAVEL_STOP = ROOT / "state" / "vaultwalker_travel.STOP"
 
+
+def load_auto_live() -> Dict[str, Any]:
+    """Progressive-delivery style flag (unarmed by default)."""
+    default = {
+        "armed": False,
+        "allowed_cycles": ["light", "resurface"],
+        "forbid_deep": True,
+        "silos_allow": ["PhronesisVault"],
+        "min_last_score": 90,
+        "require_last_dry_ok": True,
+        "max_last_errors": 0,
+        "notes": "Set armed=true only after dry-run streak OK. Jeff 15C guardrails.",
+    }
+    if not AUTO_LIVE.is_file():
+        try:
+            STATE_DIR.mkdir(parents=True, exist_ok=True)
+            AUTO_LIVE.write_text(json.dumps(default, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        return default
+    try:
+        data = json.loads(AUTO_LIVE.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return default
+        out = dict(default)
+        out.update(data)
+        return out
+    except Exception:
+        return default
+
+
+def decide_live_mode(
+    args_live: bool,
+    cycle: str,
+    silos: List[str],
+) -> tuple[bool, str]:
+    """Return (dry_run, reason).
+
+    LIVE paths:
+      1) Explicit: --live AND VAULTWALKER_LIVE=1
+      2) Guardrailed auto: auto_live.json armed=true AND all gates pass
+    Never auto-deep. Travel STOP forces dry.
+    """
+    if TRAVEL_STOP.is_file():
+        return True, "travel_STOP_present"
+    live_env = os.environ.get("VAULTWALKER_LIVE", "").strip() == "1"
+    if args_live and live_env:
+        if cycle == "deep":
+            # deep still allowed only with explicit env+flag (Jeff manual)
+            return False, "explicit_LIVE_deep"
+        return False, "explicit_LIVE_env"
+    # Guardrailed auto (15C)
+    cfg = load_auto_live()
+    if not cfg.get("armed"):
+        return True, "auto_live_unarmed"
+    if cycle == "deep" or (cfg.get("forbid_deep", True) and cycle == "deep"):
+        return True, "auto_live_forbids_deep"
+    allowed = cfg.get("allowed_cycles") or ["light", "resurface"]
+    if cycle not in allowed:
+        return True, f"cycle_{cycle}_not_in_allowed"
+    allow_silos = set(cfg.get("silos_allow") or ["PhronesisVault"])
+    if any(s not in allow_silos for s in silos):
+        return True, "silo_not_in_allowlist"
+    # last run gates
+    min_score = int(cfg.get("min_last_score") or 90)
+    max_err = int(cfg.get("max_last_errors") or 0)
+    require_dry = bool(cfg.get("require_last_dry_ok", True))
+    if FEEDBACK_JSON.is_file():
+        try:
+            last = json.loads(FEEDBACK_JSON.read_text(encoding="utf-8"))
+            fb = last.get("feedback") or {}
+            score = int(fb.get("score") or 0)
+            errors = int((fb.get("totals") or {}).get("errors") or 0)
+            last_dry = bool(last.get("dry_run", True))
+            if score < min_score:
+                return True, f"last_score_{score}_lt_{min_score}"
+            if errors > max_err:
+                return True, f"last_errors_{errors}"
+            if require_dry and not last_dry:
+                # last was live — require a dry success before next live (canary cadence)
+                # allow consecutive live only if require_last_dry_ok false
+                pass
+            if require_dry and last.get("exit_code", 1) != 0:
+                return True, "last_exit_nonzero"
+            # Prefer last dry success when requiring dry ok
+            if require_dry and not last_dry:
+                return True, "need_intervening_dry_success"
+        except Exception as e:
+            return True, f"last_feedback_unreadable:{type(e).__name__}"
+    else:
+        return True, "no_last_feedback_yet"
+    return False, "auto_live_gates_pass"
 
 def evaluate_feedback(summary: Dict[str, Any], dry_run: bool, silos: List[str], rc: int) -> Dict[str, Any]:
     score = 100
@@ -192,22 +287,25 @@ def main() -> int:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
 
-    live_env = os.environ.get("VAULTWALKER_LIVE", "").strip() == "1"
-    dry = not (args.live and live_env)
+    # Jeff 15C: explicit LIVE or guardrailed auto; default dry
+    dry, live_reason = decide_live_mode(bool(args.live), args.cycle, list(args.silos))
+    # Hard forbid auto multi-silo surprise
+    if not dry and any(s != "PhronesisVault" for s in args.silos):
+        if os.environ.get("VAULTWALKER_LIVE", "").strip() != "1":
+            dry, live_reason = True, "force_dry_non_vault_silo"
 
     cmd = [sys.executable, str(WALKER), "--silos", *args.silos, "--cycle", args.cycle]
     if dry:
         cmd.append("--dry-run")
-    # if walker supports --live only when not dry; ignore
 
     log_path = LOG_DIR / "daily_vaultwalker.log"
     started = datetime.now(timezone.utc).isoformat()
     with log_path.open("a", encoding="utf-8") as log:
         log.write(
-            f"\n=== vaultwalker_cron {started} dry={dry} silos={args.silos} "
-            f"cycle={args.cycle} timeout={args.timeout} ===\n"
+            f"\n=== vaultwalker_cron {started} dry={dry} reason={live_reason} "
+            f"silos={args.silos} cycle={args.cycle} timeout={args.timeout} ===\n"
         )
-
+    print(f"[vaultwalker_cron] dry={dry} reason={live_reason}")
     try:
         proc = subprocess.run(
             cmd,

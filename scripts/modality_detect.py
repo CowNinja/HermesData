@@ -15,6 +15,9 @@ EXT = {
     ".yaml": "text",
     ".yml": "text",
     ".log": "text",
+    ".html": "text",  # takeout Keep/Voice — Jeff 2026-07-18 land wave
+    ".htm": "text",
+    ".rtf": "text",
     ".py": "code",
     ".js": "code",
     ".ts": "code",

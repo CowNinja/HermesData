@@ -1,5 +1,11 @@
-User driving autonomous 'Silo Kitchen' (K: silo post-ingest QA, repair/re-pull, re-OCR, text clean to .train.md + tags/index for Phronesis twin/RAG). Medical/Navy first. Incremental/safe/tested; log all; only real blockers; nested trees; rich connections/history.
+Jeff builds Phronesis sovereign digital twin from personal silo (Medical/Navy/Family/Booksbloom). Travels often (phone-only) → ultra-brief TLDR/cliff notes; vault holds depth.
 §
-Jeff: Loves nested origin trees for future photo/people tagging and connections. Prefers copying directory structure when in doubt for intuitive access. Positive on multi-agent plans, auto index refresh, Amazon rehome, and rich historical connections (e.g., parents' BooksBloom business).
+Silo Kitchen execution lives in Discord Data silo agent thread 1524529242019336434 (land/OCR/train/continuous/six_numbers). Grok thread 1524846849360531456 is architecture/judgment only — see Operations/Grok-Thread-Architecture-Judgment-CANONICAL-2026-07-18.
 §
-Jeff (user): Builds Phronesis sovereign digital twin from personal data silo (Medical/Navy/Family/Booksbloom). Travels frequently (phone-only); requires ultra-brief TLDR/cliff notes on overload. Full autonomy on silo kitchen work (OCR drain, twin train/index/stamps/retrieval, Booksbloom, local cook, purge prep). Strictly prefers Barney-format kitchen updates: short tables (Action | Result), scoreboard, 'Next concrete step — done', chef metaphors, 'You’re free. I keep cooking.' No long reports or forensics in chat; full logs in vault. 'Keep Barney updates short.' 'Work incrementally with testing. Log everything locally.' Standing goal: production-perfect post-OCR twin readiness & full stack Swiss-watch optimization.
+Kitchen style (silo thread): Barney short tables (Action|Result), scoreboard, Next concrete step—done, chef metaphors, “You’re free. I keep cooking.” Incremental/safe/tested; log locally; real blockers only.
+§
+Loves nested origin trees (photo/people tagging), copy directory structure when unsure, multi-agent plans, auto index refresh, BooksBloom history, rich connections.
+§
+VW: default dry PhronesisVault-only; LIVE only with explicit Jeff green light + decision card. Never gateway cowboy fixes.
+§
+Positive on hybrid Grok-driver + local grunt; purge and destructive ops always Jeff-gated.

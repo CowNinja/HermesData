@@ -76,6 +76,7 @@ HOT_PATHS: dict[str, list[str]] = {
     "Operations": [
         "| Need | Open |",
         "|------|------|",
+        "| **Grok thread scope** (arch / VW / hybrid / escalate) | [[Operations/Grok-Thread-Architecture-Judgment-CANONICAL-2026-07-18]] |",
         "| **Semantic wiki ops** (Ingest/Query/Lint) | [[Operations/Silo-Second-Brain-Loop-Utilization-CANONICAL-2026-07-13]] |",
         "| **Which skills load** | [[Operations/Skills-Safe-Incorporate-Silo-CANONICAL-2026-07-12]] · [[Operations/Skills-Stack-Silo-Incorporation-CANONICAL-2026-07-12]] |",
         "| **One silo → many views** | [[Operations/Multi-View-Wiki-Silo-Architecture-CANONICAL-2026-07-11]] |",
@@ -84,8 +85,13 @@ HOT_PATHS: dict[str, list[str]] = {
         "| **Physical priority queue** | [[Operations/Silo-Next-Enhancements-2026-07-12]] · brief: `logs/silo-status-brief-latest.md` |",
         "| **Detective -> codify** | [[Operations/Detective-Entity-Codify-Loop-CANONICAL-2026-07-11]] |",
         "| **Failure modes research** | [[Operations/Research-LLM-Wiki-Second-Brain-Failure-Modes-2026-07-13]] |",
+        "| **VaultWalker judgment** | [[Operations/VaultWalker-PhronesisVault-Focus-0.8.0-2026-07-17]] |",
+        "| **Hybrid Grok/local tokens** | [[Operations/Hybrid-Local-Grok-Token-Policy-CANONICAL-2026-07-17]] |",
+        "| **Gateway restore** | [[Operations/SINGLE-GATEWAY-RESTORE]] |",
+        "| **Silo kitchen thread handoff** | [[Operations/logs/silo-thread-merge-handoff-2026-07-18]] |",
         "",
         "Rule: **K: = raw** · **vault entity wiki = compiled**. Continuous drain stays scripts; second-brain is capped semantic densify.",
+        "**Thread rule:** silo land/cook/six_numbers → Data silo agent; Grok lane → architecture/judgment only.",
     ],
     "Research": [
         "| Need | Open |",

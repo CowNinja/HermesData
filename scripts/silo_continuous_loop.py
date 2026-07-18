@@ -156,6 +156,7 @@ def _worker_python() -> str:
 
 
 def _run(cmd, timeout=120) -> Tuple[int, str]:
+    """Run child; for long timeouts pulse tick heartbeat so supervisors see liveness."""
     try:
         # CREATE_NO_WINDOW: child ticks must not flash conhost / steal focus.
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
@@ -168,16 +169,66 @@ def _run(cmd, timeout=120) -> Tuple[int, str]:
         ):
             cmd = list(cmd)
             cmd[0] = _worker_python()
-        p = subprocess.run(
+        # Short commands: simple run
+        if timeout <= 120:
+            p = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                creationflags=flags if sys.platform == "win32" else 0,
+            )
+            return p.returncode, ((p.stdout or "") + (p.stderr or ""))[-2000:]
+        # Long tick: Popen + heartbeat pulse every 60s (stall visibility)
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
             creationflags=flags if sys.platform == "win32" else 0,
         )
-        return p.returncode, ((p.stdout or "") + (p.stderr or ""))[-2000:]
+        t0 = time.time()
+        while True:
+            try:
+                out, err = proc.communicate(timeout=60)
+                code = int(proc.returncode or 0)
+                return code, ((out or "") + (err or ""))[-2000:]
+            except subprocess.TimeoutExpired:
+                elapsed = time.time() - t0
+                if elapsed >= timeout:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                    try:
+                        out, err = proc.communicate(timeout=15)
+                    except Exception:
+                        out, err = "", ""
+                    return 124, f"timeout {timeout}s after {elapsed:.0f}s\n" + (
+                        (out or "") + (err or "")
+                    )[-1500:]
+                # pulse heartbeat / phase so external watchers don't false-dead
+                try:
+                    hb = {
+                        "at": datetime.now(timezone.utc).isoformat(),
+                        "phase": "tick_running",
+                        "elapsed_s": int(elapsed),
+                        "child_pid": proc.pid,
+                    }
+                    (Path(r"D:/HermesData/state") / "silo_tick_heartbeat.json").write_text(
+                        json.dumps(hb, indent=2), encoding="utf-8"
+                    )
+                    if STATE.is_file():
+                        cur = json.loads(STATE.read_text(encoding="utf-8"))
+                        if isinstance(cur, dict):
+                            cur["phase"] = "tick_running"
+                            cur["heartbeat_at"] = hb["at"]
+                            cur["tick_elapsed_s"] = int(elapsed)
+                            STATE.write_text(json.dumps(cur, indent=2), encoding="utf-8")
+                except Exception:
+                    pass
     except Exception as e:
-        return 1, str(e)
+        return 1, f"{type(e).__name__}: {e}"
 
 
 def vram_used_mib() -> int | None:
@@ -322,7 +373,7 @@ def limits_for(mode: str) -> Dict[str, int]:
     if mode == "pause":
         return {"drain": 0, "enrich": 0, "train": 0, "reroute": 0, "sleep": 600}
     # normal — elevated (night-capable)
-        return {"drain": 1500, "enrich": 50, "train": 35, "reroute": 28, "sleep": 18}
+    return {"drain": 1500, "enrich": 50, "train": 35, "reroute": 28, "sleep": 18}
 
 
 
