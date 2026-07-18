@@ -2,23 +2,36 @@
 """Travel autonomy heartbeat — progress snapshot + gray queue + continuous kick if needed.
 
 Safe for Task Scheduler every 30–60 min. No Grok. No gateway restarts.
+Always kicks continuous with pythonw + CREATE_NO_WINDOW (no focus steal).
 """
 from __future__ import annotations
 
 import json
 import sqlite3
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+SCRIPTS = Path(r"D:\HermesData\scripts")
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+from windows_subprocess import (  # noqa: E402
+    hidden_powershell_command,
+    popen_daemon,
+    run_hidden,
+)
 
 STATE = Path(r"D:\HermesData\state\silo_continuous_state.json")
 STOP = Path(r"D:\HermesData\state\silo_continuous.STOP")
 PROGRESS = Path(r"D:\HermesData\state\travel_progress.jsonl")
 BRIEF_LOG = Path(r"D:\PhronesisVault\Operations\logs\travel-heartbeat-latest.md")
 DB = Path(r"D:\HermesData\state\ingest_registry.sqlite3")
-PY = r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\python.exe"
-SCRIPTS = Path(r"D:\HermesData\scripts")
+# python.exe + FreeConsole in worker (pythonw unstable for long multi-child loops).
+_PY_CANDIDATES = [
+    Path(r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\python.exe"),
+    Path(sys.executable),
+]
+PY = str(next((p for p in _PY_CANDIDATES if p.is_file()), Path(sys.executable)))
 STALE_S = 1200  # 20 min
 
 
@@ -28,13 +41,13 @@ def utc() -> str:
 
 def continuous_running() -> bool:
     try:
-        r = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-Command",
-                "(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*silo_continuous_loop.py*' -and $_.Name -eq 'python.exe' } | Measure-Object).Count",
-            ],
+        # Match python.exe AND pythonw.exe (background relaunch uses pythonw).
+        r = run_hidden(
+            hidden_powershell_command(
+                "(Get-CimInstance Win32_Process | Where-Object { "
+                "$_.CommandLine -like '*silo_continuous_loop.py*' "
+                "-and $_.Name -like 'python*' } | Measure-Object).Count"
+            ),
             capture_output=True,
             text=True,
             timeout=45,
@@ -50,17 +63,30 @@ def kick_continuous() -> str:
     # Jeff 2026-07-13: never kill+respawn if already running (multi-writer storm)
     if continuous_running():
         return "already_running"
-    out = open(r"D:\HermesData\state\silo_continuous_stdout.log", "a", encoding="utf-8")
-    err = open(r"D:\HermesData\state\silo_continuous_stderr.log", "a", encoding="utf-8")
-    p = subprocess.Popen(
-        [PY, "-u", str(SCRIPTS / "silo_continuous_loop.py"), "--max-cycles", "0", "--force-mode", "aggressive"],
-        cwd=r"D:\HermesData",
-        stdout=out,
-        stderr=err,
-        creationflags=0x00000008 | 0x08000000,
-    )
-    Path(r"D:\HermesData\state\silo_continuous.pid").write_text(str(p.pid), encoding="utf-8")
-    return f"started {p.pid}"
+    vbs = Path(r"D:\HermesData\scripts\start_silo_continuous_only_hidden.vbs")
+    run_hidden(["wscript.exe", "//B", str(vbs)], timeout=15)
+    import time as _t
+
+    _t.sleep(1.0)
+    pid = "?"
+    try:
+        r = run_hidden(
+            hidden_powershell_command(
+                "(Get-CimInstance Win32_Process | Where-Object { "
+                "$_.CommandLine -like '*silo_continuous_loop.py*' "
+                "-and $_.Name -like 'python*' } | "
+                "Select-Object -First 1 -ExpandProperty ProcessId)"
+            ),
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        pid = (r.stdout or "?").strip().splitlines()[-1]
+        if pid.isdigit():
+            Path(r"D:\HermesData\state\silo_continuous.pid").write_text(pid, encoding="utf-8")
+    except Exception:
+        pass
+    return f"started {pid}"
 
 
 def main() -> int:
@@ -95,7 +121,7 @@ def main() -> int:
 
     # gray queue refresh
     try:
-        r = subprocess.run(
+        r = run_hidden(
             [PY, str(SCRIPTS / "silo_gray_entities_queue.py")],
             capture_output=True,
             text=True,

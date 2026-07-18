@@ -13,17 +13,17 @@ logOut = logDir & "\llama-" & port & "-router.log"
 logErr = logDir & "\llama-" & port & "-router.err.log"
 preSets = "D:\PhronesisVault\Operations\models-8090.ini"
 
+' models-max MUST be on CLI (community: ini models-max is ignored / broken)
+' Do NOT pass global --ctx-size here — it overrides per-model ctx in the preset
 args = """" & prebuiltDir & "\llama-server.exe"" " & _
        "--port " & port & " " & _
        "--host 127.0.0.1 " & _
        "--models-preset """ & preSets & """ " & _
-       "--models-max 2 " & _
+       "--models-max 1 " & _
        "--models-autoload " & _
        "--flash-attn on " & _
-       "--ctx-size 16384 " & _
        "--cache-type-k q8_0 " & _
-       "--cache-type-v q4_0 " & _
-       "--mlock"
+       "--cache-type-v q4_0"
 
 Dim fso, logFolder
 Set fso = CreateObject("Scripting.FileSystemObject")

@@ -23,19 +23,55 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# No focus steal: detach any console inherited from parent continuous loop
+try:
+    from win_free_console import free_console  # type: ignore
+
+    free_console()
+except Exception:
+    try:
+        import ctypes
+
+        if sys.platform == "win32":
+            ctypes.windll.kernel32.FreeConsole()
+    except Exception:
+        pass
+
 SCRIPTS = Path(r"D:\HermesData\scripts")
 VAULT_LOG = Path(r"D:\PhronesisVault\Operations\logs")
 STATE = Path(r"D:\HermesData\state\silo_orchestrator_last.json")
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
+
+
+def _worker_python() -> str:
+    """pythonw for children — avoids a new console/conhost per silo script."""
+    try:
+        from windows_subprocess import prefer_pythonw  # type: ignore
+
+        return prefer_pythonw(sys.executable)
+    except Exception:
+        from pathlib import Path
+
+        pyw = Path(sys.executable).with_name("pythonw.exe")
+        return str(pyw) if pyw.is_file() else sys.executable
 
 
 def run(cmd: List[str], timeout: int = 600) -> Tuple[int, str]:
     try:
+        if (
+            sys.platform == "win32"
+            and cmd
+            and str(cmd[0]).lower().endswith(("python.exe", "pythonw.exe"))
+        ):
+            cmd = list(cmd)
+            cmd[0] = _worker_python()
         p = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=timeout,
             cwd=str(SCRIPTS),
+            creationflags=_NO_WINDOW,
         )
         out = (p.stdout or "") + (("\n" + p.stderr) if p.stderr else "")
         return p.returncode, out[-4000:]

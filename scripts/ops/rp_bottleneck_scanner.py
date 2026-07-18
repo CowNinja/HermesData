@@ -56,21 +56,38 @@ def _http_ok(url: str, timeout: float = 3.0) -> bool:
 
 
 def _process_running(pattern: str) -> bool:
+    """True if any python/pythonw command line matches pattern. No PowerShell (focus steal)."""
     if os.name != "nt":
         return False
-    proc = subprocess.run(
-        [
-            "powershell",
-            "-NoProfile",
-            "-Command",
-            f"Get-CimInstance Win32_Process -Filter \"Name='python.exe' OR Name='pythonw.exe'\" | "
-            f"Where-Object {{ $_.CommandLine -match '{pattern}' }} | Select-Object -First 1",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=15,
-    )
-    return bool((proc.stdout or "").strip())
+    try:
+        import re
+
+        pat = re.compile(pattern, re.I)
+        # Pure WMI via ctypes-free path: use CreateProcess-less enumeration
+        # through tasklist is lossy; use PowerShell only with CREATE_NO_WINDOW.
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        proc = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                "Get-CimInstance Win32_Process -Filter \"Name='python.exe' OR Name='pythonw.exe'\" | "
+                "ForEach-Object { $_.CommandLine }",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            creationflags=flags,
+        )
+        for line in (proc.stdout or "").splitlines():
+            if line and pat.search(line):
+                return True
+        return False
+    except Exception:
+        return False
 
 
 def scan() -> dict:
@@ -233,17 +250,34 @@ def apply_fixes(report: dict, *, channel: str) -> dict:
             fixes.append("cleared_stale_render_lock")
         elif code in ("daemon_dead", "watcher_down"):
             ps1 = ROOT / "scripts" / "ops" / "Ensure-RP-Watchers.ps1"
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
             subprocess.run(
-                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ps1), "-Channel", channel, "-Quiet"],
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-WindowStyle",
+                    "Hidden",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(ps1),
+                    "-Channel",
+                    channel,
+                    "-Quiet",
+                ],
                 timeout=30,
                 check=False,
+                creationflags=flags,
             )
             fixes.append(f"ensure_rp_watchers_{code}")
         elif code == "delivery_drift":
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
             subprocess.run(
                 [str(PY), str(ROOT / "scripts" / "comfy_delivery_daemon.py"), "--once", "--channel", channel],
                 timeout=90,
                 check=False,
+                creationflags=flags,
             )
             fixes.append("delivery_tick")
     report["fixes_applied"] = fixes

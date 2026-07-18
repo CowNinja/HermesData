@@ -21,16 +21,20 @@ def utc() -> str:
 
 def continuous_count() -> int:
     try:
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         r = subprocess.run(
             [
                 "powershell.exe",
                 "-NoProfile",
+                "-WindowStyle",
+                "Hidden",
                 "-Command",
                 "(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*silo_continuous_loop.py*' } | Measure-Object).Count",
             ],
             capture_output=True,
             text=True,
             timeout=30,
+            creationflags=flags if sys.platform == "win32" else 0,
         )
         return int((r.stdout or "0").strip() or "0")
     except Exception:
@@ -49,9 +53,13 @@ def main() -> int:
         ).total_seconds()
         n = continuous_count()
         if age > 900 and n == 0:
+            pyw = Path(PY).with_name("pythonw.exe")
+            launcher = str(pyw) if pyw.is_file() else PY
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            # DEVNULL stdio so parent exit doesn't kill child via closed log handles
             subprocess.Popen(
                 [
-                    PY,
+                    launcher,
                     str(SCRIPTS / "silo_continuous_loop.py"),
                     "--force-mode",
                     "aggressive",
@@ -59,8 +67,10 @@ def main() -> int:
                     "0",
                 ],
                 cwd=str(SCRIPTS),
-                stdout=open(STATE / "silo_continuous.out", "a"),
-                stderr=subprocess.STDOUT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                creationflags=flags if sys.platform == "win32" else 0,
             )
             actions.append(f"restarted continuous (age={age:.0f}s)")
         elif age > 900 and n > 0:

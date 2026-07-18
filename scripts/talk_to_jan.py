@@ -36,13 +36,14 @@ def load_soul() -> str:
 
 
 def load_public() -> str:
+    # 2026-07-17: raised 2500→4500 so expanded booksbloom.com public pack fits
     bits = []
     if PUBLIC.exists():
-        bits.append(PUBLIC.read_text(encoding="utf-8", errors="ignore")[:2500])
+        bits.append(PUBLIC.read_text(encoding="utf-8", errors="ignore")[:4500])
     if FAMILY.exists():
         bits.append(
             "FAMILY LIVING FACTS (label as family update, never as manuscript quote):\n"
-            + FAMILY.read_text(encoding="utf-8", errors="ignore")[:2500]
+            + FAMILY.read_text(encoding="utf-8", errors="ignore")[:3000]
         )
     return "\n\n".join(bits)
 

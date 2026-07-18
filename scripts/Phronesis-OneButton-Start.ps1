@@ -115,9 +115,23 @@ if ($need8090) {
         "--n-gpu-layers", "$($mc.Ngl)",
         "--parallel", "1",
         "--cont-batching",
-        "--flash-attn", "on"
+        "--flash-attn", "on",
+        # Required for Hermes tool_calls (chat template / parser). Without this, complex
+        # agent turns often 400 "Unable to generate parser for this template" via :8091.
+        "--jinja"
     )
-    Start-Process -FilePath $core.llama_exe -ArgumentList $args -WindowStyle Hidden
+    # Never Start-Process llama-server directly — console binary steals focus.
+    # pythonw + CREATE_NO_WINDOW launcher keeps Jeff's keyboard.
+    $hermesRoot = if ($core.hermes_root) { $core.hermes_root } else { "D:\HermesData" }
+    $pyw = Join-Path $hermesRoot "hermes-agent\venv\Scripts\pythonw.exe"
+    if (-not (Test-Path $pyw)) { $pyw = $core.venv_python }
+    $hiddenLauncher = Join-Path $PSScriptRoot "launch_console_hidden.py"
+    if ((Test-Path $pyw) -and (Test-Path $hiddenLauncher)) {
+        $argLine = @($hiddenLauncher, "--", $core.llama_exe) + $args
+        Start-Process -FilePath $pyw -ArgumentList $argLine -WindowStyle Hidden | Out-Null
+    } else {
+        Start-Process -FilePath $core.llama_exe -ArgumentList $args -WindowStyle Hidden
+    }
     $ready = $false
     for ($i = 1; $i -le 120; $i++) {
         try {
@@ -135,7 +149,7 @@ if (-not (Test-VenvOwns8091)) {
     if (Port-Up $core.ports.proxy) { Log "8091 not venv-owned - recycling..." }
     else { Log "Starting sovereign proxy on $($core.ports.proxy)..." }
     Stop-HermesProcesses -RolePattern 'sovereign_openai_proxy' | Out-Null
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "Start-Sovereign-Proxy-8091.ps1")
+    & (Join-Path $PSScriptRoot "Start-Sovereign-Proxy-8091.ps1")
     if (-not (Wait-ProxyVenvReady -MaxSeconds 15)) {
         Log "FATAL: 8091 did not start under venv (parent-chain timeout)"
         exit 1
@@ -177,7 +191,7 @@ if (-not $SkipDashboard -and $core.start_dashboard) {
         if (Wait-PortUp -Port $dashPort -MaxSeconds 45) { Log "$dashPort UP (venv-owned)" }
         else {
             Log "WARN: $dashPort not listening - running heal-dashboard fallback"
-            & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "ops\05-heal-dashboard.ps1") 2>&1 | ForEach-Object { Log "  $_" }
+            & (Join-Path $PSScriptRoot "ops\05-heal-dashboard.ps1") 2>&1 | ForEach-Object { Log "  $_" }
             if (Wait-PortUp -Port $dashPort -MaxSeconds 20) { Log "$dashPort UP (heal fallback)" }
             else { Log "WARN: $dashPort still not listening" }
         }
@@ -207,22 +221,22 @@ if ($imagePaused) {
     Log "Image rider skipped (image-pipeline-pause.json)"
 } elseif (Test-Path $riderScript) {
     Log "Starting roleplay-image-rider daemon..."
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $riderScript
+    & $riderScript
     Log "Image rider launch invoked"
 } else {
     Log "WARN: Start-Image-Rider.ps1 not found - skip rider"
 }
 
 # --- Verify ---
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "ops\04-status.ps1")
+& (Join-Path $PSScriptRoot "ops\04-status.ps1")
 if (-not $SkipSmoke) {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "ops\06-smoke-test.ps1")
+    & (Join-Path $PSScriptRoot "ops\06-smoke-test.ps1")
     if ($LASTEXITCODE -ne 0) { Log "Smoke test FAILED"; exit 1 }
 }
 # Optional daily confidence (non-blocking)
 $healthPs1 = Join-Path $PSScriptRoot "Phronesis-Full-Health-Check.ps1"
 if (Test-Path $healthPs1) {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $healthPs1 -Quiet 2>&1 | Out-Null
+    & $healthPs1 -Quiet 2>&1 | Out-Null
     Log "Health check log written (see logs/health-check-*.log)"
 }
 

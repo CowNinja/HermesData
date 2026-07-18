@@ -53,13 +53,15 @@ def normalize_logical_model_id(model_id: str) -> str:
     mid = str(model_id or "").strip()
     return _LOGICAL_MODEL_ALIASES.get(mid, mid)
 
+# Three-tier map (12GB / models-max 1 LRU). Override via pin JSON tier_map.
 TIER_LOGICAL_MODELS: Dict[str, str] = {
-    "local_hot": _UNIFIED_LOGICAL,
+    "local_hot": "qwen25-3b-q4",
     "local_warm": _UNIFIED_LOGICAL,
-    "local_classifier": _UNIFIED_LOGICAL,
-    "local_cold": _UNIFIED_LOGICAL,
+    "local_classifier": "qwen25-3b-q4",
+    "local_cold": "qwen25-coder-14b-q4",
     "local_roleplay": _UNIFIED_LOGICAL,
     "local_generalist": _UNIFIED_LOGICAL,
+    "code": "qwen25-coder-14b-q4",
 }
 
 # Single-model pivot — no neighbor preloads
@@ -102,7 +104,15 @@ def load_pin_config() -> Dict[str, Any]:
         try:
             data = json.loads(PIN_CONFIG_PATH.read_text(encoding="utf-8"))
             if isinstance(data, dict):
-                return {**defaults, **data}
+                merged = {**defaults, **data}
+                # Optional tier_map overrides module-level TIER_LOGICAL_MODELS
+                tm = data.get("tier_map")
+                if isinstance(tm, dict):
+                    for k, v in tm.items():
+                        mid = normalize_logical_model_id(str(v or "").strip())
+                        if mid:
+                            TIER_LOGICAL_MODELS[str(k)] = mid
+                return merged
         except Exception:
             pass
     return defaults

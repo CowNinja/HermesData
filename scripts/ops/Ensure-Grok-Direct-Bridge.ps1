@@ -5,6 +5,28 @@ param(
     [string]$Model = ""
 )
 
+# If Task Scheduler started bare powershell (focus steal), bounce into pythonw CREATE_NO_WINDOW.
+if ($env:HERMES_HIDDEN_CHILD -ne "1" -and $MyInvocation.InvocationName -ne '.' -and $MyInvocation.Line -notmatch '^\s*\.') {
+    # Only trampoline when this file is the entry script, not when dot-sourced from Guardian-Body
+    $entry = $MyInvocation.MyCommand.Path
+    if ($entry -and (Test-Path $entry)) {
+        $pyw = "D:\HermesData\hermes-agent\venv\Scripts\pythonw.exe"
+        $launcher = "D:\HermesData\scripts\launch_hidden_ps.py"
+        if (Test-Path $pyw) {
+            $extra = @()
+            if ($Quiet) { $extra += "-Quiet" }
+            if ($Restart) { $extra += "-Restart" }
+            if ($Model) { $extra += @("-Model", $Model) }
+            try {
+                $w = New-Object -ComObject WScript.Shell
+                $arg = "`"$pyw`" `"$launcher`" `"$entry`" " + ($extra -join " ")
+                $null = $w.Run($arg, 0, $false)
+                exit 0
+            } catch {}
+        }
+    }
+}
+
 $root = "D:\HermesData"
 $py = Join-Path $root "hermes-agent\venv\Scripts\python.exe"
 $pyw = Join-Path $root "hermes-agent\venv\Scripts\pythonw.exe"

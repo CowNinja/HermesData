@@ -24,8 +24,28 @@ import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+# Detach console immediately so hidden python.exe never steals focus while typing.
+try:
+    from win_free_console import free_console  # type: ignore
+
+    free_console()
+except Exception:
+    try:
+        import ctypes
+
+        if sys.platform == "win32":
+            ctypes.windll.kernel32.FreeConsole()
+    except Exception:
+        pass
+
 SCRIPTS = Path(r"D:/HermesData/scripts")
-PY = sys.executable
+# Prefer python.exe (not pythonw) for stable child subprocess pipes; FreeConsole hides it.
+_py = Path(sys.executable)
+if _py.name.lower() == "pythonw.exe":
+    _alt = _py.with_name("python.exe")
+    PY = str(_alt) if _alt.is_file() else sys.executable
+else:
+    PY = sys.executable
 STATE = Path(r"D:/HermesData/state/silo_autonomous_sprint_state.json")
 LOG = Path(r"D:/HermesData/state/silo_autonomous_sprint.log")
 RECEIPT = Path(r"D:/PhronesisVault/Operations/logs/silo-autonomous-sprint-latest.md")
@@ -48,6 +68,7 @@ def log(msg: str) -> None:
 
 def run(args: list[str], timeout: int) -> tuple[int, str]:
     try:
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         r = subprocess.run(
             args,
             cwd=str(SCRIPTS),
@@ -56,6 +77,7 @@ def run(args: list[str], timeout: int) -> tuple[int, str]:
             timeout=timeout,
             encoding="utf-8",
             errors="replace",
+            creationflags=flags if sys.platform == "win32" else 0,
         )
         return r.returncode, ((r.stdout or "") + (r.stderr or ""))[-2500:]
     except subprocess.TimeoutExpired:

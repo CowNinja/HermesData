@@ -24,8 +24,13 @@ function Start-HiddenProcess {
     param(
         [Parameter(Mandatory)][string]$FilePath,
         [string[]]$ArgumentList = @(),
-        [string]$WorkingDirectory = ""
+        [string]$WorkingDirectory = "",
+        [switch]$Breakaway
     )
+    # Default Breakaway for long-lived services: escape parent Job Objects
+    # (Grok shell / scheduled-task hosts kill children when the parent command ends).
+    if (-not $PSBoundParameters.ContainsKey('Breakaway')) { $Breakaway = $true }
+
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $FilePath
     $psi.UseShellExecute = $false
@@ -43,6 +48,36 @@ function Start-HiddenProcess {
         }
         $psi.Arguments = [string]::Join(' ', $parts)
     }
+
+    if ($Breakaway) {
+        # Prefer wscript for true detachment when launching python daemons
+        if ($FilePath -match 'python(w)?\.exe$' -or $FilePath -match 'python(w)?$') {
+            $argLine = $psi.Arguments
+            $cmd = '"' + $FilePath + '"'
+            if ($argLine) { $cmd = $cmd + ' ' + $argLine }
+            # Escape for VB: double double-quotes
+            $cmdEsc = $cmd -replace '"', '""'
+            $vbs = @"
+Set sh = CreateObject("WScript.Shell")
+sh.Run "$cmdEsc", 0, False
+"@
+            $tmp = Join-Path $env:TEMP ("phronesis-hidden-" + [guid]::NewGuid().ToString() + ".vbs")
+            Set-Content -Path $tmp -Value $vbs -Encoding ASCII
+            Start-Process -FilePath "wscript.exe" -ArgumentList @("//B", $tmp) -WindowStyle Hidden | Out-Null
+            Start-Sleep -Milliseconds 400
+            # Best-effort: find matching child process
+            $needle = [regex]::Escape([IO.Path]::GetFileNameWithoutExtension(($ArgumentList | Select-Object -First 1)))
+            if (-not $needle -or $needle -eq '') { $needle = [regex]::Escape([IO.Path]::GetFileName($FilePath)) }
+            $found = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+                Where-Object { $_.CommandLine -and $_.CommandLine -like "*$($ArgumentList -join '*')*" } |
+                Select-Object -First 1
+            if ($found) {
+                try { return [System.Diagnostics.Process]::GetProcessById([int]$found.ProcessId) } catch { return $null }
+            }
+            return $null
+        }
+    }
+
     return [System.Diagnostics.Process]::Start($psi)
 }
 
@@ -225,6 +260,48 @@ function Set-HermesGatewayEnv {
     $env:HERMES_CONFIG_PATH = Join-Path $HermesRoot "config.yaml"
     $env:HERMES_GATEWAY_RESPONSE_TRUNCATION_GUARD = "1"
     $env:HERMES_GATEWAY_FORCE_FINISH_REASON = "1"
+    # Never let boot integrity BLOCK Discord (timeout under concurrent restarts → mute).
+    $env:PHRONESIS_BOOT_INTEGRITY_MODE = "fast"
+    $env:PHRONESIS_BOOT_INTEGRITY_FAIL = "warn"
+}
+
+function Clear-StaleGatewayMarkers {
+    <#
+    .SYNOPSIS
+      Remove gateway.pid / gateway.lock / stale gateway_state when claimed PID is dead.
+      Dead markers cause "looks running" operator confusion and can block clean starts.
+    #>
+    $cleared = @()
+    $markers = @(
+        (Join-Path $HermesRoot "gateway.pid"),
+        (Join-Path $HermesRoot "gateway.lock"),
+        (Join-Path $HermesRoot "gateway_state.json")
+    )
+    foreach ($path in $markers) {
+        if (-not (Test-Path $path)) { continue }
+        try {
+            $raw = Get-Content -LiteralPath $path -Raw -ErrorAction Stop
+            $pidClaim = $null
+            if ($raw -match '"pid"\s*:\s*(\d+)') { $pidClaim = [int]$Matches[1] }
+            elseif ($raw.Trim() -match '^\d+$') { $pidClaim = [int]$raw.Trim() }
+            $alive = $false
+            if ($pidClaim -and $pidClaim -gt 0) {
+                $alive = [bool](Get-Process -Id $pidClaim -ErrorAction SilentlyContinue)
+            }
+            # state file without pid: leave if port is healthy
+            if ($path -like '*gateway_state.json' -and -not $pidClaim) {
+                if ((Get-PortListenerPid -Port (Get-GatewayPort)) -and (Test-GatewayHealth)) { continue }
+            }
+            if (-not $alive) {
+                Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+                $cleared += $path
+            }
+        } catch {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+            $cleared += $path
+        }
+    }
+    return $cleared
 }
 
 function Wait-GatewayReady {
@@ -307,6 +384,8 @@ function Wait-ProxyVenvReady {
 function Start-VenvGateway {
     Set-HermesGatewayEnv
     $gwPort = Get-GatewayPort
+    # Drop dead pid/lock/state so restarts are not confused by ghosts.
+    $null = Clear-StaleGatewayMarkers
     # Healthy listener already up — never spawn a second gateway (causes restart storms).
     if ((Get-PortListenerPid -Port $gwPort) -and (Test-GatewayHealth)) {
         return
@@ -318,6 +397,39 @@ function Start-VenvGateway {
     Start-HiddenProcess -FilePath $pyw `
         -ArgumentList @("-m", "gateway.run") `
         -WorkingDirectory $HermesRoot | Out-Null
+}
+
+function Test-GatewayKeepaliveAlive {
+    $kaLock = Join-Path $HermesRoot "state\gateway-keepalive.lock"
+    if (-not (Test-Path $kaLock)) { return $false }
+    try {
+        $old = [int]((Get-Content $kaLock -Raw).Trim().Split()[0])
+        if ($old -le 0) { return $false }
+        return [bool](Get-Process -Id $old -ErrorAction SilentlyContinue)
+    } catch { return $false }
+}
+
+function Start-GatewayKeepalive {
+    <#
+    .SYNOPSIS
+      Ensure durable 60s gateway keepalive is running (detached via VBS).
+      Called from Heal/Guardian so keepalive cannot stay dead after a crash.
+    #>
+    if (Test-GatewayKeepaliveAlive) { return $false }
+    $vbs = Join-Path $PSScriptRoot "Start-Gateway-Keepalive-Hidden.vbs"
+    if (-not (Test-Path $vbs)) {
+        # Inline fallback
+        $vbs = Join-Path $env:TEMP "phronesis-start-keepalive.vbs"
+        $body = @'
+Set sh = CreateObject("WScript.Shell")
+sh.CurrentDirectory = "D:\HermesData\scripts"
+sh.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""D:\HermesData\scripts\Phronesis-Gateway-Keepalive.ps1"" -IntervalSec 60", 0, False
+'@
+        Set-Content -Path $vbs -Value $body -Encoding ASCII
+    }
+    Start-Process -FilePath "wscript.exe" -ArgumentList @("//B", $vbs) -WindowStyle Hidden | Out-Null
+    Start-Sleep -Milliseconds 800
+    return $true
 }
 
 function Restart-VenvGateway {

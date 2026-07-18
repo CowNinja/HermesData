@@ -60,8 +60,10 @@ function Clear-PhronesisMaintenanceLock {
 function Test-DiscordTurnInFlight {
     param(
         [string]$ThreadId = "",
-        [int]$MaxAgeMinutes = 15,
-        [int]$StuckMinutes = 4
+        [int]$MaxAgeMinutes = 12,
+        # If agent.log shows no progress for this long, treat turn as stuck so healers can recover.
+        # Long tool calls (e.g. 180s terminal) still emit logs; silent death does not.
+        [int]$StuckMinutes = 3
     )
     if (-not (Test-Path $script:AgentLog)) { return $false }
     try {
@@ -108,6 +110,22 @@ function Test-DiscordTurnInFlight {
     if (-not $pendingChat) { return $false }
     # Hung API call: inbound received but no agent progress for StuckMinutes — allow heal/restart.
     if ($lastActivityAt -and $lastActivityAt -lt $stuckCutoff) { return $false }
+
+    # Ghost turn: inbound from a prior gateway process that died mid-turn never gets
+    # "response ready". If gateway process started AFTER the pending inbound, the old
+    # turn is dead — do not block restarts/config reloads (2026-07-17 booksBloom hang).
+    try {
+        $gwPort = 8642
+        $listener = Get-NetTCPConnection -LocalPort $gwPort -State Listen -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($listener -and $pendingAt) {
+            $gp = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
+            if ($gp -and $gp.StartTime -and ($gp.StartTime -gt $pendingAt.AddSeconds(5))) {
+                return $false
+            }
+        }
+    } catch {}
+
     return $true
 }
 
@@ -121,12 +139,18 @@ function Test-PhronesisMaintenanceBlocked {
     $gwPort = 8642
     $gwListening = [bool](Get-NetTCPConnection -LocalPort $gwPort -State Listen -ErrorAction SilentlyContinue)
 
-    # Always defer disruptive gateway actions while a Discord turn is in-flight (no lock file required).
+    # Defer disruptive gateway actions only while a Discord turn is in-flight AND gateway
+    # is still listening. If :8642 is down, never block heal — stale "in flight" after a
+    # silent crash was leaving Discord dead for hours (2026-07-17).
     if ($Action -in @('gateway_restart', 'gateway_stop', 'gateway_heal')) {
-        $threadFilter = if ($lock -and $lock.thread_id) { [string]$lock.thread_id } else { "" }
-        $inFlight = Test-DiscordTurnInFlight -ThreadId $threadFilter -MaxAgeMinutes 15
-        if ($inFlight -and $gwListening) {
-            return @{ blocked = $true; reason = "discord_turn_in_flight" }
+        if (-not $gwListening) {
+            # Port down = allow heal/restart regardless of log-derived in-flight state.
+        } else {
+            $threadFilter = if ($lock -and $lock.thread_id) { [string]$lock.thread_id } else { "" }
+            $inFlight = Test-DiscordTurnInFlight -ThreadId $threadFilter -MaxAgeMinutes 12
+            if ($inFlight) {
+                return @{ blocked = $true; reason = "discord_turn_in_flight" }
+            }
         }
     }
 

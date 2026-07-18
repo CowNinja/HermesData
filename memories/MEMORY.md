@@ -10,6 +10,8 @@ Jeff: ultra-brief TLDR/cliff notes; vault holds depth. Travel: no gateway restar
 §
 User explicitly requires stopping freeform batch immediately for Alice; use ONLY targeted registry-locked generation (e.g. --candidate alice-al-rashid) for character consistency every time.
 §
-Silo kitchen work uses strict Barney format: short tables (wave | result), scoreboard (inbox/footprint/OCR ok_text/queue/Med/Navy), "Next concrete step — done", chef metaphors, "You’re free. I keep cooking." Reinforced in personal-data-silo skill.
+Silo kitchen: ONLY python D:/HermesData/scripts/silo_discord_six_numbers.py for silo/K:/booksBloom ingest; quote the 6 numbers. Max 4 tool turns silo, max 8 overall. Barney format: short tables (wave|result), scoreboard, Next concrete step—done, chef metaphors. Never kill gateway.
 §
 User focusing on colibri-glm52-local skill to setup/run GLM-5.2 744B MoE locally (HF int4 + NVMe expert streaming, ~25GB RAM). Redirects from rabbit holes to exact standing goal.
+§
+Mom writing: talk_to_jan.py only. Standing post-crash: ACK-ONLINE + one line on restore; never kill/restart gateway.

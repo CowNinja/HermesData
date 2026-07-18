@@ -35,6 +35,15 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+# Detach any console so 8091 never flashes / steals focus on launch or heal.
+try:
+    import ctypes
+
+    if sys.platform == "win32":
+        ctypes.windll.kernel32.FreeConsole()
+except Exception:
+    pass
+
 HERMES_SCRIPTS = Path(__file__).resolve().parent
 VAULT_SCRIPTS = Path(r"D:\PhronesisVault\scripts")
 sys.path.insert(0, str(HERMES_SCRIPTS))

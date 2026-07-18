@@ -90,20 +90,56 @@ def port_open(port: int = GATEWAY_PORT, host: str = "127.0.0.1", timeout: float 
 
 
 def health_ok(timeout: float = 2.5) -> bool:
-    """HTTP /health is stronger than TCP open (avoids half-bound sockets)."""
+    """HTTP /health 2xx only.
+
+    Do NOT fall back to bare TCP connect: a half-dead process, wrong service, or
+    stale ESTABLISHED traffic can make port_open() true while Discord is silent.
+    That false-positive caused stack_healing_once to report already_up with empty
+    listeners while the gateway was effectively dead (2026-07-17 outages).
+    """
     try:
-        import urllib.error
         import urllib.request
 
         req = urllib.request.Request(
             f"http://127.0.0.1:{GATEWAY_PORT}/health",
             method="GET",
-            headers={"User-Agent": "stack-healing-once/1.0"},
+            headers={"User-Agent": "stack-healing-once/1.1"},
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return 200 <= int(resp.status) < 300
     except Exception:
-        return port_open(timeout=timeout)
+        return False
+
+
+def clear_stale_pid_files() -> list[dict]:
+    """Remove gateway.pid / gateway.lock when claimed PID is not alive."""
+    results: list[dict] = []
+    for home in (HERMES_HOME, HERMES_HOME_ALT):
+        for name in ("gateway.pid", "gateway.lock", "gateway_state.json"):
+            path = home / name
+            if not path.is_file():
+                continue
+            try:
+                raw = path.read_text(encoding="utf-8").strip()
+                pid = 0
+                if raw.startswith("{"):
+                    data = json.loads(raw)
+                    pid = int(data.get("pid") or 0)
+                else:
+                    try:
+                        pid = int(raw.split()[0])
+                    except Exception:
+                        pid = 0
+                if pid and _pid_alive(pid):
+                    results.append({"path": str(path), "action": "kept", "pid": pid})
+                    continue
+                path.unlink(missing_ok=True)
+                results.append(
+                    {"path": str(path), "action": "cleared", "pid": pid or None, "reason": "dead_or_unparseable"}
+                )
+            except Exception as exc:
+                results.append({"path": str(path), "action": "error", "error": str(exc)})
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -332,21 +368,41 @@ def list_gateway_pids() -> list[int]:
             pids.add(int(rec["pid"]))
 
     if sys.platform == "win32":
-        # Narrow CIM filter — avoid pulling every process into Python.
+        # Narrow CIM filter — only real python gateway processes.
+        # Exclude powershell/cmd whose *script text* mentions gateway.run (false positives
+        # caused healers to treat diagnostic shells as hung gateways).
         ps = (
             "Get-CimInstance Win32_Process | "
-            "Where-Object { $_.CommandLine -and ("
+            "Where-Object { "
+            "$_.CommandLine -and "
+            "$_.Name -match 'python(w)?\\.exe' -and "
+            "$_.CommandLine -notmatch 'powershell|pwsh|cmd\\.exe' -and ("
             "$_.CommandLine -match 'hermes_cli\\.main.*gateway' -or "
+            "$_.CommandLine -match '-m\\s+gateway\\.run' -or "
             "$_.CommandLine -match 'gateway\\.run' -or "
             "$_.CommandLine -match 'hermes-agent[\\\\/]gateway[\\\\/]run\\.py'"
             ") } | ForEach-Object { $_.ProcessId }"
         )
         try:
+            flags = (
+                getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                if sys.platform == "win32"
+                else 0
+            )
             r = subprocess.run(
-                ["powershell.exe", "-NoProfile", "-Command", ps],
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-WindowStyle",
+                    "Hidden",
+                    "-Command",
+                    ps,
+                ],
                 capture_output=True,
                 text=True,
                 timeout=45,
+                creationflags=flags,
             )
             for line in (r.stdout or "").splitlines():
                 line = line.strip()
@@ -449,10 +505,18 @@ def start_via_phronesis_gateway() -> dict:
     """Canonical launcher — matches ForkGuard / Phronesis-Guardian."""
     ps1 = SCRIPTS / "Phronesis.ps1"
     try:
+        flags = (
+            getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            if sys.platform == "win32"
+            else 0
+        )
         r = subprocess.run(
             [
                 "powershell.exe",
                 "-NoProfile",
+                "-NonInteractive",
+                "-WindowStyle",
+                "Hidden",
                 "-ExecutionPolicy",
                 "Bypass",
                 "-File",
@@ -464,6 +528,7 @@ def start_via_phronesis_gateway() -> dict:
             text=True,
             timeout=90,
             cwd=str(ROOT),
+            creationflags=flags,
         )
         return {
             "step": "phronesis_gateway_start",
@@ -499,15 +564,17 @@ def start_via_schtasks() -> dict:
 def start_via_direct_pythonw() -> dict:
     """Last-resort single launch. HERMES_HOME forced to canonical ROOT.
 
-    Uses hermes_cli.main gateway run --replace so Hermes's own PID/lock
-    guards replace a stale claim rather than spawning a silent second
-    dispatcher when a dead pid file exists.
+    Never use --replace here: legacy watchdogs treated --replace as an eviction
+    trigger and killed the process. Clear dead pid/lock first, then start clean
+    via -m gateway.run (same as ForkGuard Start-VenvGateway).
     """
+    clear_stale_pid_files()
     pyw = ROOT / "hermes-agent" / "venv" / "Scripts" / "pythonw.exe"
     if not pyw.is_file():
         pyw = Path(sys.executable)
     env = os.environ.copy()
     env["HERMES_HOME"] = str(HERMES_HOME)
+    env["HERMES_CONFIG_PATH"] = str(ROOT / "config.yaml")
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("HERMES_GATEWAY_DETACHED", "1")
     creation = 0
@@ -518,8 +585,9 @@ def start_via_direct_pythonw() -> dict:
             | 0x08000000  # CREATE_NO_WINDOW
         )
     try:
+        # Prefer -m gateway.run (matches live Windows process tree).
         subprocess.Popen(
-            [str(pyw), "-m", "hermes_cli.main", "gateway", "run", "--replace"],
+            [str(pyw), "-m", "gateway.run"],
             cwd=str(ROOT),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -528,7 +596,7 @@ def start_via_direct_pythonw() -> dict:
             close_fds=True,
             env=env,
         )
-        return {"step": "direct_pythonw", "ok": True, "pyw": str(pyw), "replace": True}
+        return {"step": "direct_pythonw", "ok": True, "pyw": str(pyw), "replace": False, "argv": "gateway.run"}
     except Exception as exc:
         return {"step": "direct_pythonw", "error": str(exc), "ok": False}
 
@@ -536,6 +604,7 @@ def start_via_direct_pythonw() -> dict:
 def restore_gateway(*, force: bool = False) -> dict:
     """Idempotent restore. Never double-boots a live/starting gateway."""
     actions: list[dict] = []
+    actions.append({"step": "clear_stale_pid_files", "results": clear_stale_pid_files()})
 
     listeners = serving_listener_pids()
     if health_ok():
@@ -792,18 +861,23 @@ def main() -> int:
             print(json.dumps(summary, indent=2))
             return 0 if summary["health"] else 1
 
+        # Always drop ghost pid/lock before health decisions.
+        stale = clear_stale_pid_files()
         if health_ok():
             gateway_result = {
                 "action": "none",
-                "port_8642": True,
+                "port_8642": port_open(),
                 "health": True,
                 "restored": False,
                 "note": "already_up",
                 "pids": list_gateway_pids(),
+                "listeners": serving_listener_pids(),
+                "stale_cleared": stale,
                 "restart_loop": clear_restart_loop(force=False, max_age_sec=600.0),
             }
         else:
             gateway_result = restore_gateway(force=force)
+            gateway_result["stale_cleared"] = stale
 
         wd: dict
         if skip_watchdog:

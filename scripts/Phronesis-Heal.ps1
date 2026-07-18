@@ -77,7 +77,8 @@ if ((Port-Up $core.ports.proxy) -and -not (Test-VenvOwns8091)) {
 if ($needInference) {
     Start-Sleep -Seconds 2
     Write-Heal "Healing inference (8090/8091)..." "Cyan"
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scriptRoot "Phronesis-OneButton-Start.ps1") -SkipGateway -SkipDashboard -SkipWorkspace -SkipSmoke
+    # In-process (no nested powershell console flash)
+    & (Join-Path $scriptRoot "Phronesis-OneButton-Start.ps1") -SkipGateway -SkipDashboard -SkipWorkspace -SkipSmoke
     $actions += "onebutton_inference"
 }
 
@@ -153,12 +154,56 @@ if ($core.start_gateway) {
     } elseif (($gwDown -or $gwBadOwner -or $gwUnhealthy) -and $gwBlock.blocked) {
         $actions += "gateway_heal:LOCKED"
         Write-Heal "Gateway heal skipped ($($gwBlock.reason))" "DarkYellow"
+        # If port is actually down, force start anyway (stale in-flight lock after crash).
+        if ($gwDown) {
+            Write-Heal "Port down despite lock - forcing Start-VenvGateway" "Yellow"
+            $null = Clear-StaleGatewayMarkers
+            Start-VenvGateway
+            $actions += "gateway_force_start_port_down"
+            if (Wait-GatewayReady -MaxSeconds 45) { $actions += "gateway_force_start:OK" }
+        }
     } elseif (($gwDown -or $gwBadOwner -or $gwUnhealthy) -and $inCooldown) {
         $actions += "gateway_heal:COOLDOWN"
         Write-Heal "Gateway heal skipped (90s cooldown - use 'heal -ForceGateway')" "DarkYellow"
     }
 
     $port8642 = if (Port-Up $gwPort) { "UP" } else { "DOWN" }
+
+    # Keepalive + Python supervisor must stay alive (PS keepalive has died mid-incident).
+    try {
+        if (Get-Command Start-GatewayKeepalive -ErrorAction SilentlyContinue) {
+            if (Start-GatewayKeepalive) {
+                $actions += "keepalive_started"
+                Write-Heal "Gateway keepalive (re)started" "Cyan"
+            } else {
+                $actions += "keepalive_ok"
+            }
+        }
+    } catch {
+        $actions += "keepalive_err"
+    }
+    try {
+        $supLock = Join-Path $hermesRoot "state\gateway-supervisor.lock"
+        $supAlive = $false
+        if (Test-Path $supLock) {
+            try {
+                $spid = [int]((Get-Content $supLock -Raw).Trim().Split()[0])
+                $supAlive = [bool](Get-Process -Id $spid -ErrorAction SilentlyContinue)
+            } catch {}
+        }
+        if (-not $supAlive) {
+            $vbs = Join-Path $scriptRoot "Start-Gateway-Supervisor-Hidden.vbs"
+            if (Test-Path $vbs) {
+                Start-Process -FilePath "wscript.exe" -ArgumentList @("//B", $vbs) -WindowStyle Hidden | Out-Null
+                $actions += "supervisor_started"
+                Write-Heal "Gateway supervisor (re)started" "Cyan"
+            }
+        } else {
+            $actions += "supervisor_ok"
+        }
+    } catch {
+        $actions += "supervisor_err"
+    }
 }
 
 # Dashboard
@@ -170,7 +215,8 @@ if ($core.start_dashboard) {
         Write-Heal "Healing dashboard ($dashPort) via 05-heal-dashboard.ps1..." "Cyan"
         $healDashPs1 = Join-Path $scriptRoot "ops\05-heal-dashboard.ps1"
         if (Test-Path $healDashPs1) {
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $healDashPs1 | Out-Null
+            # In-process — nested powershell was flashing cmd popups every Guardian tick
+            & $healDashPs1 | Out-Null
             if ($LASTEXITCODE -eq 0 -and (Wait-PortUp -Port $dashPort -MaxSeconds 10)) {
                 $actions += "dashboard_restart:OK"
             } else {
@@ -195,7 +241,7 @@ if ($core.start_workspace) {
         $restartWs = Join-Path $scriptRoot "ops\restart-workspace.ps1"
         $wsOk = $false
         if (Test-Path $restartWs) {
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $restartWs -Quiet | Out-Null
+            & $restartWs -Quiet | Out-Null
             $wsOk = ($LASTEXITCODE -eq 0) -and (Port-Up $wsPort)
         } elseif (Restart-WorkspaceServer -MaxSeconds 35) {
             $wsOk = $true

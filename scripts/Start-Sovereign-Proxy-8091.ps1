@@ -18,8 +18,9 @@ if (-not (Test-Path $venvPython)) {
 
 . $forkGuard
 
-# pythonw can pass the 15s ready probe then exit; python.exe + Start-HiddenProcess stays up.
-$launcher = $venvPython
+# Prefer pythonw via Start-HiddenProcess (breakaway/wscript) — no console, stays up on this host (2026-07-17).
+# Fall back to python.exe if pythonw missing.
+$launcher = if (Test-Path $venvPythonw) { $venvPythonw } else { $venvPython }
 
 if (Test-Path $ensurePy) {
     Write-Host "Ensuring Hermes sovereign context_length matches phronesis-core..." -ForegroundColor Cyan

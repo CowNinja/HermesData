@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -17,7 +16,17 @@ from pathlib import Path
 
 STATE = Path(r"D:/HermesData/state")
 SCRIPTS = Path(r"D:/HermesData/scripts")
-PY = sys.executable
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+from windows_subprocess import prefer_pythonw, run_hidden  # noqa: E402
+
+# Prefer pythonw so relaunch chain never attaches a console.
+_PY_CANDIDATES = [
+    Path(r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\pythonw.exe"),
+    Path(prefer_pythonw(sys.executable)),
+    Path(sys.executable),
+]
+PY = str(next((p for p in _PY_CANDIDATES if p.is_file()), Path(sys.executable)))
 PID_F = STATE / "silo_autonomous_sprint.pid"
 LOG = STATE / "silo_autonomous_sprint_bg.log"
 STOP = STATE / "silo_autonomous.STOP"
@@ -91,7 +100,7 @@ def main() -> int:
         actions.append("no_pid")
         need_restart = True
     if need_restart and not STOP.is_file():
-        r = subprocess.run(
+        r = run_hidden(
             [
                 PY,
                 str(SCRIPTS / "silo_autonomous_launch.py"),

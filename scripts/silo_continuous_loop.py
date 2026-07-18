@@ -30,6 +30,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
+# Detach console immediately so hidden python.exe never steals focus while typing.
+try:
+    from win_free_console import free_console  # type: ignore
+
+    free_console()
+except Exception:
+    try:
+        import ctypes
+
+        if sys.platform == "win32":
+            ctypes.windll.kernel32.FreeConsole()
+    except Exception:
+        pass
+
 SCRIPTS = Path(r"D:\HermesData\scripts")
 STATE = Path(r"D:\HermesData\state\silo_continuous_state.json")
 VRAM_STATE = Path(r"D:\HermesData\state\vram-priority.json")
@@ -57,13 +71,38 @@ def acquire_singleton() -> bool:
     if LOCK.is_file():
         try:
             pid = int(LOCK.read_text(encoding="utf-8").split()[0])
-            import subprocess
+            # Never use bare wmic/powershell here — that flashes conhost on Windows.
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
             r = subprocess.run(
-                ["wmic", "process", "where", f"ProcessId={pid}", "get", "CommandLine"],
-                capture_output=True, text=True, timeout=15,
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/V"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                creationflags=flags if sys.platform == "win32" else 0,
             )
-            if "silo_continuous_loop" in ((r.stdout or "") + (r.stderr or "")):
+            out = ((r.stdout or "") + (r.stderr or "")).lower()
+            if str(pid) in out and "silo_continuous" in out:
                 return False
+            # If process alive but title unknown, still treat as owned if pid alive
+            if _pid_alive(pid) and "no tasks" not in out:
+                # second check: command line via CIM hidden
+                r2 = subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-WindowStyle",
+                        "Hidden",
+                        "-Command",
+                        f"(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').CommandLine",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                    creationflags=flags if sys.platform == "win32" else 0,
+                )
+                if "silo_continuous_loop" in ((r2.stdout or "") + (r2.stderr or "")):
+                    return False
         except Exception:
             pass
         try:
@@ -104,9 +143,38 @@ DISK_K_MIN_GB = 50
 DISK_D_MIN_GB = 30
 
 
+def _worker_python() -> str:
+    """Prefer pythonw for child workers so they never allocate a console."""
+    try:
+        from windows_subprocess import prefer_pythonw  # type: ignore
+
+        return prefer_pythonw(sys.executable)
+    except Exception:
+        exe = Path(sys.executable)
+        pyw = exe.with_name("pythonw.exe")
+        return str(pyw) if pyw.is_file() else sys.executable
+
+
 def _run(cmd, timeout=120) -> Tuple[int, str]:
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        # CREATE_NO_WINDOW: child ticks must not flash conhost / steal focus.
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        # Normalize python.exe -> pythonw.exe for Hermes script children
+        if (
+            sys.platform == "win32"
+            and isinstance(cmd, (list, tuple))
+            and cmd
+            and str(cmd[0]).lower().endswith("python.exe")
+        ):
+            cmd = list(cmd)
+            cmd[0] = _worker_python()
+        p = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            creationflags=flags if sys.platform == "win32" else 0,
+        )
         return p.returncode, ((p.stdout or "") + (p.stderr or ""))[-2000:]
     except Exception as e:
         return 1, str(e)
@@ -282,7 +350,7 @@ def run_tick(limits: Dict[str, int], allow_grunt: bool) -> Dict[str, Any]:
     except Exception:
         pass
     cmd = [
-        sys.executable,
+        _worker_python(),
         str(SCRIPTS / "silo_orchestrator_tick.py"),
         "--drain-limit",
         str(limits["drain"]),
