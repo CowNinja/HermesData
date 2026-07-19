@@ -63,6 +63,21 @@ def _http_ok(url: str, timeout: float = 3.0) -> bool:
         return False
 
 
+def _comfy_json_ok(url: str, timeout: float = 3.0) -> bool:
+    """True only for real ComfyUI JSON /system_stats (gallery SPA returns HTML 200)."""
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            if getattr(resp, "status", 200) != 200:
+                return False
+            text = resp.read(2048).decode("utf-8", errors="replace").lstrip()
+            if not text.startswith("{"):
+                return False
+            data = json.loads(text)
+            return isinstance(data, dict) and ("system" in data or "devices" in data)
+    except Exception:
+        return False
+
+
 def _process_running(pattern: str) -> bool:
     """True if any python/pythonw command line matches pattern. No PowerShell (focus steal)."""
     if os.name != "nt":
@@ -149,25 +164,27 @@ def scan() -> dict:
     elif not checks["delivery_watcher"]:
         issues.append({"code": "watcher_idle", "severity": "info"})
 
-    # Production Comfy is 8189; 8188 is legacy. Prefer env COMFY_URL, else probe both.
+    # Production: Comfy inference :8188; gallery SPA :8189 (HTML 200 on /system_stats — never treat as Comfy).
+    # Prefer COMFY_URL env, else probe 8188 then 8189 with JSON validation only.
     comfy_env = (os.environ.get("COMFY_URL") or "").strip().rstrip("/")
-    comfy_candidates = []
+    comfy_candidates: list[str] = []
     if comfy_env:
         comfy_candidates.append(comfy_env)
-    for base in ("http://127.0.0.1:8189", "http://127.0.0.1:8188"):
+    for base in ("http://127.0.0.1:8188", "http://127.0.0.1:8189"):
         if base not in comfy_candidates:
             comfy_candidates.append(base)
     comfy_up = False
     comfy_url_hit = ""
     for base in comfy_candidates:
-        if _http_ok(f"{base}/system_stats"):
+        if _comfy_json_ok(f"{base}/system_stats"):
             comfy_up = True
             comfy_url_hit = base
             break
     checks["comfy_up"] = comfy_up
-    checks["comfy_url"] = comfy_url_hit or comfy_candidates[0]
-    checks["comfy_8189"] = _http_ok("http://127.0.0.1:8189/system_stats")
-    checks["comfy_8188"] = _http_ok("http://127.0.0.1:8188/system_stats")  # legacy probe
+    checks["comfy_url"] = comfy_url_hit or "http://127.0.0.1:8188"
+    checks["comfy_8188"] = _comfy_json_ok("http://127.0.0.1:8188/system_stats")
+    checks["gallery_8189"] = _http_ok("http://127.0.0.1:8189/")  # SPA only
+    checks["comfy_8189_is_gallery"] = True  # label lock — do not probe 8189 as Comfy
     if not comfy_up and batch_active:
         issues.append({"code": "comfy_down", "severity": "critical", "url": checks["comfy_url"]})
     elif not comfy_up:

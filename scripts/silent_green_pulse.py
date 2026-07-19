@@ -117,13 +117,27 @@ def main() -> int:
     gw_status = (gw.get("status") or "").lower()
     gw_ok = bool(gw.get("ok")) or gw_status == "ok"
     multi = "multi" in gw_status
+    llama_ok = bool(p8090.get("up"))
+    proxy_ok = bool(p8091.get("up"))
 
-    if gw_ok and p8091.get("up") and not multi:
+    # Honesty 2026-07-19: GREEN = full local inference path (gw + 8091 + 8090).
+    # Prior bug: GREEN on gateway+8091 while llama down → false silent-green vs ops pulse RED.
+    # Research: Google SRE readiness vs liveness — edge up ≠ dependency ready.
+    if multi:
+        color = "RED"
+        summary = "multi-LISTEN :8642 (double-boot risk)"
+    elif gw_ok and proxy_ok and llama_ok:
         color = "GREEN"
-        summary = "silent-green: gateway single + 8091 up"
-    elif multi or (not gw_ok and p8091.get("up")):
+        summary = "silent-green: gateway single + 8091 + 8090 up"
+    elif gw_ok and proxy_ok and not llama_ok:
+        color = "YELLOW"
+        summary = "degraded: gateway+8091 up but llama :8090 down"
+    elif multi or (not gw_ok and proxy_ok):
         color = "YELLOW"
         summary = "advisory: multi-listener or gateway soft issue; 8091 may still serve"
+    elif gw_ok or proxy_ok or llama_ok:
+        color = "YELLOW"
+        summary = "partial: some core ports only"
     else:
         color = "RED"
         summary = "down: gateway and/or 8091 unhealthy"
@@ -141,6 +155,9 @@ def main() -> int:
         "proxy_8091": p8091,
         "llama_8090": p8090,
         "silo": silo,
+        "requires_llama_8090": True,
+        "ok_for_silent_green": color == "GREEN",
+        "honesty_note": "GREEN requires :8090 (fixed 2026-07-19; was gateway+8091 only)",
         "actions": {
             "GREEN": "none (silent)",
             "YELLOW": "receipt only; heal authority = stack_healing / service loop",

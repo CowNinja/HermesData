@@ -105,7 +105,11 @@ if ($ForceRestart -or -not $daemonAlive -or -not $daemonIsHermes) {
 }
 }
 
-# --- Folder watcher (singleton, hermes venv only) ---
+# --- Folder watcher (singleton, hermes venv only; off when image pipeline paused) ---
+if ($imagePaused) {
+    $stoppedWatch = Stop-Matching 'watch_comfy_delivery\.py' 'delivery watcher (paused)'
+    if ($stoppedWatch -gt 0) { Log "image pipeline paused - stopped delivery watcher" }
+} else {
 $watchProcs = @(Get-MatchingProcs 'watch_comfy_delivery\.py')
 $goodWatch = @($watchProcs | Where-Object { $_.CommandLine -match 'hermes-agent\\venv' })
 $badWatch = @($watchProcs | Where-Object { $_.CommandLine -notmatch 'hermes-agent\\venv' })
@@ -143,6 +147,7 @@ if ($goodWatch.Count -eq 1) {
     Log "delivery watcher started channel=$Channel"
 } else {
     Log "ERROR missing py or watcher script"
+}
 }
 
 # Rider disabled: agent gateway + comfy_delivery_daemon are the only posters (no triple delivery).

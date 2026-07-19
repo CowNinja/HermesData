@@ -41,15 +41,32 @@ $args = @(
 )
 if ($ContBatching) { $args += "--cont-batching" }
 
+# Bind 0.0.0.0 OK; health MUST use 127.0.0.1 (0.0.0.0 is not a connect target on Windows).
+# Research 2026-07-19: prior ready-loop hit http://0.0.0.0:$Port → 120s false FATAL even when
+# process was healthy; direct exe start to 127.0.0.1 worked. Prefer /health (fast) over /v1/models.
 Write-Host "Starting llama-server on ${Port}: $(Split-Path $Model -Leaf) (runtime ctx $CtxSize, advertised $AdvertisedCtx)" -ForegroundColor Yellow
-Start-Process -FilePath $llamaServer -ArgumentList $args -WindowStyle Hidden
+$logDir = "D:\PhronesisVault\Operations\logs"
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+$outLog = Join-Path $logDir "llama-start-ps1.out.log"
+$errLog = Join-Path $logDir "llama-start-ps1.err.log"
+Start-Process -FilePath $llamaServer -ArgumentList $args -WindowStyle Hidden `
+    -RedirectStandardOutput $outLog -RedirectStandardError $errLog
 
+$healthUrl = "http://127.0.0.1:$Port/health"
 for ($i = 1; $i -le 120; $i++) {
     try {
-        Invoke-RestMethod -Uri "http://0.0.0.0:$Port/v1/models" -TimeoutSec 2 -ErrorAction Stop | Out-Null
-        Write-Host "Ready after $i seconds." -ForegroundColor Green
-        exit 0
-    } catch { Start-Sleep -Seconds 1 }
+        $r = Invoke-WebRequest -Uri $healthUrl -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+        if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) {
+            Write-Host "Ready after $i seconds ($healthUrl)." -ForegroundColor Green
+            exit 0
+        }
+    } catch {
+        try {
+            Invoke-RestMethod -Uri "http://127.0.0.1:$Port/v1/models" -TimeoutSec 2 -ErrorAction Stop | Out-Null
+            Write-Host "Ready after $i seconds (/v1/models)." -ForegroundColor Green
+            exit 0
+        } catch { Start-Sleep -Seconds 1 }
+    }
 }
-Write-Host "FATAL: llama-server did not become ready" -ForegroundColor Red
+Write-Host "FATAL: llama-server did not become ready on 127.0.0.1:$Port (see $errLog)" -ForegroundColor Red
 exit 1

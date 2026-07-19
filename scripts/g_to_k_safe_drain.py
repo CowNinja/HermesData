@@ -326,14 +326,15 @@ def load_priority_sources():
                         "SELECT COUNT(*) FROM ingest WHERE source_path LIKE ?",
                         (root_n + "\\" + "%",),
                     ).fetchone()[0]
-                    # light disk sample cap
+                    # light disk sample cap (was 120k — hung weekly smoke / drain planning)
                     disk_n = 0
                     for i, fp in enumerate(root.rglob("*")):
                         if fp.is_file():
                             disk_n += 1
-                        if i > 120000:
+                        if i > 8000:
                             break
-                    if disk_n > 0 and reg_n / disk_n >= 0.995:
+                    # Only treat as complete when sample is dense AND registry is large
+                    if disk_n >= 200 and reg_n >= disk_n and reg_n / max(disk_n, 1) >= 0.995:
                         continue
                 except Exception:
                     pass
@@ -577,12 +578,21 @@ def main() -> int:
     ai_used = 0
     # Oversample candidates: archive has many content-dupes of live GD.
     # Plan more than limit so apply can fill real copies after hash skips.
-    plan_cap = max(args.limit * 20, args.limit + 500)
+    # Bound hard — scanning millions of already-ingested paths hung weekly smoke (180s+).
+    plan_cap = min(max(args.limit * 8, args.limit + 40), max(args.limit * 20, 400))
     for src_root in sources:
         if len(planned) >= plan_cap:
             break
         need = plan_cap - len(planned)
-        pool = iter_candidates(src_root, max(need * 100, 20000), skip_sources=skip_sources)
+        # Candidate pool + max_scan proportional to need (not 20k–2M unbounded walks)
+        pool_limit = min(max(need * 12, args.limit * 20), 4000)
+        scan_budget = min(max(pool_limit * 40, 2000), 80_000)
+        pool = iter_candidates(
+            src_root,
+            pool_limit,
+            skip_sources=skip_sources,
+            max_scan=scan_budget,
+        )
         for f in pool:
             dom = domain_for(f.name)
             if args.ai_inbox and dom.endswith("_Inbox") and ai_used < args.ai_inbox_cap:

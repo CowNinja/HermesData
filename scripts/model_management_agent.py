@@ -491,8 +491,8 @@ def _benchmark_age_days(meta: Optional[Dict[str, Any]]) -> Optional[float]:
 
 def _local_smoke_probe(
     port: int = 8090,
-    timeout: float = 45.0,
-    retries: int = 3,
+    timeout: float = 20.0,
+    retries: int = 2,
 ) -> Dict[str, Any]:
     """Lightweight inference smoke -- not full harness. Retries for 3060 warmup/busy GPU.
 
@@ -501,6 +501,9 @@ def _local_smoke_probe(
     non-empty as alive. Prefer logical model DEFAULT (router preset) over dummy name.
     Research: llama.cpp #20408 reasoning_effort; local-model-management reasoning_content
     gotcha (2026-07-18 L07 root cause).
+
+    2026-07-19: default timeout 20s / retries 2 (was 45/3 ≈ 140s wall) so light ticks
+    stay inside agent/tool budgets. Callers can raise for full-tick deep smoke.
     """
     url = f"http://127.0.0.1:{port}/v1/chat/completions"
     # Prefer DEFAULT so models-preset router resolves; include enable_thinking=false
@@ -702,14 +705,24 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
                 }
             )
 
-    smoke = _local_smoke_probe() if node.get("up") else {"ok": False, "skipped": True}
+    smoke = (
+        _local_smoke_probe(timeout=15.0, retries=1)
+        if node.get("up")
+        else {"ok": False, "skipped": True}
+    )
     if node.get("up") and not smoke.get("ok"):
+        # Health up + smoke fail is NOT "start-llama" (would thrash a live PID for 150s+).
+        # L07 → manual/retry path; start-llama only when port is actually down (L03).
+        # Timeout on cold/busy 3060 is medium (not high) — health already proves process live.
+        err = str(smoke.get("error") or smoke.get("preview") or "bad response")
+        sev = "medium" if "timed out" in err.lower() or "timeout" in err.lower() else "high"
         issues.append(
             {
                 "code": "L07",
-                "severity": "high",
-                "message": f"Local smoke inference failed: {smoke.get('error', smoke.get('preview', 'bad response'))}",
-                "fix": "start-llama",
+                "severity": sev,
+                "message": f"Local smoke inference failed: {err}",
+                "fix": "manual",
+                "hint": "health up but chat failed — check busy GPU / enable_thinking / template; do not dual-start",
             }
         )
     elif node.get("up") and smoke.get("ok"):
@@ -969,7 +982,8 @@ def assess_constellation(
 def assess_inventory(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str, Any]:
     """Inventory <-> disk <-> models.ini drift via fleetctl (read-only)."""
     loaded = str((stack.get("8090") or {}).get("loaded") or "")
-    drift = _run_python(TOOLBOX["fleetctl"], ["drift", "--json", "--loaded", loaded], timeout=60)
+    # Bounded 30s (was 60) — hang guard 2026-07-19; drift is advisory not critical path
+    drift = _run_python(TOOLBOX["fleetctl"], ["drift", "--json", "--loaded", loaded], timeout=30)
     issues: List[Dict[str, Any]] = []
     for problem in (drift.get("problems") or []):
         if not isinstance(problem, dict):
@@ -982,6 +996,15 @@ def assess_inventory(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str, A
                 "message": f"Inventory drift: {problem.get('code')} -- {problem}",
                 "fix": "manual",
                 "hint": "fleetctl reconcile (operator) or fleetctl drift --json",
+            }
+        )
+    if drift.get("error") and not drift.get("problems"):
+        issues.append(
+            {
+                "code": "L09",
+                "severity": "low",
+                "message": f"fleetctl drift soft-fail: {str(drift.get('error'))[:160]}",
+                "fix": "manual",
             }
         )
     return {"drift": drift, "issues": issues}
@@ -1094,7 +1117,23 @@ def remediate(
         if fix_id == "heal":
             result = _run_warm_action("heal")
         elif fix_id == "start-llama":
-            result = _run_warm_action("start-llama")
+            # Skip thrash if :8090 already healthy (race: assess saw down, now up).
+            try:
+                import urllib.request as _u
+
+                with _u.urlopen("http://127.0.0.1:8090/health", timeout=2.5) as resp:
+                    already_up = 200 <= int(resp.status) < 300
+            except Exception:
+                already_up = False
+            if already_up:
+                result = {
+                    "ok": True,
+                    "skipped": True,
+                    "reason": "8090_already_healthy",
+                    "hint": "skip start-llama — live health ok (2026-07-19 hang guard)",
+                }
+            else:
+                result = _run_warm_action("start-llama")
         elif fix_id == "start-proxy":
             result = _run_warm_action("start-proxy")
         elif fix_id == "restart-gateway":
@@ -1111,8 +1150,11 @@ def remediate(
         if result.get("ok"):
             time.sleep(2)
 
-    # Unified resource manager preflight as final pass
-    if not dry_run and any(i.get("fix") in ("heal", "start-llama", "start-proxy") for i in all_issues):
+    # Unified resource manager preflight as final pass — only when we actually healed ports
+    if not dry_run and any(
+        a.get("action") in ("heal", "start-llama", "start-proxy") and a.get("ok") and not a.get("skipped")
+        for a in actions_taken
+    ):
         preflight = _run_python(TOOLBOX["resource_mgr"], ["--preflight", "--auto-recover"], timeout=120)
         actions_taken.append({"action": "resource_preflight", **preflight})
 
@@ -1196,13 +1238,25 @@ def run_tick(
         status = "amber"
 
     diagnostics: Dict[str, Any] = {"skipped": True}
-    if status in ("amber", "red") and remediate_flag and not dry_run:
-        diagnostics = _run_diagnostics_preflight(repair=(status == "red" and not stack.get("stack_ready")))
+    # Only run heavy diagnostics when stack is not ready (avoids 60–120s hang on healthy amber).
+    if (
+        status in ("amber", "red")
+        and remediate_flag
+        and not dry_run
+        and not stack.get("stack_ready")
+    ):
+        diagnostics = _run_diagnostics_preflight(repair=(status == "red"))
         if diagnostics.get("ok") and status == "red":
             stack = verify_stack()
             local = assess_local_models(core, stack)
             if stack.get("stack_ready"):
                 status = "amber" if all_issues else "green"
+    elif status in ("amber", "red") and stack.get("stack_ready"):
+        diagnostics = {
+            "skipped": True,
+            "reason": "stack_ready_skip_preflight",
+            "note": "2026-07-19 hang guard: amber with live stack does not run resource preflight",
+        }
 
     reflection = _self_reflection(
         status=status,

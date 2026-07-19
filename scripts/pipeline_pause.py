@@ -51,18 +51,60 @@ def image_delivery_allowed() -> bool:
     return not image_pipeline_paused()
 
 
+# Auto-resume reasons that must not clear operator/emergency hard-stops.
+_AUTO_RESUME_REASONS = frozenset(
+    {
+        "comfy_stack_start",
+        "vram_image_mode",
+        "operator_resume",
+        "",
+    }
+)
+_HARD_PAUSE_REASON_PREFIXES = (
+    "emergency_",
+    "hard_stop",
+    "discord_flood",
+    "operator_hard",
+)
+
+
+def is_hard_pause(state: Dict[str, Any] | None = None) -> bool:
+    """True when pause must not be cleared by Comfy-Stack / VRAM auto-resume."""
+    st = state if isinstance(state, dict) else load_pause_state()
+    if not st.get("paused"):
+        return False
+    if st.get("hard") or st.get("hard_stop") or st.get("lock"):
+        return True
+    reason = str(st.get("reason") or "").lower()
+    note = str(st.get("note") or "").lower()
+    if any(reason.startswith(p) for p in _HARD_PAUSE_REASON_PREFIXES):
+        return True
+    if "do not auto-resume" in note or "do-not-auto-resume" in note or "hard-stop" in note:
+        return True
+    return False
+
+
 def set_image_pipeline_paused(
     paused: bool,
     *,
     reason: str = "",
     note: str = "",
+    hard: bool | None = None,
 ) -> Dict[str, Any]:
     PAUSE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    reason_s = reason or ("sovereign_router_phase" if paused else "operator_resume")
+    if hard is None:
+        hard = bool(paused) and (
+            any(reason_s.lower().startswith(p) for p in _HARD_PAUSE_REASON_PREFIXES)
+            or "do not auto-resume" in (note or "").lower()
+            or "do-not-auto-resume" in (note or "").lower()
+        )
     state = {
         "paused": bool(paused),
-        "reason": reason or ("sovereign_router_phase" if paused else "operator_resume"),
+        "reason": reason_s,
         "note": note,
         "updated_at": _utc_now(),
+        "hard": bool(hard) if paused else False,
     }
     PAUSE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
     return state
@@ -75,19 +117,41 @@ def main() -> int:
     parser.add_argument("action", nargs="?", choices=("status", "pause", "resume"), default="status")
     parser.add_argument("--reason", default="")
     parser.add_argument("--note", default="")
+    parser.add_argument(
+        "--hard",
+        action="store_true",
+        help="Hard pause: block comfy_stack_start / vram auto-resume until explicit operator resume",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="On resume: allow clearing a hard/emergency pause",
+    )
     args = parser.parse_args()
     if args.action == "pause":
-        state = set_image_pipeline_paused(True, reason=args.reason or "operator_pause", note=args.note)
+        state = set_image_pipeline_paused(
+            True,
+            reason=args.reason or "operator_pause",
+            note=args.note,
+            hard=True if args.hard else None,
+        )
     elif args.action == "resume":
+        current = load_pause_state()
         if silo_primary_active() and args.reason in ("comfy_stack_start", ""):
             state = set_image_pipeline_paused(
                 True,
                 reason="silo_primary",
                 note="resume blocked — run .\\Phronesis.ps1 vram image first",
             )
+        elif is_hard_pause(current) and not args.force and args.reason in _AUTO_RESUME_REASONS:
+            # Keep hard emergency pauses; Comfy may start without re-enabling Discord delivery.
+            state = dict(current)
+            state["resume_blocked"] = True
+            state["resume_blocked_by"] = args.reason or "auto"
+            state["resume_blocked_at"] = _utc_now()
         else:
             state = set_image_pipeline_paused(
-                False, reason=args.reason or "operator_resume", note=args.note
+                False, reason=args.reason or "operator_resume", note=args.note, hard=False
             )
     else:
         state = load_pause_state()

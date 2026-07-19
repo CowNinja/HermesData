@@ -15,7 +15,29 @@ BATCH_VRAM_SNAPSHOT = ROOT / "state" / "comfy-batch-vram-snapshot.json"
 MODE_NOTES = {
     "lowvram": "Comfy launches with lowvram (default balance, faster staging)",
     "ram_prefer": "Comfy launches with novram + disable-smart-memory (heavier RAM staging, slower renders)",
+    # Jeff / RP shorthand aliases (persist as real modes after normalize)
+    "image": "alias→ram_prefer (solo quality / stick image mode)",
+    "quality": "alias→ram_prefer",
+    "fast": "alias→lowvram",
 }
+
+# Canonical modes written to disk (aliases normalize here).
+CANON_MODES = frozenset({"lowvram", "ram_prefer"})
+
+
+def normalize_mode(mode: str) -> str:
+    m = str(mode or "lowvram").strip().lower()
+    aliases = {
+        "image": "ram_prefer",
+        "quality": "ram_prefer",
+        "solo": "ram_prefer",
+        "fast": "lowvram",
+        "batch": "lowvram",
+        "novram": "ram_prefer",
+    }
+    m = aliases.get(m, m)
+    return m if m in CANON_MODES else "lowvram"
+
 
 # Named profiles for batch session + Hermes visibility (Swiss-army-knife layer).
 VRAM_PROFILES: dict[str, dict[str, str]] = {
@@ -23,6 +45,7 @@ VRAM_PROFILES: dict[str, dict[str, str]] = {
     "triplet_smoke": {"mode": "lowvram", "batch_speed": "quality", "notes": "3-girl groups, no hand detailer"},
     "group_4plus": {"mode": "lowvram", "batch_speed": "quality", "notes": "4+ subjects, count-lock poses"},
     "solo_max_quality": {"mode": "ram_prefer", "batch_speed": "quality", "notes": "single portrait max VRAM"},
+    "image": {"mode": "ram_prefer", "batch_speed": "quality", "notes": "Jeff 'vram image' stick mode"},
 }
 
 PROFILE_FILE = ROOT / "state" / "comfy-vram-profile.json"
@@ -33,18 +56,20 @@ def read_mode() -> str:
         return "lowvram"
     try:
         data = json.loads(VRAM_MODE_FILE.read_text(encoding="utf-8-sig"))
-        mode = str(data.get("mode") or "lowvram").strip()
-        return mode if mode in MODE_NOTES else "lowvram"
+        return normalize_mode(str(data.get("mode") or "lowvram"))
     except Exception:
         return "lowvram"
 
 
 def write_mode(mode: str, *, notes: str = "") -> dict:
-    mode = mode if mode in MODE_NOTES else "lowvram"
+    raw = str(mode or "lowvram").strip().lower()
+    mode = normalize_mode(raw)
+    note = notes or MODE_NOTES.get(raw) or MODE_NOTES.get(mode) or MODE_NOTES["lowvram"]
     payload = {
         "mode": mode,
+        "requested": raw if raw != mode else mode,
         "updated": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "notes": notes or MODE_NOTES[mode],
+        "notes": note,
     }
     VRAM_MODE_FILE.parent.mkdir(parents=True, exist_ok=True)
     VRAM_MODE_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")

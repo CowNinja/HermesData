@@ -10,21 +10,29 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 
-# Phronesis production Comfy listens on 8189 (8188 often down / legacy).
-# COMFY_URL env still wins; otherwise probe 8189 then 8188 once at import.
+# Production: Comfy inference :8188, gallery SPA :8189.
+# Gallery returns 200 HTML for /system_stats — must JSON-validate, prefer 8188.
+# COMFY_URL env still wins; otherwise probe 8188 then 8189 once at import.
 def _detect_comfy_url() -> str:
     env = (os.environ.get("COMFY_URL") or "").strip()
     if env:
         return env.rstrip("/")
-    for port in (8189, 8188):
+    for port in (8188, 8189):
         url = f"http://127.0.0.1:{port}"
         try:
             with urllib.request.urlopen(f"{url}/system_stats", timeout=1.5) as resp:
-                if getattr(resp, "status", 200) == 200:
+                if getattr(resp, "status", 200) != 200:
+                    continue
+                raw = resp.read(2048)
+                text = raw.decode("utf-8", errors="replace").lstrip()
+                if not text.startswith("{"):
+                    continue
+                data = json.loads(text)
+                if isinstance(data, dict) and ("system" in data or "devices" in data):
                     return url
         except Exception:
             continue
-    return "http://127.0.0.1:8189"
+    return "http://127.0.0.1:8188"
 
 
 COMFY_URL = _detect_comfy_url()

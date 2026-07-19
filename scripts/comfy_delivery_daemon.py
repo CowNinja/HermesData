@@ -33,6 +33,12 @@ DEFAULT_CHANNEL = "1521146755985576116"
 POST_SCRIPT = SCRIPTS.parent / "temp" / "post_discord_image.py"
 POLL_SEC = 3
 MAX_LEDGER = 200
+# Flood guards: never dump historical Comfy output into Discord in one tick.
+MAX_POSTS_PER_TICK = int(os.environ.get("COMFY_DELIVERY_MAX_POSTS_PER_TICK", "2") or 2)
+# Auto-delivery only for PNGs newer than this (force/--force-png still allowed).
+MAX_AUTO_AGE_SEC = float(os.environ.get("COMFY_DELIVERY_MAX_AUTO_AGE_SEC", str(20 * 60)) or (20 * 60))
+# If more than this many look "pending", seal cold backlog instead of posting it.
+PENDING_FLOOD_SEAL_THRESHOLD = int(os.environ.get("COMFY_DELIVERY_FLOOD_SEAL_THRESHOLD", "8") or 8)
 HERMES_GATEWAY_MARKER = "hermes-gateway"
 
 _OPS = SCRIPTS / "ops"
@@ -404,7 +410,7 @@ def _sync_batch_delivered_count(png_name: str) -> None:
     _save_batch_session(session)
 
 
-def _deliver(channel: str, png_name: str, *, caption: str | None = None) -> tuple[bool, str]:
+def _deliver(channel: str, png_name: str, *, caption: str | None = None, force: bool = False) -> tuple[bool, str]:
     png_path = COMFY_OUTPUT / png_name
     if not png_path.is_file():
         return False, ""
@@ -415,7 +421,7 @@ def _deliver(channel: str, png_name: str, *, caption: str | None = None) -> tupl
     digest = _sha256_file(png_path)
     if _posted_to_discord(png_name, digest):
         return False, "already_posted"
-    if not _ready_for_daemon_delivery(png_name, digest, mtime):
+    if not force and not _ready_for_daemon_delivery(png_name, digest, mtime):
         return False, "hermes_pending"
     ok_guard, guard_reason = _batch_contamination_guard(png_name)
     if not ok_guard:
@@ -537,22 +543,54 @@ def bootstrap_state() -> dict:
     return _seal_existing_pngs(state)
 
 
+def _png_age_sec(mtime: float) -> float:
+    return max(0.0, time.time() - float(mtime or 0))
+
+
 def _undelivered_pngs(state: dict) -> list[tuple[str, float, str]]:
+    """Return pending Discord posts.
+
+    Primary path: mtime > cursor (normal forward scan).
+    Hole path: PNGs at/before cursor that never landed in delivered ledger or
+    posted registry — but ONLY within a tight time window of the cursor
+    (default 30m, not multi-hour). Prevents replaying cold historical output
+    when the ledger advanced past a mid-series failure (e.g. 759/760 under 761).
+
+    Age guard: never auto-queue PNGs older than MAX_AUTO_AGE_SEC (default 20m).
+    Historical dumps (00005… after a channel retarget) must require --force-png.
+    """
     cursor_mtime = float(state.get("last_mtime") or 0)
+    # Tight hole window (was 3h — wide enough to re-flood historical holes).
+    hole_window_sec = float(os.environ.get("COMFY_DELIVERY_HOLE_WINDOW_SEC", str(30 * 60)) or (30 * 60))
+    hole_floor = max(0.0, cursor_mtime - hole_window_sec) if cursor_mtime > 0 else 0.0
+    max_age = float(os.environ.get("COMFY_DELIVERY_MAX_AUTO_AGE_SEC", str(MAX_AUTO_AGE_SEC)) or MAX_AUTO_AGE_SEC)
     pending: list[tuple[str, float, str]] = []
-    for path in sorted(iter_output_pngs(COMFY_OUTPUT), key=lambda p: p.stat().st_mtime):
+    seen: set[str] = set()
+    paths = sorted(iter_output_pngs(COMFY_OUTPUT), key=lambda p: p.stat().st_mtime)
+    for path in paths:
         try:
             mtime = path.stat().st_mtime
         except OSError:
             continue
+        name = path.name
+        if name in seen:
+            continue
+        # Age guard first — skip cold archive without hashing.
+        if max_age > 0 and _png_age_sec(mtime) > max_age:
+            continue
         digest = _sha256_file(path)
-        if _already_delivered(state, path.name, digest):
+        if _already_delivered(state, name, digest):
             continue
-        if mtime <= cursor_mtime:
+        is_forward = mtime > cursor_mtime
+        # Hole: at/before cursor, but still near the series tip (not cold archive).
+        is_hole = (not is_forward) and cursor_mtime > 0 and mtime >= hole_floor
+        if not is_forward and not is_hole:
             continue
-        if not _ready_for_daemon_delivery(path.name, digest, mtime):
+        if not _ready_for_daemon_delivery(name, digest, mtime):
             continue
-        pending.append((path.name, mtime, digest))
+        pending.append((name, mtime, digest))
+        seen.add(name)
+    pending.sort(key=lambda t: t[1])
     return pending
 
 
@@ -666,6 +704,8 @@ def _tick_locked(channel: str) -> dict:
                 continue
             if mtime <= cursor_mtime:
                 continue
+            if MAX_AUTO_AGE_SEC > 0 and _png_age_sec(mtime) > MAX_AUTO_AGE_SEC:
+                continue
             digest = _sha256_file(path)
             if _already_delivered(state, path.name, digest):
                 continue
@@ -674,6 +714,29 @@ def _tick_locked(channel: str) -> dict:
         if waiting:
             return {"action": "none", "reason": "hermes_pending", "waiting": waiting}
         return {"action": "none", "reason": "no_pending"}
+
+    # Flood guard: large backlogs are almost always historical, not intentional series.
+    # Seal everything except the newest few so Discord does not get a dump.
+    flood_threshold = max(3, int(os.environ.get("COMFY_DELIVERY_FLOOD_SEAL_THRESHOLD", str(PENDING_FLOOD_SEAL_THRESHOLD)) or PENDING_FLOOD_SEAL_THRESHOLD))
+    max_posts = max(1, int(os.environ.get("COMFY_DELIVERY_MAX_POSTS_PER_TICK", str(MAX_POSTS_PER_TICK)) or MAX_POSTS_PER_TICK))
+    if len(pending) >= flood_threshold:
+        keep = pending[-max_posts:]
+        seal_names = [n for n, _, _ in pending[:-max_posts]] if len(pending) > max_posts else []
+        for name, mtime, digest in pending[:-max_posts] if len(pending) > max_posts else []:
+            _mark_delivered(state, name, mtime, digest)
+        if seal_names:
+            _save_state(state)
+            pending = keep
+            # Continue to post only the tip; report sealed backlog.
+            tip_result_extra = {"flood_sealed": seal_names, "flood_sealed_count": len(seal_names)}
+        else:
+            tip_result_extra = {"flood_sealed_count": 0}
+    else:
+        tip_result_extra = {}
+
+    # Cap posts per tick regardless (prevents multi-minute Discord spam loops).
+    pending = pending[:max_posts]
+
     delivered = list(state.get("delivered") or [])
     delivered_sha = list(state.get("delivered_sha256") or [])
     posted: list[str] = []
@@ -689,7 +752,14 @@ def _tick_locked(channel: str) -> dict:
                 continue
             if detail == "hermes_pending":
                 continue
-            return {"action": "deliver", "ok": False, "png": name, "posted": posted, "error": detail}
+            return {
+                "action": "deliver",
+                "ok": False,
+                "png": name,
+                "posted": posted,
+                "error": detail,
+                **tip_result_extra,
+            }
         delivered.append(name)
         if digest:
             delivered_sha.append(digest)
@@ -702,8 +772,17 @@ def _tick_locked(channel: str) -> dict:
     state["last_mtime"] = last_mtime
     _save_state(state)
     if not posted:
-        return {"action": "none", "reason": "hermes_pending"}
-    return {"action": "deliver", "ok": True, "png": posted[-1] if posted else "", "posted": posted, "count": len(posted)}
+        if tip_result_extra.get("flood_sealed_count"):
+            return {"action": "none", "reason": "flood_sealed", **tip_result_extra}
+        return {"action": "none", "reason": "hermes_pending", **tip_result_extra}
+    return {
+        "action": "deliver",
+        "ok": True,
+        "png": posted[-1] if posted else "",
+        "posted": posted,
+        "count": len(posted),
+        **tip_result_extra,
+    }
 
 
 def main() -> int:
@@ -718,6 +797,13 @@ def main() -> int:
         metavar="PNG",
         help="Record successful Hermes gateway delivery (blocks daemon repost)",
     )
+    parser.add_argument(
+        "--force-png",
+        metavar="PNG",
+        action="append",
+        default=[],
+        help="Force-deliver one PNG by name or path (repeatable); bypasses cursor, still dedupes posted registry",
+    )
     parser.add_argument("--interval", type=int, default=POLL_SEC)
     parser.add_argument("--channel", default=DEFAULT_CHANNEL)
     args = parser.parse_args()
@@ -727,6 +813,38 @@ def main() -> int:
     if args.record_hermes:
         print(json.dumps(record_hermes_delivery(args.record_hermes)))
         return 0
+    if args.force_png:
+        results = []
+        for raw in args.force_png:
+            path = Path(raw)
+            name = path.name if path.suffix.lower() == ".png" else str(raw)
+            if not name.endswith(".png"):
+                name = f"{name}.png" if "_" in name else name
+            png_path = COMFY_OUTPUT / name if not Path(raw).is_file() else Path(raw)
+            if not png_path.is_file():
+                results.append({"ok": False, "png": name, "error": "missing"})
+                continue
+            try:
+                mtime = png_path.stat().st_mtime
+            except OSError as exc:
+                results.append({"ok": False, "png": name, "error": str(exc)})
+                continue
+            digest = _sha256_file(png_path)
+            ok, detail = _deliver(args.channel, png_path.name, force=True)
+            if ok:
+                state = _load_state()
+                _mark_delivered(state, png_path.name, mtime, digest)
+                _save_state(state)
+                results.append({"ok": True, "png": png_path.name, "discord_id": detail})
+            else:
+                # already_posted: still advance ledger so holes stay sealed
+                if detail == "already_posted":
+                    state = _load_state()
+                    _mark_delivered(state, png_path.name, mtime, digest)
+                    _save_state(state)
+                results.append({"ok": False, "png": png_path.name, "error": detail})
+        print(json.dumps({"action": "force_png", "results": results}, indent=2))
+        return 0 if all(r.get("ok") or r.get("error") == "already_posted" for r in results) else 1
     if args.once:
         print(json.dumps(tick(args.channel)))
         return 0

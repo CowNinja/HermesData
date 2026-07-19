@@ -27,7 +27,14 @@ def port_ok(port: int) -> bool:
 
 
 def main() -> int:
-    ports = {8090: "qwythos", 8091: "proxy", 8642: "gateway", 8189: "comfy"}
+    # Inference is :8188; :8189 is gallery SPA only (HTML 200 ≠ Comfy API).
+    ports = {
+        8090: "qwythos",
+        8091: "proxy",
+        8642: "gateway",
+        8188: "comfy",
+        8189: "gallery",
+    }
     # gateway may not have /health
     status = {}
     for port, name in ports.items():

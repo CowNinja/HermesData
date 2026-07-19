@@ -17,7 +17,8 @@ from pathlib import Path
 PORTS = {
     8090: "Qwythos llama",
     8091: "proxy router",
-    8189: "ComfyUI",
+    8188: "ComfyUI inference",
+    8189: "Comfy gallery SPA",
     8642: "Hermes gateway",
 }
 OUT_MD = Path(r"D:\PhronesisVault\Operations\logs\dawn-pulse-latest.md")

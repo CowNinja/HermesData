@@ -4,7 +4,7 @@
 2026-07-18 residual seal:
 - Always print one status line (cron MD was empty on some failures).
 - Soft-fail: exit 0 unless active batch still unhealthy after scan/fix.
-- Scanner probes Comfy 8189 (prod) then 8188 (legacy).
+- Scanner probes Comfy inference :8188 (JSON /system_stats) then treats :8189 as gallery SPA only.
 """
 from __future__ import annotations
 

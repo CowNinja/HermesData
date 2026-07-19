@@ -2066,9 +2066,41 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             try:
                 payload["stack"] = matrix
                 if LRU_ROUTER_STATE.is_file():
-                    payload["last_dispatch"] = json.loads(
-                        LRU_ROUTER_STATE.read_text(encoding="utf-8")
+                    raw_ld = json.loads(LRU_ROUTER_STATE.read_text(encoding="utf-8"))
+                    # A2 health truth (2026-07-19): never present stale LRU as "live traffic".
+                    # Consumers used last_dispatch + last_model (e.g. MythoMax) as if current.
+                    # Research: readiness payloads must distinguish last-event vs live state.
+                    ld = dict(raw_ld) if isinstance(raw_ld, dict) else {"raw": raw_ld}
+                    ts_raw = str(ld.get("last_dispatch") or ld.get("ts") or "")
+                    age_sec = None
+                    try:
+                        from datetime import datetime, timezone
+
+                        ts_clean = ts_raw.replace("Z", "+00:00")
+                        dt = datetime.fromisoformat(ts_clean)
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        age_sec = max(0.0, (datetime.now(timezone.utc) - dt).total_seconds())
+                    except Exception:
+                        age_sec = None
+                    stale_after = 6 * 3600  # 6h
+                    ld["age_sec"] = age_sec
+                    ld["stale"] = bool(age_sec is None or age_sec > stale_after)
+                    ld["stale_after_sec"] = stale_after
+                    ld["resident_note"] = (
+                        "last_dispatch is last routed event, not necessarily the GGUF "
+                        "currently loaded on :8090 (unified_8090 / Qwythos primary)"
                     )
+                    # Prefer stack matrix model truth over frozen LRU last_model
+                    try:
+                        live_model = (matrix.get("unified_model") or matrix.get("model")
+                                      or matrix.get("loaded") or "")
+                        if live_model:
+                            ld["resident_model_hint"] = live_model
+                    except Exception:
+                        pass
+                    payload["last_dispatch"] = ld
+                    payload["last_dispatch_stale"] = ld["stale"]
             except Exception:
                 pass
             try:
@@ -2480,6 +2512,19 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 "completion_tokens": usage_out,
                 "total_tokens": usage_in + usage_out,
             },
+            # Phase 1–2 decision-log hygiene (2026-07-19): align with decision_log_schema
+            "policy_version": "hybrid-local-grok-2026-07-17",
+            "routing_reasons": [
+                r for r in [
+                    f"task_type={routing.get('task_type') or resolve_task_type(model)}",
+                    f"tier={result.get('tier')}",
+                    f"backend={prov.get('selected_backend')}",
+                    f"router_mode=unified_8090" if True else "",
+                    "uncensored" if prov.get("uncensored_route") else "",
+                    "force_roleplay" if routing.get("force_roleplay") else "",
+                ] if r
+            ],
+            "failure_class": None,
         })
         # Keep /health last_dispatch live (not frozen LRU from pre-unified path).
         _touch_last_dispatch(

@@ -178,6 +178,11 @@ def main() -> int:
     workers: List[Tuple[str, List[str], int]] = []
     if not args.no_drain:
             # Focus land: only top incomplete priority folder (self-improve efficiency)
+            # 2026-07-19: 1800s TIMEOUT tree-kill on skip-heavy Google_Backups waves
+            # (aggressive drain_limit=1800; ~84% skip-registry-hash). Headroom must stay
+            # under continuous_loop run_tick parent timeout (see silo_continuous_loop.py).
+            # Refs: sqlite WAL single-writer; Temporal activity StartToClose > p95 work;
+            # k8s: probe/timeout budget > expected work or thrash-restart orphans writers.
             workers.append(
                 (
                     "focus_land",
@@ -187,7 +192,7 @@ def main() -> int:
                         "--limit",
                         str(args.drain_limit),
                     ],
-                    1800,
+                    2700,
                 )
             )
     workers.extend(

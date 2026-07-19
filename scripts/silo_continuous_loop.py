@@ -439,7 +439,10 @@ def run_tick(limits: Dict[str, int], allow_grunt: bool) -> Dict[str, Any]:
         cmd.append("--no-grunt")
     if limits["drain"] == 0:
         cmd.append("--no-drain")
-    code, out = _run(cmd, timeout=2400)
+    # 2026-07-19: parent must exceed focus_land worker timeout (2700s) + depth tail.
+    # Was 2400 with focus_land 1800 → skip-heavy waves tree-killed mid-copy (exit 124)
+    # and wasted drain budget. Keep single-writer: tree-kill still on true hang only.
+    code, out = _run(cmd, timeout=4200)
     try:
         # last json block
         j = out[out.rfind("{") : out.rfind("}") + 1]
