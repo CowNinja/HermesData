@@ -24,6 +24,12 @@ import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 # Detach console immediately so hidden python.exe never steals focus while typing.
 try:
     from win_free_console import free_console  # type: ignore
@@ -263,17 +269,15 @@ def main() -> int:
             smoke = None
         rec = {"cycle": n, "heal": heal, "depth": depth, "smoke": smoke}
         cycles.append(rec)
-        STATE.write_text(
-            json.dumps(
-                {
-                    "at": utc(),
-                    "cycles": cycles[-8:],
-                    "deadline": deadline.isoformat() if deadline else None,
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
+        state_obj = {
+            "at": utc(),
+            "cycles": cycles[-8:],
+            "deadline": deadline.isoformat() if deadline else None,
+        }
+        if atomic_write_json is not None:
+            atomic_write_json(STATE, state_obj, indent=2, min_bytes=20)
+        else:
+            STATE.write_text(json.dumps(state_obj, indent=2), encoding="utf-8")
         log(f"cycle {n} done ocr_open={heal.get('ocr_open')} cook={depth.get('cook_code')} train_tail={(depth.get('train_tail') or '')[:80]}")
         if args.once or not deadline:
             break
@@ -301,7 +305,11 @@ def main() -> int:
         "100% local · zero Grok · purge NOT armed · next-sources not auto-landed",
         "[[Operations/Autonomous-Silo-Runbook-CANONICAL-2026-07-14]]",
     ]
-    RECEIPT.write_text("\n".join(lines), encoding="utf-8")
+    body = "\n".join(lines)
+    if atomic_write_text is not None:
+        atomic_write_text(RECEIPT, body, min_bytes=20)
+    else:
+        RECEIPT.write_text(body, encoding="utf-8")
     print(json.dumps({"cycles": len(cycles), "receipt": str(RECEIPT), "state": str(STATE)}, indent=2))
     return 0
 

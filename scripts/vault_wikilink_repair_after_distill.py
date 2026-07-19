@@ -11,9 +11,16 @@ from __future__ import annotations
 
 import re
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter, defaultdict
+
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
 
 VAULT = Path(r"D:\PhronesisVault")
 ARCH = VAULT / "Archive" / "Distillations-2026-07-10"
@@ -448,7 +455,10 @@ def main() -> int:
         "examples": replaced_examples[:30],
     }
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
-    OUT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(OUT_JSON, payload, indent=2, min_bytes=20)
+    else:
+        OUT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     OUT_MD.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         f"# Wikilink Repair — {TS}",
@@ -471,7 +481,11 @@ def main() -> int:
         "- [[Operations/Active-Work-Program-Phase-B-Orchestrator-Insights-2026-07-10]]",
         "",
     ]
-    OUT_MD.write_text("\n".join(lines), encoding="utf-8")
+    md_body = "\n".join(lines)
+    if atomic_write_text is not None:
+        atomic_write_text(OUT_MD, md_body, min_bytes=20)
+    else:
+        OUT_MD.write_text(md_body, encoding="utf-8")
     print(json.dumps({k: payload[k] for k in ("redirects", "rewritten_files", "replacements", "unresolved_count")}, indent=2))
     print("top_unresolved", top[:10])
     return 0

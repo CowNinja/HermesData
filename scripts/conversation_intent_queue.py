@@ -29,6 +29,12 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 ROOT = Path(r"D:\HermesData")
 STATE = ROOT / "state"
 QUEUE = STATE / "intent_queue.jsonl"
@@ -36,6 +42,14 @@ STOP = STATE / "intent_queue.STOP"
 VAULT_LOG = Path(r"D:\PhronesisVault\Operations\logs")
 LATEST = VAULT_LOG / "intent-queue-latest.json"
 CANON = "Operations/Conversation-to-Action-Ladder-CANONICAL-2026-07-18.md"
+
+
+def _write_latest(obj: dict) -> None:
+    VAULT_LOG.mkdir(parents=True, exist_ok=True)
+    if atomic_write_json is not None:
+        atomic_write_json(LATEST, obj, indent=2, min_bytes=20)
+    else:
+        LATEST.write_text(json.dumps(obj, indent=2), encoding="utf-8")
 
 # Risk classes — only low can ever be auto-eligible later; high always human
 RISK_KEYWORDS = {
@@ -166,7 +180,7 @@ def append_entry(entry: dict) -> None:
     VAULT_LOG.mkdir(parents=True, exist_ok=True)
     with QUEUE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, separators=(",", ":")) + "\n")
-    LATEST.write_text(json.dumps(entry, indent=2), encoding="utf-8")
+    _write_latest(entry)
 
 
 def update_entry(eid: str, mutator) -> dict | None:
@@ -181,12 +195,15 @@ def update_entry(eid: str, mutator) -> dict | None:
             new_rows.append(r)
     if not found:
         return None
-    tmp = QUEUE.with_suffix(".jsonl.tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        for r in new_rows:
-            f.write(json.dumps(r, separators=(",", ":")) + "\n")
-    tmp.replace(QUEUE)
-    LATEST.write_text(json.dumps(found, indent=2), encoding="utf-8")
+    body = "".join(json.dumps(r, separators=(",", ":")) + "\n" for r in new_rows)
+    if atomic_write_text is not None:
+        atomic_write_text(QUEUE, body, min_bytes=1)
+    else:
+        tmp = QUEUE.with_suffix(".jsonl.tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            f.write(body)
+        tmp.replace(QUEUE)
+    _write_latest(found)
     return found
 
 

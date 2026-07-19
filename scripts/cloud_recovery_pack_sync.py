@@ -18,6 +18,11 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_text = None  # type: ignore
+
 TS = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 HERMES = Path(r"D:\HermesData")
 VAULT = Path(r"D:\PhronesisVault")
@@ -139,24 +144,28 @@ def main() -> int:
             sync_msg = f"fail {d}: {msg}"
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    RECEIPT.write_text(
-        "\n".join(
-            [
-                f"# Cloud recovery pack sync — {TS}",
-                "",
-                f"**Staging:** `{STAGING}`",
-                f"**Cloud dest:** `{chosen or 'NONE — pack built locally only'}`",
-                f"**Sync:** {sync_msg}",
-                "",
-                "## Files",
-                *[f"- {c}" for c in copied],
-                "",
-                "[[Operations/Catastrophe-Restore-and-Backup-Hardening-2026-07-10]]",
-                "",
-            ]
-        ),
-        encoding="utf-8",
+    receipt_body = "\n".join(
+        [
+            f"# Cloud recovery pack sync — {TS}",
+            "",
+            f"**Staging:** `{STAGING}`",
+            f"**Cloud dest:** `{chosen or 'NONE — pack built locally only'}`",
+            f"**Sync:** {sync_msg}",
+            "",
+            "## Files",
+            *[f"- {c}" for c in copied],
+            "",
+            "[[Operations/Catastrophe-Restore-and-Backup-Hardening-2026-07-10]]",
+            "",
+        ]
     )
+    if atomic_write_text is not None:
+        atomic_write_text(RECEIPT, receipt_body, min_bytes=20)
+    else:
+        RECEIPT.write_text(
+            receipt_body if receipt_body.endswith("\n") else receipt_body + "\n",
+            encoding="utf-8",
+        )
     print(
         json.dumps(
             {

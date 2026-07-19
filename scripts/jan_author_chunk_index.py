@@ -53,12 +53,21 @@ def chunk_text(text: str, size: int = 850, overlap: int = 140) -> list[str]:
 
 
 def build_index() -> int:
-    """Chunk text/ and text_wpd/ shelves into jan_chunks.jsonl."""
+    """Chunk text/ and text_wpd/ shelves into jan_chunks.jsonl.
+
+    Atomic publish (tmp → fsync → replace) — same class of fix as
+    jan_unified_index.py after the 2026-07-19 0-byte wipe incident.
+    """
+    import os
+    import shutil
+    import time
+
     text_dirs = [SHELF / "text", SHELF / "text_wpd"]
     CHUNKS.parent.mkdir(parents=True, exist_ok=True)
     n = 0
     seen_body_prefix: set[str] = set()
-    with CHUNKS.open("w", encoding="utf-8") as f:
+    tmp = CHUNKS.with_name(CHUNKS.name + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
         for text_dir in text_dirs:
             if not text_dir.is_dir():
                 continue
@@ -99,7 +108,47 @@ def build_index() -> int:
                     }
                     f.write(json.dumps(rec, ensure_ascii=False) + "\n")
                     n += 1
-    print(json.dumps({"chunks": n, "path": str(CHUNKS), "dirs": [str(d) for d in text_dirs]}))
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    expected = tmp.stat().st_size
+    if expected < 50 and n > 0:
+        raise RuntimeError(f"refusing tiny jan_chunks tmp size={expected}")
+    last_err: Exception | None = None
+    for attempt in range(5):
+        try:
+            os.replace(tmp, CHUNKS)
+            last_err = None
+            break
+        except PermissionError as e:
+            last_err = e
+            time.sleep(0.15 * (attempt + 1))
+            try:
+                shutil.copy2(tmp, CHUNKS)
+                if CHUNKS.stat().st_size == expected:
+                    try:
+                        tmp.unlink()
+                    except OSError:
+                        pass
+                    last_err = None
+                    break
+            except OSError as e2:
+                last_err = e2
+    if last_err is not None:
+        raise RuntimeError(f"jan_chunks atomic publish failed: {last_err}") from last_err
+    print(
+        json.dumps(
+            {
+                "chunks": n,
+                "path": str(CHUNKS),
+                "bytes": CHUNKS.stat().st_size if CHUNKS.exists() else 0,
+                "write": "atomic_tmp_replace",
+                "dirs": [str(d) for d in text_dirs],
+            }
+        )
+    )
     return n
 
 
@@ -120,6 +169,17 @@ def retrieve(query: str, k: int = 8) -> list[dict]:
             for phrase, boost in (
                 ("who should we then", 5),
                 ("keepers of the books", 4),
+                ("sailing on living light", 5),
+                ("foundational five", 4),
+                ("cradle to grade", 5),
+                ("tally ho", 3),
+                ("yee haw", 3),
+                ("before romance", 3),
+                ("business by the books", 4),
+                ("creating capacity", 3),
+                ("living books", 3),
+                ("hi-ho silver", 6),
+                ("hi ho silver", 6),
                 ("mighty whitey", 6),
                 ("thrift", 3),
                 ("meteor", 4),
@@ -130,25 +190,44 @@ def retrieve(query: str, k: int = 8) -> list[dict]:
                 ("booksbloom", 3),
                 ("homeschool", 2),
                 ("conference", 2),
+                ("greenville", 2),
+                ("fpea", 3),
+                ("round rock", 2),
                 ("new book", 2),
                 ("merge", 1),
             ):
                 if phrase in ql and phrase in tl:
                     score += boost
             # slight boost for jan shelf over incidental bb noise
-            if rec.get("lane") == "jan_shelf":
+            lane = rec.get("lane") or ""
+            if lane == "jan_shelf":
                 score += 0.5
+            # labeled vault packs should win on living/road/workshop queries
+            if lane in {"family_living", "workshop_catalog", "convention_master", "public"}:
+                score += 0.75
             if score > 0:
                 scored.append((score, rec))
     scored.sort(key=lambda x: -x[0])
     out = []
     seen_src = set()
+    seen_ids = set()
     for sc, rec in scored:
+        rid = rec.get("id") or ""
+        if rid and rid in seen_ids:
+            continue
         src = rec.get("source") or ""
         key = Path(src).name
-        if key in seen_src and len(out) >= max(k // 2, 3):
-            continue
+        lane = rec.get("lane") or ""
+        # Allow multiple chunks from same big gold/shelf source, but keep
+        # vault packs to one hit once any chunk of that pack is chosen.
+        if key in seen_src:
+            if lane in {"family_living", "workshop_catalog", "convention_master", "public"}:
+                continue
+            if len(out) >= max(k // 2, 3):
+                continue
         seen_src.add(key)
+        if rid:
+            seen_ids.add(rid)
         out.append(rec)
         if len(out) >= k:
             break

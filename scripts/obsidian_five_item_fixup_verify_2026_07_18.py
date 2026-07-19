@@ -9,6 +9,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    import sys as _sys
+
+    _sys.path.insert(0, str(Path(r"D:\HermesData\scripts")))
+    from atomic_io import atomic_write_json, atomic_write_text  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 OBS = VAULT / ".obsidian"
 LOGS = VAULT / "Operations" / "logs"
@@ -257,11 +265,9 @@ Restore from `.obsidian/backups/five-item-closed-cook-20260718T194820Z/` and rib
 """
     LOGS.mkdir(parents=True, exist_ok=True)
     SETUP.mkdir(parents=True, exist_ok=True)
-    (LOGS / "obsidian-five-item-closed-cook-latest.md").write_text(md, encoding="utf-8")
-    (LOGS / f"obsidian-five-item-closed-cook-{TS}.md").write_text(md, encoding="utf-8")
-    (SETUP / "Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18.md").write_text(
-        md, encoding="utf-8"
-    )
+    atomic_write_text(LOGS / "obsidian-five-item-closed-cook-latest.md", md)
+    atomic_write_text(LOGS / f"obsidian-five-item-closed-cook-{TS}.md", md)
+    atomic_write_text(SETUP / "Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18.md", md)
 
     dual_md = f"""---
 tags:
@@ -290,14 +296,12 @@ tags:
 
 Full: [[Operations/logs/obsidian-five-item-closed-cook-latest]] · [[Setup/Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18]]
 """
-    (LOGS / "obsidian-dual-verify-latest.md").write_text(dual_md, encoding="utf-8")
+    atomic_write_text(LOGS / "obsidian-dual-verify-latest.md", dual_md)
     payload = {"v1": v1, "v2": v2, "ts": TS, "pass": dual_pass}
-    (LOGS / "obsidian-dual-verify-latest.json").write_text(
-        json.dumps(payload, indent=2) + "\n", encoding="utf-8"
-    )
-    (LOGS / "obsidian-five-item-closed-cook-latest.json").write_text(
-        json.dumps({"ts": TS, "v1": v1, "v2": v2, "all_ok": dual_pass}, indent=2) + "\n",
-        encoding="utf-8",
+    atomic_write_json(LOGS / "obsidian-dual-verify-latest.json", payload)
+    atomic_write_json(
+        LOGS / "obsidian-five-item-closed-cook-latest.json",
+        {"ts": TS, "v1": v1, "v2": v2, "all_ok": dual_pass},
     )
 
     # Housekeeping stamp

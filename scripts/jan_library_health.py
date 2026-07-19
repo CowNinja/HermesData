@@ -7,6 +7,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from atomic_io import atomic_write_json
+
 SHELF = Path(
     r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\Family\Jan-Bloom-Author"
 )
@@ -56,7 +58,45 @@ def check() -> dict:
                     pass
     flag("unified_chunks", n >= 2000, f"n={n} lanes={lanes}", hard=True)
     flag("jan_shelf_lane", lanes.get("jan_shelf", 0) >= 1000, f"jan_shelf={lanes.get('jan_shelf')}")
-    flag("family_living", lanes.get("family_living", 0) >= 1, f"family_living={lanes.get('family_living')}")
+    flag(
+        "booksbloom_gold_lane",
+        lanes.get("booksbloom_gold", 0) >= 500,
+        f"booksbloom_gold={lanes.get('booksbloom_gold')}",
+    )
+    flag(
+        "family_living",
+        lanes.get("family_living", 0) >= 1,
+        f"family_living={lanes.get('family_living')}",
+        hard=False,
+    )
+    flag(
+        "workshop_catalog",
+        lanes.get("workshop_catalog", 0) >= 1,
+        f"workshop_catalog={lanes.get('workshop_catalog')}",
+    )
+    flag("public_lane", lanes.get("public", 0) >= 1, f"public={lanes.get('public')}")
+    flag(
+        "convention_master",
+        lanes.get("convention_master", 0) >= 1,
+        f"convention_master={lanes.get('convention_master')}",
+    )
+    flag(
+        "author_list_lane",
+        lanes.get("author_list", 0) >= 1,
+        f"author_list={lanes.get('author_list')}",
+        hard=False,
+    )
+
+    # Vault CNS packs (talk_to_jan secondary context)
+    for p in (
+        Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Public-Context-2026-07-14.md"),
+        Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Family-Living-Facts-2026-07-14.md"),
+        Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Workshop-Catalog-2026-07-18.md"),
+        Path(r"D:\PhronesisVault\Operations\BooksBloom-Convention-Master-Table-2026-07-19.md"),
+        Path(r"D:\PhronesisVault\Operations\WSWTR-Author-List-Extract-2026-07-19.md"),
+        Path(r"D:\PhronesisVault\Operations\SOUL-Jan-Library-Agent-2026-07-14.md"),
+    ):
+        flag(f"vault_pack:{p.name}", p.exists() and p.stat().st_size > 100, str(p), hard=True)
 
     # Scripts
     for s in (
@@ -65,23 +105,39 @@ def check() -> dict:
         "jan_author_chunk_index.py",
         "jan_unified_index.py",
         "apply_jan_discord_channel.py",
+        "local_edge_tts.py",
+        "jan_tts_summary.py",
+        "jan_golden_eval.py",
+        "jan_wswtr_author_list_extract.py",
     ):
         p = SCRIPTS / s
-        flag(f"script:{s}", p.exists(), str(p), hard=True)
+        hard = True
+        flag(f"script:{s}", p.exists(), str(p), hard=hard)
 
-    # Discord wire
+    # Discord wire — yaml optional; missing PyYAML is soft (run via hermes venv)
     try:
-        import yaml
-
-        cfg = yaml.safe_load(
-            (Path.home() / ".hermes" / "config.yaml").read_text(encoding="utf-8")
-        )
-        d = cfg.get("discord") or {}
-        prompts = d.get("channel_prompts") or {}
-        fr = str(d.get("free_response_channels") or "")
-        flag("discord_prompt", DISCORD_CID in prompts, "channel_prompts", hard=True)
-        flag("discord_free", DISCORD_CID in fr, "free_response")
+        try:
+            import yaml  # type: ignore
+        except ImportError:
+            # soft: shelf/scripts still prove library health without discord cfg parse
+            flag(
+                "discord_config",
+                False,
+                "PyYAML missing in this interpreter — use hermes-agent venv",
+                hard=False,
+            )
+            yaml = None  # type: ignore
+        if yaml is not None:
+            cfg = yaml.safe_load(
+                (Path.home() / ".hermes" / "config.yaml").read_text(encoding="utf-8")
+            )
+            d = cfg.get("discord") or {}
+            prompts = d.get("channel_prompts") or {}
+            fr = str(d.get("free_response_channels") or "")
+            flag("discord_prompt", DISCORD_CID in prompts, "channel_prompts", hard=True)
+            flag("discord_free", DISCORD_CID in fr, "free_response")
     except Exception as e:
+        # config unreadable = hard; import already handled soft above
         flag("discord_config", False, str(e), hard=True)
 
     # SOUL + docs
@@ -112,7 +168,7 @@ def check() -> dict:
         flag("retrieve_smoke", False, str(e), hard=True)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    atomic_write_json(OUT, report, indent=2)
     return report
 
 

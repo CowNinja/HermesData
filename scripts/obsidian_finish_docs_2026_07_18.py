@@ -8,6 +8,14 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    import sys as _sys
+
+    _sys.path.insert(0, str(Path(r"D:\HermesData\scripts")))
+    from atomic_io import atomic_write_json, atomic_write_text  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 OBS = VAULT / ".obsidian"
 
@@ -133,10 +141,9 @@ Links: [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]]
     }
     logs = VAULT / "Operations" / "logs"
     logs.mkdir(parents=True, exist_ok=True)
-    (logs / "obsidian-dual-verify-latest.json").write_text(
-        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
-    )
-    (logs / "obsidian-dual-verify-latest.md").write_text(
+    atomic_write_json(logs / "obsidian-dual-verify-latest.json", summary)
+    atomic_write_text(
+        logs / "obsidian-dual-verify-latest.md",
         f"""---
 tags:
   - domain/ops
@@ -159,7 +166,6 @@ tags:
 
 Full narrative: [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]]
 """,
-        encoding="utf-8",
     )
     print("summary", summary)
 
@@ -167,7 +173,7 @@ Full narrative: [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]]
     src = logs / "obsidian-remaining-pass-20260718T181716Z.md"
     latest = logs / "obsidian-remaining-pass-latest.md"
     if src.exists():
-        latest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        atomic_write_text(latest, src.read_text(encoding="utf-8"))
         print("remaining_latest_synced")
 
     idx = VAULT / "Setup" / "00-INDEX.md"

@@ -15,6 +15,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 # Stack/orch pointers — best-effort; paths moved over time. Never fail job if absent.
 STACK_CANDIDATES = [
@@ -31,6 +36,14 @@ RECEIPT = VAULT / "Operations" / "logs" / "citadel-daily-audit-cron-latest.json"
 CHILD_TIMEOUT_SEC = 900
 
 
+def _write_receipt(payload: dict) -> None:
+    RECEIPT.parent.mkdir(parents=True, exist_ok=True)
+    if atomic_write_json is not None:
+        atomic_write_json(RECEIPT, payload, indent=2, min_bytes=20)
+    else:
+        RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def main() -> int:
     at = datetime.now(timezone.utc).isoformat()
     payload: dict = {
@@ -45,8 +58,7 @@ def main() -> int:
 
     if not SCRIPT.is_file():
         payload["error"] = f"missing_script:{SCRIPT}"
-        RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-        RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        _write_receipt(payload)
         print(f"FAIL: missing {SCRIPT}")
         return 1
 
@@ -149,7 +161,7 @@ def main() -> int:
         payload["stack_error"] = str(e)[:200]
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _write_receipt(payload)
     print(
         f"CitadelDaily ok={payload['ok']} partial={payload['partial']} "
         f"channels={channels} errors={errors} soft_fail=1 receipt={RECEIPT}"

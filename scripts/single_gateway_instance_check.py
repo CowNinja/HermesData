@@ -22,6 +22,12 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_append_jsonl
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_append_jsonl = None  # type: ignore
+
 PORT = 8642
 HEALTH_URL = f"http://127.0.0.1:{PORT}/health"
 SEAL = "2026-07-18-single-gateway-soft-fail"
@@ -87,12 +93,18 @@ def read_claimed_pid() -> int | None:
 def write_receipt(payload: dict) -> None:
     RECEIPT_DIR.mkdir(parents=True, exist_ok=True)
     JSONL.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(payload, indent=2) + "\n"
-    tmp = RECEIPT.with_suffix(".json.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    tmp.replace(RECEIPT)
-    with JSONL.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    if atomic_write_json is not None:
+        atomic_write_json(RECEIPT, payload, indent=2, min_bytes=20)
+    else:
+        text = json.dumps(payload, indent=2) + "\n"
+        tmp = RECEIPT.with_suffix(".json.tmp")
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(RECEIPT)
+    if atomic_append_jsonl is not None:
+        atomic_append_jsonl(JSONL, payload)
+    else:
+        with JSONL.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, separators=(",", ":")) + "\n")
 
 
 def main() -> int:

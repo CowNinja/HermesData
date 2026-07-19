@@ -17,6 +17,12 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 # touch policy
 import sys
 sys.path.insert(0, str(Path(r"D:/HermesData/scripts")))
@@ -421,7 +427,10 @@ def acquire_single_writer_lock() -> tuple[bool, str]:
         if old and old != os.getpid() and _pid_alive(old):
             return False, f"lock_held_by_pid={old}"
     payload = f"{os.getpid()} {datetime.now(timezone.utc).isoformat()}\n"
-    lock.write_text(payload, encoding="utf-8")
+    if atomic_write_text is not None:
+        atomic_write_text(lock, payload if payload.endswith("\n") else payload + "\n", min_bytes=1)
+    else:
+        lock.write_text(payload, encoding="utf-8")
 
     def _release() -> None:
         try:
@@ -728,7 +737,11 @@ def main() -> int:
 
     if args.apply and meta_batch:
         STAGING.mkdir(parents=True, exist_ok=True)
-        (STAGING / f"batch-{TS}.json").write_text(json.dumps(meta_batch, indent=2), encoding="utf-8")
+        batch_path = STAGING / f"batch-{TS}.json"
+        if atomic_write_json is not None:
+            atomic_write_json(batch_path, meta_batch, indent=2)
+        else:
+            batch_path.write_text(json.dumps(meta_batch, indent=2), encoding="utf-8")
 
     lines += [
         "",
@@ -744,7 +757,10 @@ def main() -> int:
         "",
     ]
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    RECEIPT.write_text("\n".join(lines), encoding="utf-8")
+    if atomic_write_text is not None:
+        atomic_write_text(RECEIPT, "\n".join(lines), min_bytes=20)
+    else:
+        RECEIPT.write_text("\n".join(lines), encoding="utf-8")
     print(json.dumps({"mode": "apply" if args.apply else "dry-run", "planned": len(planned), "copied": copied, "receipt": str(RECEIPT)}, indent=2))
     return 0
 

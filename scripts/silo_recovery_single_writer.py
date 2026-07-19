@@ -12,6 +12,20 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_text = None  # type: ignore
+
+
+def _pid_write(path: Path, pid: int | str) -> None:
+    body = str(pid)
+    if atomic_write_text is not None:
+        atomic_write_text(path, body, min_bytes=1)
+    else:
+        path.write_text(body, encoding="utf-8")
+
+
 SCRIPTS = Path(r"D:\HermesData\scripts")
 STATE = Path(r"D:\HermesData\state")
 LOG = Path(r"D:\PhronesisVault\Operations\logs\silo-recovery-single-writer-latest.md")
@@ -159,7 +173,7 @@ def main() -> int:
             cont_pid = pid
             break
     if cont_pid:
-        (STATE / "silo_continuous.pid").write_text(str(cont_pid), encoding="utf-8")
+        _pid_write(STATE / "silo_continuous.pid", cont_pid)
         report["continuous_pid"] = cont_pid
     sprint_pid = None
     for pid, cmd in list_python_cmds():
@@ -167,7 +181,7 @@ def main() -> int:
             sprint_pid = pid
             break
     if sprint_pid:
-        (STATE / "silo_autonomous_sprint.pid").write_text(str(sprint_pid), encoding="utf-8")
+        _pid_write(STATE / "silo_autonomous_sprint.pid", sprint_pid)
         report["sprint_pid"] = sprint_pid
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
@@ -193,7 +207,11 @@ def main() -> int:
         "[[Operations/Autonomous-Silo-Runbook-CANONICAL-2026-07-14]]",
         "",
     ]
-    LOG.write_text("\n".join(lines), encoding="utf-8")
+    md = "\n".join(lines)
+    if atomic_write_text is not None:
+        atomic_write_text(LOG, md, min_bytes=20)
+    else:
+        LOG.write_text(md if md.endswith("\n") else md + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
     return 0 if report["ok_single_continuous"] and report["ok_no_dual_focus"] else 1
 

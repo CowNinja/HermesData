@@ -33,6 +33,13 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text, atomic_append_jsonl
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+    atomic_append_jsonl = None  # type: ignore
+
 HERMES = Path(r"D:\HermesData")
 SCRIPTS = HERMES / "scripts"
 VAULT = Path(r"D:\PhronesisVault")
@@ -151,12 +158,18 @@ def main() -> int:
     }
 
     LOG_JSON.parent.mkdir(parents=True, exist_ok=True)
-    LOG_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    with LOG_JSONL.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(payload) + "\n")
+    if atomic_write_json is not None:
+        atomic_write_json(LOG_JSON, payload, indent=2, min_bytes=20)
+    else:
+        LOG_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if atomic_append_jsonl is not None:
+        atomic_append_jsonl(LOG_JSONL, payload)
+    else:
+        with LOG_JSONL.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload) + "\n")
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    RECEIPT.write_text(
+    md_body = (
         f"""# Vault Hygiene 6h — {ts}
 
 **Score:** {score}/100 · pipeline_ok={pipeline_ok} · mode=light
@@ -186,9 +199,12 @@ def main() -> int:
 - [[Operations/Vault-Hygiene-Cadence-CANONICAL-2026-07-12]]
 - [[Operations/Vault-Gardener-Automation-System-2026-07-10]]
 - [[Operations/Four-Worlds-Silo-Architecture-CANONICAL-2026-07-10]]
-""",
-        encoding="utf-8",
+"""
     )
+    if atomic_write_text is not None:
+        atomic_write_text(RECEIPT, md_body, min_bytes=20)
+    else:
+        RECEIPT.write_text(md_body, encoding="utf-8")
 
     # One-liner for cron (empty would be silent; keep short status for audit trail)
     print(f"VaultHygiene6h score={score} ok={pipeline_ok} steps={len(steps)}")

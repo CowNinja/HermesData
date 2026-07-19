@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Habit helper: after a recovery/check, speak tool-truth board (optional).
+
+Runs silent_green_pulse then voice_truth_speak from six_numbers.
+Never claims audio without MEDIA path.
+
+Usage:
+  python voice_after_recovery.py
+  python voice_after_recovery.py --post-discord CHANNEL_ID
+  python voice_after_recovery.py --dry-run
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+SCRIPTS = Path(r"D:\HermesData\scripts")
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+try:
+    from atomic_io import atomic_write_json
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+
+PY = sys.executable
+VAULT = Path(r"D:\PhronesisVault\Operations\logs")
+RECEIPT = VAULT / "voice-after-recovery-latest.json"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--post-discord", default="")
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    green = subprocess.run(
+        [PY, str(SCRIPTS / "silent_green_pulse.py"), "--json"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    try:
+        g = json.loads(green.stdout or "{}")
+    except json.JSONDecodeError:
+        g = {"color": "UNKNOWN", "raw": (green.stdout or "")[:200]}
+
+    voice_cmd = [
+        PY,
+        str(SCRIPTS / "voice_truth_speak.py"),
+        "--from-tool",
+        "six_numbers",
+        "--slug",
+        "after-recovery",
+    ]
+    if args.dry_run:
+        voice_cmd.append("--dry-run")
+    if args.post_discord:
+        voice_cmd.extend(["--post-discord", args.post_discord])
+
+    voice = subprocess.run(voice_cmd, capture_output=True, text=True, timeout=180)
+    try:
+        out = voice.stdout or ""
+        # Prefer first balanced JSON object (voice_truth prints JSON then prose)
+        start = out.find("{")
+        if start < 0:
+            v = {"ok": False, "stdout": out[-500:]}
+        else:
+            depth = 0
+            end = None
+            for i, ch in enumerate(out[start:], start):
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+            blob = out[start:end] if end else out[start:]
+            v = json.loads(blob)
+            v.setdefault("ok", True)
+    except json.JSONDecodeError:
+        v = {"ok": False, "stdout": (voice.stdout or "")[-400:], "stderr": (voice.stderr or "")[-200:]}
+
+    payload = {
+        "green": g,
+        "voice": v,
+        "rule": "speak_only_after_tools",
+        "green_color": g.get("color"),
+    }
+    VAULT.mkdir(parents=True, exist_ok=True)
+    if atomic_write_json is not None:
+        atomic_write_json(RECEIPT, payload, indent=2, min_bytes=20)
+    else:
+        RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(json.dumps(payload, indent=2)[:2000])
+    print(f"receipt={RECEIPT}")
+    return 0 if green.returncode in (0, 1) else green.returncode
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

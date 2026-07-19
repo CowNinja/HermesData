@@ -20,6 +20,11 @@ from windows_subprocess import (  # noqa: E402
     popen_daemon,
     run_hidden,
 )
+try:
+    from atomic_io import atomic_write_text, atomic_write_json  # noqa: E402
+except ImportError:  # pragma: no cover
+    atomic_write_text = None  # type: ignore
+    atomic_write_json = None  # type: ignore
 
 STATE = Path(r"D:\HermesData\state\silo_continuous_state.json")
 STOP = Path(r"D:\HermesData\state\silo_continuous.STOP")
@@ -83,7 +88,11 @@ def kick_continuous() -> str:
         )
         pid = (r.stdout or "?").strip().splitlines()[-1]
         if pid.isdigit():
-            Path(r"D:\HermesData\state\silo_continuous.pid").write_text(pid, encoding="utf-8")
+            pid_path = Path(r"D:\HermesData\state\silo_continuous.pid")
+            if atomic_write_text is not None:
+                atomic_write_text(pid_path, pid, min_bytes=1)
+            else:
+                pid_path.write_text(pid, encoding="utf-8")
     except Exception:
         pass
     return f"started {pid}"
@@ -139,7 +148,10 @@ def main() -> int:
             if not j.get("enabled"):
                 j["enabled"] = True
                 j["reason"] = "travel_autonomy_reassert"
-                sp.write_text(json.dumps(j, indent=2), encoding="utf-8")
+                if atomic_write_json is not None:
+                    atomic_write_json(sp, j, indent=2, min_bytes=20)
+                else:
+                    sp.write_text(json.dumps(j, indent=2), encoding="utf-8")
                 actions.append("reasserted silo_primary")
     except Exception:
         pass
@@ -158,13 +170,16 @@ def main() -> int:
         f.write(json.dumps(entry) + "\n")
 
     BRIEF_LOG.parent.mkdir(parents=True, exist_ok=True)
-    BRIEF_LOG.write_text(
+    brief = (
         f"# Travel heartbeat — {entry['at']}\n\n"
         f"- registry: **{reg}** · unique: **{uniq}**\n"
         f"- continuous age: {age}\n"
-        f"- actions: {actions}\n",
-        encoding="utf-8",
+        f"- actions: {actions}\n"
     )
+    if atomic_write_text is not None:
+        atomic_write_text(BRIEF_LOG, brief, min_bytes=20)
+    else:
+        BRIEF_LOG.write_text(brief, encoding="utf-8")
     print(json.dumps(entry))
     return 0
 

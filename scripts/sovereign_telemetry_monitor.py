@@ -27,6 +27,15 @@ from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional, Tuple
 
 HERMES_SCRIPTS = Path(__file__).resolve().parent
+if str(HERMES_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(HERMES_SCRIPTS))
+
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 REGISTRY_PATH = Path(r"D:\HermesData\config\fleet_registry.yaml")
 TELEMETRY_LOG = Path(r"D:\PhronesisVault\Operations\logs\fleet-telemetry.jsonl")
 OPTIMIZATION_LOG = Path(r"D:\PhronesisVault\Operations\logs\system_optimizations.jsonl")
@@ -713,7 +722,11 @@ class SovereignTelemetryMonitor:
                         current = int(p.get("priority") or 0)
                         p["priority"] = max(0, current + delta)
                         p["telemetry_throttled_at"] = _utc_now()
-            REGISTRY_PATH.write_text(yaml.safe_dump(reg, sort_keys=False, allow_unicode=True), encoding="utf-8")
+            body = yaml.safe_dump(reg, sort_keys=False, allow_unicode=True)
+            if atomic_write_text is not None:
+                atomic_write_text(REGISTRY_PATH, body, min_bytes=20)
+            else:
+                REGISTRY_PATH.write_text(body, encoding="utf-8")
         except Exception:
             pass
 
@@ -768,7 +781,11 @@ class SovereignTelemetryMonitor:
                 }
                 _append_jsonl(OPTIMIZATION_LOG, evt)
 
-            REGISTRY_PATH.write_text(yaml.safe_dump(reg, sort_keys=False, allow_unicode=True), encoding="utf-8")
+            body = yaml.safe_dump(reg, sort_keys=False, allow_unicode=True)
+            if atomic_write_text is not None:
+                atomic_write_text(REGISTRY_PATH, body, min_bytes=20)
+            else:
+                REGISTRY_PATH.write_text(body, encoding="utf-8")
             return {"tuned": True, "stress": stress, "procurement": proc}
         except Exception as exc:
             return {"tuned": False, "error": str(exc)}
@@ -794,7 +811,10 @@ class SovereignTelemetryMonitor:
             "providers": {pid: pt.to_dict() for pid, pt in self._providers.items()},
             "governor_stress": self._governor_stress_level,
         }
-        TELEMETRY_REPORT.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+        if atomic_write_json is not None:
+            atomic_write_json(TELEMETRY_REPORT, report, indent=2)
+        else:
+            TELEMETRY_REPORT.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
         self._save_state()
         return report
 
@@ -824,7 +844,10 @@ class SovereignTelemetryMonitor:
                 "combined_stress_level": self.combined_stress_level(),
                 "updated_at": _utc_now(),
             }
-            TELEMETRY_STATE.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+            if atomic_write_json is not None:
+                atomic_write_json(TELEMETRY_STATE, data, indent=2)
+            else:
+                TELEMETRY_STATE.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
         except Exception:
             pass
 

@@ -17,6 +17,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 REPORT_MD = VAULT / "Operations" / "logs" / "domain-tag-lint-latest.md"
 REPORT_JSON = VAULT / "Operations" / "logs" / "domain-tag-lint-latest.json"
@@ -136,7 +142,10 @@ def main() -> int:
     }
 
     REPORT_JSON.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_JSON.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(REPORT_JSON, payload, indent=2, min_bytes=20)
+    else:
+        REPORT_JSON.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     lines = [
         f"# Domain tag lint — latest",
@@ -181,7 +190,11 @@ def main() -> int:
         "- [[Housekeeping]]",
         "",
     ]
-    REPORT_MD.write_text("\n".join(lines), encoding="utf-8")
+    md_body = "\n".join(lines)
+    if atomic_write_text is not None:
+        atomic_write_text(REPORT_MD, md_body, min_bytes=20)
+    else:
+        REPORT_MD.write_text(md_body, encoding="utf-8")
 
     summary = f"domain_tag_lint scanned={len(files)} tagged={len(tagged)} missing={len(missing)}"
     print(summary)

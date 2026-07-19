@@ -27,6 +27,13 @@ SCRIPTS = Path(r"D:\HermesData\scripts")
 sys.path.insert(0, str(SCRIPTS))
 from domain_route import domain_for  # noqa: E402
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text, atomic_append_jsonl
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+    atomic_append_jsonl = None  # type: ignore
+
 VAULT_LOG = Path(r"D:\PhronesisVault\Operations\logs\detective-codify-smoke-latest.json")
 VAULT_MD = Path(r"D:\PhronesisVault\Operations\logs\detective-codify-smoke-latest.md")
 HERMES_TRAJ = Path(r"D:\HermesData\data\self_correcting_loops\detective_codify_smoke.jsonl")
@@ -134,7 +141,10 @@ def main() -> int:
 
     # Always write latest report (measure); commit flag only changes mode label
     VAULT_LOG.parent.mkdir(parents=True, exist_ok=True)
-    VAULT_LOG.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(VAULT_LOG, payload, indent=2, ensure_ascii=False, min_bytes=20)
+    else:
+        VAULT_LOG.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     md = [
         f"# Detective codify smoke",
         f"",
@@ -157,12 +167,19 @@ def main() -> int:
         f"- [[Operations/Codifying-Loops-Guardrails-Map-2026-07-18]]",
         f"",
     ]
-    VAULT_MD.write_text("\n".join(md), encoding="utf-8")
+    md_body = "\n".join(md)
+    if atomic_write_text is not None:
+        atomic_write_text(VAULT_MD, md_body, min_bytes=20)
+    else:
+        VAULT_MD.write_text(md_body, encoding="utf-8")
 
     if args.commit:
         HERMES_TRAJ.parent.mkdir(parents=True, exist_ok=True)
-        with HERMES_TRAJ.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        if atomic_append_jsonl is not None:
+            atomic_append_jsonl(HERMES_TRAJ, payload)
+        else:
+            with HERMES_TRAJ.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
     print(
         f"DETECTIVE_SMOKE ok={ok} pass={payload['n_pass']}/{payload['n_cases']} "

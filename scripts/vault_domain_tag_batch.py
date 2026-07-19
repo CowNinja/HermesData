@@ -23,6 +23,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 LOG_DIR = VAULT / "Operations" / "logs"
 BACKUP_ROOT = VAULT / "Operations" / "backups" / "domain-tag-batch"
@@ -241,9 +247,14 @@ def cmd_dry_or_apply(apply: bool) -> int:
     }
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     dry_path = LOG_DIR / f"domain-tag-batch-{'apply' if apply else 'dry'}-{ts}.json"
-    dry_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    latest = LOG_DIR / "domain-tag-batch-latest.json"
-    latest.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(dry_path, report, indent=2, min_bytes=20)
+        latest = LOG_DIR / "domain-tag-batch-latest.json"
+        atomic_write_json(latest, report, indent=2, min_bytes=20)
+    else:
+        dry_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        latest = LOG_DIR / "domain-tag-batch-latest.json"
+        latest.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
     md_lines = [
         f"# Domain tag batch — {'APPLY' if apply else 'DRY-RUN'}",
@@ -274,7 +285,12 @@ def cmd_dry_or_apply(apply: bool) -> int:
         "- [[Operations/logs/domain-tag-lint-latest]]",
         "",
     ]
-    (LOG_DIR / "domain-tag-batch-latest.md").write_text("\n".join(md_lines), encoding="utf-8")
+    md_body = "\n".join(md_lines)
+    md_path = LOG_DIR / "domain-tag-batch-latest.md"
+    if atomic_write_text is not None:
+        atomic_write_text(md_path, md_body, min_bytes=20)
+    else:
+        md_path.write_text(md_body, encoding="utf-8")
 
     print(f"mode={'apply' if apply else 'dry-run'} scanned={len(candidates)} changes={report['would_change']} report={dry_path}")
 
@@ -316,10 +332,14 @@ def cmd_dry_or_apply(apply: bool) -> int:
             manifest.setdefault("errors", []).append({"path": it["path"], "error": str(e)})
 
     man_path = LOG_DIR / f"domain-tag-batch-manifest-{ts}.json"
-    man_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    (LOG_DIR / "domain-tag-batch-manifest-latest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
+    if atomic_write_json is not None:
+        atomic_write_json(man_path, manifest, indent=2, min_bytes=20)
+        atomic_write_json(LOG_DIR / "domain-tag-batch-manifest-latest.json", manifest, indent=2, min_bytes=20)
+    else:
+        man_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        (LOG_DIR / "domain-tag-batch-manifest-latest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
     print(f"applied={changed} errors={errors} manifest={man_path} backup={batch_dir}")
     return 0 if errors == 0 else 1
 

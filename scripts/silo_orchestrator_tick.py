@@ -23,6 +23,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 # No focus steal: detach any console inherited from parent continuous loop
 try:
     from win_free_console import free_console  # type: ignore
@@ -377,11 +383,18 @@ def main() -> int:
     )
 
     
+    # continuous-only: OCR/brief already run as separate workers above.
+    # Full self-heal previously hung tick on OCR rediscover + status brief (~OCR/brief timeouts).
+    # v1.10: critical-path isolation — restart/recovery + post-verify only (~1s when healthy).
     workers.append(
         (
             "self_heal_monitor",
-            [sys.executable, str(SCRIPTS / "silo_self_heal_monitor.py")],
-            90,
+            [
+                sys.executable,
+                str(SCRIPTS / "silo_self_heal_monitor.py"),
+                "--continuous-only",
+            ],
+            60,
         )
     )
 
@@ -528,7 +541,10 @@ def main() -> int:
     cad["n"] = int(cad.get("n") or 0) + 1
     n = cad["n"]
     try:
-        cadence_path.write_text(_json.dumps(cad), encoding="utf-8")
+        if atomic_write_json is not None:
+            atomic_write_json(cadence_path, cad, indent=None, min_bytes=1)
+        else:
+            cadence_path.write_text(_json.dumps(cad), encoding="utf-8")
     except Exception:
         pass
     heavy_even_only = {
@@ -603,7 +619,10 @@ def main() -> int:
     report["mode"] = "full_grunt" if local_llm else "scripts_only_rules"
 
     STATE.parent.mkdir(parents=True, exist_ok=True)
-    STATE.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(STATE, report, indent=2, min_bytes=20)
+    else:
+        STATE.write_text(json.dumps(report, indent=2), encoding="utf-8")
     VAULT_LOG.mkdir(parents=True, exist_ok=True)
     md = VAULT_LOG / "silo-orchestrator-tick-latest.md"
     lines = [
@@ -620,7 +639,11 @@ def main() -> int:
     lines.append("")
     lines.append("State: `D:\\\\HermesData\\\\state\\\\silo_orchestrator_last.json`")
     lines.append("[[Operations/Orchestrator-Subagent-Qwythos-Perpetual-CANONICAL-2026-07-11]]")
-    md.write_text("\n".join(lines), encoding="utf-8")
+    body = "\n".join(lines)
+    if atomic_write_text is not None:
+        atomic_write_text(md, body, min_bytes=20)
+    else:
+        md.write_text(body, encoding="utf-8")
     print(json.dumps(
         {
             "mode": report["mode"],

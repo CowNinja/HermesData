@@ -311,9 +311,24 @@ def main() -> int:
         log(f"stale age={int(age)}s src={src} — kill land tree then single restart")
         kill_land_tree()
     elif not running:
-        log("not running — start (after orphan land tree cleanup)")
-        # Clear orphan land workers even if continuous died
-        kill_land_tree()
+        # Overnight 2026-07-18 lesson: continuous can die while a healthy single
+        # focus/drain wave is still copying. Full land-tree cleanup then aborts
+        # multi-hour Google_Backups progress. If writers are single and drain/focus
+        # is live, only restart continuous — do not kill the active wave.
+        healthy_orphan_wave = (
+            dual.get("drain", 0) <= 1
+            and dual.get("focus_land", 0) <= 1
+            and dual.get("orchestrator", 0) <= 1
+            and (dual.get("drain", 0) == 1 or dual.get("focus_land", 0) == 1)
+        )
+        if healthy_orphan_wave:
+            log(
+                f"not running — start WITHOUT land-tree kill "
+                f"(preserve live single drain/focus) dual={dual}"
+            )
+        else:
+            log("not running — start (after orphan land tree cleanup)")
+            kill_land_tree()
     else:
         log("running age unknown — leave alone")
         return 0

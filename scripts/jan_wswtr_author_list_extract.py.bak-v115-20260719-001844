@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""Extract WSWTR author surnames/lists from BooksBloom gold only.
+
+Policy:
+  - Corpus gold extracts only (K: _gold_extracts). Never invent authors.
+  - Primary source: 2005-12-21 jan-authors.wpd (clean Last, First lines).
+  - Secondary: "New authors added" block from WSWTR part1 final (labeled).
+  - Output JSON + markdown for vault CNS; talk_to_jan can cite these packs.
+
+Usage:
+  python jan_wswtr_author_list_extract.py
+  python jan_wswtr_author_list_extract.py --min-count 50
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from datetime import datetime, timezone
+from pathlib import Path
+
+GOLD = Path(
+    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\Projects"
+    r"\from-g-drive\Booksbloom\_gold_extracts"
+)
+OUT_JSON = Path(r"D:\HermesData\state\wswtr_author_list_latest.json")
+OUT_MD = Path(
+    r"D:\PhronesisVault\Operations\WSWTR-Author-List-Extract-2026-07-19.md"
+)
+OUT_LOG = Path(r"D:\PhronesisVault\Operations\logs\wswtr-author-list-latest.json")
+
+# Prefer explicit author-index gold first
+PRIMARY = [
+    "2005-12-21_-_jan-authors.wpd.md",
+]
+# Secondary: revised-edition "New authors added" (First Last form)
+SECONDARY_NEW = [
+    "2010-06-10_1451_-_WSWTR_part1_final.wpd.md",
+]
+
+LAST_FIRST = re.compile(
+    r"^(?P<last>[A-Z][A-Za-z'’\-\.]*(?:[\s][A-Z][A-Za-z'’\-\.]*){0,2}),\s*"
+    r"(?P<first>.+?)\s*$"
+)
+# First Last (2–4 tokens) for the "New authors added" block
+FIRST_LAST = re.compile(
+    r"^(?P<first>[A-Z][A-Za-z'’\-\.]+(?:\s[A-Z][A-Za-z'’\-\.]+){0,2})\s+"
+    r"(?P<last>[A-Z][A-Za-z'’\-\.]+)$"
+)
+
+SKIP_LINE = re.compile(
+    r"^(SOURCE:|#|---|\*|❀|BLANK|WHO SHOULD|VOLUME|AUTHORS OF|Jan Bloom|"
+    r"www\.|COPYRIGHT|Published|Printed|All rights|To order|New authors|"
+    r"New series|Improved|Space for|Reading |Favorite |Updated |Additional |"
+    r"method:|chars:|lane:|source:|extracted)",
+    re.I,
+)
+
+
+def utc() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def strip_frontmatter(text: str) -> str:
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            return parts[2]
+    return text
+
+
+def parse_last_first_file(path: Path) -> list[dict]:
+    raw = strip_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    authors: list[dict] = []
+    seen: set[str] = set()
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or SKIP_LINE.search(line):
+            continue
+        # drop pure noise fragments
+        if len(line) < 3 or len(line) > 80:
+            continue
+        m = LAST_FIRST.match(line)
+        if not m:
+            continue
+        last = m.group("last").strip(" .")
+        first = m.group("first").strip(" .")
+        # reject truncated tails like "Dalgle"
+        if len(last) < 2 or len(first) < 1:
+            continue
+        key = f"{last.lower()}|{first.lower()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        authors.append(
+            {
+                "last": last,
+                "first": first,
+                "display": f"{last}, {first}",
+                "source_file": path.name,
+                "form": "last_first",
+            }
+        )
+    return authors
+
+
+def parse_new_authors_block(path: Path) -> list[dict]:
+    """Pull only the short 'New authors added' list near the top of part1 final."""
+    raw = strip_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    # window after marker
+    m = re.search(r"New authors added\s*(.+?)New series added", raw, re.I | re.S)
+    if not m:
+        return []
+    block = m.group(1)
+    authors: list[dict] = []
+    seen: set[str] = set()
+    for line in block.splitlines():
+        line = line.strip().lstrip("❀•-* ").strip()
+        if not line or SKIP_LINE.search(line):
+            continue
+        # allow multi names on one line separated by 2+ spaces
+        parts = re.split(r"\s{2,}", line) if "  " in line else [line]
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            fm = FIRST_LAST.match(part)
+            if not fm:
+                continue
+            first = fm.group("first").strip()
+            last = fm.group("last").strip()
+            key = f"{last.lower()}|{first.lower()}"
+            if key in seen:
+                continue
+            seen.add(key)
+            authors.append(
+                {
+                    "last": last,
+                    "first": first,
+                    "display": f"{last}, {first}",
+                    "source_file": path.name,
+                    "form": "first_last_new_authors_block",
+                    "note": "from revised-edition 'New authors added' list",
+                }
+            )
+    return authors
+
+
+def build(min_count: int = 50) -> dict:
+    primary_rows: list[dict] = []
+    secondary_rows: list[dict] = []
+    sources_used: list[str] = []
+    warnings: list[str] = []
+
+    for name in PRIMARY:
+        p = GOLD / name
+        if not p.exists():
+            warnings.append(f"missing primary: {name}")
+            continue
+        rows = parse_last_first_file(p)
+        primary_rows.extend(rows)
+        sources_used.append(str(p))
+
+    for name in SECONDARY_NEW:
+        p = GOLD / name
+        if not p.exists():
+            warnings.append(f"missing secondary: {name}")
+            continue
+        rows = parse_new_authors_block(p)
+        secondary_rows.extend(rows)
+        sources_used.append(str(p) + "#New_authors_added")
+
+    # merge unique by last|first
+    merged: dict[str, dict] = {}
+    for r in primary_rows + secondary_rows:
+        key = f"{r['last'].lower()}|{r['first'].lower()}"
+        if key not in merged:
+            merged[key] = r
+        else:
+            # keep primary form; note secondary if both
+            if r.get("form") != merged[key].get("form"):
+                merged[key].setdefault("also_in", []).append(r.get("source_file"))
+
+    authors = sorted(merged.values(), key=lambda a: (a["last"].lower(), a["first"].lower()))
+    report = {
+        "at": utc(),
+        "policy": "gold extracts only — never invent authors/ISBNs",
+        "primary_count": len(primary_rows),
+        "secondary_new_count": len(secondary_rows),
+        "unique_count": len(authors),
+        "min_count": min_count,
+        "ok": len(authors) >= min_count,
+        "sources_used": sources_used,
+        "warnings": warnings,
+        "authors": authors,
+        "public_blurb_note": (
+            "Public site says 157 authors per WSWTR volume — this extract is a "
+            "partial gold index (jan-authors list + revised new-authors block), "
+            "not a claim of completeness."
+        ),
+    }
+    return report
+
+
+def write_outputs(report: dict) -> None:
+    OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
+    OUT_LOG.parent.mkdir(parents=True, exist_ok=True)
+    # full JSON state
+    OUT_JSON.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    # slim log without repeating huge if needed — keep full for now
+    OUT_LOG.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    lines = [
+        "---",
+        "tags:",
+        "  - domain/ops",
+        "  - booksbloom",
+        "  - wswtr",
+        "---",
+        "",
+        "# WSWTR author list extract (gold only)",
+        "",
+        f"**Generated:** {report['at']}  ",
+        f"**Unique authors:** {report['unique_count']}  ",
+        f"**Primary (jan-authors Last, First):** {report['primary_count']}  ",
+        f"**Secondary (part1 'New authors added'):** {report['secondary_new_count']}  ",
+        f"**OK (≥{report['min_count']}):** {'yes' if report['ok'] else 'NO'}  ",
+        "",
+        "## Policy",
+        "",
+        "- Extracted **only** from K gold files listed below.",
+        "- **Do not** treat as complete 157-author public blurb fulfillment.",
+        "- Curator may say “on the gold author index…” and cite this pack + source file.",
+        "- Never invent missing surnames to reach 157.",
+        "",
+        "## Sources",
+        "",
+    ]
+    for s in report["sources_used"]:
+        lines.append(f"- `{s}`")
+    if report["warnings"]:
+        lines += ["", "## Warnings", ""]
+        for w in report["warnings"]:
+            lines.append(f"- {w}")
+    lines += [
+        "",
+        "## Author index (alphabetical)",
+        "",
+        "| # | Author (Last, First) | Source | Form |",
+        "|---|----------------------|--------|------|",
+    ]
+    for i, a in enumerate(report["authors"], 1):
+        lines.append(
+            f"| {i} | {a['display']} | `{a['source_file']}` | {a['form']} |"
+        )
+    lines += [
+        "",
+        "## Related",
+        "",
+        "- [[Operations/Jan-Bloom-Public-Context-2026-07-14]] (public: 157 authors/volume)",
+        "- [[Operations/BooksBloom-Convention-Master-Table-2026-07-19]]",
+        "- [[Operations/Jan-BooksBloom-SubSilo-Done-Definition-2026-07-18]]",
+        "- Script: `D:\\HermesData\\scripts\\jan_wswtr_author_list_extract.py`",
+        "",
+    ]
+    OUT_MD.write_text("\n".join(lines), encoding="utf-8")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--min-count", type=int, default=50)
+    args = ap.parse_args()
+    report = build(min_count=args.min_count)
+    write_outputs(report)
+    slim = {k: report[k] for k in report if k != "authors"}
+    slim["sample"] = [a["display"] for a in report["authors"][:15]]
+    slim["out_md"] = str(OUT_MD)
+    slim["out_json"] = str(OUT_JSON)
+    print(json.dumps(slim, indent=2))
+    return 0 if report["ok"] else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

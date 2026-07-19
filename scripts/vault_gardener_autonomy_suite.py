@@ -28,6 +28,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 HERMES = Path(r"D:\HermesData")
 SCRIPTS = HERMES / "scripts"
 VAULT = Path(r"D:\PhronesisVault")
@@ -128,17 +134,23 @@ def main() -> int:
         "worst_exit": worst,
         "steps": [{"script": r["script"], "exit": r["exit"], "skip": r.get("skip")} for r in results],
     }
-    LOG_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    LOG_TXT.write_text(
+    if atomic_write_json is not None:
+        atomic_write_json(LOG_JSON, payload, indent=2, min_bytes=20)
+    else:
+        LOG_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    txt_body = (
         f"{ts} mode={args.mode} execute_safe={args.execute_safe} worst={worst}\n"
-        + "\n".join(f"{r['script']}: {r['exit']}\n{r.get('out','')[:500]}" for r in results),
-        encoding="utf-8",
+        + "\n".join(f"{r['script']}: {r['exit']}\n{r.get('out','')[:500]}" for r in results)
     )
+    if atomic_write_text is not None:
+        atomic_write_text(LOG_TXT, txt_body, min_bytes=1)
+    else:
+        LOG_TXT.write_text(txt_body, encoding="utf-8")
 
     # Vault receipt (thin)
     rec = VAULT / "Operations" / "logs" / f"autonomy-suite-{datetime.now().strftime('%Y-%m-%d')}.md"
     rec.parent.mkdir(parents=True, exist_ok=True)
-    rec.write_text(
+    rec_body = (
         f"# Autonomy Suite Run — {datetime.now().strftime('%Y-%m-%d')}\n\n"
         f"- mode: `{args.mode}`\n"
         f"- execute_safe: `{args.execute_safe}`\n"
@@ -147,9 +159,12 @@ def main() -> int:
         + "\n".join(f"- `{r['script']}` → exit {r['exit']}" for r in results)
         + "\n\n## Vault links\n"
         "- [[Operations/Vault-Gardener-Automation-System-2026-07-10]]\n"
-        "- [[Operations/Lesson-to-Automation-Protocol-2026-07-10]]\n",
-        encoding="utf-8",
+        "- [[Operations/Lesson-to-Automation-Protocol-2026-07-10]]\n"
     )
+    if atomic_write_text is not None:
+        atomic_write_text(rec, rec_body, min_bytes=20)
+    else:
+        rec.write_text(rec_body, encoding="utf-8")
     print(json.dumps(payload, indent=2))
     return 0 if worst == 0 else worst
 

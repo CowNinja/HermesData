@@ -14,6 +14,12 @@ SCRIPTS = Path(__file__).resolve().parent
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 from windows_subprocess import prefer_pythonw, run_hidden  # noqa: E402
 
 COMFY_OUTPUT = Path(r"D:\ComfyUI\output")
@@ -101,17 +107,28 @@ def _load_state() -> dict:
 
 
 def _save_state(state: dict) -> None:
+    """Atomic state publish (tmp→fsync→replace). Best-effort .bak of prior file."""
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(state, indent=2)
-    tmp = STATE_FILE.with_suffix(".json.tmp")
-    tmp.write_text(payload, encoding="utf-8")
     if STATE_FILE.is_file():
         backup = STATE_FILE.with_suffix(".json.bak")
         try:
-            backup.write_text(STATE_FILE.read_text(encoding="utf-8"), encoding="utf-8")
+            if atomic_write_text is not None:
+                atomic_write_text(
+                    backup,
+                    STATE_FILE.read_text(encoding="utf-8"),
+                    min_bytes=1,
+                )
+            else:
+                backup.write_text(STATE_FILE.read_text(encoding="utf-8"), encoding="utf-8")
         except OSError:
             pass
-    tmp.replace(STATE_FILE)
+    if atomic_write_json is not None:
+        atomic_write_json(STATE_FILE, state, indent=2, min_bytes=20)
+    else:
+        payload = json.dumps(state, indent=2)
+        tmp = STATE_FILE.with_suffix(".json.tmp")
+        tmp.write_text(payload, encoding="utf-8")
+        tmp.replace(STATE_FILE)
 
 
 def _load_posted_registry() -> dict:
@@ -136,7 +153,10 @@ def _save_posted_registry(reg: dict) -> None:
         keep = sorted(names.items(), key=lambda kv: kv[1].get("at", ""))[-MAX_LEDGER:]
         names = dict(keep)
     reg["names"] = names
-    POSTED_REGISTRY.write_text(json.dumps(reg, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(POSTED_REGISTRY, reg, indent=2, min_bytes=20)
+    else:
+        POSTED_REGISTRY.write_text(json.dumps(reg, indent=2), encoding="utf-8")
 
 
 def _posted_to_discord(name: str, digest: str) -> bool:
@@ -179,7 +199,10 @@ def _load_batch_session() -> dict:
 
 def _save_batch_session(session: dict) -> None:
     BATCH_SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
-    BATCH_SESSION_FILE.write_text(json.dumps(session, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(BATCH_SESSION_FILE, session, indent=2, min_bytes=2)
+    else:
+        BATCH_SESSION_FILE.write_text(json.dumps(session, indent=2), encoding="utf-8")
 
 
 def _png_series_index(png_name: str, session: dict) -> int | None:

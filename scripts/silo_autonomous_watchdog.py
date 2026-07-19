@@ -67,8 +67,9 @@ def kill(pid: int) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stall-minutes", type=float, default=12)
-    ap.add_argument("--hours", type=float, default=4)
-    ap.add_argument("--sleep", type=int, default=45)
+    # Overnight default 9h (was 4) so schtasks relaunch covers full sleep window
+    ap.add_argument("--hours", type=float, default=9)
+    ap.add_argument("--sleep", type=int, default=30)
     args = ap.parse_args()
     actions = []
     if STOP.is_file():

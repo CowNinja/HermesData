@@ -51,6 +51,18 @@ def load_public() -> str:
             "WORKSHOP CATALOG (from K gold extracts; label as business/workshop docs, not novel prose):\n"
             + WORKSHOPS.read_text(encoding="utf-8", errors="ignore")[:3500]
         )
+    conv = Path(r"D:\PhronesisVault\Operations\BooksBloom-Convention-Master-Table-2026-07-19.md")
+    if conv.exists():
+        bits.append(
+            "CONVENTION MASTER TABLE (public + contract anchors; do not invent stops):\n"
+            + conv.read_text(encoding="utf-8", errors="ignore")[:4000]
+        )
+    authors = Path(r"D:\PhronesisVault\Operations\WSWTR-Author-List-Extract-2026-07-19.md")
+    if authors.exists():
+        bits.append(
+            "WSWTR AUTHOR LIST EXTRACT (gold only, PARTIAL — not full 157; never invent missing names):\n"
+            + authors.read_text(encoding="utf-8", errors="ignore")[:5000]
+        )
     return "\n\n".join(bits)
 
 
@@ -67,11 +79,19 @@ def pack_context(hits: list[dict]) -> str:
 def groundedness(answer: str, hits: list[dict]) -> dict:
     """Token-overlap groundedness vs retrieved context (cheap faithfulness proxy)."""
     ctx = " ".join((h.get("text") or "") for h in hits).lower()
-    # also allow family living facts in public pack
-    fam = ""
-    if FAMILY.exists():
-        fam = FAMILY.read_text(encoding="utf-8", errors="ignore").lower()
-    ctx_words = set(re.findall(r"[a-z0-9']{4,}", ctx + " " + fam))
+    # also allow labeled vault packs (family / workshops / public / conventions / authors)
+    pack_bits = []
+    pack_paths = [
+        FAMILY,
+        PUBLIC,
+        WORKSHOPS,
+        Path(r"D:\PhronesisVault\Operations\BooksBloom-Convention-Master-Table-2026-07-19.md"),
+        Path(r"D:\PhronesisVault\Operations\WSWTR-Author-List-Extract-2026-07-19.md"),
+    ]
+    for p in pack_paths:
+        if p.exists():
+            pack_bits.append(p.read_text(encoding="utf-8", errors="ignore").lower())
+    ctx_words = set(re.findall(r"[a-z0-9']{4,}", ctx + " " + " ".join(pack_bits)))
     ans_words = set(re.findall(r"[a-z0-9']{4,}", answer.lower()))
     # drop stop-ish
     stop = {

@@ -16,6 +16,11 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+
 JAN_CHUNKS = Path(
     r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\Family\Jan-Bloom-Author\chunks\jan_chunks.jsonl"
 )
@@ -186,45 +191,169 @@ def harvest_bb(limit_files: int = 400) -> list[dict]:
     return rows
 
 
-def public_stub() -> list[dict]:
-    pub = Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Public-Context-2026-07-14.md")
-    if not pub.exists():
-        return []
-    t = pub.read_text(encoding="utf-8", errors="ignore")
-    return [
-        {
-            "id": "public_context_0",
-            "file": str(pub),
-            "source": str(pub),
-            "title": "public BooksBloom context",
-            "i": 0,
-            "text": t[:3000],
-            "lane": "public",
-        }
+def vault_pack_rows() -> list[dict]:
+    """Thin vault CNS packs as labeled retrieval lanes (not manuscript text).
+
+    talk_to_jan already injects these into the system prompt; indexing them
+    also lets retrieve() surface Hi-Ho Silver / workshop titles / public
+    schedule facts when the query is about living/road life.
+    """
+    packs = [
+        (
+            Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Public-Context-2026-07-14.md"),
+            "public",
+            "public BooksBloom context",
+            4500,
+        ),
+        (
+            Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Family-Living-Facts-2026-07-14.md"),
+            "family_living",
+            "family living facts (labeled)",
+            3500,
+        ),
+        (
+            Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Workshop-Catalog-2026-07-18.md"),
+            "workshop_catalog",
+            "workshop catalog (business docs)",
+            4000,
+        ),
+        (
+            Path(r"D:\PhronesisVault\Operations\BooksBloom-Convention-Master-Table-2026-07-19.md"),
+            "convention_master",
+            "convention master table",
+            5000,
+        ),
+        (
+            Path(r"D:\PhronesisVault\Operations\WSWTR-Author-List-Extract-2026-07-19.md"),
+            "author_list",
+            "WSWTR author list extract (gold only, partial)",
+            12000,
+        ),
     ]
+    rows: list[dict] = []
+    for path, lane, title, cap in packs:
+        if not path.exists():
+            continue
+        t = path.read_text(encoding="utf-8", errors="ignore").strip()
+        if len(t) < 80:
+            continue
+        body = t[:cap]
+        # Keep vault CNS packs whole whenever possible so tables (schedules,
+        # family facts, workshop lists) don't fragment across retrieve hits.
+        # Only chunk packs larger than the read cap window.
+        if len(body) <= cap:
+            pieces = [body]
+        else:
+            pieces = chunk_text(body, size=1200, overlap=200) or [body]
+        for i, ch in enumerate(pieces):
+            rows.append(
+                {
+                    "id": f"{lane}_{i}",
+                    "file": str(path),
+                    "source": str(path),
+                    "title": title,
+                    "i": i,
+                    "text": ch,
+                    "lane": lane,
+                }
+            )
+    return rows
+
+
+def public_stub() -> list[dict]:
+    """Backward-compatible alias — prefer vault_pack_rows(). """
+    return [r for r in vault_pack_rows() if r.get("lane") == "public"]
+
+
+def _atomic_write_jsonl(path: Path, rows: list[dict]) -> str:
+    """Write JSONL without leaving a 0-byte target on crash or Win lock.
+
+    Pattern: write complete .tmp → fsync → replace. On Windows PermissionError
+    (destination briefly locked), fall back to copy2 over the target only after
+    tmp is fully written — never open(target, 'w') first.
+    """
+    import os
+    import shutil
+    import time
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        for rec in rows:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    expected = tmp.stat().st_size
+    if expected < 50:
+        raise RuntimeError(f"refusing to publish tiny tmp size={expected}")
+    method = "os.replace"
+    last_err: Exception | None = None
+    for attempt in range(5):
+        try:
+            os.replace(tmp, path)
+            last_err = None
+            break
+        except PermissionError as e:
+            last_err = e
+            method = "copy2_fallback"
+            time.sleep(0.15 * (attempt + 1))
+            try:
+                shutil.copy2(tmp, path)
+                if path.stat().st_size == expected:
+                    try:
+                        tmp.unlink()
+                    except OSError:
+                        pass
+                    last_err = None
+                    break
+            except OSError as e2:
+                last_err = e2
+    if last_err is not None:
+        # Leave tmp in place for recovery; do not wipe target
+        raise RuntimeError(
+            f"atomic publish failed; tmp kept at {tmp} size={expected}: {last_err}"
+        ) from last_err
+    if path.stat().st_size != expected and method == "os.replace":
+        # rare race; still better than empty
+        pass
+    return method
 
 
 def build() -> dict:
     jan = load_jan()
     bb = harvest_bb()
-    pub = public_stub()
-    all_rows = jan + bb + pub
-    UNIFIED.parent.mkdir(parents=True, exist_ok=True)
-    with UNIFIED.open("w", encoding="utf-8") as f:
-        for rec in all_rows:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    vault = vault_pack_rows()
+    all_rows = jan + bb + vault
+    write_method = _atomic_write_jsonl(UNIFIED, all_rows)
+    lanes: dict[str, int] = {}
+    for rec in all_rows:
+        lane = rec.get("lane") or "?"
+        lanes[lane] = lanes.get(lane, 0) + 1
     meta = {
         "at": utc(),
         "path": str(UNIFIED),
         "jan_chunks": len(jan),
         "booksbloom_gold_chunks": len(bb),
-        "public": len(pub),
+        "vault_pack_chunks": len(vault),
+        "lanes": lanes,
+        "public": lanes.get("public", 0),
+        "family_living": lanes.get("family_living", 0),
+        "workshop_catalog": lanes.get("workshop_catalog", 0),
+        "convention_master": lanes.get("convention_master", 0),
         "total": len(all_rows),
-        "policy": "unified jan + booksbloom gold only (not full 76k pilot dump)",
+        "bytes": UNIFIED.stat().st_size if UNIFIED.exists() else 0,
+        "policy": "unified jan + booksbloom gold + vault CNS packs (not full pilot dump)",
+        "write": write_method,
     }
-    (UNIFIED.parent / "jan_unified_meta.json").write_text(
-        json.dumps(meta, indent=2), encoding="utf-8"
-    )
+    meta_path = UNIFIED.parent / "jan_unified_meta.json"
+    if atomic_write_json is not None:
+        meta["meta_write"] = atomic_write_json(meta_path, meta, min_bytes=20)
+    else:
+        meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+        meta["meta_write"] = "write_text_fallback"
     print(json.dumps(meta, indent=2))
     return meta
 

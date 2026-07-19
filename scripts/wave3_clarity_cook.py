@@ -13,6 +13,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 HERMES = Path(r"D:\HermesData")
 SCRIPTS = HERMES / "scripts"
@@ -526,7 +532,11 @@ def main() -> int:
         "backup": str(BACKUP),
     }
     LOGS.mkdir(parents=True, exist_ok=True)
-    (LOGS / "wave3-clarity-cook-latest.json").write_text(json.dumps(receipt, indent=2, default=str), encoding="utf-8")
+    wave3_json = LOGS / "wave3-clarity-cook-latest.json"
+    if atomic_write_json is not None:
+        atomic_write_json(wave3_json, receipt, indent=2, min_bytes=20)
+    else:
+        wave3_json.write_text(json.dumps(receipt, indent=2, default=str), encoding="utf-8")
 
     md = f"""# Wave-3 Clarity Cook Receipt — {TS[:10]}
 
@@ -567,8 +577,12 @@ def main() -> int:
 tags: [wave3, clarity-cook, vault-cns, distillation, silo]
 """
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    RECEIPT.write_text(md, encoding="utf-8", newline="\n")
-    RECEIPT_LATEST.write_text(md, encoding="utf-8", newline="\n")
+    if atomic_write_text is not None:
+        atomic_write_text(RECEIPT, md, min_bytes=20)
+        atomic_write_text(RECEIPT_LATEST, md, min_bytes=20)
+    else:
+        RECEIPT.write_text(md, encoding="utf-8", newline="\n")
+        RECEIPT_LATEST.write_text(md, encoding="utf-8", newline="\n")
     print(json.dumps({k: receipt[k] for k in receipt if k not in ("silo_keys",)}, indent=2, default=str)[:4000])
     print("RECEIPT", RECEIPT)
     return 0

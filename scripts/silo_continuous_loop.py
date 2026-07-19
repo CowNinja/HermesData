@@ -30,6 +30,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 # Detach console immediately so hidden python.exe never steals focus while typing.
 try:
     from win_free_console import free_console  # type: ignore
@@ -110,10 +116,11 @@ def acquire_singleton() -> bool:
         except Exception:
             pass
     LOCK.parent.mkdir(parents=True, exist_ok=True)
-    LOCK.write_text(
-        str(__import__("os").getpid()) + " " + datetime.now(timezone.utc).isoformat() + chr(10),
-        encoding="utf-8",
-    )
+    lock_body = str(__import__("os").getpid()) + " " + datetime.now(timezone.utc).isoformat() + chr(10)
+    if atomic_write_text is not None:
+        atomic_write_text(LOCK, lock_body, min_bytes=1)
+    else:
+        LOCK.write_text(lock_body, encoding="utf-8")
     return True
 
 
@@ -221,16 +228,21 @@ def _run(cmd, timeout=120) -> Tuple[int, str]:
                         "elapsed_s": int(elapsed),
                         "child_pid": proc.pid,
                     }
-                    (Path(r"D:/HermesData/state") / "silo_tick_heartbeat.json").write_text(
-                        json.dumps(hb, indent=2), encoding="utf-8"
-                    )
+                    hb_path = Path(r"D:/HermesData/state") / "silo_tick_heartbeat.json"
+                    if atomic_write_json is not None:
+                        atomic_write_json(hb_path, hb, indent=2, min_bytes=20)
+                    else:
+                        hb_path.write_text(json.dumps(hb, indent=2), encoding="utf-8")
                     if STATE.is_file():
                         cur = json.loads(STATE.read_text(encoding="utf-8"))
                         if isinstance(cur, dict):
                             cur["phase"] = "tick_running"
                             cur["heartbeat_at"] = hb["at"]
                             cur["tick_elapsed_s"] = int(elapsed)
-                            STATE.write_text(json.dumps(cur, indent=2), encoding="utf-8")
+                            if atomic_write_json is not None:
+                                atomic_write_json(STATE, cur, indent=2, min_bytes=20)
+                            else:
+                                STATE.write_text(json.dumps(cur, indent=2), encoding="utf-8")
                 except Exception:
                     pass
     except Exception as e:
@@ -391,9 +403,11 @@ def run_tick(limits: Dict[str, int], allow_grunt: bool) -> Dict[str, Any]:
             "phase": "tick_running",
             "limits": limits,
         }
-        (Path(r"D:/HermesData/state") / "silo_tick_heartbeat.json").write_text(
-            json.dumps(hb, indent=2), encoding="utf-8"
-        )
+        hb_path = Path(r"D:/HermesData/state") / "silo_tick_heartbeat.json"
+        if atomic_write_json is not None:
+            atomic_write_json(hb_path, hb, indent=2, min_bytes=20)
+        else:
+            hb_path.write_text(json.dumps(hb, indent=2), encoding="utf-8")
         # merge phase into existing STATE if present
         if STATE.is_file():
             try:
@@ -401,7 +415,10 @@ def run_tick(limits: Dict[str, int], allow_grunt: bool) -> Dict[str, Any]:
                 if isinstance(cur, dict):
                     cur["phase"] = "tick_running"
                     cur["heartbeat_at"] = hb["at"]
-                    STATE.write_text(json.dumps(cur, indent=2), encoding="utf-8")
+                    if atomic_write_json is not None:
+                        atomic_write_json(STATE, cur, indent=2, min_bytes=20)
+                    else:
+                        STATE.write_text(json.dumps(cur, indent=2), encoding="utf-8")
             except Exception:
                 pass
     except Exception:
@@ -434,7 +451,10 @@ def run_tick(limits: Dict[str, int], allow_grunt: bool) -> Dict[str, Any]:
 
 def write_state(state: Dict[str, Any]) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
-    STATE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(STATE, state, indent=2, min_bytes=20)
+    else:
+        STATE.write_text(json.dumps(state, indent=2), encoding="utf-8")
     LOG.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         f"# Silo continuous loop — {state.get('at')}",
@@ -448,7 +468,11 @@ def write_state(state: Dict[str, Any]) -> None:
         "Stop: create `D:\\\\HermesData\\\\state\\\\silo_continuous.STOP`",
         "[[Operations/Silo-Continuous-Resource-Aware-Loop-CANONICAL-2026-07-11]]",
     ]
-    LOG.write_text("\n".join(lines), encoding="utf-8")
+    body = "\n".join(lines)
+    if atomic_write_text is not None:
+        atomic_write_text(LOG, body, min_bytes=20)
+    else:
+        LOG.write_text(body, encoding="utf-8")
 
 
 def main() -> int:

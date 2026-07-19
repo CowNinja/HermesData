@@ -12,6 +12,14 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+SCRIPTS = ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+try:
+    from atomic_io import atomic_write_json
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+
 STATE = ROOT / "state"
 LOGS = ROOT / "logs"
 REPORT = LOGS / "rp-bottleneck-report.json"
@@ -323,7 +331,10 @@ def main() -> int:
         report = apply_fixes(report, channel=args.channel)
 
     REPORT.parent.mkdir(parents=True, exist_ok=True)
-    REPORT.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(REPORT, report, indent=2, min_bytes=20)
+    else:
+        REPORT.write_text(json.dumps(report, indent=2), encoding="utf-8")
     if args.json_only:
         print(json.dumps(report))
     else:

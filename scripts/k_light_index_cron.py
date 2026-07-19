@@ -17,6 +17,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+
 ROOT = Path(r"D:\HermesData")
 VAULT = Path(r"D:\PhronesisVault")
 SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
@@ -24,6 +29,14 @@ RECEIPT = VAULT / "Operations" / "logs" / "k-light-index-latest.json"
 # 2026-07-18: 180s was flapping K-Light to score=40; silo capped walk still needs headroom.
 CHILD_TIMEOUT_SEC = 600
 SOFT_FAIL_EXIT = 0  # advisory index job — never red-fail the day on timeout/partial
+
+
+def _write_receipt(payload: dict) -> None:
+    RECEIPT.parent.mkdir(parents=True, exist_ok=True)
+    if atomic_write_json is not None:
+        atomic_write_json(RECEIPT, payload, indent=2, min_bytes=20)
+    else:
+        RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def run_py(script: Path, timeout: int = CHILD_TIMEOUT_SEC) -> dict:
@@ -83,8 +96,7 @@ def main() -> int:
 
     if not k_ok:
         payload["skip_reason"] = "K_drive_not_mounted"
-        RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-        RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        _write_receipt(payload)
         print(f"KLightIndex score=0 ok=False skipped=True reason=K_missing elapsed={time.time()-t0:.1f}s")
         # Catastrophic only if world script also cannot run meaningfully — still soft for cron noise.
         return SOFT_FAIL_EXIT
@@ -105,8 +117,7 @@ def main() -> int:
     # Partial success is still a useful run (receipt proves scheduler fired).
     payload["partial"] = bool(score >= 50 and not payload["ok"])
 
-    RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _write_receipt(payload)
     print(
         f"KLightIndex score={score} ok={payload['ok']} partial={payload['partial']} "
         f"skipped=False soft_fail=1 elapsed={payload['elapsed_sec']}s receipt={RECEIPT}"

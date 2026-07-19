@@ -16,6 +16,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
+try:
+    from atomic_io import atomic_write_json
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+
 OPTIMIZATION_LOG = Path(r"D:\PhronesisVault\Operations\logs\system_optimizations.jsonl")
 TELEMETRY_STATE = Path(r"D:\PhronesisVault\Operations\logs\sovereign-telemetry-state.json")
 TELEMETRY_REPORT = Path(r"D:\PhronesisVault\Operations\logs\sovereign-telemetry-report.json")
@@ -112,7 +117,10 @@ def build_panel(*, tail_limit: int = 30) -> Dict[str, Any]:
 def refresh_panel() -> Dict[str, Any]:
     panel = build_panel()
     PANEL_OUT.parent.mkdir(parents=True, exist_ok=True)
-    PANEL_OUT.write_text(json.dumps(panel, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(PANEL_OUT, panel, indent=2, min_bytes=20)
+    else:
+        PANEL_OUT.write_text(json.dumps(panel, indent=2), encoding="utf-8")
     return panel
 
 

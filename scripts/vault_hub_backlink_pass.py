@@ -19,9 +19,16 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
 
 VAULT = Path(r"D:\PhronesisVault")
 HERMES_LOG = Path(r"D:\HermesData\logs\vault-hub-backlink-latest.json")
@@ -299,7 +306,10 @@ def main() -> int:
         "sample_indexes": sorted(set(changed_indexes))[:20],
     }
     HERMES_LOG.parent.mkdir(parents=True, exist_ok=True)
-    HERMES_LOG.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(HERMES_LOG, payload, indent=2, min_bytes=20)
+    else:
+        HERMES_LOG.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     VAULT_LOG.parent.mkdir(parents=True, exist_ok=True)
     mode = "APPLY" if args.apply else "DRY-RUN"
     lines = [
@@ -324,7 +334,11 @@ def main() -> int:
         "- [[docs/agent-coordination/Vault-Link-Audit-2026-06-24]]",
         "",
     ]
-    VAULT_LOG.write_text("\n".join(lines), encoding="utf-8")
+    md_body = "\n".join(lines)
+    if atomic_write_text is not None:
+        atomic_write_text(VAULT_LOG, md_body, min_bytes=20)
+    else:
+        VAULT_LOG.write_text(md_body, encoding="utf-8")
     print(json.dumps(payload, indent=2))
     return 0
 

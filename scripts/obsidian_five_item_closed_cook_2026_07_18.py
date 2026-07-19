@@ -23,6 +23,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    import sys as _sys
+
+    _sys.path.insert(0, str(Path(r"D:\HermesData\scripts")))
+    from atomic_io import atomic_write_json, atomic_write_text  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 OBS = VAULT / ".obsidian"
 HERMES = Path(r"D:\HermesData")
@@ -44,7 +52,8 @@ def load_json(path: Path):
 
 
 def dump_json(path: Path, data) -> None:
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    """Atomic JSON publish for receipts + config snapshots."""
+    atomic_write_json(path, data)
 
 
 def backup(path: Path) -> None:
@@ -767,10 +776,10 @@ Restore from `.obsidian/backups/five-item-closed-cook-{TS}/` (workspace, communi
 - [[Housekeeping]]
 """
 
-    # latest pointers
-    (LOGS / "obsidian-five-item-closed-cook-latest.md").write_text(md, encoding="utf-8")
-    (LOGS / f"obsidian-five-item-closed-cook-{TS}.md").write_text(md, encoding="utf-8")
-    (SETUP / "Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18.md").write_text(md, encoding="utf-8")
+    # latest pointers (pulse-registered receipts atomic)
+    atomic_write_text(LOGS / "obsidian-five-item-closed-cook-latest.md", md)
+    atomic_write_text(LOGS / f"obsidian-five-item-closed-cook-{TS}.md", md)
+    atomic_write_text(SETUP / "Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18.md", md)
 
     # dual-verify latest
     dual_md = f"""---
@@ -801,7 +810,7 @@ tags:
 
 Full: [[Operations/logs/obsidian-five-item-closed-cook-latest]] · [[Setup/Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18]]
 """
-    (LOGS / "obsidian-dual-verify-latest.md").write_text(dual_md, encoding="utf-8")
+    atomic_write_text(LOGS / "obsidian-dual-verify-latest.md", dual_md)
     dump_json(LOGS / "obsidian-dual-verify-latest.json", {"v1": v1, "v2": v2, "ts": TS})
 
     # Update thread charter backlog
@@ -873,7 +882,7 @@ def main() -> int:
     dump_json(LOGS / f"obsidian-five-item-closed-cook-{TS}.json", RESULTS)
     # human report
     rep = "\n".join(REPORT) + f"\n\nALL_OK={all_ok}\n"
-    (LOGS / f"obsidian-five-item-closed-cook-{TS}-console.txt").write_text(rep, encoding="utf-8")
+    atomic_write_text(LOGS / f"obsidian-five-item-closed-cook-{TS}-console.txt", rep)
     log(f"ALL_OK={all_ok}")
     return 0 if all_ok else 1
 

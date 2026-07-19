@@ -26,6 +26,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    import sys as _sys
+
+    _sys.path.insert(0, str(Path(r"D:\HermesData\scripts")))
+    from atomic_io import atomic_write_json, atomic_write_text  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 OBS = VAULT / ".obsidian"
 HERMES = Path(r"D:\HermesData")
@@ -473,9 +481,10 @@ SKIP_INDEX_PARTS = {
     r_idx = run([PY, str(SCRIPTS / "refresh_folder_indexes.py")], timeout=600)
     r_vw = run([PY, str(SCRIPTS / "vaultwalker.py"), "--dry-run", "--cycle", "light", "--silos", "PhronesisVault"], timeout=300)
 
-    # 4) Scoreboard receipt
+    # 4) Scoreboard receipt (ops log — atomic publish)
     scoreboard = LOGS / "vaultwalker-effectiveness-scoreboard-2026-07-18.md"
-    scoreboard.write_text(
+    atomic_write_text(
+        scoreboard,
         f"""---
 tags:
   - domain/ops
@@ -510,8 +519,6 @@ tags:
 - [[Operations/Vault-Hygiene-Cadence-CANONICAL-2026-07-12]]
 - [[Operations/Grand-Vision-Silo-Gardener-and-Hermes-Continuity-2026-07-10]]
 """,
-        encoding="utf-8",
-        newline="\n",
     )
 
     return {
@@ -623,19 +630,16 @@ V1 and V2 must match; `pass` must be true.
 - [[Setup/Obsidian-Category-Colors-and-Tags]]
 - [[Housekeeping]]
 """
-    receipt.write_text(body, encoding="utf-8", newline="\n")
+    atomic_write_text(receipt, body)
     latest = LOGS / "Five-Item-Vault-Clarity-Cook-latest.md"
-    latest.write_text(body, encoding="utf-8", newline="\n")
-    # JSON report
-    (HERMES / "logs" / f"five-item-clarity-cook-{TS_FILE}.json").write_text(
-        json.dumps(report, indent=2, default=str), encoding="utf-8"
-    )
-    (HERMES / "logs" / "five-item-clarity-cook-latest.json").write_text(
-        json.dumps(report, indent=2, default=str), encoding="utf-8"
-    )
+    atomic_write_text(latest, body)
+    # JSON report (pulse-registered latest + dated stamp)
+    atomic_write_json(HERMES / "logs" / f"five-item-clarity-cook-{TS_FILE}.json", report)
+    atomic_write_json(HERMES / "logs" / "five-item-clarity-cook-latest.json", report)
     # Setup short receipt
     setup_r = SETUP / "Five-Item-Vault-Clarity-Cook-Receipt-2026-07-18.md"
-    setup_r.write_text(
+    atomic_write_text(
+        setup_r,
         f"""---
 tags:
   - domain/setup
@@ -662,8 +666,6 @@ Obsidian **Ctrl+R** to load graph.json / app.json changes.
 - [[Operations/logs/Five-Item-Vault-Clarity-Cook-latest]]
 - [[Housekeeping]]
 """,
-        encoding="utf-8",
-        newline="\n",
     )
 
 

@@ -4,6 +4,7 @@
 Canon:
   Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18 (A3/N1)
   Operations/Codifying-Loops-Guardrails-Map-2026-07-18
+  Operations/Silo-Self-Heal-Loop-CANONICAL-2026-07-12
 
 Guardrails:
   - exact process match only (silo_continuous_loop.py) — never gateway
@@ -11,6 +12,13 @@ Guardrails:
   - success claim ONLY after post-verify re-measure
   - soft-fail exit 0 when measure ran; receipt always written
   - --verify-only: measure + post-verify report, no restart/ocr side effects
+  - --continuous-only: heal continuous path only (no OCR/brief side work)
+  - live process required for healthy claim (fresh state alone is NOT enough)
+
+Research (2026-07-19 overnight):
+  SRE critical-path isolation — best-effort side effects (OCR/brief) must not
+  block or timeout the heal that keeps the land loop single-writer alive.
+  Prior overnight: full monitor hung ~120s on OCR/brief while continuous was dead.
 """
 from __future__ import annotations
 
@@ -22,6 +30,8 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from atomic_io import atomic_write_json, atomic_write_text
 
 STATE = Path(r"D:\HermesData\state")
 SCRIPTS = Path(r"D:\HermesData\scripts")
@@ -38,7 +48,7 @@ STOP_FILES = [
 ]
 PY = sys.executable
 # After restart, allow process to appear before claiming success
-POST_VERIFY_SLEEP_S = 4.0
+POST_VERIFY_SLEEP_S = 6.0
 # Heartbeat / state freshness after successful heal (seconds)
 POST_VERIFY_MAX_AGE_S = 1200.0
 
@@ -48,8 +58,22 @@ def utc() -> str:
 
 
 def continuous_count() -> int:
+    """Count real silo_continuous_loop.py Python workers only.
+
+    Pitfall (2026-07-19): a bare CommandLine -like '*silo_continuous_loop.py*'
+    also matches bash/powershell agent shells that embed the string in their
+    -c / eval payload, inflating n to 5+ and false-failing post-verify.
+    Restrict to python.exe / pythonw.exe process names.
+    """
     try:
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        # Name filter first; CommandLine exact script token second.
+        ps = (
+            "$n = (Get-CimInstance Win32_Process | Where-Object { "
+            "($_.Name -match '^python(w)?\\.exe$') -and "
+            "($_.CommandLine -like '*silo_continuous_loop.py*') "
+            "} | Measure-Object).Count; Write-Output $n"
+        )
         r = subprocess.run(
             [
                 "powershell.exe",
@@ -57,7 +81,7 @@ def continuous_count() -> int:
                 "-WindowStyle",
                 "Hidden",
                 "-Command",
-                "(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*silo_continuous_loop.py*' } | Measure-Object).Count",
+                ps,
             ],
             capture_output=True,
             text=True,
@@ -143,22 +167,27 @@ def post_verify(*, attempted_restart: bool) -> dict:
             }
         )
     else:
-        # Idle healthy: either fresh state or live process
-        healthy = (age <= 900 and n <= 1) or (n == 1)
+        # Live process required unless STOP armed.
+        # Pitfall (2026-07-19 overnight): (age<=900 and n<=1) treated DEAD workers
+        # with a fresh state stamp as healthy → success_claim while kitchen was down.
+        intentional_stop = n == 0 and len(stops) > 0
+        healthy = (n == 1) or intentional_stop
         checks.append(
             {
                 "name": "continuous_healthy_or_live",
-                "ok": healthy or (n == 0 and age > 900 and len(stops) > 0),
-                "detail": f"age={age:.0f}s n={n}",
+                "ok": healthy,
+                "detail": f"age={age:.0f}s n={n} stops={len(stops)}",
             }
         )
 
     if hb_age is not None:
+        # Presence alone is not health; n=0 + leftover hb must not PASS.
+        hb_ok = (n == 1) or (n == 0 and len(stops) > 0)
         checks.append(
             {
                 "name": "heartbeat_present",
-                "ok": True,
-                "detail": f"hb_age={hb_age:.0f}s",
+                "ok": hb_ok,
+                "detail": f"hb_age={hb_age:.0f}s n={n}",
             }
         )
 
@@ -166,9 +195,9 @@ def post_verify(*, attempted_restart: bool) -> dict:
     evidence = "; ".join(
         f"{c['name']}={'PASS' if c['ok'] else 'FAIL'}:{c['detail']}" for c in checks
     )
-    # Success claim only when verify ok AND (no restart needed path or restart worked)
-    success_claim = bool(ok and (n == 1 or (n == 0 and age <= 900) or (n == 0 and stops)))
-    # Narrower: never claim "restarted ok" without n==1
+    # Success only with a live single writer, or intentional STOP (n=0).
+    # Never claim healthy on fresh state + dead process (stale PID pattern).
+    success_claim = bool(ok and ((n == 1 and not stops) or (n == 0 and bool(stops))))
     if attempted_restart:
         success_claim = bool(ok and n == 1 and not stops)
 
@@ -188,16 +217,14 @@ def post_verify(*, attempted_restart: bool) -> dict:
         "escalate_hint": (
             None
             if ok
-            else "python D:/HermesData/scripts/prepare_grok_escalation_brief.py --topic \"silo self-heal post-verify fail\""
+            else 'python D:/HermesData/scripts/prepare_grok_escalation_brief.py --topic "silo self-heal post-verify fail"'
         ),
     }
 
 
 def write_post_verify(result: dict) -> None:
     POST_VERIFY_JSON.parent.mkdir(parents=True, exist_ok=True)
-    POST_VERIFY_JSON.write_text(
-        json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    atomic_write_json(POST_VERIFY_JSON, result, indent=2, ensure_ascii=False)
     lines = [
         f"# silo self-heal post-verify",
         f"",
@@ -216,7 +243,29 @@ def write_post_verify(result: dict) -> None:
         f"- [[Operations/Autonomous-Silo-Runbook-CANONICAL-2026-07-14]]",
         f"",
     ]
-    POST_VERIFY_MD.write_text("\n".join(lines), encoding="utf-8")
+    atomic_write_text(POST_VERIFY_MD, "\n".join(lines))
+
+
+def start_continuous() -> None:
+    """Spawn exact continuous loop only (never gateway)."""
+    pyw = Path(PY).with_name("pythonw.exe")
+    launcher = str(pyw) if pyw.is_file() else PY
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    subprocess.Popen(
+        [
+            launcher,
+            str(SCRIPTS / "silo_continuous_loop.py"),
+            "--force-mode",
+            "aggressive",
+            "--max-cycles",
+            "0",
+        ],
+        cwd=str(SCRIPTS),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+        creationflags=flags if sys.platform == "win32" else 0,
+    )
 
 
 def main() -> int:
@@ -225,6 +274,14 @@ def main() -> int:
         "--verify-only",
         action="store_true",
         help="Measure + post-verify only; no restart/ocr/brief side effects",
+    )
+    ap.add_argument(
+        "--continuous-only",
+        action="store_true",
+        help=(
+            "Heal continuous single-writer path only; skip OCR rediscover + status brief. "
+            "Use for hang-free overnight restart (critical path isolation)."
+        ),
     )
     ap.add_argument(
         "--post-verify-sleep",
@@ -243,29 +300,38 @@ def main() -> int:
     if args.verify_only:
         actions.append(f"verify-only age={age:.0f}s n={n0} stops={stops0 or 'none'}")
     else:
+        if args.continuous_only:
+            actions.append("mode=continuous-only (skip ocr/brief)")
         if stops0:
             actions.append(f"STOP present — no restart ({stops0})")
-        elif age > 900 and n0 == 0:
-            pyw = Path(PY).with_name("pythonw.exe")
-            launcher = str(pyw) if pyw.is_file() else PY
-            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-            subprocess.Popen(
-                [
-                    launcher,
-                    str(SCRIPTS / "silo_continuous_loop.py"),
-                    "--force-mode",
-                    "aggressive",
-                    "--max-cycles",
-                    "0",
-                ],
-                cwd=str(SCRIPTS),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                creationflags=flags if sys.platform == "win32" else 0,
-            )
+        elif n0 > 1:
+            # Dual/multi continuous = single-writer violation. Exact recovery only; never gateway.
+            rec = SCRIPTS / "silo_recovery_single_writer.py"
+            if rec.is_file():
+                try:
+                    r = subprocess.run(
+                        [PY, str(rec)],
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                        cwd=str(SCRIPTS),
+                    )
+                    attempted_restart = True
+                    actions.append(
+                        f"single_writer_recovery n0={n0} exit={r.returncode} "
+                        f"out={(r.stdout or '')[-200:].replace(chr(10), ' ')}"
+                    )
+                    time.sleep(max(0.0, float(args.post_verify_sleep)))
+                except Exception as e:
+                    actions.append(f"single_writer_recovery err {e}")
+            else:
+                actions.append(f"dual continuous n={n0} but recovery script missing")
+        elif n0 == 0:
+            # Dead worker: restart immediately. Do NOT wait for age>900 —
+            # fresh state + dead PID previously delayed heal for 15 minutes.
+            start_continuous()
             attempted_restart = True
-            actions.append(f"restarted continuous (age={age:.0f}s)")
+            actions.append(f"restarted continuous (n=0 age={age:.0f}s)")
             time.sleep(max(0.0, float(args.post_verify_sleep)))
         elif age > 900 and n0 > 0:
             actions.append(f"stale state age={age:.0f}s but {n0} live — leave")
@@ -274,40 +340,45 @@ def main() -> int:
                 f"continuous ok age={age:.0f}s cycle={st.get('cycle')} n={n0}"
             )
 
-        try:
-            con = sqlite3.connect(str(STATE / "ocr_backlog.sqlite3"))
-            q = con.execute(
-                "select count(*) from ocr_queue where status in ('queued','needs_ocr')"
-            ).fetchone()[0]
-            ok_n = con.execute(
-                "select count(*) from ocr_queue where status='ok_text'"
-            ).fetchone()[0]
-            con.close()
-            actions.append(f"ocr queued={q} ok_text={ok_n}")
-            if q < 100:
-                subprocess.run(
-                    [
-                        PY,
-                        str(SCRIPTS / "silo_ocr_backlog_worker.py"),
-                        "--limit",
-                        "5",
-                        "--discover-only",
-                    ],
-                    timeout=120,
-                )
-                actions.append("ocr rediscover")
-        except Exception as e:
-            actions.append(f"ocr check err {e}")
+        # OCR/brief are best-effort side paths; never block continuous heal forever.
+        # --continuous-only skips them entirely (critical-path isolation).
+        if not args.continuous_only:
+            try:
+                con = sqlite3.connect(str(STATE / "ocr_backlog.sqlite3"))
+                q = con.execute(
+                    "select count(*) from ocr_queue where status in ('queued','needs_ocr')"
+                ).fetchone()[0]
+                ok_n = con.execute(
+                    "select count(*) from ocr_queue where status='ok_text'"
+                ).fetchone()[0]
+                con.close()
+                actions.append(f"ocr queued={q} ok_text={ok_n}")
+                if q < 100:
+                    subprocess.run(
+                        [
+                            PY,
+                            str(SCRIPTS / "silo_ocr_backlog_worker.py"),
+                            "--limit",
+                            "5",
+                            "--discover-only",
+                        ],
+                        timeout=45,
+                    )
+                    actions.append("ocr rediscover")
+            except Exception as e:
+                actions.append(f"ocr check err {e}")
 
-        try:
-            subprocess.run(
-                [PY, str(SCRIPTS / "silo_status_brief.py")],
-                timeout=60,
-                capture_output=True,
-            )
-            actions.append("brief refreshed")
-        except Exception as e:
-            actions.append(f"brief err {e}")
+            try:
+                subprocess.run(
+                    [PY, str(SCRIPTS / "silo_status_brief.py")],
+                    timeout=30,
+                    capture_output=True,
+                )
+                actions.append("brief refreshed")
+            except Exception as e:
+                actions.append(f"brief err {e}")
+        else:
+            actions.append("skipped ocr/brief (continuous-only)")
 
     # POST-VERIFY — never claim restart success without re-measure
     pv = post_verify(attempted_restart=attempted_restart)
@@ -324,7 +395,8 @@ def main() -> int:
         )
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
-    LOG.write_text(
+    atomic_write_text(
+        LOG,
         "# self-heal "
         + utc()
         + "\n\n"
@@ -332,7 +404,6 @@ def main() -> int:
         + "\n\n"
         + f"- post_verify_json: `{POST_VERIFY_JSON}`\n"
         + f"- canon: [[Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18]]\n",
-        encoding="utf-8",
     )
     out = {
         "at": utc(),

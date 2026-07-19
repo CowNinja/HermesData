@@ -27,6 +27,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+from atomic_io import atomic_append_jsonl, atomic_write_json
+
 ROOT = Path(r"D:\HermesData")
 SCRIPTS = ROOT / "scripts"
 PY = sys.executable
@@ -149,9 +151,8 @@ def main() -> int:
 
     VAULT.mkdir(parents=True, exist_ok=True)
     JSONL.parent.mkdir(parents=True, exist_ok=True)
-    RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    with JSONL.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    atomic_write_json(RECEIPT, payload, indent=2)
+    atomic_append_jsonl(JSONL, payload)
 
     if args.json:
         print(json.dumps(payload, indent=2))

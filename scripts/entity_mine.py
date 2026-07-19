@@ -26,6 +26,8 @@ QUEUE = Path(r"D:\PhronesisVault\Operations\logs\entity-review-queue-latest.md")
 RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\entity-mine-latest.md")
 JSON_OUT = Path(r"D:\HermesData\Backups\entity-mine-latest.json")
 GRUNT = Path(r"D:\HermesData\scripts\grunt_local.py")
+SCRIPTS = Path(r"D:\HermesData\scripts")
+SMOKE = SCRIPTS / "detective_codify_smoke.py"
 
 STOP = {
     "the", "and", "for", "with", "from", "this", "that", "your", "have", "will",
@@ -180,6 +182,29 @@ def promote(entity_doc: dict, key: str, role: str, domain: str, names: list[str]
     return True
 
 
+def run_post_promote_smoke() -> dict:
+    """N2/A6 gate after entity_context write. Non-LLM. Soft-fail dict always."""
+    if not SMOKE.is_file():
+        return {"ok": False, "error": "detective_codify_smoke.py missing"}
+    try:
+        r = subprocess.run(
+            [sys.executable, str(SMOKE), "--json"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(SCRIPTS),
+        )
+        out = (r.stdout or "") + (r.stderr or "")
+        a, b = out.find("{"), out.rfind("}") + 1
+        if a >= 0 and b > a:
+            data = json.loads(out[a:b])
+            data["exit_code"] = r.returncode
+            return data
+        return {"ok": False, "error": "no_json", "raw": out[-400:], "exit_code": r.returncode}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=6000)
@@ -271,9 +296,15 @@ def main() -> int:
             if promote(entity_doc, r["key"], role, domain, names_list):
                 promoted.append(r)
 
+    smoke_result: dict | None = None
     if promoted and not args.no_promote:
         entity_doc["updated"] = utc()[:10]
         save_json(ENTITY, entity_doc)
+        # Tier A6 / N2 — domain_for smoke after any promote write
+        smoke_result = run_post_promote_smoke()
+        if not smoke_result.get("ok"):
+            # Do not silent-green a broken lexicon; leave write (audit trail) but flag hard.
+            RECEIPT.parent.mkdir(parents=True, exist_ok=True)
 
     queue = sorted(queue, key=lambda r: -r["count"])[: int((policy.get("human_review") or {}).get("max_queue") or 40)]
 
@@ -321,25 +352,36 @@ def main() -> int:
         "queue_rows": queue,
     }
     save_json(JSON_OUT, payload)
+    smoke_line = ""
+    if smoke_result is not None:
+        smoke_line = (
+            f"post_promote_smoke ok={smoke_result.get('ok')} "
+            f"pass={smoke_result.get('n_pass')}/{smoke_result.get('n_cases')} "
+            f"evidence={str(smoke_result.get('evidence') or smoke_result.get('error') or '')[:200]}\n\n"
+            f"Smoke: [[Operations/logs/detective-codify-smoke-latest]]\n"
+        )
     RECEIPT.write_text(
         f"# Entity mine — {utc()}\n\n"
         f"scanned_files={len(names)} clusters={len(results)} "
         f"promoted={len(promoted)} queue={len(queue)}\n\n"
-        f"Queue: [[Operations/logs/entity-review-queue-latest]]\n",
+        f"{smoke_line}"
+        f"Queue: [[Operations/logs/entity-review-queue-latest]]\n"
+        f"Canon: [[Operations/Detective-Entity-Codify-Loop-CANONICAL-2026-07-11]] "
+        f"· [[Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18]]\n",
         encoding="utf-8",
     )
-    print(
-        json.dumps(
-            {
-                "files_scanned": len(names),
-                "clusters": len(results),
-                "promoted": len(promoted),
-                "queue": len(queue),
-                "queue_md": str(QUEUE),
-            },
-            indent=2,
-        )
-    )
+    payload_out = {
+        "files_scanned": len(names),
+        "clusters": len(results),
+        "promoted": len(promoted),
+        "queue": len(queue),
+        "queue_md": str(QUEUE),
+        "post_promote_smoke": smoke_result,
+    }
+    print(json.dumps(payload_out, indent=2))
+    # exit 2 only when we promoted AND smoke hard-failed (lexicon regression)
+    if smoke_result is not None and not smoke_result.get("ok"):
+        return 2
     return 0
 
 

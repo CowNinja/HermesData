@@ -1,0 +1,375 @@
+#!/usr/bin/env python3
+"""Ending-loop self-heal: measure → fix → POST-VERIFY → log. $0 Grok.
+
+Canon:
+  Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18 (A3/N1)
+  Operations/Codifying-Loops-Guardrails-Map-2026-07-18
+
+Guardrails:
+  - exact process match only (silo_continuous_loop.py) — never gateway
+  - STOP files win (no restart if STOP present)
+  - success claim ONLY after post-verify re-measure
+  - soft-fail exit 0 when measure ran; receipt always written
+  - --verify-only: measure + post-verify report, no restart/ocr side effects
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sqlite3
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+STATE = Path(r"D:\HermesData\state")
+SCRIPTS = Path(r"D:\HermesData\scripts")
+LOG = Path(r"D:\PhronesisVault\Operations\logs\silo-self-heal-latest.md")
+POST_VERIFY_JSON = Path(
+    r"D:\PhronesisVault\Operations\logs\silo-self-heal-post-verify-latest.json"
+)
+POST_VERIFY_MD = Path(
+    r"D:\PhronesisVault\Operations\logs\silo-self-heal-post-verify-latest.md"
+)
+STOP_FILES = [
+    STATE / "silo_continuous.STOP",
+    STATE / "silo_autonomous.STOP",
+]
+PY = sys.executable
+# After restart, allow process to appear before claiming success
+POST_VERIFY_SLEEP_S = 4.0
+# Heartbeat / state freshness after successful heal (seconds)
+POST_VERIFY_MAX_AGE_S = 1200.0
+
+
+def utc() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def continuous_count() -> int:
+    try:
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        r = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                "(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*silo_continuous_loop.py*' } | Measure-Object).Count",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=flags if sys.platform == "win32" else 0,
+        )
+        return int((r.stdout or "0").strip() or "0")
+    except Exception:
+        return 0
+
+
+def stop_present() -> list[str]:
+    hits = []
+    for p in STOP_FILES:
+        if p.is_file():
+            hits.append(str(p))
+    return hits
+
+
+def state_age_s() -> tuple[float, dict]:
+    st_path = STATE / "silo_continuous_state.json"
+    if not st_path.is_file():
+        return 99999.0, {}
+    try:
+        st = json.loads(st_path.read_text(encoding="utf-8"))
+        age = (
+            datetime.now(timezone.utc)
+            - datetime.fromisoformat(st["at"].replace("Z", "+00:00"))
+        ).total_seconds()
+        return age, st
+    except Exception:
+        return 99999.0, {}
+
+
+def heartbeat_age_s() -> float | None:
+    hb = STATE / "silo_tick_heartbeat.json"
+    if not hb.is_file():
+        return None
+    try:
+        data = json.loads(hb.read_text(encoding="utf-8"))
+        ts = data.get("at") or data.get("ts") or data.get("updated")
+        if not ts:
+            return None
+        return (
+            datetime.now(timezone.utc)
+            - datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        ).total_seconds()
+    except Exception:
+        return None
+
+
+def post_verify(*, attempted_restart: bool) -> dict:
+    """Deterministic ground truth after any act. Never an LLM."""
+    stops = stop_present()
+    n = continuous_count()
+    age, st = state_age_s()
+    hb_age = heartbeat_age_s()
+    checks: list[dict] = []
+
+    # STOP always wins — do not claim healthy run while STOP armed
+    checks.append(
+        {
+            "name": "stop_clear",
+            "ok": len(stops) == 0,
+            "detail": f"stops={stops or 'none'}",
+        }
+    )
+    # Single-writer: 0 or 1 continuous; >1 is dual-writer failure
+    checks.append(
+        {
+            "name": "continuous_count_le_1",
+            "ok": n <= 1,
+            "detail": f"n={n}",
+        }
+    )
+    if attempted_restart and len(stops) == 0:
+        # After restart attempt we expect exactly one live process
+        checks.append(
+            {
+                "name": "restart_produced_one",
+                "ok": n == 1,
+                "detail": f"n={n} after restart attempt",
+            }
+        )
+    else:
+        # Idle healthy: either fresh state or live process
+        healthy = (age <= 900 and n <= 1) or (n == 1)
+        checks.append(
+            {
+                "name": "continuous_healthy_or_live",
+                "ok": healthy or (n == 0 and age > 900 and len(stops) > 0),
+                "detail": f"age={age:.0f}s n={n}",
+            }
+        )
+
+    if hb_age is not None:
+        checks.append(
+            {
+                "name": "heartbeat_present",
+                "ok": True,
+                "detail": f"hb_age={hb_age:.0f}s",
+            }
+        )
+
+    ok = all(c["ok"] for c in checks)
+    evidence = "; ".join(
+        f"{c['name']}={'PASS' if c['ok'] else 'FAIL'}:{c['detail']}" for c in checks
+    )
+    # Success claim only when verify ok AND (no restart needed path or restart worked)
+    success_claim = bool(ok and (n == 1 or (n == 0 and age <= 900) or (n == 0 and stops)))
+    # Narrower: never claim "restarted ok" without n==1
+    if attempted_restart:
+        success_claim = bool(ok and n == 1 and not stops)
+
+    return {
+        "at": utc(),
+        "ok": ok,
+        "success_claim": success_claim,
+        "attempted_restart": attempted_restart,
+        "continuous_count": n,
+        "state_age_s": age,
+        "heartbeat_age_s": hb_age,
+        "stops": stops,
+        "cycle": st.get("cycle"),
+        "checks": checks,
+        "evidence": evidence,
+        "canon": "Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18",
+        "escalate_hint": (
+            None
+            if ok
+            else "python D:/HermesData/scripts/prepare_grok_escalation_brief.py --topic \"silo self-heal post-verify fail\""
+        ),
+    }
+
+
+def write_post_verify(result: dict) -> None:
+    POST_VERIFY_JSON.parent.mkdir(parents=True, exist_ok=True)
+    POST_VERIFY_JSON.write_text(
+        json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    lines = [
+        f"# silo self-heal post-verify",
+        f"",
+        f"- **at:** {result['at']}",
+        f"- **ok:** {result['ok']}",
+        f"- **success_claim:** {result['success_claim']}",
+        f"- **attempted_restart:** {result['attempted_restart']}",
+        f"- **continuous_count:** {result['continuous_count']}",
+        f"- **state_age_s:** {result['state_age_s']}",
+        f"- **evidence:** `{result['evidence']}`",
+        f"- **escalate:** {result.get('escalate_hint') or 'n/a'}",
+        f"",
+        f"## Vault links",
+        f"- [[Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18]]",
+        f"- [[Operations/Codifying-Loops-Guardrails-Map-2026-07-18]]",
+        f"- [[Operations/Autonomous-Silo-Runbook-CANONICAL-2026-07-14]]",
+        f"",
+    ]
+    POST_VERIFY_MD.write_text("\n".join(lines), encoding="utf-8")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Silo self-heal with post-verify gate")
+    ap.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="Measure + post-verify only; no restart/ocr/brief side effects",
+    )
+    ap.add_argument(
+        "--post-verify-sleep",
+        type=float,
+        default=POST_VERIFY_SLEEP_S,
+        help="Seconds to wait after restart before re-measure",
+    )
+    args = ap.parse_args()
+
+    actions: list[str] = []
+    attempted_restart = False
+    age, st = state_age_s()
+    n0 = continuous_count()
+    stops0 = stop_present()
+
+    if args.verify_only:
+        actions.append(f"verify-only age={age:.0f}s n={n0} stops={stops0 or 'none'}")
+    else:
+        if stops0:
+            actions.append(f"STOP present — no restart ({stops0})")
+        elif n0 > 1:
+            # Dual/multi continuous = single-writer violation. Exact recovery only; never gateway.
+            rec = SCRIPTS / "silo_recovery_single_writer.py"
+            if rec.is_file():
+                try:
+                    r = subprocess.run(
+                        [PY, str(rec)],
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                        cwd=str(SCRIPTS),
+                    )
+                    attempted_restart = True
+                    actions.append(
+                        f"single_writer_recovery n0={n0} exit={r.returncode} "
+                        f"out={(r.stdout or '')[-200:].replace(chr(10), ' ')}"
+                    )
+                    time.sleep(max(0.0, float(args.post_verify_sleep)))
+                except Exception as e:
+                    actions.append(f"single_writer_recovery err {e}")
+            else:
+                actions.append(f"dual continuous n={n0} but recovery script missing")
+        elif age > 900 and n0 == 0:
+            pyw = Path(PY).with_name("pythonw.exe")
+            launcher = str(pyw) if pyw.is_file() else PY
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            subprocess.Popen(
+                [
+                    launcher,
+                    str(SCRIPTS / "silo_continuous_loop.py"),
+                    "--force-mode",
+                    "aggressive",
+                    "--max-cycles",
+                    "0",
+                ],
+                cwd=str(SCRIPTS),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                creationflags=flags if sys.platform == "win32" else 0,
+            )
+            attempted_restart = True
+            actions.append(f"restarted continuous (age={age:.0f}s)")
+            time.sleep(max(0.0, float(args.post_verify_sleep)))
+        elif age > 900 and n0 > 0:
+            actions.append(f"stale state age={age:.0f}s but {n0} live — leave")
+        else:
+            actions.append(
+                f"continuous ok age={age:.0f}s cycle={st.get('cycle')} n={n0}"
+            )
+
+        try:
+            con = sqlite3.connect(str(STATE / "ocr_backlog.sqlite3"))
+            q = con.execute(
+                "select count(*) from ocr_queue where status in ('queued','needs_ocr')"
+            ).fetchone()[0]
+            ok_n = con.execute(
+                "select count(*) from ocr_queue where status='ok_text'"
+            ).fetchone()[0]
+            con.close()
+            actions.append(f"ocr queued={q} ok_text={ok_n}")
+            if q < 100:
+                subprocess.run(
+                    [
+                        PY,
+                        str(SCRIPTS / "silo_ocr_backlog_worker.py"),
+                        "--limit",
+                        "5",
+                        "--discover-only",
+                    ],
+                    timeout=120,
+                )
+                actions.append("ocr rediscover")
+        except Exception as e:
+            actions.append(f"ocr check err {e}")
+
+        try:
+            subprocess.run(
+                [PY, str(SCRIPTS / "silo_status_brief.py")],
+                timeout=60,
+                capture_output=True,
+            )
+            actions.append("brief refreshed")
+        except Exception as e:
+            actions.append(f"brief err {e}")
+
+    # POST-VERIFY — never claim restart success without re-measure
+    pv = post_verify(attempted_restart=attempted_restart)
+    write_post_verify(pv)
+    if attempted_restart and pv.get("success_claim"):
+        actions.append(f"POST_VERIFY PASS claim_restart_ok evidence=[{pv['evidence']}]")
+    elif attempted_restart:
+        actions.append(
+            f"POST_VERIFY FAIL no_success_claim evidence=[{pv['evidence']}]"
+        )
+    else:
+        actions.append(
+            f"POST_VERIFY ok={pv['ok']} success_claim={pv['success_claim']} evidence=[{pv['evidence']}]"
+        )
+
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    LOG.write_text(
+        "# self-heal "
+        + utc()
+        + "\n\n"
+        + "\n".join(f"- {a}" for a in actions)
+        + "\n\n"
+        + f"- post_verify_json: `{POST_VERIFY_JSON}`\n"
+        + f"- canon: [[Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18]]\n",
+        encoding="utf-8",
+    )
+    out = {
+        "at": utc(),
+        "actions": actions,
+        "post_verify": {
+            "ok": pv["ok"],
+            "success_claim": pv["success_claim"],
+            "evidence": pv["evidence"],
+            "path": str(POST_VERIFY_JSON),
+        },
+    }
+    print(json.dumps(out, ensure_ascii=False))
+    # Soft-fail: measure ran → exit 0; hard signal only via success_claim false in receipt
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

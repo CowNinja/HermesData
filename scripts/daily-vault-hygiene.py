@@ -18,9 +18,22 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 RECEIPT = VAULT / "Operations" / "logs" / "daily-vault-hygiene-cron-latest.json"
 CHILD_TIMEOUT_SEC = 900  # large vault walk; was unbounded under flaky cron envs
+
+
+def _write_receipt(payload: dict) -> None:
+    RECEIPT.parent.mkdir(parents=True, exist_ok=True)
+    if atomic_write_json is not None:
+        atomic_write_json(RECEIPT, payload, indent=2, min_bytes=20)
+    else:
+        RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def _run(label: str, argv: list[str], *, timeout: int = CHILD_TIMEOUT_SEC) -> dict:
@@ -179,7 +192,7 @@ def main() -> int:
         "note": "ACT path is vault_gardener_tick @05:15 — this job never moves notes. Living unresolved = CNS hygiene truth surface.",
     }
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _write_receipt(payload)
     print(f"receipt={RECEIPT}")
     print(
         f"DailyVaultHygiene measure_ok={measure_ok} soft_fail=1 exit=0 "

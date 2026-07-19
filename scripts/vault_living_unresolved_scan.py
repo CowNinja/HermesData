@@ -17,6 +17,12 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 OUT_JSON = Path(r"D:\HermesData\logs\living-unresolved-latest.json")
 OUT_MD = VAULT / "Operations" / "logs" / "living-unresolved-latest.md"
@@ -225,7 +231,10 @@ def main() -> int:
         "sample": unresolved[:40],
     }
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
-    OUT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(OUT_JSON, payload, indent=2, min_bytes=20)
+    else:
+        OUT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     lines = [
         f"# Living Unresolved Scan — {payload['ts'][:10]}",
         "",
@@ -245,7 +254,11 @@ def main() -> int:
         "",
     ]
     OUT_MD.parent.mkdir(parents=True, exist_ok=True)
-    OUT_MD.write_text("\n".join(lines), encoding="utf-8")
+    md_body = "\n".join(lines)
+    if atomic_write_text is not None:
+        atomic_write_text(OUT_MD, md_body, min_bytes=20)
+    else:
+        OUT_MD.write_text(md_body, encoding="utf-8")
     if args.json:
         print(json.dumps(payload, indent=2)[:8000])
     else:

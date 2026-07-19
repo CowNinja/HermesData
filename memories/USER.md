@@ -9,3 +9,5 @@ Loves nested origin trees (photo/people tagging), copy directory structure when 
 VW: default dry PhronesisVault-only; LIVE only with explicit Jeff green light + decision card. Never gateway cowboy fixes.
 §
 Positive on hybrid Grok-driver + local grunt; purge and destructive ops always Jeff-gated.
+§
+Mebaman (~preteen) plays on dad’s PC; asks Hermes to build/create in games (e.g. Trailmakers Creative/Test Zone). Jeff green-lights long autonomous overnight game sessions (“keep cooking until morning,” no continue-permission popups). Always save creations when asked.

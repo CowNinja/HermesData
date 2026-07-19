@@ -1,0 +1,321 @@
+#!/usr/bin/env python3
+"""N3 — Canon conflict detector (Tier B4). Always read-only.
+
+Scans Operations/*CANONICAL*.md (skips backups/) for lock contradictions and
+hard-rule violations. Never auto-edits law.
+
+Out:
+  D:/PhronesisVault/Operations/logs/canon-conflict-latest.md
+  D:/PhronesisVault/Operations/logs/canon-conflict-latest.json
+
+Exit:
+  0 = ran clean (0 conflicts) OR soft report-only with --soft
+  1 = conflicts found (default)
+  2 = scan error
+
+Canon: Operations/Codifying-Loops-Guardrails-Map-2026-07-18 §N3
+       Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18
+Sources: Anthropic gates; CrewAI guardrail_max_retries; LangGraph HITL pause.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
+OPS = Path(r"D:\PhronesisVault\Operations")
+LOG_MD = OPS / "logs" / "canon-conflict-latest.md"
+LOG_JSON = OPS / "logs" / "canon-conflict-latest.json"
+SKIP_DIR_PARTS = {"backups", "archive", "Archive", "_archive", "node_modules"}
+
+# (rule_id, severity, description, regex) — applied per file (case-insensitive)
+# severity: hard = always conflict; soft = advisory
+HARD_FORBIDDEN = [
+    (
+        "gateway_taskkill_recipe",
+        "hard",
+        "Canon must not prescribe taskkill of gateway (restore path is Phronesis.ps1 / stack_healing)",
+        re.compile(
+            r"(?:^|\n).*?(?:taskkill\s+.*gateway|kill\s+the\s+gateway|gateway\s+taskkill).*(?:\n|$)",
+            re.I,
+        ),
+    ),
+    (
+        "clear_stop_without_jeff",
+        "hard",
+        "Must not instruct clearing STOP files without Jeff / operator intent",
+        re.compile(
+            r"clear\s+(?:the\s+)?(?:silo_)?(?:continuous|autonomous)?\.?STOP\s+(?:to\s+)?(?:force\s+)?start",
+            re.I,
+        ),
+    ),
+    (
+        "vw_live_default_on",
+        "hard",
+        "VaultWalker LIVE must not be default-on in canon",
+        re.compile(r"vaultwalker.*\bdefault\b.*\blive\b|\blive\b.*default\s+on", re.I),
+    ),
+    (
+        "llm_only_purge",
+        "hard",
+        "Must not allow LLM-only purge/delete as sole authority",
+        re.compile(
+            r"(?:allow|permit|enable)\s+llm[-\s]?only\s+(?:purge|delete)|"
+            r"llm[-\s]?only\s+(?:purge|delete)\s+(?:ok|allowed|is\s+fine|as\s+sole)|"
+            r"(?:^|[.!?]\s+)purge\s+without\s+(?:jeff|human|gate)\b",
+            re.I | re.M,
+        ),
+    ),
+    (
+        "grok_every_file",
+        "hard",
+        "Must not route every file through Grok",
+        re.compile(
+            r"(?:route|send|run)\s+(?:every|all)\s+files?\s+.*\bgrok\b|"
+            r"grok\s+on\s+every\s+file\s+(?:ok|allowed|default)|"
+            r"always\s+use\s+grok\s+for\s+(?:every|all)\s+files?",
+            re.I,
+        ),
+    ),
+]
+
+# Pair rules: if A appears in corpus without balancing B in same file → soft/hard
+PAIR_LOCKS = [
+    (
+        "single_writer_with_kill_scope",
+        "soft",
+        "Documents multi-writer kill/recovery should mention never-gateway",
+        re.compile(r"silo_recovery_single_writer|multi-?writer|dual\s+continuous", re.I),
+        re.compile(r"never\s+gateway|not\s+touch\s+gateway|gateway\s+kill", re.I),
+    ),
+    (
+        "vw_live_needs_decision_card",
+        "soft",
+        "LIVE mention should reference decision card or Jeff green light",
+        re.compile(r"\bVW\s*LIVE\b|VaultWalker\s+LIVE|\bLIVE\s+auto\b", re.I),
+        re.compile(r"decision\s*card|jeff\s+green|armed\s*[:=]\s*false|green\s+light", re.I),
+    ),
+    (
+        "kitchen_vs_judgment_plane",
+        "soft",
+        "Grok-thread canon should lock kitchen out",
+        re.compile(r"Grok-Thread-Architecture|architecture/judgment|1524846849360531456", re.I),
+        re.compile(r"silo\s+kitchen|land/cook|six_numbers|Data\s+silo\s+agent", re.I),
+    ),
+]
+
+# Global corpus checks (cross-file)
+GLOBAL_MUST_EXIST = [
+    (
+        "forbid_gateway_kill_stated",
+        re.compile(r"never.*gateway.*(?:kill|taskkill)|(?:kill|taskkill).*never.*gateway", re.I),
+        "At least one CANONICAL must state never-gateway-kill for silo stalls",
+    ),
+    (
+        "vw_dry_default_stated",
+        re.compile(r"dry\s+PhronesisVault-only|default\s+dry|dry-run\s+default", re.I),
+        "At least one CANONICAL must state VW/dry default",
+    ),
+    (
+        "self_correct_schema_stated",
+        re.compile(r"PROPOSE\s*→\s*VERIFY|VERIFY\s*\(non-LLM\)", re.I),
+        "Self-correct schema should appear in canon set",
+    ),
+]
+
+
+def utc() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def iter_canonicals() -> list[Path]:
+    out: list[Path] = []
+    if not OPS.is_dir():
+        return out
+    for p in OPS.rglob("*.md"):
+        if any(part in SKIP_DIR_PARTS for part in p.parts):
+            continue
+        name = p.name
+        if "CANONICAL" not in name and "Decision-Card" not in name:
+            # include companion maps that act as law-adjacent
+            if name not in {
+                "Codifying-Loops-Guardrails-Map-2026-07-18.md",
+                "SINGLE-GATEWAY-RESTORE.md",
+            }:
+                continue
+        out.append(p)
+    return sorted(out)
+
+
+def _is_forbid_context(text: str, start: int, end: int) -> bool:
+    """True if match sits in a Never/Forbidden/Do-not style line or nearby header."""
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    if line_end < 0:
+        line_end = len(text)
+    line = text[line_start:line_end]
+    window = text[max(0, start - 180) : min(len(text), end + 80)]
+    if re.search(
+        r"\b(?:never|forbid|forbidden|do\s+not|don't|must\s+not|not\s+allowed|"
+        r"anti-pattern|wrong\s+layer|refuse|no\b\s|✗|❌|not\s+ad-hoc)\b",
+        window,
+        re.I,
+    ):
+        return True
+    if re.search(r"^\s*[-*]\s*\*\*(?:Never|Forbidden|Do not)", line, re.I):
+        return True
+    if re.search(r"(?:\|[^\n]*){0,2}\bnever\b", line, re.I):
+        return True
+    return False
+
+
+def scan_file(path: Path) -> list[dict]:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        return [{"rule": "read_error", "severity": "hard", "file": str(path), "detail": str(e)}]
+    rel = str(path.relative_to(OPS.parent)) if OPS.parent in path.parents else str(path)
+    hits: list[dict] = []
+    for rid, sev, desc, rx in HARD_FORBIDDEN:
+        for m in rx.finditer(text):
+            snippet = m.group(0).strip().replace("\n", " ")[:160]
+            # Canon that *forbids* the pattern is healthy, not a conflict
+            if _is_forbid_context(text, m.start(), m.end()):
+                continue
+            hits.append(
+                {
+                    "rule": rid,
+                    "severity": sev,
+                    "file": rel.replace("\\", "/"),
+                    "detail": desc,
+                    "snippet": snippet,
+                }
+            )
+    for rid, sev, desc, need, bal in PAIR_LOCKS:
+        if need.search(text) and not bal.search(text):
+            # skip pair soft if file is clearly a short receipt/index
+            if len(text) < 400:
+                continue
+            hits.append(
+                {
+                    "rule": rid,
+                    "severity": sev,
+                    "file": rel.replace("\\", "/"),
+                    "detail": desc,
+                    "snippet": "pair imbalance",
+                }
+            )
+    return hits
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--soft", action="store_true", help="always exit 0 after writing report")
+    ap.add_argument("--json", action="store_true", help="print JSON to stdout")
+    args = ap.parse_args()
+
+    files = iter_canonicals()
+    conflicts: list[dict] = []
+    for p in files:
+        conflicts.extend(scan_file(p))
+
+    corpus = ""
+    for p in files:
+        try:
+            corpus += "\n" + p.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    missing_global = []
+    for gid, rx, desc in GLOBAL_MUST_EXIST:
+        if not rx.search(corpus):
+            missing_global.append({"rule": gid, "severity": "hard", "file": "_corpus_", "detail": desc, "snippet": ""})
+    conflicts.extend(missing_global)
+
+    hard = [c for c in conflicts if c.get("severity") == "hard"]
+    soft = [c for c in conflicts if c.get("severity") != "hard"]
+    ok = len(hard) == 0
+
+    report = {
+        "at": utc(),
+        "ok": ok,
+        "n_files": len(files),
+        "n_conflicts": len(conflicts),
+        "n_hard": len(hard),
+        "n_soft": len(soft),
+        "conflicts": conflicts,
+        "canon": [
+            "Operations/Codifying-Loops-Guardrails-Map-2026-07-18",
+            "Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18",
+        ],
+        "sources": [
+            "anthropic.com/research/building-effective-agents (gates)",
+            "CrewAI guardrail + guardrail_max_retries",
+            "LangGraph interrupt/HITL",
+        ],
+    }
+
+    LOG_MD.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        f"# Canon conflict lint — {report['at']}",
+        "",
+        f"- files_scanned: **{len(files)}**",
+        f"- hard: **{len(hard)}** · soft: **{len(soft)}**",
+        f"- ok: **{ok}**",
+        "",
+        "## Hard",
+        "",
+    ]
+    if not hard:
+        lines.append("_None_")
+    else:
+        for c in hard:
+            lines.append(f"- `{c['rule']}` · `{c['file']}` — {c['detail']}")
+            if c.get("snippet"):
+                lines.append(f"  - snippet: {c['snippet'][:120]}")
+    lines += ["", "## Soft / advisory", ""]
+    if not soft:
+        lines.append("_None_")
+    else:
+        for c in soft:
+            lines.append(f"- `{c['rule']}` · `{c['file']}` — {c['detail']}")
+    lines += [
+        "",
+        "Read-only. Never auto-edit law. Escalate new hard class via `prepare_grok_escalation_brief.py`.",
+        "",
+        "[[Operations/Codifying-Loops-Guardrails-Map-2026-07-18]]",
+        "[[Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18]]",
+        "",
+    ]
+    md = "\n".join(lines)
+    if atomic_write_text is not None:
+        atomic_write_text(LOG_MD, md, min_bytes=20)
+    else:
+        LOG_MD.write_text(md if md.endswith("\n") else md + "\n", encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(LOG_JSON, report, min_bytes=20)
+    else:
+        LOG_JSON.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+
+    if args.json:
+        print(json.dumps(report, indent=2))
+    else:
+        print(
+            f"CANON_CONFLICT ok={ok} hard={len(hard)} soft={len(soft)} "
+            f"files={len(files)} log={LOG_JSON}"
+        )
+    if args.soft:
+        return 0
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

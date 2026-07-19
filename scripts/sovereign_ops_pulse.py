@@ -10,22 +10,70 @@ Exit policy (soft-fail default):
   --strict: exit 1 on rollup red
 
 Expand forever: add a receipts: or live_probes: block in the YAML.
-Unregistered *-latest.json paths are listed under discovery.unregistered.
-"""
-from __future__ import annotations
+Unregistered *-latest.json paths are listed under discovery.unregistered
+(own outputs + discovery_exclude_globs skipped).
 
+v1.1 (2026-07-19): schema-on-read expects, probe latency, trend, jsonl trim,
+self-exclude discovery, metric_budget, color_ryg, stack_ports, worst_exit.
+v1.2 (2026-07-19 overnight): N3/N5 codify receipts, absolute cron workdir,
+jan unified atomic write recovery, hygiene multi-signal severity retained.
+v1.3 (2026-07-19 overnight): continuous_count python-only filter, optional
+ports signal-only, jan gold receipts.
+v1.4 (2026-07-19 overnight): critical_ok/dual_verify cook schema-on-read,
+stack_ports accepts health/listen_pid, expand wave2/wikifp/cook receipts,
+exclude ghost k-light Hermes path from discovery.
+v1.5 (2026-07-19 overnight): discovery freshness gate (stale ≠ expand candidate),
+fix prev_level trend bug, score-drop soft issue, MD archived-stale section.
+v1.6 (2026-07-19 overnight): atomic publish for pulse outputs (jan/VW parity),
+probe HTTP one-retry on transient fail (SRE flapping).
+v1.7 (2026-07-19 overnight): shared scripts/atomic_io.py SSOT for kitchen
+writers; silo_self_heal live-process gate (fresh state alone ≠ healthy);
+single-writer continuous recovery confirmed n=1.
+v1.8 (2026-07-19 overnight): residual receipt writers on atomic_io
+(loop_registry, canon_conflict, propose_recovery, recovery log, jan meta).
+v1.9 (2026-07-19 overnight): self-heal --continuous-only (skip OCR/brief);
+cloud_recovery_pack_sync receipt on atomic_io.
+v1.10 (2026-07-19 overnight): orchestrator_tick self_heal uses --continuous-only
+(OCR already separate workers); more pulse residual writers on atomic_io
+(citadel-daily-audit, daily-vault-hygiene, detective_codify_smoke,
+conversation_intent_queue, four_worlds_audit_cron).
+v1.11 (2026-07-19 overnight): pulse-registered residual writers on atomic_io
+(k_light_index_cron, vault_hygiene_6h, living_unresolved, stack_reconcile,
+domain_tag_lint, vault_gardener) + kitchen travel_heartbeat (pid/primary/brief).
+v1.12 (2026-07-19 overnight): next residual pulse writers on atomic_io —
+voice_after_recovery, single_gateway (SSOT migrate), rp_bottleneck_scanner,
+jan_golden_eval, vault_wikilink_repair receipts, vault_hub_backlink receipts,
+vault_domain_tag_batch receipts, wave3_clarity_cook latest receipts.
+v1.13 (2026-07-19 overnight): cook receipt writers on atomic_io —
+five_item_vault_clarity_cook, five_item_wave2_link_clarity_cook (incl. wikifp
+audit + repair mirror), obsidian_five_item_closed_cook, obsidian_five_item
+fixup_verify, obsidian_finish_docs dual-verify latest. Receipt-only atomic.
+v1.14 (2026-07-19 overnight): continuous kitchen state path on atomic_io —
+silo_continuous_loop LOCK/heartbeat/STATE/LOG; recovery PID files via _pid_write.
+Takes effect on next continuous start/recover (no forced dual-start).
+"""
+
+from __future__ import annotations
 import argparse
+import glob as _glob
 import json
 import os
 import shutil
 import socket
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
+
+try:
+    from atomic_io import atomic_write_text as _shared_atomic_write_text
+except ImportError:  # pragma: no cover
+    _shared_atomic_write_text = None  # type: ignore
 
 try:
     import yaml  # type: ignore
@@ -33,7 +81,16 @@ except ImportError:
     yaml = None  # type: ignore
 
 REGISTRY_DEFAULT = Path(r"D:\HermesData\config\sovereign_ops_pulse_registry.yaml")
-SEAL = "sovereign-ops-pulse-v1"
+SEAL = "sovereign-ops-pulse-v1.17"
+
+VAULT_MD_LINKS = [
+    "[[Operations/Sovereign-Ops-Pulse-CANONICAL-2026-07-18]]",
+    "[[Operations/logs/00-INDEX]]",
+    "[[Operations/00-INDEX]]",
+    "[[Silent-Green-Autonomy-CANONICAL-2026-07-18]]",
+    "[[Discord-Hermes-Creative-Recovery-CANONICAL-2026-07-18]]",
+    "[[Housekeeping]]",
+]
 
 
 def utc_now() -> datetime:
@@ -53,7 +110,6 @@ def load_registry(path: Path) -> dict[str, Any]:
         if not isinstance(doc, dict):
             raise ValueError("registry root must be mapping")
         return doc
-    # Minimal fallback: refuse without pyyaml rather than silent bad parse
     raise RuntimeError("PyYAML required for sovereign_ops_pulse registry")
 
 
@@ -78,6 +134,43 @@ def _age_hours(path: Path) -> float | None:
         return None
 
 
+def _atomic_write_text(path: Path, content: str, min_bytes: int = 20) -> str:
+    """Delegate to shared atomic_io (local fallback keeps pulse standalone)."""
+    if _shared_atomic_write_text is not None:
+        return _shared_atomic_write_text(path, content, min_bytes=min_bytes)
+    # Fallback copy of shared contract if import path fails under odd launchers.
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    data = content if content.endswith("\n") else content + "\n"
+    with tmp.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(data)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    size = tmp.stat().st_size
+    if size < min_bytes:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise RuntimeError(f"refusing to publish tiny tmp size={size} path={path}")
+    method = "os.replace"
+    try:
+        os.replace(tmp, path)
+    except OSError:
+        method = "copy2_fallback"
+        shutil.copy2(tmp, path)
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+    if path.stat().st_size < min_bytes:
+        raise RuntimeError(f"post-publish size too small: {path.stat().st_size}")
+    return method
+
+
 def _as_bool(v: Any) -> bool | None:
     if isinstance(v, bool):
         return v
@@ -92,10 +185,75 @@ def _as_bool(v: Any) -> bool | None:
     return None
 
 
+def _norm_color(v: Any) -> str | None:
+    if v is None:
+        return None
+    s = str(v).strip().upper()
+    if s in ("GREEN", "G", "OK", "PASS"):
+        return "GREEN"
+    if s in ("YELLOW", "Y", "AMBER", "WARN", "WARNING"):
+        return "YELLOW"
+    if s in ("RED", "R", "FAIL", "CRITICAL", "ERROR"):
+        return "RED"
+    return None
+
+
+def _level_from_score(sc: float, score_green: float, score_amber: float, partial: bool) -> str:
+    if sc >= score_green and not partial:
+        return "green"
+    if sc >= score_amber or partial:
+        return "amber"
+    return "red"
+
+
+def _metric_budget_level(doc: dict[str, Any], metrics: dict[str, Any]) -> dict[str, Any]:
+    """Evaluate numeric fields against green_max / amber_max budgets."""
+    out: dict[str, Any] = {
+        "ok": True,
+        "partial": False,
+        "score": None,
+        "level": "green",
+        "signals": [],
+    }
+    if not metrics:
+        out["level"] = "unknown"
+        out["ok"] = None
+        out["signals"].append("no_metrics_cfg")
+        return out
+    worst = "green"
+    for field, bounds in metrics.items():
+        if not isinstance(bounds, dict):
+            continue
+        raw = doc.get(field)
+        if not isinstance(raw, (int, float)):
+            out["signals"].append(f"{field}=missing")
+            if worst == "green":
+                worst = "amber"
+            continue
+        gmax = bounds.get("green_max", 0)
+        amax = bounds.get("amber_max", gmax)
+        out["signals"].append(f"{field}={raw}")
+        if raw <= gmax:
+            lvl = "green"
+        elif raw <= amax:
+            lvl = "amber"
+        else:
+            lvl = "red"
+        if lvl == "red":
+            worst = "red"
+        elif lvl == "amber" and worst != "red":
+            worst = "amber"
+    out["level"] = worst
+    out["ok"] = worst in ("green", "amber")
+    out["partial"] = worst == "amber"
+    return out
+
+
 def interpret_receipt(
     doc: dict[str, Any] | None,
     expect: str,
     defaults: dict[str, Any],
+    metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Normalize heterogeneous soft-fail schemas into one verdict."""
     score_green = float(defaults.get("score_green", 90))
@@ -126,11 +284,187 @@ def interpret_receipt(
     status = doc.get("status")
     status_ok = _as_bool(status) if status is not None else None
 
-    # Pipeline notes
     if doc.get("pipeline_ok") is True:
         out["signals"].append("pipeline_ok")
     if soft in (True, 1, "1"):
         out["signals"].append("soft_fail")
+
+    # --- specialized expects ---
+    if expect == "metric_budget":
+        return _metric_budget_level(doc, metrics or {})
+
+    if expect == "color_ryg":
+        color = _norm_color(doc.get("color") or doc.get("green_color"))
+        if color is None and isinstance(doc.get("silent_green"), dict):
+            color = _norm_color(doc["silent_green"].get("color"))
+        out["signals"].append(f"color={color or 'none'}")
+        if color == "GREEN":
+            out["ok"] = True
+            out["level"] = "green"
+        elif color == "YELLOW":
+            out["ok"] = True
+            out["level"] = "amber"
+            out["partial"] = True
+        elif color == "RED":
+            out["ok"] = False
+            out["level"] = "red"
+        else:
+            out["level"] = "unknown"
+        return out
+
+    if expect == "green_nested":
+        color = _norm_color(doc.get("green_color"))
+        if color is None and isinstance(doc.get("green"), dict):
+            color = _norm_color(doc["green"].get("color"))
+        voice_ok = None
+        if isinstance(doc.get("voice"), dict):
+            voice_ok = _as_bool(doc["voice"].get("ok"))
+        out["signals"].append(f"green_color={color or 'none'}")
+        if voice_ok is not None:
+            out["signals"].append(f"voice_ok={voice_ok}")
+        if color == "GREEN" and voice_ok is not False:
+            out["ok"] = True
+            out["level"] = "green"
+        elif color == "GREEN" and voice_ok is False:
+            out["ok"] = True
+            out["level"] = "amber"
+            out["partial"] = True
+        elif color == "YELLOW":
+            out["ok"] = True
+            out["level"] = "amber"
+        elif color == "RED":
+            out["ok"] = False
+            out["level"] = "red"
+        elif voice_ok is True:
+            out["ok"] = True
+            out["level"] = "green"
+            out["signals"].append("voice_only")
+        else:
+            out["level"] = "unknown"
+        return out
+
+    if expect == "stack_ports":
+        ports = doc.get("ports") if isinstance(doc.get("ports"), dict) else {}
+        # core stack ports — 8090/8091/8642 must be up; extras informational
+        core_ids = ("8090", "8091", "8642")
+        core_ok = 0
+        core_n = 0
+        extra_down = []
+        for pid, meta in ports.items():
+            up = False
+            if isinstance(meta, dict):
+                # Accept stack_snapshot (up/status) AND stack_reconcile (health/listen_pid)
+                up = bool(meta.get("up")) or bool(meta.get("health")) or (
+                    isinstance(meta.get("status"), int) and 200 <= meta["status"] < 400
+                ) or (
+                    meta.get("listen_pid") not in (None, 0, "0", "")
+                    and meta.get("health") is not False
+                )
+            elif isinstance(meta, bool):
+                up = meta
+            spid = str(pid)
+            if spid in core_ids:
+                core_n += 1
+                if up:
+                    core_ok += 1
+                else:
+                    out["signals"].append(f"port_{spid}_down")
+            elif not up:
+                extra_down.append(spid)
+        # also fold silent_green color if present
+        sg = doc.get("silent_green") if isinstance(doc.get("silent_green"), dict) else {}
+        sg_color = _norm_color(sg.get("color"))
+        if sg_color:
+            out["signals"].append(f"sg={sg_color}")
+        out["signals"].append(f"core_ports={core_ok}/{core_n or len(core_ids)}")
+        if core_n == 0 and not ports:
+            out["level"] = "unknown"
+            return out
+        if core_ok >= 3 or (core_n > 0 and core_ok == core_n):
+            out["ok"] = True
+            # Optional/info ports (9119 metrics, 3001 dash, etc.) are signals only.
+            # Core green + silent-green GREEN must not amber on chronic optional downs
+            # (Prometheus pattern: separate optional job ≠ fail primary scrape).
+            if extra_down:
+                out["signals"].append("extra_down=" + ",".join(extra_down[:4]))
+            if sg_color == "YELLOW":
+                out["level"] = "amber"
+                out["partial"] = True
+            elif sg_color == "RED":
+                out["ok"] = False
+                out["level"] = "red"
+            else:
+                out["level"] = "green"
+        elif core_ok >= 1:
+            out["ok"] = False
+            out["level"] = "amber"
+            out["partial"] = True
+        else:
+            out["ok"] = False
+            out["level"] = "red"
+        return out
+
+    if expect == "worst_exit":
+        we = doc.get("worst_exit")
+        if isinstance(we, (int, float)):
+            out["signals"].append(f"worst_exit={int(we)}")
+            if int(we) == 0:
+                out["ok"] = True
+                out["level"] = "green"
+            elif int(we) in (1, 124):  # soft timeout / advisory
+                out["ok"] = True
+                out["level"] = "amber"
+                out["partial"] = True
+            else:
+                out["ok"] = False
+                out["level"] = "red"
+            return out
+        # fallback steps
+        steps = doc.get("steps")
+        if isinstance(steps, list) and steps:
+            bad = [s for s in steps if isinstance(s, dict) and s.get("exit") not in (0, None) and not s.get("skip")]
+            out["ok"] = len(bad) == 0
+            out["level"] = "green" if not bad else "amber"
+            out["signals"].append(f"steps_bad={len(bad)}")
+            return out
+        out["level"] = "unknown"
+        return out
+
+    if expect == "fresh_presence":
+        # File was readable — presence of a structured receipt is success.
+        # Prefer explicit ok/status when present.
+        if ok_field is True:
+            out["ok"] = True
+            out["level"] = "green"
+            out["signals"].append("ok")
+        elif ok_field is False:
+            out["ok"] = False
+            out["level"] = "amber" if soft else "red"
+            out["signals"].append("ok_false")
+        elif status is not None:
+            # proposed/armed/queued etc. are healthy queue states
+            st = str(status).lower()
+            if st in ("proposed", "armed", "queued", "ok", "done", "complete", "success"):
+                out["ok"] = True
+                out["level"] = "green"
+                out["signals"].append(f"status={status}")
+            elif st in ("failed", "error", "blocked"):
+                out["ok"] = False
+                out["level"] = "amber"
+                out["signals"].append(f"status={status}")
+            else:
+                out["ok"] = True
+                out["level"] = "green"
+                out["signals"].append(f"status={status}")
+        elif doc.get("seal") or doc.get("ts") or doc.get("at") or doc.get("options"):
+            out["ok"] = True
+            out["level"] = "green"
+            out["signals"].append("receipt_present")
+        else:
+            out["ok"] = True
+            out["level"] = "green"
+            out["signals"].append("object_present")
+        return out
 
     if expect == "measure_ok":
         if measure_ok is True:
@@ -145,14 +479,32 @@ def interpret_receipt(
             out["ok"] = ok_field
             out["level"] = "green" if ok_field else "amber"
         else:
-            # steps present → ran
             steps = doc.get("steps")
             out["ok"] = True if steps else None
             out["level"] = "green" if steps else "unknown"
             out["signals"].append("steps_present" if steps else "no_signal")
 
     elif expect == "soft_partial_ok":
-        # Citadel style: partial OK is amber/green, not red
+        # Nested citadel-channel-audit shape: {summary: {partial, error_count, channel_count}}
+        summary = doc.get("summary") if isinstance(doc.get("summary"), dict) else {}
+        if summary:
+            if isinstance(summary.get("partial"), bool) and out.get("partial") is not True:
+                out["partial"] = bool(summary.get("partial"))
+            if summary.get("error_count") is not None:
+                out["signals"].append(f"error_count={summary.get('error_count')}")
+            if summary.get("channel_count") is not None:
+                out["signals"].append(f"channel_count={summary.get('channel_count')}")
+            if ok_field is None and summary.get("partial") is True:
+                out["ok"] = True
+                out["level"] = "amber"
+                out["partial"] = True
+                out["signals"].append("partial_ok")
+                return out
+            if ok_field is None and summary.get("error_count") == 0 and summary.get("channel_count"):
+                out["ok"] = True
+                out["level"] = "green"
+                out["signals"].append("audit_clean")
+                return out
         if out["partial"] and (ok_field is False or ok_field is None):
             out["ok"] = True
             out["level"] = "amber"
@@ -168,8 +520,7 @@ def interpret_receipt(
             out["ok"] = False
             out["level"] = "red" if not soft else "amber"
         else:
-            # channel_count / audit_summary fallback
-            if doc.get("channel_count") or doc.get("audit_summary"):
+            if doc.get("channel_count") or doc.get("audit_summary") or summary.get("channel_count"):
                 out["ok"] = True
                 out["level"] = "amber"
                 out["signals"].append("audit_present")
@@ -180,12 +531,7 @@ def interpret_receipt(
         sc = out["score"]
         if sc is not None:
             out["ok"] = sc >= score_amber
-            if sc >= score_green:
-                out["level"] = "green"
-            elif sc >= score_amber:
-                out["level"] = "amber"
-            else:
-                out["level"] = "red"
+            out["level"] = _level_from_score(sc, score_green, score_amber, out["partial"])
             out["signals"].append(f"score={sc}")
         elif ok_field is not None:
             out["ok"] = ok_field
@@ -194,77 +540,184 @@ def interpret_receipt(
             out["ok"] = status_ok
             out["level"] = "green" if status_ok else "amber"
         elif isinstance(doc.get("checks"), (list, dict)):
-            out["ok"] = True
-            out["level"] = "green"
-            out["signals"].append("checks_present")
+            # list of {ok: bool}
+            checks = doc["checks"]
+            if isinstance(checks, list) and checks and all(isinstance(c, dict) for c in checks):
+                oks = [bool(c.get("ok")) for c in checks if "ok" in c]
+                if oks and all(oks):
+                    out["ok"] = True
+                    out["level"] = "green"
+                elif oks and any(oks):
+                    out["ok"] = True
+                    out["level"] = "amber"
+                    out["partial"] = True
+                elif oks:
+                    out["ok"] = False
+                    out["level"] = "red"
+                else:
+                    out["ok"] = True
+                    out["level"] = "green"
+                out["signals"].append(f"checks={sum(oks)}/{len(oks)}")
+            else:
+                out["ok"] = True
+                out["level"] = "green"
+                out["signals"].append("checks_present")
         elif doc.get("pipeline_ok") is True:
             out["ok"] = True
             out["level"] = "green"
         else:
             out["level"] = "unknown"
 
-    else:  # soft_ok_or_score (default)
+    else:  # soft_ok_or_score (default) + schema-on-read fallbacks
+        # schema-on-read shortcuts before generic ok/score
+        color = _norm_color(doc.get("color") or doc.get("green_color"))
+        if color and expect in ("soft_ok_or_score", "auto"):
+            return interpret_receipt(doc, "color_ryg", defaults, metrics)
+
+        if "worst_exit" in doc and expect in ("soft_ok_or_score", "auto"):
+            return interpret_receipt(doc, "worst_exit", defaults, metrics)
+
+        if isinstance(doc.get("ports"), dict) and expect in ("soft_ok_or_score", "auto"):
+            return interpret_receipt(doc, "stack_ports", defaults, metrics)
+
         sc = out["score"]
         if sc is not None:
             out["ok"] = sc >= score_amber
-            if sc >= score_green and not out["partial"]:
-                out["level"] = "green"
-            elif sc >= score_amber or out["partial"]:
-                out["level"] = "amber"
-            else:
-                out["level"] = "red"
+            out["level"] = _level_from_score(sc, score_green, score_amber, out["partial"])
             out["signals"].append(f"score={sc}")
         elif ok_field is True:
             out["ok"] = True
             out["level"] = "amber" if out["partial"] else "green"
         elif ok_field is False:
             out["ok"] = False
-            out["level"] = "amber" if (soft or out["partial"]) else "red"
+            # soft_fail receipts or check lists with partial pass → amber
+            checks = doc.get("checks")
+            if isinstance(checks, list) and any(
+                isinstance(c, dict) and c.get("ok") for c in checks
+            ):
+                out["level"] = "amber"
+                out["partial"] = True
+                out["signals"].append("checks_partial")
+            else:
+                out["level"] = "amber" if (soft or out["partial"]) else "red"
+            if soft:
+                out["signals"].append("soft_fail_ok_false")
         elif status_ok is not None:
             out["ok"] = status_ok
             out["level"] = "green" if status_ok else "amber"
+        elif isinstance(doc.get("checks"), list):
+            # re-enter score_or_checks path
+            return interpret_receipt(doc, "score_or_checks", defaults, metrics)
+        elif isinstance(doc.get("critical_ok"), dict) and doc.get("critical_ok"):
+            # wave2 / wikilink-FP cook receipts: map of path → bool
+            crit = doc["critical_ok"]
+            vals = [bool(v) for v in crit.values()]
+            n_ok = sum(vals)
+            n = len(vals)
+            out["signals"].append(f"critical_ok={n_ok}/{n}")
+            dv = doc.get("dual_verify") or doc.get("independent_dual_verify")
+            if isinstance(dv, str) and "PASS" in dv.upper():
+                out["signals"].append("dual_verify=PASS")
+            elif isinstance(dv, dict) and (
+                str(dv.get("result", "")).upper().find("PASS") >= 0
+                or dv.get("all_critical") is True
+            ):
+                out["signals"].append("dual_verify=PASS")
+            if n and n_ok == n:
+                out["ok"] = True
+                out["level"] = "green"
+            elif n_ok > 0:
+                out["ok"] = True
+                out["level"] = "amber"
+                out["partial"] = True
+            else:
+                out["ok"] = False
+                out["level"] = "amber" if soft else "red"
+        elif "all_ok" in doc or "pass" in doc:
+            # closed-cook / five-item clarity: residual lint often pass=false
+            # Treat explicit pass/all_ok; soft amber on false (not stack-red).
+            ao = _as_bool(doc.get("all_ok"))
+            ps = _as_bool(doc.get("pass"))
+            flag = ao if ao is not None else ps
+            out["signals"].append(f"all_ok_or_pass={flag}")
+            if flag is True:
+                out["ok"] = True
+                out["level"] = "green"
+            elif flag is False:
+                out["ok"] = True  # cook ran; residual debt is hygiene amber
+                out["level"] = "amber"
+                out["partial"] = True
+            else:
+                out["level"] = "unknown"
         else:
             out["level"] = "unknown"
 
     return out
 
 
-def probe_http(url: str, timeout: float = 3.0) -> dict[str, Any]:
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "SovereignOpsPulse/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read(160).decode("utf-8", errors="replace")
-            ok = 200 <= int(resp.status) < 400
-            return {
-                "ok": ok,
-                "status": int(resp.status),
-                "snippet": body[:120],
-                "error": None,
-            }
-    except Exception as e:
-        # fallback: TCP open?
-        try:
-            from urllib.parse import urlparse
+def probe_http(url: str, timeout: float = 3.0, retries: int = 1, retry_delay_s: float = 0.35) -> dict[str, Any]:
+    """HTTP probe with one cheap retry on transient failure.
 
-            u = urlparse(url)
-            host = u.hostname or "127.0.0.1"
-            port = u.port or (443 if u.scheme == "https" else 80)
-            with socket.create_connection((host, port), timeout=min(timeout, 1.5)):
-                return {
+    Research (SRE flapping / Prometheus scrape retries): a single blip should not
+    red a critical kitchen SLI. retries=1 → up to 2 attempts. No multi-second
+    backoff (pulse must stay fast for 30m cron).
+    """
+    attempts = max(1, int(retries) + 1)
+    last: dict[str, Any] | None = None
+    t_all = time.perf_counter()
+    for attempt in range(attempts):
+        t0 = time.perf_counter()
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "SovereignOpsPulse/1.6"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                body = resp.read(160).decode("utf-8", errors="replace")
+                ok = 200 <= int(resp.status) < 400
+                ms = round((time.perf_counter() - t0) * 1000.0, 1)
+                out = {
+                    "ok": ok,
+                    "status": int(resp.status),
+                    "latency_ms": ms,
+                    "snippet": body[:120],
+                    "error": None,
+                    "attempts": attempt + 1,
+                }
+                if ok:
+                    return out
+                last = out
+        except Exception as e:
+            ms = round((time.perf_counter() - t0) * 1000.0, 1)
+            try:
+                u = urlparse(url)
+                host = u.hostname or "127.0.0.1"
+                port = u.port or (443 if u.scheme == "https" else 80)
+                with socket.create_connection((host, port), timeout=min(timeout, 1.5)):
+                    last = {
+                        "ok": False,
+                        "status": None,
+                        "latency_ms": ms,
+                        "snippet": "",
+                        "error": f"tcp_open_http_fail:{type(e).__name__}",
+                        "tcp_open": True,
+                        "attempts": attempt + 1,
+                    }
+            except OSError:
+                last = {
                     "ok": False,
                     "status": None,
+                    "latency_ms": ms,
                     "snippet": "",
-                    "error": f"tcp_open_http_fail:{type(e).__name__}",
-                    "tcp_open": True,
+                    "error": f"{type(e).__name__}:{str(e)[:80]}",
+                    "tcp_open": False,
+                    "attempts": attempt + 1,
                 }
-        except OSError:
-            return {
-                "ok": False,
-                "status": None,
-                "snippet": "",
-                "error": f"{type(e).__name__}:{str(e)[:80]}",
-                "tcp_open": False,
-            }
+        if attempt + 1 < attempts:
+            time.sleep(retry_delay_s)
+    assert last is not None
+    # wall latency across retries for forensics
+    last["latency_ms_total"] = round((time.perf_counter() - t_all) * 1000.0, 1)
+    if last.get("attempts", 1) > 1:
+        last["retried"] = True
+    return last
 
 
 def disk_free_gb(path: str) -> float | None:
@@ -287,7 +740,6 @@ def gpu_snapshot() -> dict[str, Any]:
             timeout=8,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
         ).strip()
-        # take first GPU
         line = out.splitlines()[0] if out else ""
         parts = [p.strip() for p in line.split(",")]
         if len(parts) >= 5:
@@ -308,59 +760,143 @@ def gpu_snapshot() -> dict[str, Any]:
         return {"ok": False, "error": f"{type(e).__name__}:{str(e)[:80]}"}
 
 
+def _norm_key(p: str) -> str:
+    return os.path.normcase(os.path.normpath(p))
+
+
 def discover_unregistered(
-    globs: list[str], registered_paths: set[str]
-) -> list[dict[str, Any]]:
-    found: list[dict[str, Any]] = []
+    globs: list[str],
+    registered_paths: set[str],
+    exclude_globs: list[str] | None = None,
+    exclude_paths: set[str] | None = None,
+    max_age_hours: float | None = 72.0,
+) -> dict[str, Any]:
+    """Surface only *actionable* expand candidates.
+
+    Research (Google SRE monitoring + Prometheus alerting practices):
+    alerts/candidates must be actionable and fresh. Stale one-shot receipts
+    (days old pilots, dry-runs) are noise — count them as archived, do not
+    push Jeff to register them as live kitchen gauges.
+    """
+    fresh: list[dict[str, Any]] = []
+    stale: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for pattern in globs:
-        for p in sorted(Path().glob(pattern) if False else Path(pattern).parent.glob(Path(pattern).name)):
-            # Path.glob needs parent + name from pattern
-            pass
-    # proper glob
-    import glob as _glob
+    excluded: set[str] = set()
+    for p in exclude_paths or set():
+        excluded.add(_norm_key(p))
+    for pattern in exclude_globs or []:
+        for match in _glob.glob(pattern):
+            excluded.add(_norm_key(match))
+    reg_norm = {_norm_key(rp) for rp in registered_paths}
 
     for pattern in globs:
         for match in _glob.glob(pattern):
-            ap = str(Path(match).resolve()) if Path(match).exists() else match
-            norm = str(Path(match))
-            key = os.path.normcase(os.path.normpath(norm))
-            if key in seen:
+            key = _norm_key(match)
+            if key in seen or key in excluded or key in reg_norm:
                 continue
             seen.add(key)
-            reg_hit = False
-            for rp in registered_paths:
-                if os.path.normcase(os.path.normpath(rp)) == key:
-                    reg_hit = True
-                    break
-            if reg_hit:
-                continue
             age = _age_hours(Path(match))
-            found.append(
-                {
-                    "path": norm,
-                    "age_h": round(age, 2) if age is not None else None,
-                    "hint": "add under receipts: in sovereign_ops_pulse_registry.yaml",
-                }
-            )
-    # newest first
-    found.sort(key=lambda x: (x.get("age_h") is None, x.get("age_h") or 0))
-    return found[:40]
+            row = {
+                "path": str(Path(match)),
+                "age_h": round(age, 2) if age is not None else None,
+                "hint": "add under receipts: in sovereign_ops_pulse_registry.yaml",
+            }
+            if max_age_hours is not None and age is not None and age > float(max_age_hours):
+                row["hint"] = "stale_archived — re-run job before registering"
+                stale.append(row)
+            else:
+                fresh.append(row)
+    fresh.sort(key=lambda x: (x.get("age_h") is None, x.get("age_h") or 0))
+    stale.sort(key=lambda x: -(x.get("age_h") or 0))
+    return {
+        "unregistered": fresh[:40],
+        "unregistered_count": len(fresh),
+        "stale_archived": stale[:40],
+        "stale_archived_count": len(stale),
+        "discovery_max_age_hours": max_age_hours,
+        "scanned_unregistered_total": len(fresh) + len(stale),
+    }
 
 
-def rollup_level(levels: list[str], critical_down: bool) -> str:
-    if critical_down:
+def rollup_level(
+    levels: list[str],
+    critical_down: bool,
+    core_red: bool = False,
+    hygiene_red_n: int = 0,
+) -> str:
+    """Kitchen scoreboard severity.
+
+    Research (SRE multi-signal / burn-rate style): page on *critical* SLIs,
+    not on chronic hygiene debt. Core probe down or core/silo receipt red → red.
+    Hygiene/rp red alone → amber (debt visible). ≥3 hygiene reds → still amber
+    unless critical_down (avoid paging Jeff overnight for link debt).
+    """
+    if critical_down or core_red:
         return "red"
     if "red" in levels:
-        return "red"
-    if "missing" in levels:
-        # missing core handled by caller weights; treat any missing as amber floor
-        pass
+        # non-core reds (hygiene/rp) — surface as amber kitchen state
+        return "amber"
     if "amber" in levels or "missing" in levels or "unknown" in levels:
         return "amber"
     if levels and all(l == "green" for l in levels):
         return "green"
     return "amber"
+
+
+def read_trend(jsonl_path: Path, window: int = 12) -> dict[str, Any]:
+    """Last-N history from jsonl for score/level trend."""
+    out: dict[str, Any] = {"n": 0, "levels": [], "scores": [], "delta_score": None, "prev_level": None}
+    if not jsonl_path.is_file():
+        return out
+    try:
+        lines = jsonl_path.read_text(encoding="utf-8").splitlines()
+        rows: list[dict[str, Any]] = []
+        for line in lines[-max(window, 1) :]:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+        out["n"] = len(rows)
+        out["levels"] = [r.get("level") for r in rows if r.get("level")]
+        out["scores"] = [r.get("score") for r in rows if isinstance(r.get("score"), (int, float))]
+        if len(out["scores"]) >= 2:
+            # window delta (oldest→newest in window) + step delta (prev tick)
+            out["delta_score"] = round(float(out["scores"][-1]) - float(out["scores"][-2]), 1)
+            out["delta_score_window"] = round(float(out["scores"][-1]) - float(out["scores"][0]), 1)
+        # prev_level = prior tick, not current tail (v1.4 bugfix)
+        if len(out["levels"]) >= 2:
+            out["prev_level"] = out["levels"][-2]
+        elif len(out["levels"]) == 1:
+            out["prev_level"] = None
+        # streak of current tail level
+        if out["levels"]:
+            tail = out["levels"][-1]
+            streak = 0
+            for lv in reversed(out["levels"]):
+                if lv == tail:
+                    streak += 1
+                else:
+                    break
+            out["level_streak"] = streak
+            out["tail_level"] = tail
+    except OSError:
+        pass
+    return out
+
+
+def trim_jsonl(path: Path, keep: int) -> None:
+    if keep <= 0 or not path.is_file():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        if len(lines) <= keep:
+            return
+        path.write_text("\n".join(lines[-keep:]) + "\n", encoding="utf-8")
+    except OSError:
+        pass
 
 
 def render_md(report: dict[str, Any]) -> str:
@@ -369,21 +905,39 @@ def render_md(report: dict[str, Any]) -> str:
         "",
         f"**Rollup:** `{report.get('level')}` · score **{report.get('score')}** · seal `{report.get('seal')}`",
         "",
+    ]
+    trend = report.get("trend") or {}
+    if trend.get("n"):
+        lines.append(
+            f"_trend:_ n={trend.get('n')} prev=`{trend.get('prev_level')}` "
+            f"Δscore={trend.get('delta_score')} streak={trend.get('level_streak')}"
+        )
+        lines.append("")
+    lines += [
         "## Live probes",
         "",
-        "| ID | OK | Detail |",
-        "|----|----|--------|",
+        "| ID | OK | HTTP | ms | Detail |",
+        "|----|----|------|----|--------|",
     ]
     for p in report.get("probes") or []:
-        detail = p.get("status") or p.get("error") or ""
-        lines.append(f"| {p.get('id')} | {p.get('ok')} | {detail} |")
-    lines += ["", "## Receipts", "", "| ID | Level | OK | Score | Age_h | Notes |", "|----|-------|----|-------|-------|-------|"]
+        detail = p.get("error") or ""
+        lines.append(
+            f"| {p.get('id')} | {p.get('ok')} | {p.get('status')} | {p.get('latency_ms')} | {detail} |"
+        )
+    lines += [
+        "",
+        "## Receipts",
+        "",
+        "| ID | Level | OK | Score | Age_h | Tier | Notes |",
+        "|----|-------|----|-------|-------|------|-------|",
+    ]
     for r in report.get("receipts") or []:
         notes = ",".join(r.get("signals") or []) or r.get("error") or ""
         if r.get("stale"):
             notes = (notes + " stale").strip()
         lines.append(
-            f"| {r.get('id')} | {r.get('level')} | {r.get('ok')} | {r.get('score')} | {r.get('age_h')} | {notes} |"
+            f"| {r.get('id')} | {r.get('level')} | {r.get('ok')} | {r.get('score')} | "
+            f"{r.get('age_h')} | {r.get('tier')} | {notes} |"
         )
     dsk = report.get("disk") or []
     if dsk:
@@ -393,17 +947,40 @@ def render_md(report: dict[str, Any]) -> str:
     gpu = report.get("gpu") or {}
     if gpu:
         lines += ["", "## GPU", "", f"```\n{gpu.get('raw') or gpu}\n```"]
-    unreg = (report.get("discovery") or {}).get("unregistered") or []
+    disc = report.get("discovery") or {}
+    unreg = disc.get("unregistered") or []
+    stale_arch = disc.get("stale_archived") or []
     if unreg:
-        lines += ["", "## Unregistered receipts (expand here)", ""]
+        lines += ["", "## Unregistered receipts (fresh — expand here)", ""]
         for u in unreg[:15]:
+            lines.append(f"- `{u.get('path')}` age_h={u.get('age_h')}")
+    elif disc.get("stale_archived_count"):
+        lines += [
+            "",
+            f"_No fresh expand candidates_ (discovery_max_age_h="
+            f"{disc.get('discovery_max_age_hours')}). "
+            f"stale_archived={disc.get('stale_archived_count')}.",
+            "",
+        ]
+    if stale_arch:
+        lines += [
+            "",
+            f"## Stale archived unregistered ({disc.get('stale_archived_count', len(stale_arch))})",
+            "",
+            "_Not expand candidates until job re-runs (SRE: actionable+fresh only)._ ",
+            "",
+        ]
+        for u in stale_arch[:8]:
             lines.append(f"- `{u.get('path')}` age_h={u.get('age_h')}")
     issues = report.get("issues") or []
     if issues:
         lines += ["", "## Issues", ""]
         for i in issues:
             lines.append(f"- {i}")
-    lines += ["", "---", "_$0 LLM · registry-driven · soft-fail_", ""]
+    lines += ["", "---", "_$0 LLM · registry-driven · soft-fail_", "", "## Vault links", ""]
+    for link in VAULT_MD_LINKS:
+        lines.append(f"- {link}")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -422,7 +999,8 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
     for p in reg.get("live_probes") or []:
         url = p.get("url") or ""
         timeout = float(p.get("timeout_sec") or 3)
-        res = probe_http(url, timeout=timeout)
+        retries = int(p.get("retries") if p.get("retries") is not None else defaults.get("probe_retries", 1))
+        res = probe_http(url, timeout=timeout, retries=retries)
         row = {
             "id": p.get("id"),
             "label": p.get("label"),
@@ -439,6 +1017,11 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
             issues.append(f"critical probe down: {p.get('id')} ({res.get('error') or res.get('status')})")
 
     registered_paths: set[str] = set()
+    own_outputs: set[str] = set()
+    for k in ("json", "md", "state", "jsonl"):
+        if outputs.get(k):
+            own_outputs.add(str(outputs[k]))
+
     for r in reg.get("receipts") or []:
         path_s = r.get("path") or ""
         registered_paths.add(path_s)
@@ -449,17 +1032,25 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
         doc, err = _read_json(path)
         age = _age_hours(path)
         stale = bool(age is not None and age > max_age)
-        interp = interpret_receipt(doc, r.get("expect") or "soft_ok_or_score", defaults)
+        metrics = r.get("metrics") if isinstance(r.get("metrics"), dict) else None
+        interp = interpret_receipt(
+            doc, r.get("expect") or "soft_ok_or_score", defaults, metrics=metrics
+        )
         level = interp["level"]
         if err == "missing":
             level = "missing"
-            if tier in ("core", "hygiene", "rp"):
+            if tier in ("core", "hygiene", "rp", "silo"):
                 issues.append(f"receipt missing: {r.get('id')}")
         elif stale and level == "green":
             level = "amber"
             issues.append(f"stale receipt: {r.get('id')} age_h={age:.1f}>{max_age}")
         elif stale and level not in ("red", "missing"):
             issues.append(f"stale receipt: {r.get('id')} age_h={round(age or 0, 1)}")
+
+        if level == "red":
+            issues.append(
+                f"receipt red: {r.get('id')} signals={','.join(interp.get('signals') or []) or 'n/a'}"
+            )
 
         # optional tier never reds the rollup alone
         if tier == "optional" and level == "red":
@@ -527,10 +1118,30 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
             issues.append(f"GPU VRAM {gpu['mem_pct']}%")
             levels.append("amber")
 
-    unreg = discover_unregistered(list(reg.get("discovery_globs") or []), registered_paths)
+    jsonl_path = Path(outputs.get("jsonl") or r"D:/PhronesisVault/Operations/logs/sovereign-ops-pulse.jsonl")
+    trend_pre = read_trend(jsonl_path, window=int(defaults.get("trend_window") or 12))
 
-    level = rollup_level(levels, critical_down)
-    # composite score 0-100
+    disc_max_age = defaults.get("discovery_max_age_hours", 72)
+    if disc_max_age is not None:
+        try:
+            disc_max_age = float(disc_max_age)
+        except (TypeError, ValueError):
+            disc_max_age = 72.0
+    discovery = discover_unregistered(
+        list(reg.get("discovery_globs") or []),
+        registered_paths,
+        exclude_globs=list(reg.get("discovery_exclude_globs") or []),
+        exclude_paths=own_outputs,
+        max_age_hours=disc_max_age,
+    )
+
+    core_red = any(
+        r.get("level") == "red" and r.get("tier") in ("core", "silo") for r in receipts_out
+    )
+    hygiene_red_n = sum(
+        1 for r in receipts_out if r.get("level") == "red" and r.get("tier") in ("hygiene", "rp")
+    )
+    level = rollup_level(levels, critical_down, core_red=core_red, hygiene_red_n=hygiene_red_n)
     if weighted_total > 0:
         base = 100.0 * (weighted_ok / weighted_total)
     else:
@@ -538,6 +1149,22 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
     probe_pen = sum(15 for p in probes_out if p.get("critical") and not p.get("ok"))
     probe_pen += sum(5 for p in probes_out if not p.get("critical") and not p.get("ok"))
     score = max(0, min(100, round(base - probe_pen, 1)))
+
+    # Soft score-drop issue (Prometheus: alert on burn / sudden change, not chronic amber)
+    drop_thr = float(defaults.get("score_drop_issue_points") or 8)
+    if isinstance(trend_pre.get("delta_score"), (int, float)) and trend_pre["delta_score"] <= -drop_thr:
+        issues.append(
+            f"score_drop Δ={trend_pre['delta_score']} (thr=-{drop_thr}) "
+            f"prev_level={trend_pre.get('prev_level')}"
+        )
+    # Window crash (e.g. 95→88 overnight) — advisory only
+    if (
+        isinstance(trend_pre.get("delta_score_window"), (int, float))
+        and trend_pre["delta_score_window"] <= -(drop_thr * 1.5)
+    ):
+        issues.append(
+            f"score_window_drop Δ={trend_pre['delta_score_window']} over n={trend_pre.get('n')}"
+        )
 
     report: dict[str, Any] = {
         "at": utc_iso(),
@@ -553,10 +1180,8 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
         "receipts": receipts_out,
         "disk": disk_out,
         "gpu": gpu,
-        "discovery": {
-            "unregistered_count": len(unreg),
-            "unregistered": unreg,
-        },
+        "trend": trend_pre,
+        "discovery": discovery,
         "counts": {
             "probes": len(probes_out),
             "probes_ok": sum(1 for p in probes_out if p.get("ok")),
@@ -565,24 +1190,34 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
             "receipts_amber": sum(1 for r in receipts_out if r.get("level") == "amber"),
             "receipts_red": sum(1 for r in receipts_out if r.get("level") == "red"),
             "receipts_missing": sum(1 for r in receipts_out if r.get("level") == "missing"),
+            "unreg_fresh": discovery.get("unregistered_count", 0),
+            "unreg_stale_archived": discovery.get("stale_archived_count", 0),
         },
     }
 
-    # writes
     json_path = Path(outputs.get("json") or r"D:/PhronesisVault/Operations/logs/sovereign-ops-pulse-latest.json")
     md_path = Path(outputs.get("md") or r"D:/PhronesisVault/Operations/logs/sovereign-ops-pulse-latest.md")
     state_path = Path(outputs.get("state") or r"D:/HermesData/state/sovereign_ops_pulse.json")
-    jsonl_path = Path(outputs.get("jsonl") or r"D:/PhronesisVault/Operations/logs/sovereign-ops-pulse.jsonl")
 
     payload = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
     md = render_md(report)
+    wrote_methods: dict[str, str] = {}
     for pth, content in (
         (json_path, payload),
         (md_path, md),
         (state_path, payload),
     ):
-        pth.parent.mkdir(parents=True, exist_ok=True)
-        pth.write_text(content, encoding="utf-8")
+        try:
+            wrote_methods[str(pth)] = _atomic_write_text(pth, content)
+        except Exception as e:
+            # last-resort non-atomic so kitchen still gets a receipt
+            try:
+                pth.parent.mkdir(parents=True, exist_ok=True)
+                pth.write_text(content, encoding="utf-8")
+                wrote_methods[str(pth)] = f"write_text_fallback:{type(e).__name__}"
+            except OSError as e2:
+                issues.append(f"write_fail {pth.name}:{type(e2).__name__}")
+                wrote_methods[str(pth)] = f"fail:{type(e2).__name__}"
 
     try:
         jsonl_path.parent.mkdir(parents=True, exist_ok=True)
@@ -593,9 +1228,14 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
             "issues_n": len(issues),
             "probes_ok": report["counts"]["probes_ok"],
             "receipts_green": report["counts"]["receipts_green"],
+            "receipts_amber": report["counts"]["receipts_amber"],
+            "receipts_red": report["counts"]["receipts_red"],
+            "unreg": report["discovery"].get("unregistered_count", 0),
+            "unreg_stale": report["discovery"].get("stale_archived_count", 0),
         }
         with jsonl_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(slim, ensure_ascii=False) + "\n")
+        trim_jsonl(jsonl_path, int(defaults.get("jsonl_keep_lines") or 500))
     except OSError:
         pass
 
@@ -603,7 +1243,17 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
         "json": str(json_path),
         "md": str(md_path),
         "state": str(state_path),
+        "jsonl": str(jsonl_path),
+        "methods": wrote_methods,
     }
+    # Re-publish JSON/state so on-disk receipt includes write methods (forensics).
+    try:
+        final_payload = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+        wrote_methods[str(json_path)] = _atomic_write_text(json_path, final_payload)
+        wrote_methods[str(state_path)] = _atomic_write_text(state_path, final_payload)
+        report["_wrote"]["methods"] = wrote_methods
+    except Exception:
+        pass
     return report
 
 

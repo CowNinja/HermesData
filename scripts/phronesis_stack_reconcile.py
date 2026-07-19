@@ -24,6 +24,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+
 ROOT = Path(r"D:\HermesData")
 SCRIPTS = ROOT / "scripts"
 STATE = ROOT / "state"
@@ -333,9 +338,11 @@ def main() -> int:
         )
         # write latest json
         try:
-            (ROOT / "logs" / "stack-reconcile-latest.json").write_text(
-                json.dumps(report, indent=2), encoding="utf-8"
-            )
+            out = ROOT / "logs" / "stack-reconcile-latest.json"
+            if atomic_write_json is not None:
+                atomic_write_json(out, report, indent=2, min_bytes=20)
+            else:
+                out.write_text(json.dumps(report, indent=2), encoding="utf-8")
         except Exception:
             pass
     return 0 if report["ports"].get("8642", {}).get("health") or not args.start_missing else 1

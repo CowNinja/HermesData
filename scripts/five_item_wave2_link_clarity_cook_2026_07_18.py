@@ -25,6 +25,14 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    import sys as _sys
+
+    _sys.path.insert(0, str(Path(r"D:\HermesData\scripts")))
+    from atomic_io import atomic_write_json, atomic_write_text  # type: ignore
+
 VAULT = Path(r"D:\PhronesisVault")
 HERMES = Path(r"D:\HermesData")
 TS = datetime.now(timezone.utc)
@@ -707,7 +715,7 @@ def write_receipts(payload: dict) -> None:
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_MD.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    OUT_JSON.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    atomic_write_json(OUT_JSON, payload)
 
     top = payload.get("after_top") or []
     lines = [
@@ -751,7 +759,8 @@ def write_receipts(payload: dict) -> None:
         "- [[Research/Silo-Entities/dr-kapoor]]",
         "",
     ]
-    OUT_MD.write_text("\n".join(lines), encoding="utf-8", newline="\n")
+    md_body = "\n".join(lines)
+    atomic_write_text(OUT_MD, md_body)
 
     receipt = f"""---
 title: Wave-2 Link Clarity Cook Receipt
@@ -785,7 +794,7 @@ Ctrl+R if graph still sticky — optional.
 - [[Operations/logs/wikilink-false-positive-audit-latest]]
 - `D:\\\\HermesData\\\\logs\\\\wave2-link-clarity-cook-latest.json`
 """
-    RECEIPT.write_text(receipt, encoding="utf-8", newline="\n")
+    atomic_write_text(RECEIPT, receipt)
 
     # scoreboard touch
     sb = f"""---
@@ -808,7 +817,7 @@ tags:
 
 See [[Operations/logs/wave2-link-clarity-cook-latest]].
 """
-    SCORE.write_text(sb, encoding="utf-8", newline="\n")
+    atomic_write_text(SCORE, sb)
 
     # also mirror wikilink-repair-latest for continuity
     repair_latest = {
@@ -823,12 +832,8 @@ See [[Operations/logs/wave2-link-clarity-cook-latest]].
         "top_unresolved": payload.get("after_top"),
         "examples": (payload.get("pass1") or {}).get("examples", [])[:30],
     }
-    (HERMES / "logs" / "wikilink-repair-latest.json").write_text(
-        json.dumps(repair_latest, indent=2), encoding="utf-8"
-    )
-    (VAULT / "Operations" / "logs" / "wikilink-repair-latest.md").write_text(
-        OUT_MD.read_text(encoding="utf-8"), encoding="utf-8", newline="\n"
-    )
+    atomic_write_json(HERMES / "logs" / "wikilink-repair-latest.json", repair_latest)
+    atomic_write_text(VAULT / "Operations" / "logs" / "wikilink-repair-latest.md", md_body)
 
 
 def main() -> int:
@@ -908,7 +913,7 @@ def main() -> int:
         ],
     }
     AUDIT_JSON.parent.mkdir(parents=True, exist_ok=True)
-    AUDIT_JSON.write_text(json.dumps(audit, indent=2), encoding="utf-8")
+    atomic_write_json(AUDIT_JSON, audit)
     alines = [
         f"# Wikilink False-Positive Audit — {TS_DAY}",
         "",
@@ -925,7 +930,7 @@ def main() -> int:
         alines.append(f"- ({n}) `{t}`")
     alines += ["", "## Class legend", "- `real_broken` — no living file", "- `archive_only` — only under Archive/Distillations", "- `false_positive_base` — .base exists", "- `companion_mismatch` — json/md wrapper issue", "- `allowlist_or_folderish` / `entity_stub_candidate` — intentional stubs", ""]
     AUDIT_MD.parent.mkdir(parents=True, exist_ok=True)
-    AUDIT_MD.write_text("\n".join(alines), encoding="utf-8", newline="\n")
+    atomic_write_text(AUDIT_MD, "\n".join(alines))
 
     payload = {
         "ts": TS.isoformat(),

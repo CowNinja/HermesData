@@ -14,6 +14,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+
 HERMES = Path(r"D:\HermesData")
 SCRIPTS = HERMES / "scripts"
 LOG_JSON = HERMES / "logs" / "four-worlds-audit-cron-latest.json"
@@ -65,7 +70,10 @@ def main() -> int:
         ok = False
 
     LOG_JSON.parent.mkdir(parents=True, exist_ok=True)
-    LOG_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(LOG_JSON, payload, indent=2, min_bytes=20)
+    else:
+        LOG_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"FourWorldsAudit ok={payload.get('ok')} exit={payload.get('exit')}")
     return 0 if ok else 1
 

@@ -27,6 +27,12 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 ROOT = Path(r"D:\HermesData")
 LOG = ROOT / "logs" / "gateway-service.log"
 STATE = ROOT / "state"
@@ -154,6 +160,14 @@ def kill_stray_gateways() -> None:
         log(f"kill_stray err: {exc}")
 
 
+def _publish_lock_body(body: str) -> None:
+    """Atomic lock publish (min_bytes=1) — never truncate mid-write."""
+    if atomic_write_text is not None:
+        atomic_write_text(LOCK, body if body.endswith("\n") else body + "\n", min_bytes=1)
+    else:
+        LOCK.write_text(body, encoding="utf-8")
+
+
 def heartbeat(status: str, **extra) -> None:
     try:
         STATE.mkdir(parents=True, exist_ok=True)
@@ -164,8 +178,11 @@ def heartbeat(status: str, **extra) -> None:
             "health": health(1.5),
             **extra,
         }
-        HEARTBEAT.write_text(json.dumps(payload), encoding="utf-8")
-        LOCK.write_text(f"{os.getpid()} {datetime.now().isoformat()}", encoding="utf-8")
+        if atomic_write_json is not None:
+            atomic_write_json(HEARTBEAT, payload, indent=None, min_bytes=20)
+        else:
+            HEARTBEAT.write_text(json.dumps(payload), encoding="utf-8")
+        _publish_lock_body(f"{os.getpid()} {datetime.now().isoformat()}")
     except Exception:
         pass
 
@@ -180,7 +197,7 @@ def acquire() -> bool:
                 return False
         except Exception:
             pass
-    LOCK.write_text(f"{os.getpid()} {datetime.now().isoformat()}", encoding="utf-8")
+    _publish_lock_body(f"{os.getpid()} {datetime.now().isoformat()}")
     return True
 
 

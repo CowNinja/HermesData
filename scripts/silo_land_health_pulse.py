@@ -222,6 +222,35 @@ def main() -> int:
                 or counts.get("focus_land", 0) > 1
             )
 
+    # Soft prune dual depth sprints (not land writers, but thrash CPU/IO)
+    sprint_pids = _pids("silo_autonomous_sprint.py")
+    if len(sprint_pids) > 1:
+        keep = min(sprint_pids)
+        killed_s = []
+        try:
+            from windows_subprocess import kill_process_tree as _kpt
+        except Exception:
+            _kpt = None  # type: ignore
+        for p in sprint_pids:
+            if p == keep:
+                continue
+            if _kpt:
+                _kpt(p)
+            else:
+                subprocess.run(
+                    ["taskkill", "/PID", str(p), "/T", "/F"],
+                    capture_output=True,
+                    timeout=60,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            killed_s.append(p)
+        if killed_s:
+            actions.append(f"soft_prune_sprints={killed_s}")
+            counts["sprint"] = _count("silo_autonomous_sprint.py")
+
+    # Stuck orch: long tick, no drain/focus, registry flat → ask overnight WD only if freeze
+    # (continuous timeout is 2400s; pulse just flags — does not kill cont)
+
     # Continuous dead + no STOP → ask overnight watchdog to start
     if counts.get("continuous", 0) <= 0 and not STOP.is_file():
         try:

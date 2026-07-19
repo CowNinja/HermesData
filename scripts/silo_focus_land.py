@@ -20,6 +20,12 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from atomic_io import atomic_write_json, atomic_write_text
+except ImportError:  # pragma: no cover
+    atomic_write_json = None  # type: ignore
+    atomic_write_text = None  # type: ignore
+
 QUEUE = Path(r"D:\HermesData\config\land_priority_queue.json")
 REG = Path(r"D:\HermesData\state\ingest_registry.sqlite3")
 CACHE = Path(r"D:\HermesData\state\land_folder_disk_cache.json")
@@ -45,7 +51,10 @@ def load_cache() -> dict:
 
 def save_cache(c: dict) -> None:
     CACHE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE.write_text(json.dumps(c, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(CACHE, c, indent=2)
+    else:
+        CACHE.write_text(json.dumps(c, indent=2), encoding="utf-8")
 
 
 def disk_file_count(root: Path, cache: dict) -> int:
@@ -76,7 +85,10 @@ def load_empty_state() -> dict:
 
 def save_empty_state(d: dict) -> None:
     EMPTY_STATE.parent.mkdir(parents=True, exist_ok=True)
-    EMPTY_STATE.write_text(json.dumps(d, indent=2), encoding="utf-8")
+    if atomic_write_json is not None:
+        atomic_write_json(EMPTY_STATE, d, indent=2)
+    else:
+        EMPTY_STATE.write_text(json.dumps(d, indent=2), encoding="utf-8")
 
 
 def mark_queue_complete(item_id: str, note: str) -> bool:
@@ -103,7 +115,10 @@ def mark_queue_complete(item_id: str, note: str) -> bool:
                 break
         if changed:
             data["updated"] = utc()
-            QUEUE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            if atomic_write_json is not None:
+                atomic_write_json(QUEUE, data, indent=2)
+            else:
+                QUEUE.write_text(json.dumps(data, indent=2), encoding="utf-8")
         return changed
     except Exception:
         return False

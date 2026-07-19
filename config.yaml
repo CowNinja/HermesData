@@ -173,10 +173,11 @@ auxiliary:
     model: grok-4.5
     timeout: 120
   compression:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-synthesis
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    # MUST match main Discord/Grok context class. Local synthesis (65K) auto-lowers
+    # grok-4.5 sessions from ~275k-500k threshold down to 65,536 (Discord errors 2026-07-18).
+    # Re-fixed 2026-07-19 after regression to phronesis-sovereign-synthesis.
+    provider: xai-oauth
+    model: grok-4.5
     timeout: 360
   skills_hub:
     provider: xai-oauth
@@ -601,7 +602,11 @@ discord:
       metrics -> ONLY python D:/HermesData/scripts/silo_discord_six_numbers.py (max
       4 tool turns). Mom writing -> talk_to_jan.py. Never patch hermes-agent/gateway/config
       or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:
-      TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay.'
+      TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay.
+      DISCORD RECOVERY (2026-07-18): On failures run python D:/HermesData/scripts/propose_recovery.py
+      --symptom "..." and reply with Options A/B/C + Recommend + Do not. Snapshot once via
+      stack_snapshot.py. Future actions (we should/set up): conversation_intent_queue.py
+      propose (dry-run), never free-form execute. Skills: discord-issue-playbook + discord-skill-index.'
     '1523156115808845926': 'FACTUAL MODE (not roleplay).
 
 
@@ -978,14 +983,15 @@ discord:
       model: grok-4.5
       provider: xai-oauth
       context_length: 500000
+      max_turns: 28
       system_prompt: 'Grok/Hermes coordination — factual JUDGMENT plane (thread 1524846849360531456).
 
         Canon: Operations/Grok-Thread-Architecture-Judgment-CANONICAL-2026-07-18 +
-        SOUL-Grok-Architecture-Agent-2026-07-18.
+        SOUL-Grok-Architecture-Agent-2026-07-18 + Discord-Hermes-Creative-Recovery-CANONICAL-2026-07-18.
 
 
         OWN: architecture · VaultWalker judgment · hybrid policy · hard escalations
-        only.
+        · recovery menus · intent ladder · codify loops.
 
         FORBIDDEN here: multi-hour silo land/cook/continuous/ghost/train sprints;
         free-form KPI boards; roleplay; inventing facts; gateway taskkill unless Jeff
@@ -996,12 +1002,36 @@ discord:
         If metrics needed for judgment only: python D:/HermesData/scripts/silo_discord_six_numbers.py
         once — no multi-hour boards.
 
+        ISSUES: python D:/HermesData/scripts/propose_recovery.py --symptom "..." then
+        Options A/B/C + Recommend. Snapshot: stack_snapshot.py. Intents: conversation_intent_queue.py propose.
+        Skills: discord-issue-playbook, discord-skill-index.
+
         VW: default dry PhronesisVault-only; LIVE only Jeff green light + VaultWalker-LIVE-Decision-Card.
 
         Measure stack facts with tools. Short vault links. Useful beats agreeable.
 
         UNIVERSAL STABILITY: short tool loops; Mom→talk_to_jan.py; RP only #alice-roleplay;
-        never patch gateway/config unless Jeff asks.'
+        never patch gateway/config unless Jeff asks. Arch max_turns=28.'
+      enabled_toolsets:
+        - terminal
+        - file
+        - web_search
+    '1526952913413607454':
+      model: grok-4.5
+      provider: xai-oauth
+      context_length: 500000
+      max_turns: 28
+      system_prompt: 'Sovereign router + model management thread only.
+
+        Canon: Discord-Hermes-Creative-Recovery + Silent-Green-Autonomy + local-model-management.
+
+        Measure: silent_green_pulse / stack_snapshot / propose_recovery Options A/B/C.
+
+        No multi-hour silo land. No dual gateway start. Intents: conversation_intent_queue
+        propose (dry-run). Skills: discord-issue-playbook, discord-skill-index.
+
+        UNIVERSAL STABILITY: short tool loops; never taskkill gateway unless Jeff asks.
+        Arch max_turns=28.'
       enabled_toolsets:
         - terminal
         - file
