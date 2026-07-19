@@ -56,7 +56,33 @@ def _worker_python() -> str:
         return str(pyw) if pyw.is_file() else sys.executable
 
 
+def _kill_tree(pid: int) -> None:
+    """Kill worker + descendants so drain/focus cannot orphan dual-writers."""
+    try:
+        from windows_subprocess import kill_process_tree  # type: ignore
+
+        kill_process_tree(int(pid))
+        return
+    except Exception:
+        pass
+    if sys.platform == "win32" and pid:
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(int(pid)), "/T", "/F"],
+                capture_output=True,
+                timeout=60,
+                creationflags=_NO_WINDOW,
+            )
+        except Exception:
+            pass
+
+
 def run(cmd: List[str], timeout: int = 600) -> Tuple[int, str]:
+    """Run worker; on timeout kill the full process tree (not just parent).
+
+    2026-07-18: plain subprocess.run(timeout=) left orphan g_to_k_safe_drain
+    children → dual land writers every ~2h (overnight watchdog thrash).
+    """
     try:
         if (
             sys.platform == "win32"
@@ -65,18 +91,26 @@ def run(cmd: List[str], timeout: int = 600) -> Tuple[int, str]:
         ):
             cmd = list(cmd)
             cmd[0] = _worker_python()
-        p = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
             cwd=str(SCRIPTS),
             creationflags=_NO_WINDOW,
         )
-        out = (p.stdout or "") + (("\n" + p.stderr) if p.stderr else "")
-        return p.returncode, out[-4000:]
-    except subprocess.TimeoutExpired:
-        return 124, "TIMEOUT"
+        try:
+            out, err = proc.communicate(timeout=timeout)
+            text = (out or "") + (("\n" + err) if err else "")
+            return int(proc.returncode or 0), text[-4000:]
+        except subprocess.TimeoutExpired:
+            _kill_tree(int(proc.pid or 0))
+            try:
+                out, err = proc.communicate(timeout=20)
+            except Exception:
+                out, err = "", ""
+            text = (out or "") + (("\n" + err) if err else "")
+            return 124, ("TIMEOUT tree-killed\n" + text)[-4000:]
     except Exception as e:
         return 1, f"{type(e).__name__}: {e}"
 

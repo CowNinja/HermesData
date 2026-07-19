@@ -343,6 +343,99 @@ def load_priority_sources():
 
 
 
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        import ctypes
+
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        if h:
+            k.CloseHandle(h)
+            return True
+        return False
+    except Exception:
+        try:
+            import os
+
+            os.kill(int(pid), 0)
+            return True
+        except Exception:
+            return False
+
+
+def _count_live_drains() -> list[int]:
+    """PIDs whose command line is g_to_k_safe_drain.py (exclude self)."""
+    import os
+    import subprocess as _sp
+
+    me = os.getpid()
+    pids: list[int] = []
+    try:
+        r = _sp.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Get-CimInstance Win32_Process | Where-Object { "
+                "$_.Name -like 'python*' -and $_.CommandLine -like '*g_to_k_safe_drain.py*' } "
+                "| Select-Object -ExpandProperty ProcessId",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=getattr(_sp, "CREATE_NO_WINDOW", 0),
+        )
+        for line in (r.stdout or "").splitlines():
+            line = line.strip()
+            if line.isdigit():
+                p = int(line)
+                if p != me:
+                    pids.append(p)
+    except Exception:
+        pass
+    return pids
+
+
+def acquire_single_writer_lock() -> tuple[bool, str]:
+    """Singleton land writer for apply mode — SQLite registry is one-writer.
+
+    Research: sqlite.org/wal.html — WAL allows concurrent readers but still
+    one writer; dual drain = lock storms / stalled ticks / corrupt risk.
+    """
+    import atexit
+    import os
+
+    lock = Path(r"D:\HermesData\state\g_to_k_safe_drain.lock")
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    others = _count_live_drains()
+    if others:
+        return False, f"live_drain_pids={others}"
+    if lock.is_file():
+        try:
+            old = int((lock.read_text(encoding="utf-8").strip().split() or ["0"])[0])
+        except Exception:
+            old = 0
+        if old and old != os.getpid() and _pid_alive(old):
+            return False, f"lock_held_by_pid={old}"
+    payload = f"{os.getpid()} {datetime.now(timezone.utc).isoformat()}\n"
+    lock.write_text(payload, encoding="utf-8")
+
+    def _release() -> None:
+        try:
+            if lock.is_file():
+                cur = lock.read_text(encoding="utf-8")
+                if cur.startswith(str(os.getpid())):
+                    lock.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    atexit.register(_release)
+    return True, f"acquired pid={os.getpid()}"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="Actually copy (default dry-run)")
@@ -356,6 +449,12 @@ def main() -> int:
         help="Source root (repeatable). Defaults to MemoryCard GD + live My Drive",
     )
     args = ap.parse_args()
+    # Single-writer gate (apply only). Dry-run may still run for planning probes.
+    if args.apply:
+        ok_lock, lock_msg = acquire_single_writer_lock()
+        if not ok_lock:
+            print(json.dumps({"status": "skip_single_writer", "reason": lock_msg}, indent=2))
+            return 0  # soft skip — not an error; chef/continuous continues
     # Default: MemoryCard first; full-throttle adds C2 personal G: trees
     default_sources = load_priority_sources() or [
         Path(r"G:/MemoryCard_Backups/Google Drive(archive)"),

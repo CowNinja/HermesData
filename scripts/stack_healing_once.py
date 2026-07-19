@@ -847,18 +847,21 @@ def main() -> int:
 
     try:
         if probe_only:
+            listeners = listeners_on_port()
             summary = {
                 "event": "stack_healing_probe",
                 "port_8642": port_open(),
                 "health": health_ok(),
                 "pids": list_gateway_pids(),
                 "pid_files": read_pid_files(),
-                "listeners": listeners_on_port(),
+                "listeners": listeners,
+                "multi_listener": len(listeners) > 1,
                 "last_heal_age_sec": read_last_heal_age(),
                 "task": TASK_NAME,
                 "hermes_home": str(HERMES_HOME),
             }
             print(json.dumps(summary, indent=2))
+            # Probe stays soft on multi_listener (measure signal only).
             return 0 if summary["health"] else 1
 
         # Always drop ghost pid/lock before health decisions.
@@ -916,9 +919,48 @@ def main() -> int:
 
         _log(summary)
 
+        # Soft-fail receipt for single-instance guard (measure; no kill here).
+        try:
+            from pathlib import Path as _Path
+            import datetime as _dt
+
+            _recv = _Path(r"D:\PhronesisVault\Operations\logs\single-gateway-instance-latest.json")
+            _recv.parent.mkdir(parents=True, exist_ok=True)
+            _multi = bool(summary.get("multi_listener"))
+            _listeners = summary.get("listeners") or []
+            _health = bool(summary.get("health"))
+            _n = len(_listeners) if isinstance(_listeners, list) else 0
+            _ok = _health and not _multi and _n == 1
+            _payload = {
+                "at": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "ok": _ok,
+                "partial": (not _ok),
+                "soft_fail": (not _ok),
+                "seal": "2026-07-18-single-gateway-soft-fail",
+                "status": (
+                    "ok"
+                    if _ok
+                    else ("multi_listener" if _multi else ("down" if not _health else "unknown"))
+                ),
+                "listener_count": _n,
+                "listeners": _listeners,
+                "multi_listener": _multi,
+                "health": _health,
+                "source": "stack_healing_once",
+                "gateway_action": gateway_result.get("action"),
+                "receipt": str(_recv),
+            }
+            _tmp = _recv.with_suffix(".json.tmp")
+            _tmp.write_text(json.dumps(_payload, indent=2) + "\n", encoding="utf-8")
+            _tmp.replace(_recv)
+        except Exception:
+            pass
+
         port_ok = bool(summary["health"])
+        multi = bool(summary.get("multi_listener"))
         silent = (
             port_ok
+            and not multi
             and gateway_result.get("action") == "none"
             and bool(wd.get("ok"))
             and wd.get("status") in ("GREEN", "YELLOW")
@@ -929,6 +971,7 @@ def main() -> int:
             return 0
 
         print(json.dumps(summary, indent=2))
+        # Soft-fail: multi_listener while health up is advisory (exit 0) + printed.
         # Exit 0 if Discord path is up — critical remote-access path.
         return 0 if port_ok else 1
     finally:

@@ -191,6 +191,40 @@ def main() -> int:
         return 0
     if args.dry_run:
         return 0
+    # Refuse to spawn a second drain if one is already land-writing (orphan
+    # protection). Drain itself also singleton-locks; this is the fast path.
+    try:
+        rps = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Get-CimInstance Win32_Process | Where-Object { "
+                "$_.Name -like 'python*' -and $_.CommandLine -like '*g_to_k_safe_drain.py*' } "
+                "| Measure-Object | Select-Object -ExpandProperty Count",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        n_drain = int((rps.stdout or "0").strip() or "0")
+        # count includes nothing yet; if >=1 another writer is live
+        if n_drain >= 1:
+            print(
+                json.dumps(
+                    {
+                        "status": "skip_drain_already_running",
+                        "drain_procs": n_drain,
+                        "focus": info,
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+    except Exception as e:
+        print(json.dumps({"warn": f"drain_precheck_failed:{type(e).__name__}"}))
     cmd = [
         PY,
         str(SCRIPTS / "g_to_k_safe_drain.py"),

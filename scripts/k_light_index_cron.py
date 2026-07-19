@@ -1,115 +1,124 @@
 #!/usr/bin/env python3
-"""K: light index cron — domain shelf 00-INDEX only (no relocate, no RP, no vault thrash).
+"""K-light index cron — shelf indexes + world indexes with soft-fail receipts.
 
-World 3 housekeep: keep Personal-Digital-Silo shelves agent-navigable.
-Full multi-silo VaultWalker on K: is intentionally NOT daily (timeout risk).
-
-Usage:
-  python k_light_index_cron.py
-
-Cron: daily or every 12h, no_agent, workdir D:\\HermesData, deliver local.
-Empty-ish stdout when green is OK; one-liner always printed.
+2026-07-18 residual seal:
+- Longer child timeout (600s) — full silo walk can exceed 180s under load.
+- Measure/receipt always written; cron exit 0 unless catastrophic (K: gone AND world gone).
+- Soft-fail model: ok=false stays in JSON for humans; gateway sees green run + receipt.
+Research: cron soft-fail + heartbeat/receipt (dead-man complementary); exit 0 + structured
+status beats silent exit-1 red noise for advisory index jobs.
 """
 from __future__ import annotations
 
 import json
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-HERMES = Path(r"D:\HermesData")
-SCRIPTS = HERMES / "scripts"
+ROOT = Path(r"D:\HermesData")
 VAULT = Path(r"D:\PhronesisVault")
-K_ROOT = Path(r"K:\Phronesis-Sovereign")
-LOG_JSON = HERMES / "logs" / "k-light-index-latest.json"
-RECEIPT = VAULT / "Operations" / "logs" / "k-light-index-latest.md"
+SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
+RECEIPT = VAULT / "Operations" / "logs" / "k-light-index-latest.json"
+# 2026-07-18: 180s was flapping K-Light to score=40; silo capped walk still needs headroom.
+CHILD_TIMEOUT_SEC = 600
+SOFT_FAIL_EXIT = 0  # advisory index job — never red-fail the day on timeout/partial
 
 
-def main() -> int:
-    ts = datetime.now(timezone.utc).isoformat()
-    if not K_ROOT.exists():
-        payload = {
-            "ts": ts,
-            "ok": True,
-            "skipped": True,
-            "reason": "K: not mounted",
-            "score": 100,
-        }
-        LOG_JSON.parent.mkdir(parents=True, exist_ok=True)
-        LOG_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        print("KLightIndex skipped=K_unmounted score=100")
-        return 0
-
-    script = SCRIPTS / "silo_domain_indexes.py"
+def run_py(script: Path, timeout: int = CHILD_TIMEOUT_SEC) -> dict:
     if not script.is_file():
-        print("KLightIndex error=missing_silo_domain_indexes")
-        return 1
-
+        return {"ok": False, "reason": "missing_script", "script": str(script)}
     try:
-        r = subprocess.run(
+        p = subprocess.run(
             [sys.executable, str(script)],
             capture_output=True,
             text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=180,
-            cwd=str(HERMES),
+            timeout=timeout,
+            cwd=str(ROOT),
         )
-        out = ((r.stdout or "") + "\n" + (r.stderr or ""))[-2500:]
-        ok = r.returncode == 0
-        score = 100 if ok else 60
-        payload = {
-            "ts": ts,
-            "ok": ok,
-            "skipped": False,
-            "exit": r.returncode,
-            "score": score,
-            "out_tail": out[-800:],
-            "world": 3,
-            "path": str(K_ROOT),
+        return {
+            "ok": p.returncode == 0,
+            "code": p.returncode,
+            "stdout_tail": (p.stdout or "")[-2000:],
+            "stderr_tail": (p.stderr or "")[-1000:],
+            "timeout_sec": timeout,
         }
-    except subprocess.TimeoutExpired:
-        payload = {
-            "ts": ts,
+    except subprocess.TimeoutExpired as e:
+        out = (e.stdout or "") if isinstance(e.stdout, str) else ""
+        err = (e.stderr or "") if isinstance(e.stderr, str) else ""
+        return {
             "ok": False,
-            "skipped": False,
-            "exit": 124,
-            "score": 40,
             "reason": "timeout",
+            "timeout_sec": timeout,
+            "stdout_tail": out[-2000:],
+            "stderr_tail": err[-1000:],
         }
-        ok = False
     except Exception as e:
-        payload = {
-            "ts": ts,
-            "ok": False,
-            "exit": 1,
-            "score": 30,
-            "reason": f"{type(e).__name__}: {e}",
-        }
-        ok = False
+        return {"ok": False, "reason": type(e).__name__, "error": str(e)[:300]}
 
-    LOG_JSON.parent.mkdir(parents=True, exist_ok=True)
-    LOG_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+def main() -> int:
+    t0 = time.time()
+    # Prefer local scripts copy (HermesData); fall back to vault scripts if ever moved.
+    domain_script = ROOT / "scripts" / "silo_domain_indexes.py"
+    if not domain_script.is_file():
+        domain_script = VAULT / "scripts" / "silo_domain_indexes.py"
+    world_script = ROOT / "scripts" / "silo_world_indexes.py"
+    if not world_script.is_file():
+        world_script = VAULT / "scripts" / "silo_world_indexes.py"
+
+    k_ok = SILO.is_dir()
+    payload = {
+        "at": datetime.now(timezone.utc).isoformat(),
+        "k_mounted": k_ok,
+        "child_timeout_sec": CHILD_TIMEOUT_SEC,
+        "domain_indexes": None,
+        "world_indexes": None,
+        "score": 0,
+        "ok": False,
+        "soft_fail": True,
+        "seal": "2026-07-18-k-light-softfail",
+    }
+
+    if not k_ok:
+        payload["skip_reason"] = "K_drive_not_mounted"
+        RECEIPT.parent.mkdir(parents=True, exist_ok=True)
+        RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        print(f"KLightIndex score=0 ok=False skipped=True reason=K_missing elapsed={time.time()-t0:.1f}s")
+        # Catastrophic only if world script also cannot run meaningfully — still soft for cron noise.
+        return SOFT_FAIL_EXIT
+
+    payload["domain_indexes"] = run_py(domain_script)
+    payload["world_indexes"] = run_py(world_script)
+
+    score = 0
+    if payload["domain_indexes"].get("ok"):
+        score += 50
+    if payload["world_indexes"].get("ok"):
+        score += 40
+    if k_ok:
+        score += 10
+    payload["score"] = score
+    payload["ok"] = score >= 90
+    payload["elapsed_sec"] = round(time.time() - t0, 2)
+    # Partial success is still a useful run (receipt proves scheduler fired).
+    payload["partial"] = bool(score >= 50 and not payload["ok"])
+
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    RECEIPT.write_text(
-        f"""# K Light Index — {ts}
-
-**ok:** {payload.get('ok')} · score={payload.get('score')} · skipped={payload.get('skipped', False)}
-
-World 3 only. No RP, no vault graph thrash.
-
-## Vault links
-- [[Operations/Vault-Hygiene-Cadence-CANONICAL-2026-07-12]]
-- [[Operations/Four-Worlds-Silo-Architecture-CANONICAL-2026-07-10]]
-""",
-        encoding="utf-8",
-    )
+    RECEIPT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(
-        f"KLightIndex score={payload.get('score')} ok={payload.get('ok')} "
-        f"skipped={payload.get('skipped', False)}"
+        f"KLightIndex score={score} ok={payload['ok']} partial={payload['partial']} "
+        f"skipped=False soft_fail=1 elapsed={payload['elapsed_sec']}s receipt={RECEIPT}"
     )
-    return 0 if payload.get("ok") else 1
+    # Hard-fail only if both children missing scripts (misinstall) — not timeout/partial.
+    both_missing = (
+        payload["domain_indexes"].get("reason") == "missing_script"
+        and payload["world_indexes"].get("reason") == "missing_script"
+    )
+    if both_missing:
+        return 1
+    return SOFT_FAIL_EXIT
 
 
 if __name__ == "__main__":

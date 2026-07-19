@@ -196,15 +196,21 @@ def _run(cmd, timeout=120) -> Tuple[int, str]:
             except subprocess.TimeoutExpired:
                 elapsed = time.time() - t0
                 if elapsed >= timeout:
+                    # Tree-kill: parent-only kill orphans drain/focus (dual-writer).
                     try:
-                        proc.kill()
+                        from windows_subprocess import kill_process_tree  # type: ignore
+
+                        kill_process_tree(int(proc.pid or 0))
                     except Exception:
-                        pass
+                        try:
+                            proc.kill()
+                        except Exception:
+                            pass
                     try:
                         out, err = proc.communicate(timeout=15)
                     except Exception:
                         out, err = "", ""
-                    return 124, f"timeout {timeout}s after {elapsed:.0f}s\n" + (
+                    return 124, f"timeout {timeout}s after {elapsed:.0f}s tree-killed\n" + (
                         (out or "") + (err or "")
                     )[-1500:]
                 # pulse heartbeat / phase so external watchers don't false-dead

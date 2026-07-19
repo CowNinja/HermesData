@@ -210,6 +210,60 @@ def freshness_seconds() -> tuple[float | None, str]:
     return age, src
 
 
+def _list_marker_pids(marker: str) -> list[int]:
+    try:
+        r = run_hidden(
+            hidden_powershell_command(
+                "Get-CimInstance Win32_Process | Where-Object { "
+                f"$_.CommandLine -like '*{marker}*' "
+                "-and $_.Name -like 'python*' } | "
+                "Select-Object -ExpandProperty ProcessId"
+            ),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        out = []
+        for line in (r.stdout or "").splitlines():
+            line = line.strip()
+            if line.isdigit():
+                out.append(int(line))
+        return out
+    except Exception:
+        return []
+
+
+def prune_excess_drains() -> list[int]:
+    """If multiple drains, keep oldest PID and kill the rest (soft dual fix).
+
+    Prefer this over full land-tree restart when continuous heartbeat is fresh —
+    full restart interrupts a healthy multi-hour Google_Backups wave.
+    """
+    pids = _list_marker_pids("g_to_k_safe_drain.py")
+    if len(pids) <= 1:
+        return []
+    # Keep lowest PID as proxy for oldest; kill others
+    keep = min(pids)
+    killed = []
+    for p in pids:
+        if p == keep:
+            continue
+        try:
+            from windows_subprocess import kill_process_tree
+
+            kill_process_tree(p)
+            killed.append(p)
+        except Exception:
+            run_hidden(
+                hidden_powershell_command(
+                    f"Stop-Process -Id {p} -Force -ErrorAction SilentlyContinue"
+                ),
+                timeout=30,
+            )
+            killed.append(p)
+    return killed
+
+
 def main() -> int:
     if STOP.is_file():
         log("STOP file present — no restart")
@@ -217,6 +271,25 @@ def main() -> int:
     # Dual-writer gate first (research: SQLite = one writer; orphans from parent-only kill)
     dual = dual_land_writers()
     if dual.get("bad"):
+        # Soft path: only excess drains, continuous heartbeat fresh → prune not thrash
+        age, src = freshness_seconds()
+        only_drain = (
+            dual.get("drain", 0) > 1
+            and dual.get("continuous", 0) <= 1
+            and dual.get("orchestrator", 0) <= 1
+            and dual.get("focus_land", 0) <= 1
+        )
+        if only_drain and continuous_running() and age is not None and age < HEARTBEAT_FRESH_S:
+            killed = prune_excess_drains()
+            log(
+                f"soft_prune_excess_drains killed={killed} kept_oldest dual_was={dual} "
+                f"age={int(age)}s src={src}"
+            )
+            # re-check
+            dual2 = dual_land_writers()
+            if not dual2.get("bad"):
+                return 0
+            log(f"soft_prune insufficient dual2={dual2} — escalate full tree restart")
         log(
             f"dual_land_writers counts={dual} — kill full land tree then single restart"
         )

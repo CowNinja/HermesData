@@ -123,3 +123,31 @@ def popen_daemon(args: list[str] | tuple[str, ...], **kwargs: Any) -> subprocess
     kwargs.setdefault("stdin", subprocess.DEVNULL)
     kwargs["detach"] = True
     return popen_hidden(args, **kwargs)
+
+
+def kill_process_tree(pid: int, timeout: int = 60) -> bool:
+    """Kill pid and all descendants (Windows taskkill /T). Returns True if invoked OK.
+
+    Critical for silo land: subprocess.run/Popen timeout that only kills the parent
+    leaves orphan g_to_k_safe_drain / focus_land children → dual SQLite writers.
+    Sources: Microsoft taskkill /T; SQLite single-writer WAL guidance.
+    """
+    if not pid or int(pid) <= 0:
+        return False
+    try:
+        if sys.platform == "win32":
+            r = subprocess.run(
+                ["taskkill", "/PID", str(int(pid)), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                creationflags=CREATE_NO_WINDOW,
+            )
+            return r.returncode == 0
+        import os
+        import signal
+
+        os.kill(int(pid), signal.SIGKILL)
+        return True
+    except Exception:
+        return False

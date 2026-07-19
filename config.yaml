@@ -5,22 +5,22 @@ model:
   context_length: 65536
   base_url: http://127.0.0.1:8091/v1
 fallback_providers:
-- provider: xai-oauth
-  model: grok-4.5
-  api_mode: chat_completions
-- provider: xai-oauth
-  model: grok-build-0.1
-  api_mode: chat_completions
-- provider: openrouter
-  model: openrouter/free
-  api_mode: chat_completions
-- provider: custom:phronesis-sovereign
-  model: phronesis-sovereign-auto
-  api_mode: chat_completions
+  - provider: xai-oauth
+    model: grok-4.5
+    api_mode: chat_completions
+  - provider: xai-oauth
+    model: grok-build-0.1
+    api_mode: chat_completions
+  - provider: openrouter
+    model: openrouter/free
+    api_mode: chat_completions
+  - provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-auto
+    api_mode: chat_completions
 toolsets:
-- hermes-cli
-- browser
-- computer_use
+  - hermes-cli
+  - browser
+  - computer_use
 max_live_sessions: 4
 agent:
   max_turns: 16
@@ -175,9 +175,9 @@ auxiliary:
   compression:
     provider: custom:phronesis-sovereign
     model: phronesis-sovereign-synthesis
-    timeout: 360
     base_url: http://127.0.0.1:8091/v1
     api_key: local
+    timeout: 360
   skills_hub:
     provider: xai-oauth
     model: grok-4.5
@@ -284,9 +284,9 @@ display:
   runtime_footer:
     enabled: false
     fields:
-    - model
-    - context_pct
-    - cwd
+      - model
+      - context_pct
+      - cwd
   copy_shortcut: auto
   pet:
     enabled: false
@@ -378,6 +378,8 @@ memory:
 delegation:
   model: grok-4.5
   provider: xai-oauth
+  base_url: http://127.0.0.1:8091/v1
+  api_key: local
   api_mode: chat_completions
   inherit_mcp_toolsets: true
   max_iterations: 20
@@ -390,8 +392,6 @@ delegation:
   max_async_children: 6
   comment: '2026-07-17 RP boundary: orchestrator off. Factual channels exclude hermes-cli
     (embeds delegate_task). RP channels list tools explicitly.'
-  base_url: http://127.0.0.1:8091/v1
-  api_key: local
 prefill_messages_file: ''
 goals:
   max_turns: 20
@@ -401,8 +401,8 @@ moa:
   presets:
     default:
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -412,8 +412,8 @@ moa:
     Default:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -424,10 +424,10 @@ moa:
     Grok:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
-      - provider: xai-oauth
-        model: grok-build-0.1
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
+        - provider: xai-oauth
+          model: grok-build-0.1
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -438,14 +438,14 @@ moa:
     Grok + Phronesis:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-composer-2.5-fast
-      - provider: xai-oauth
-        model: grok-4.5
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
+        - provider: xai-oauth
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-composer-2.5-fast
+        - provider: xai-oauth
+          model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -456,12 +456,12 @@ moa:
     Just xAi:
       enabled: true
       reference_models:
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-composer-2.5-fast
-      - provider: xai-oauth
-        model: grok-4.5
+        - provider: xai-oauth
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-composer-2.5-fast
+        - provider: xai-oauth
+          model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -472,12 +472,12 @@ moa:
     Grok + Free + Phronesis:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: openrouter
-        model: openrouter/free
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
+        - provider: xai-oauth
+          model: grok-build-0.1
+        - provider: openrouter
+          model: openrouter/free
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -486,8 +486,8 @@ moa:
       max_tokens: 4096
       fanout: per_iteration
   reference_models:
-  - provider: xai-oauth
-    model: grok-4.5
+    - provider: xai-oauth
+      model: grok-4.5
   aggregator:
     provider: xai-oauth
     model: grok-4.5
@@ -499,12 +499,12 @@ moa:
   Just xAi:
     enabled: true
     reference_models:
-    - provider: xai-oauth
-      model: grok-build-0.1
-    - provider: xai-oauth
-      model: grok-composer-2.5-fast
-    - provider: xai-oauth
-      model: grok-4.5
+      - provider: xai-oauth
+        model: grok-build-0.1
+      - provider: xai-oauth
+        model: grok-composer-2.5-fast
+      - provider: xai-oauth
+        model: grok-4.5
     aggregator:
       provider: xai-oauth
       model: grok-4.5
@@ -517,56 +517,56 @@ moa:
     primary + local grunt.'
 skills:
   disabled:
-  - ascii-video
-  - baoyu-infographic
-  - blogwatcher
-  - claude-code
-  - codex
-  - comfyui
-  - design-md
-  - gif-search
-  - google-workspace
-  - heartmula
-  - hermes-atlas
-  - hermes-atlas-discovery
-  - hermes-bundles
-  - himalaya
-  - jupyter-live-kernel
-  - manim-video
-  - maps
-  - minimal-agent-harness
-  - monitoring-dashboard-summary
-  - node-inspect-debugger
-  - notion
-  - opencode
-  - openhue
-  - p5js
-  - petdex
-  - polymarket
-  - popular-web-designs
-  - powerpoint
-  - pretext
-  - second-brain-vault
-  - segment-anything-model
-  - sketch
-  - songsee
-  - sovereign-computer-use-test
-  - teams-meeting-pipeline
-  - touchdesigner-mcp
-  - uncensored-image-generation
-  - weights-and-biases
-  - yuanbao
-  - airtable
-  - excalidraw
-  - nano-pdf
-  - songwriting-and-ai-music
-  - x-browser-poster
-  - x-post
-  - x-poster
-  - freellmapi
-  - agentmail
-  - blackbox
-  - dogfood
+    - ascii-video
+    - baoyu-infographic
+    - blogwatcher
+    - claude-code
+    - codex
+    - comfyui
+    - design-md
+    - gif-search
+    - google-workspace
+    - heartmula
+    - hermes-atlas
+    - hermes-atlas-discovery
+    - hermes-bundles
+    - himalaya
+    - jupyter-live-kernel
+    - manim-video
+    - maps
+    - minimal-agent-harness
+    - monitoring-dashboard-summary
+    - node-inspect-debugger
+    - notion
+    - opencode
+    - openhue
+    - p5js
+    - petdex
+    - polymarket
+    - popular-web-designs
+    - powerpoint
+    - pretext
+    - second-brain-vault
+    - segment-anything-model
+    - sketch
+    - songsee
+    - sovereign-computer-use-test
+    - teams-meeting-pipeline
+    - touchdesigner-mcp
+    - uncensored-image-generation
+    - weights-and-biases
+    - yuanbao
+    - airtable
+    - excalidraw
+    - nano-pdf
+    - songwriting-and-ai-music
+    - x-browser-poster
+    - x-post
+    - x-poster
+    - freellmapi
+    - agentmail
+    - blackbox
+    - dogfood
 curator:
   enabled: true
   interval_hours: 168
@@ -815,11 +815,11 @@ discord:
     speech_gain: 1
     ack_enabled: true
     ack_phrases:
-    - Let me look into that.
-    - One moment.
-    - Checking on that now.
-    - Give me a sec.
-    - On it.
+      - Let me look into that.
+      - One moment.
+      - Checking on that now.
+      - Give me a sec.
+      - On it.
   ignored_channels: 1523364535459774658
   channel_overrides:
     '1523156115808845926':
@@ -853,8 +853,8 @@ discord:
         or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:
         TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
     '1519144636541571133':
       model: grok-4.5
       provider: xai-oauth
@@ -886,47 +886,47 @@ discord:
         or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:
         TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
     '1519509288286949466':
       model: grok-4.5
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       provider: xai-oauth
     '1521146755985576116':
       model: grok-4.5
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       provider: xai-oauth
     '1522330326733422713':
       model: grok-4.5
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       provider: xai-oauth
     '1523604530338730004':
       model: grok-4.5
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       provider: xai-oauth
     '1525174401740312707':
       model: phronesis-sovereign-roleplay
@@ -934,10 +934,10 @@ discord:
       base_url: http://127.0.0.1:8091/v1
       api_key: local
       enabled_toolsets:
-      - hermes-cli
-      - terminal
-      - file
-      - image_gen
+        - hermes-cli
+        - terminal
+        - file
+        - image_gen
       context_length: 65536
       note: Switched to local Qwythos-9B abliterated via sovereign proxy per user
         request 2026-07-12 (token burn prevention in alice-roleplay)
@@ -947,12 +947,12 @@ discord:
       base_url: http://127.0.0.1:8091/v1
       api_key: local
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       context_length: 65536
       note: Switched to local Qwythos-9B abliterated via sovereign proxy per user
         request 2026-07-12 (token burn prevention in alice-roleplay thread 1525214795236773918)
@@ -972,8 +972,8 @@ discord:
         \ only (never gateway).\nUNIVERSAL STABILITY: short tool loops; Mom→talk_to_jan.py;\
         \ RP only #alice-roleplay; no gateway patch/restart unless Jeff asks."
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
     '1524846849360531456':
       model: grok-4.5
       provider: xai-oauth
@@ -1003,9 +1003,9 @@ discord:
         UNIVERSAL STABILITY: short tool loops; Mom→talk_to_jan.py; RP only #alice-roleplay;
         never patch gateway/config unless Jeff asks.'
       enabled_toolsets:
-      - terminal
-      - file
-      - web_search
+        - terminal
+        - file
+        - web_search
     '1526594007092826316':
       model: grok-4.5
       provider: xai-oauth
@@ -1034,8 +1034,12 @@ discord:
         \ or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:\
         \ TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay."
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
+onboarding:
+  seen:
+    busy_input_prompt: true
+_config_version: 33
 local_sovereign:
   boot_integrity:
     enabled: false
@@ -1043,8 +1047,6 @@ local_sovereign:
     on_fail: warn
     timeout_seconds: 20
   opportunistic_fleet:
-    # SSOT gate (2026-07-18): explicit false. Agent requires BOTH this AND
-    # fleet_registry.yaml policy.enabled for routing. Registry alone stays shadow.
     enabled: false
     registry: D:/HermesData/config/fleet_registry.yaml
     prefer_free_before_grok: true
@@ -1065,21 +1067,56 @@ local_sovereign:
     warm: 8090
     classifier: 8090
     proxy: 8091
-onboarding:
-  seen:
-    busy_input_prompt: true
 fallback_model:
-- provider: custom:phronesis-sovereign
-  model: phronesis-sovereign-auto
-  base_url: http://127.0.0.1:8091/v1
-  api_key: local
+  - provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-auto
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
 grok_auth:
   prefer_subscription: true
   oauth_refresh_on_auth_fail: true
   fallback_http_codes:
-  - 401
-  - 403
-  - 404
+    - 401
+    - 403
+    - 404
   transient_retry: true
   rate_limit_retries: 2
   rate_limit_max_wait_sec: 120
+platform_toolsets:
+  cli:
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - cronjob
+    - delegation
+    - file
+    - image_gen
+    - memory
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - vision
+    - web
+    - x_search
+known_plugin_toolsets:
+  cli:
+    - spotify
+
+# ── Security ──────────────────────────────────────────────────────────
+# Secret redaction is ON by default — strings that look like API keys,
+# tokens, and passwords are masked in tool output, logs, and chat
+# responses before the model or user ever sees them. Set redact_secrets
+# to false to disable (e.g. when developing the redactor itself).
+# tirith pre-exec scanning is enabled by default when the tirith binary
+# is available. Configure via security.tirith_* keys or env vars
+# (TIRITH_ENABLED, TIRITH_BIN, TIRITH_TIMEOUT, TIRITH_FAIL_OPEN).
+#
+# security:
+#   redact_secrets: true
+#   tirith_enabled: true
+#   tirith_path: "tirith"
+#   tirith_timeout: 5
+#   tirith_fail_open: true

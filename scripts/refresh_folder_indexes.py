@@ -56,7 +56,21 @@ TARGETS = [
     VAULT / "Archive" / "Distillations-2026-07-10",
 ]
 
-SKIP_NAMES = {".git", ".obsidian", ".smart-env", "__pycache__", "node_modules", "Alice", "Roleplay-Sandbox"}
+# Never descend into package/runtime trees. 2026-07-18: VW 00-INDEX stamps in
+# site-packages broke mcp→computer_use (15s timeout). Indexes = vault/silo MD only.
+SKIP_NAMES = {
+    ".git",
+    ".obsidian",
+    ".smart-env",
+    "__pycache__",
+    "node_modules",
+    "site-packages",
+    "dist-packages",
+    "venv",
+    ".venv",
+    "Alice",
+    "Roleplay-Sandbox",
+}
 INDEX_NAMES = {"00-INDEX.md", "INDEX.md", "00-index.md"}
 
 # Fixed hot paths re-injected every refresh (do not rely on manual edits alone)

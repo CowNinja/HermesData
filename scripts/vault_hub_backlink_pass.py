@@ -49,6 +49,8 @@ NOISE_PREFIXES = (
     "temp_sources/",
     "scripts/",
     "Backups/",
+    "Operations/backups/",  # never pollute backup snapshots
+    "Operations/graphs/",
     "temp/",
 )
 

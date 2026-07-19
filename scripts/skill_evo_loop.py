@@ -1138,15 +1138,34 @@ def commit_mutation(skill_name: str, mutation: dict, new_benchmarks: dict):
 
 
 def log_gate_result(skill_name: str, layer: str, passed: bool, reason: str, benchmarks: dict = None):
-    """Log gate decision."""
+    """Log gate decision.
+
+    Self-correct canon (A1): every gate line MUST carry verify_evidence.
+    Ungrounded empty reason is recorded as cites_verify=false (reject signal).
+    """
+    evidence = (reason or "").strip()
+    cites_verify = bool(evidence) and evidence.lower() not in {"ok", "lgtm", "pass", "fine"}
+    # Prefer explicit metric tokens when benchmarks present
+    if benchmarks and isinstance(benchmarks, dict):
+        bench_bits = ",".join(f"{k}={v:.3f}" if isinstance(v, (int, float)) else f"{k}={v}"
+                              for k, v in list(benchmarks.items())[:8])
+        if bench_bits and bench_bits not in evidence:
+            evidence = f"{evidence} | benches=[{bench_bits}]" if evidence else f"benches=[{bench_bits}]"
+            cites_verify = True
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "skill": skill_name,
         "gate_layer": layer,
-        "passed": passed,
+        "passed": passed and cites_verify,  # ungrounded cannot count as pass
         "reason": reason,
+        "verify_evidence": evidence,
+        "cites_verify": cites_verify,
         "benchmarks": benchmarks,
+        "canon_guard": "Self-Correcting-Codify-Loops A1 critic-citation",
     }
+    if not cites_verify:
+        entry["passed"] = False
+        entry["ungrounded_reject"] = True
     with open(GATE_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
 

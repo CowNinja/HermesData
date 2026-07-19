@@ -10,24 +10,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 
-# Phronesis production Comfy listens on 8189 (8188 often down / legacy).
-# COMFY_URL env still wins; otherwise probe 8189 then 8188 once at import.
-def _detect_comfy_url() -> str:
-    env = (os.environ.get("COMFY_URL") or "").strip()
-    if env:
-        return env.rstrip("/")
-    for port in (8189, 8188):
-        url = f"http://127.0.0.1:{port}"
-        try:
-            with urllib.request.urlopen(f"{url}/system_stats", timeout=1.5) as resp:
-                if getattr(resp, "status", 200) == 200:
-                    return url
-        except Exception:
-            continue
-    return "http://127.0.0.1:8189"
-
-
-COMFY_URL = _detect_comfy_url()
+COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188").rstrip("/")
 COMFY_OUT = Path(os.environ.get("COMFY_OUTPUT", r"D:\ComfyUI\output"))
 METRICS_FILE = Path(r"D:\HermesData\state\comfy-pipeline-metrics.json")
 
