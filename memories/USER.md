@@ -1,15 +1,15 @@
-Phone/travel → brief TLDRs; vault holds depth. Seed-grids via MEDIA: in Discord (numbered + seed IDs), never path-only.
+Phone/travel: TLDR; vault=depth. Discord MEDIA seed-grids (numbered+IDs).
 §
-Silo Kitchen exec: Discord Data silo 1524529242019336434. Grok 1524846849360531456 = architecture/judgment only (see Hybrid/Grok canon).
+Kitchen: Data silo 1524529242019336434; Grok 1524846849360531456=arch only.
 §
-Kitchen style: Barney tables (Action|Result), scoreboard, Next step, chef voice, incremental/tested; blockers only when real.
+Kitchen style: Barney tables, scoreboard, Next step, chef voice; real blockers only.
 §
-Loves nested origin trees, copy dir structure when unsure, multi-agent plans, auto index refresh, BooksBloom, rich connections.
+Loves origin trees, copy dirs, multi-agent plans, auto index, BooksBloom.
 §
-VW: default dry PhronesisVault-only; LIVE only with explicit Jeff green light + decision card. Never gateway cowboy fixes.
+VW: dry vault-only default; LIVE only on Jeff OK+decision card.
 §
-Positive on hybrid Grok-driver + local grunt; purge and destructive ops always Jeff-gated.
+Hybrid Grok+local OK; purge/destructive Jeff-gated.
 §
-Mebaman (~preteen) on dad’s PC: build/create in games (e.g. Trailmakers). Jeff OK’s long overnight autonomous sessions; always save creations when asked.
+Mebaman (~preteen) dad PC: game builds; overnight OK; always save when asked.
 §
-Alice RP: mint kiss post-cum (brush+mouthwash); sister snowball OK. Free-rein→Alice directs; eye-lock, dirty talk, hole tours, GG, squirts, flaunt. Core: Chloe/Becca/Sassy/Emily/Lyra. Town=slutty Lara Croft, 0 underwear. Short adventure beats + ledger. New-girl corrupt: resist→sweet nothings→Lyra nectar→gentle heavy lesbian (futon). Tanks: Priya Sharma (brown, gold-thread hair, jeweler); Katie Brooks (freckled auburn, green eyes, innocent).
+Alice RP: mint kiss post-cum (brush+mouthwash); snowball OK. Free-rein Alice directs; eye-lock; dirty talk; GG; squirts; heavy onomatopoeia. Harem: Chloe/Becca/Sassy/Emily/Lyra. Town=slutty Lara Croft 0 underwear; short beats+ledger. New-girl: deny/tease—voluntary+dirty beg before advance; Lyra nectar OK. Max 1–2 fingers (no fist); light rosebud+tongue OK. Noisy ATM/A2M, ATOGM/fart-creampie-eat, RCowgirl anal. Cum-tease: spit load in new-girl holes, harem slurps—deny them taste. Train lesbian cuckqueans (French-kiss in Alice cunt/ass; share her squirt; edged confessions). Alice eye-locks/loves Jeff + narrates orgy; sisters run futon. Recover=girls free show, Alice close. Tanks: Priya Sharma (brown, gold-thread jeweler); Katie Brooks (freckled auburn, green eyes, innocent).
