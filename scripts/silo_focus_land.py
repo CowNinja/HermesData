@@ -32,7 +32,19 @@ CACHE = Path(r"D:\HermesData\state\land_folder_disk_cache.json")
 EMPTY_STATE = Path(r"D:\HermesData\state\focus_land_empty_plan.json")
 RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\g-to-k-drain-receipt-latest.md")
 SCRIPTS = Path(r"D:\HermesData\scripts")
-PY = sys.executable
+# Land drain child must be python.exe — nested pythonw under orch PIPEs fails
+# silent exit 1 (2026-07-19 repro). See windows_subprocess.prefer_python_console.
+try:
+    from windows_subprocess import prefer_python_console  # type: ignore
+
+    PY = prefer_python_console(sys.executable)
+except Exception:  # pragma: no cover
+    _p = Path(sys.executable)
+    if _p.name.lower() == "pythonw.exe" and _p.with_name("python.exe").is_file():
+        PY = str(_p.with_name("python.exe"))
+    else:
+        PY = sys.executable
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
 CACHE_TTL_S = 6 * 3600  # re-count every 6h
 
 
@@ -125,12 +137,22 @@ def mark_queue_complete(item_id: str, note: str) -> bool:
 
 
 def parse_drain_receipt() -> dict:
-    """Read latest drain receipt for copied/skipped/planned."""
-    out = {"copied": None, "skipped": None, "planned": None}
+    """Read latest APPLY drain receipt for copied/skipped/planned.
+
+    Ignores dry-run receipts (separate file since 2026-07-19) so empty-plan
+    auto-advance never fires on probe waves.
+    """
+    out = {"copied": None, "skipped": None, "planned": None, "mode": None}
     if not RECEIPT.is_file():
         return out
     try:
         text = RECEIPT.read_text(encoding="utf-8", errors="replace")
+        # Refuse dry-run content if it ever lands on the apply path again.
+        mode_m = re.search(r"\*\*Mode:\*\*\s*(\S+)", text)
+        mode = (mode_m.group(1) if mode_m else "").strip().upper()
+        out["mode"] = mode or None
+        if mode and mode != "APPLY":
+            return out
         m = re.search(
             r"\*\*Copied:\*\*\s*(\d+)\s*·\s*\*\*Skipped:\*\*\s*(\d+)\s*·\s*\*\*Planned rows:\*\*\s*(\d+)",
             text,
@@ -140,6 +162,7 @@ def parse_drain_receipt() -> dict:
                 "copied": int(m.group(1)),
                 "skipped": int(m.group(2)),
                 "planned": int(m.group(3)),
+                "mode": mode or "APPLY",
             }
     except Exception:
         pass
@@ -222,9 +245,11 @@ def main() -> int:
             capture_output=True,
             text=True,
             timeout=30,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            creationflags=_NO_WINDOW,
         )
-        n_drain = int((rps.stdout or "0").strip() or "0")
+        raw_n = (rps.stdout or "0").strip().splitlines()
+        n_s = (raw_n[-1] if raw_n else "0").strip() or "0"
+        n_drain = int(n_s) if n_s.isdigit() else 0
         # count includes nothing yet; if >=1 another writer is live
         if n_drain >= 1:
             print(
@@ -239,7 +264,7 @@ def main() -> int:
             )
             return 0
     except Exception as e:
-        print(json.dumps({"warn": f"drain_precheck_failed:{type(e).__name__}"}))
+        print(json.dumps({"warn": f"drain_precheck_failed:{type(e).__name__}:{e}"}))
     cmd = [
         PY,
         str(SCRIPTS / "g_to_k_safe_drain.py"),
@@ -249,7 +274,33 @@ def main() -> int:
         "--source",
         path,
     ]
-    r = subprocess.run(cmd, cwd=str(SCRIPTS))
+    print(json.dumps({"drain_cmd_python": PY, "limit": args.limit, "source": path}))
+    # Capture + forward: orch only keeps last 4k of worker out; still better than
+    # silent nested-pythonw death. CREATE_NO_WINDOW avoids console flash with python.exe.
+    try:
+        r = subprocess.run(
+            cmd,
+            cwd=str(SCRIPTS),
+            capture_output=True,
+            text=True,
+            creationflags=_NO_WINDOW,
+        )
+    except Exception as e:
+        print(json.dumps({"status": "drain_spawn_failed", "error": f"{type(e).__name__}: {e}"}))
+        return 1
+    if r.stdout:
+        sys.stdout.write(r.stdout if r.stdout.endswith("\n") else r.stdout + "\n")
+    if r.stderr:
+        sys.stderr.write(r.stderr if r.stderr.endswith("\n") else r.stderr + "\n")
+    print(
+        json.dumps(
+            {
+                "drain_exit": int(r.returncode or 0),
+                "drain_stdout_chars": len(r.stdout or ""),
+                "drain_stderr_chars": len(r.stderr or ""),
+            }
+        )
+    )
     # Empty-plan auto-advance only when NOTHING left to plan (not skip-heavy mid-tree).
     # Skip-only waves reset progress tracking but do NOT complete — next wave may
     # still find landable files deeper (hash/skip_sources catch-up).
@@ -295,7 +346,7 @@ def main() -> int:
                 "reset": "productive_or_skip_wave",
             }
             save_empty_state(st)
-    return r.returncode
+    return int(r.returncode or 0)
 
 
 if __name__ == "__main__":

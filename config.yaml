@@ -5,14 +5,15 @@ model:
   context_length: 65536
   base_url: http://127.0.0.1:8091/v1
 fallback_providers:
+# 2026-07-19 local-first offline hygiene: free cloud before Grok; local last-resort
+- provider: openrouter
+  model: openrouter/free
+  api_mode: chat_completions
 - provider: xai-oauth
   model: grok-4.5
   api_mode: chat_completions
 - provider: xai-oauth
   model: grok-build-0.1
-  api_mode: chat_completions
-- provider: openrouter
-  model: openrouter/free
   api_mode: chat_completions
 - provider: custom:phronesis-sovereign
   model: phronesis-sovereign-auto
@@ -163,14 +164,16 @@ bedrock:
     stream_processing_mode: async
     trace: disabled
 auxiliary:
+  # 2026-07-19 Grok-bleed fix: schema-light aux → local :8091 (token-empty resilience).
+  # vision/tts stay auto. web_extract auto (soft-degrade). Hybrid: children/aux no Grok burn.
   vision:
     provider: auto
     model: ''
     timeout: 90
     download_timeout: 30
   web_extract:
-    provider: xai-oauth
-    model: grok-4.5
+    provider: auto
+    model: ''
     timeout: 120
   compression:
     provider: custom:phronesis-sovereign
@@ -179,22 +182,30 @@ auxiliary:
     base_url: http://127.0.0.1:8091/v1
     api_key: local
   skills_hub:
-    provider: xai-oauth
-    model: grok-4.5
-    timeout: 45
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-synthesis
+    timeout: 90
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   approval:
-    provider: xai-oauth
-    model: grok-4.5
-    timeout: 30
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-classify
+    timeout: 45
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   mcp:
-    provider: xai-oauth
-    model: grok-4.5
-    timeout: 30
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-classify
+    timeout: 45
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   title_generation:
-    provider: xai-oauth
-    model: grok-4.5
-    timeout: 20
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-classify
+    timeout: 30
     language: ''
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   tts_audio_tags:
     provider: auto
     model: ''
@@ -202,33 +213,47 @@ auxiliary:
     api_key: ''
     timeout: 30
   triage_specifier:
-    provider: xai-oauth
-    model: grok-4.5
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-classify
     timeout: 60
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   kanban_decomposer:
-    provider: xai-oauth
-    model: grok-4.5
-    timeout: 90
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-code
+    timeout: 120
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   profile_describer:
-    provider: xai-oauth
-    model: grok-4.5
-    timeout: 45
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-synthesis
+    timeout: 60
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   curator:
-    provider: xai-oauth
-    model: grok-4.5
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-synthesis
     timeout: 180
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   monitor:
-    provider: xai-oauth
-    model: grok-4.5
-    timeout: 45
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-classify
+    timeout: 60
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   background_review:
-    provider: xai-oauth
-    model: grok-4.5
-    timeout: 90
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-synthesis
+    timeout: 120
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
   moa_aggregator:
-    provider: xai-oauth
-    model: grok-4.5
+    provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-synthesis
     timeout: 180
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
 display:
   compact: true
   personality: technical
@@ -376,8 +401,9 @@ memory:
   user_char_limit: 1375
   provider: ''
 delegation:
-  model: grok-4.5
-  provider: xai-oauth
+  # 2026-07-19 hybrid children-never-Grok: was xai-oauth/grok-4.5 with local base_url (drift)
+  model: phronesis-sovereign-code
+  provider: custom:phronesis-sovereign
   base_url: http://127.0.0.1:8091/v1
   api_key: local
   api_mode: chat_completions
@@ -390,7 +416,8 @@ delegation:
   orchestrator_enabled: false
   subagent_auto_approve: false
   max_async_children: 6
-  comment: '2026-07-17 RP boundary: orchestrator off. Factual channels exclude hermes-cli
+  comment: '2026-07-17 RP boundary: orchestrator off. 2026-07-19 provider/model local
+    code alias (Hybrid children-never-Grok). Factual channels exclude hermes-cli
     (embeds delegate_task). RP channels list tools explicitly.'
 prefill_messages_file: ''
 goals:

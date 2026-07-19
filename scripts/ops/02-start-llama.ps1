@@ -30,6 +30,10 @@ if (-not (Test-Path $Model))       { Write-Host "FATAL: $Model not found" -Foreg
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "Phronesis-Llama-Process.ps1")
 if (Stop-LlamaOnPort -Port $Port) { Start-Sleep -Seconds 1 }
 
+# 2026-07-19: explicit --jinja for OpenAI-style tool/function calling.
+# Research: llama.cpp function-calling.md — server needs jinja (default enabled on
+# 2026-06-28+ builds; pin flag so a future --no-jinja default or wrapper cannot strip it).
+# Hybrid-Local-Grok-Token-Policy: tool/jinja correctness is local agent IQ, not a bigger GGUF.
 $args = @(
     "--model", $Model,
     "--host", "0.0.0.0",
@@ -37,7 +41,8 @@ $args = @(
     "--ctx-size", "$CtxSize",
     "--n-gpu-layers", "$Ngl",
     "--parallel", "1",
-    "--flash-attn", "on"
+    "--flash-attn", "on",
+    "--jinja"
 )
 if ($ContBatching) { $args += "--cont-batching" }
 

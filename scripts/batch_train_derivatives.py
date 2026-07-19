@@ -117,25 +117,33 @@ def candidates_from_walk(root: Path, limit: int, max_scan: int) -> list[Path]:
     exts = {".pdf", ".txt", ".md", ".csv", ".json", ".html", ".htm", ".eml", ".msg", ".rtf"}
     gold: list[Path] = []
     other: list[Path] = []
+    # scanned = eligibility candidates (not raw rglob nodes).
+    # 2026-07-19: Medical-Records prefix is train-saturated; counting every
+    # node toward max_scan left attempted=0 while deep unprocessed PDFs remain.
     scanned = 0
-    for p in root.rglob("*"):
+    nodes = 0
+    node_cap = max(max_scan * 40, 50000)
+    for pth in root.rglob("*"):
+        nodes += 1
+        if nodes > node_cap:
+            break
+        if not pth.is_file():
+            continue
+        if pth.suffix.lower() not in exts:
+            continue
+        if pth.name.endswith(".meta.json") or ".train." in pth.name:
+            continue
+        if pth.name.endswith(".train.md"):
+            continue
+        if Path(str(pth) + ".train.md").exists():
+            continue
         scanned += 1
         if scanned > max_scan:
             break
-        if not p.is_file():
+        if should_skip(pth):
+            mark_skip(pth, "junk_or_thin_imaging")
             continue
-        if p.suffix.lower() not in exts:
-            continue
-        if p.name.endswith(".meta.json") or ".train." in p.name:
-            continue
-        if p.name.endswith(".train.md"):
-            continue
-        if Path(str(p) + ".train.md").exists():
-            continue
-        if should_skip(p):
-            mark_skip(p, "junk_or_thin_imaging")
-            continue
-        (gold if GOLD_HINT.search(str(p)) else other).append(p)
+        (gold if GOLD_HINT.search(str(pth)) else other).append(pth)
         if len(gold) + len(other) >= max(limit * 4, 80):
             break
     return (gold + other)[:limit]
@@ -164,7 +172,7 @@ def candidates_from_registry(root: Path, limit: int) -> list[Path]:
             ORDER BY COALESCE(first_seen, last_seen) DESC
             LIMIT ?
             """,
-            (root_n + "\\%", max(limit * 12, 120)),
+            (root_n + "%", max(limit * 12, 120)),
         ).fetchall()
         con.close()
     except Exception:
@@ -173,22 +181,22 @@ def candidates_from_registry(root: Path, limit: int) -> list[Path]:
     for (dest,) in rows:
         if not dest:
             continue
-        p = Path(dest)
-        if not p.is_file():
+        pth = Path(dest)
+        if not pth.is_file():
             continue
-        if p.suffix.lower() not in exts and not Path(str(p) + ".ocr.md").is_file():
+        if pth.suffix.lower() not in exts and not Path(str(pth) + ".ocr.md").is_file():
             # allow binary+ocr sidecar
-            ocr_md = Path(str(p) + ".ocr.md")
+            ocr_md = Path(str(pth) + ".ocr.md")
             if ocr_md.is_file():
-                p = ocr_md
+                pth = ocr_md
             else:
                 continue
-        if Path(str(p) + ".train.md").exists():
+        if Path(str(pth) + ".train.md").exists():
             continue
-        if should_skip(p):
-            mark_skip(p, "junk_or_thin_imaging")
+        if should_skip(pth):
+            mark_skip(pth, "junk_or_thin_imaging")
             continue
-        out.append(p)
+        out.append(pth)
         if len(out) >= limit:
             break
     return out

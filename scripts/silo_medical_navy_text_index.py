@@ -49,14 +49,16 @@ def main() -> int:
 
     hits = 0
     scanned = 0
-    # Prefer Medical / Navy-ish paths
+    # Prefer Jeff-first domain roots (avoid full-K rglob hang).
+    # Medical-Records / Navy-Service are canonical shelves; Medical is legacy alias.
     roots = [
+        K / "Medical-Records",
+        K / "Navy-Service",
         K / "Medical",
-        K / "Career",
-        K / "Life-Archive",
-        K,
+        K / "Core-Personal" / "Career",
     ]
     files: list[Path] = []
+    max_files = 3000
     for root in roots:
         if not root.exists():
             continue
@@ -64,11 +66,13 @@ def main() -> int:
             try:
                 for p in root.glob(pat):
                     files.append(p)
-                    if len(files) > 5000:
+                    if len(files) >= max_files:
                         break
             except Exception:
                 pass
-        if len(files) > 5000:
+            if len(files) >= max_files:
+                break
+        if len(files) >= max_files:
             break
 
     # newest first

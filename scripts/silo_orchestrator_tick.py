@@ -88,6 +88,8 @@ def run(cmd: List[str], timeout: int = 600) -> Tuple[int, str]:
 
     2026-07-18: plain subprocess.run(timeout=) left orphan g_to_k_safe_drain
     children → dual land writers every ~2h (overnight watchdog thrash).
+    2026-07-19: do NOT force pythonw for silo_focus_land / g_to_k_safe_drain —
+    nested pythonw→pythonw under PIPEd stdio exits 1 silent (GB land stall).
     """
     try:
         if (
@@ -96,7 +98,22 @@ def run(cmd: List[str], timeout: int = 600) -> Tuple[int, str]:
             and str(cmd[0]).lower().endswith(("python.exe", "pythonw.exe"))
         ):
             cmd = list(cmd)
-            cmd[0] = _worker_python()
+            joined = " ".join(str(x) for x in cmd).lower()
+            land_writer = (
+                "silo_focus_land.py" in joined
+                or "g_to_k_safe_drain.py" in joined
+            )
+            if land_writer:
+                try:
+                    from windows_subprocess import prefer_python_console  # type: ignore
+
+                    cmd[0] = prefer_python_console(cmd[0])
+                except Exception:
+                    p = Path(str(cmd[0]))
+                    if p.name.lower() == "pythonw.exe" and p.with_name("python.exe").is_file():
+                        cmd[0] = str(p.with_name("python.exe"))
+            else:
+                cmd[0] = _worker_python()
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -183,11 +200,24 @@ def main() -> int:
             # under continuous_loop run_tick parent timeout (see silo_continuous_loop.py).
             # Refs: sqlite WAL single-writer; Temporal activity StartToClose > p95 work;
             # k8s: probe/timeout budget > expected work or thrash-restart orphans writers.
+            # focus_land: use console python.exe (not pythonw). Nested pythonw
+            # under run()'s PIPEs made drain exit 1 silent — GB land stalled
+            # at ~59.5% (2026-07-19). prefer_python_console inside focus_land
+            # is belt; orch entry also forces console interpreter.
+            try:
+                from windows_subprocess import prefer_python_console  # type: ignore
+
+                _focus_py = prefer_python_console(sys.executable)
+            except Exception:
+                _focus_py = sys.executable
+                _fp = Path(sys.executable)
+                if _fp.name.lower() == "pythonw.exe" and _fp.with_name("python.exe").is_file():
+                    _focus_py = str(_fp.with_name("python.exe"))
             workers.append(
                 (
                     "focus_land",
                     [
-                        sys.executable,
+                        _focus_py,
                         str(SCRIPTS / "silo_focus_land.py"),
                         "--limit",
                         str(args.drain_limit),

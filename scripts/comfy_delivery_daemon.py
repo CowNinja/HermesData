@@ -29,7 +29,7 @@ BATCH_SESSION_FILE = Path(r"D:\HermesData\state\comfy-batch-session.json")
 METRICS_FILE = Path(r"D:\HermesData\state\comfy-pipeline-metrics.json")
 LOCK_FILE = Path(r"D:\HermesData\state\comfy-delivery-daemon.lock")
 TICK_LOCK_FILE = Path(r"D:\HermesData\state\comfy-delivery-tick.lock")
-DEFAULT_CHANNEL = "1521146755985576116"
+DEFAULT_CHANNEL = "1524821864956956793"
 POST_SCRIPT = SCRIPTS.parent / "temp" / "post_discord_image.py"
 POLL_SEC = 3
 MAX_LEDGER = 200
@@ -625,7 +625,7 @@ def record_hermes_delivery(image_path: str | Path) -> dict:
     return {"ok": True, "action": "record_hermes", "png": png_path.name}
 
 
-def seal_png_path(image_path: str | Path) -> dict:
+def seal_png_path(image_path: str | Path, *, marker: str = "gateway-sealed") -> dict:
     path = Path(image_path)
     if is_batch_png(path.name):
         png_path = path if path.is_file() else COMFY_OUTPUT / path.name
@@ -646,14 +646,95 @@ def seal_png_path(image_path: str | Path) -> dict:
         sha.append(digest)
     reg["sha256"] = sha
     names = dict(reg.get("names") or {})
-    names[png_path.name] = {
-        "sha256": digest,
-        "discord_id": "gateway-sealed",
-        "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-    }
+    # Do not clobber a real Discord snowflake with a seal marker.
+    prev = names.get(png_path.name) if isinstance(names.get(png_path.name), dict) else {}
+    prev_id = str((prev or {}).get("discord_id") or "")
+    if prev_id.isdigit() and len(prev_id) >= 15:
+        pass
+    else:
+        names[png_path.name] = {
+            "sha256": digest,
+            "discord_id": marker,
+            "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
     reg["names"] = names
     _save_posted_registry(reg)
-    return {"ok": True, "action": "seal", "png": png_path.name}
+    return {"ok": True, "action": "seal", "png": png_path.name, "marker": marker}
+
+
+def seal_cold_backlog(
+    *,
+    older_than_sec: float | None = None,
+    dry_run: bool = False,
+    protect_active_batch: bool = True,
+    marker: str = "cold-sealed",
+) -> dict:
+    """Seal undelivered cold PNGs without Discord posts (historical hard-gate).
+
+    Never posts. Never seals files younger than older_than_sec (default MAX_AUTO_AGE).
+    Optionally protects the active batch series range from silent seal.
+    """
+    age_limit = float(MAX_AUTO_AGE_SEC if older_than_sec is None else older_than_sec)
+    if age_limit < 0:
+        age_limit = 0.0
+    protected: set[str] = set()
+    if protect_active_batch:
+        try:
+            sess = _load_batch_session()
+            if sess.get("active"):
+                start = int(sess.get("series_start_png") or 0)
+                total = int(sess.get("total") or 0)
+                for i in range(start, start + max(total, 0) + 2):
+                    protected.add(f"standard__{i:05d}_.png")
+        except Exception:
+            pass
+    state = _load_state()
+    sealed: list[str] = []
+    skipped_young: list[str] = []
+    skipped_protected: list[str] = []
+    skipped_already: list[str] = []
+    for path in sorted(iter_output_pngs(COMFY_OUTPUT), key=lambda p: p.stat().st_mtime):
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        name = path.name
+        digest = _sha256_file(path)
+        if _already_delivered(state, name, digest) or _posted_to_discord(name, digest):
+            # Real Discord id or ledger — leave alone.
+            did = _discord_id(name)
+            if did.isdigit() and len(did) >= 15:
+                skipped_already.append(name)
+                continue
+            if name in list(state.get("delivered") or []):
+                skipped_already.append(name)
+                continue
+        age = _png_age_sec(mtime)
+        if age_limit > 0 and age <= age_limit:
+            skipped_young.append(name)
+            continue
+        if name in protected:
+            skipped_protected.append(name)
+            continue
+        if dry_run:
+            sealed.append(name)
+            continue
+        seal_png_path(path, marker=marker)
+        sealed.append(name)
+        # refresh state after each seal
+        state = _load_state()
+    return {
+        "ok": True,
+        "action": "seal_cold",
+        "dry_run": dry_run,
+        "older_than_sec": age_limit,
+        "sealed_count": len(sealed),
+        "sealed": sealed[-50:],
+        "skipped_young_count": len(skipped_young),
+        "skipped_protected": skipped_protected,
+        "skipped_already_count": len(skipped_already),
+        "protected": sorted(protected),
+    }
 
 
 class _TickLock:
@@ -721,13 +802,18 @@ def _tick_locked(channel: str) -> dict:
     max_posts = max(1, int(os.environ.get("COMFY_DELIVERY_MAX_POSTS_PER_TICK", str(MAX_POSTS_PER_TICK)) or MAX_POSTS_PER_TICK))
     if len(pending) >= flood_threshold:
         keep = pending[-max_posts:]
-        seal_names = [n for n, _, _ in pending[:-max_posts]] if len(pending) > max_posts else []
-        for name, mtime, digest in pending[:-max_posts] if len(pending) > max_posts else []:
+        seal_batch = pending[:-max_posts] if len(pending) > max_posts else []
+        seal_names = [n for n, _, _ in seal_batch]
+        for name, mtime, digest in seal_batch:
             _mark_delivered(state, name, mtime, digest)
+            # Registry marker blocks accidental force/repost of flood backlog.
+            try:
+                seal_png_path(COMFY_OUTPUT / name, marker="flood-sealed")
+            except Exception:
+                pass
         if seal_names:
             _save_state(state)
             pending = keep
-            # Continue to post only the tip; report sealed backlog.
             tip_result_extra = {"flood_sealed": seal_names, "flood_sealed_count": len(seal_names)}
         else:
             tip_result_extra = {"flood_sealed_count": 0}
@@ -793,6 +879,27 @@ def main() -> int:
     parser.add_argument("--daemon", action="store_true", help="Run poll loop (default when no --once)")
     parser.add_argument("--seal", metavar="PNG", help="Reserve PNG for Hermes gateway delivery (pre-post)")
     parser.add_argument(
+        "--seal-cold",
+        action="store_true",
+        help="Seal undelivered PNGs older than --older-than-sec without posting (historical hard-gate)",
+    )
+    parser.add_argument(
+        "--older-than-sec",
+        type=float,
+        default=None,
+        help="With --seal-cold: age floor in seconds (default MAX_AUTO_AGE_SEC / 20m)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="With --seal-cold: report candidates only, no state writes",
+    )
+    parser.add_argument(
+        "--include-active-batch",
+        action="store_true",
+        help="With --seal-cold: allow sealing active batch series range (default protects it)",
+    )
+    parser.add_argument(
         "--record-hermes",
         metavar="PNG",
         help="Record successful Hermes gateway delivery (blocks daemon repost)",
@@ -809,6 +916,18 @@ def main() -> int:
     args = parser.parse_args()
     if args.seal:
         print(json.dumps(seal_png_path(args.seal)))
+        return 0
+    if args.seal_cold:
+        print(
+            json.dumps(
+                seal_cold_backlog(
+                    older_than_sec=args.older_than_sec,
+                    dry_run=args.dry_run,
+                    protect_active_batch=not args.include_active_batch,
+                ),
+                indent=2,
+            )
+        )
         return 0
     if args.record_hermes:
         print(json.dumps(record_hermes_delivery(args.record_hermes)))

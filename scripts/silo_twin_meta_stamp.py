@@ -53,23 +53,26 @@ def process_train_md(train: Path) -> dict | None:
     else:
         src = train
     meta_path = Path(str(src) + ".train.meta.json")
-    # skip if already stamped with temporal + tags
-    if meta_path.is_file():
-        try:
-            old = json.loads(meta_path.read_text(encoding="utf-8", errors="replace"))
-            if old.get("temporal") and old.get("tags") and old.get("stamped_at"):
-                return None
-        except Exception:
-            pass
-    flags = train_meta_flags(src)
-    tags = domain_tags(src)
-    tier = gold_tier(src)
     meta = {}
     if meta_path.is_file():
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8", errors="replace"))
         except Exception:
             meta = {}
+    # 2026-07-19: skip only when full stamp incl. twin_scopes is present.
+    # Earlier waves wrote temporal+tags but omitted twin_scopes from train_meta_flags.
+    if (
+        meta.get("temporal")
+        and meta.get("tags")
+        and meta.get("stamped_at")
+        and meta.get("twin_scopes")
+        and meta.get("primary_scope")
+    ):
+        return None
+    flags = train_meta_flags(src)
+    tags = domain_tags(src)
+    tier = gold_tier(src)
+    scopes = flags.get("twin_scopes") or []
     meta.update(
         {
             "source": str(src),
@@ -78,6 +81,9 @@ def process_train_md(train: Path) -> dict | None:
             "use_as_current_fact": flags.get("use_as_current_fact"),
             "use_as_historical_graph": flags.get("use_as_historical_graph"),
             "twin_training_value": flags.get("twin_training_value"),
+            "twin_scopes": scopes,
+            "primary_scope": flags.get("primary_scope")
+            or (scopes[0] if scopes else "life_archive"),
             "gold_tier": tier,
             "tags": tags,
             "family_business": "family" in tags or "business" in tags,
@@ -91,9 +97,12 @@ def process_train_md(train: Path) -> dict | None:
         if "temporal:" not in body[:500] and "twin_meta temporal=" not in body[:500]:
             header = (
                 f"<!-- twin_meta temporal={meta['temporal']} tags={','.join(tags)} "
-                f"gold={tier} -->\n"
+                f"scopes={','.join(scopes)} gold={tier} -->\n"
             )
             train.write_text(header + body, encoding="utf-8", errors="replace")
+        elif "scopes=" not in body[:500] and "twin_meta" in body[:500]:
+            # light backfill note on existing header line
+            pass
     except Exception:
         pass
     return meta
@@ -151,6 +160,8 @@ def main() -> int:
                     "temporal": meta.get("temporal"),
                     "tags": meta.get("tags"),
                     "gold_tier": meta.get("gold_tier"),
+                    "twin_scopes": meta.get("twin_scopes") or [],
+                    "primary_scope": meta.get("primary_scope"),
                     "train": str(train),
                 }
             )

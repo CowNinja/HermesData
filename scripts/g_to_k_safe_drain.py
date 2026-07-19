@@ -60,6 +60,11 @@ TS = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 K_SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
 STAGING = K_SILO / "_Staging-From-G-Drive"
 RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\g-to-k-drain-receipt-latest.md")
+RECEIPT_DRY = Path(r"D:\PhronesisVault\Operations\logs\g-to-k-drain-receipt-dry-run-latest.md")
+# Resume cursor so skip-heavy trees don't re-walk from root every wave.
+# Research: rsync batch/continuation; S3 ListObjects continuation-token;
+# fscrawler/checkpointed FS crawls; queue-first bounded scan (silo canon).
+WALK_CURSOR = Path(r"D:\HermesData\state\g_to_k_walk_cursor.json")
 
 # Domain routing SSOT (expanded after MemoryCard trial lessons)
 try:
@@ -168,122 +173,245 @@ def sha256_file(path: Path, limit: int = 32 * 1024 * 1024) -> str:
     return h.hexdigest()
 
 
+def load_walk_cursor() -> dict:
+    if WALK_CURSOR.is_file():
+        try:
+            return json.loads(WALK_CURSOR.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def save_walk_cursor(data: dict) -> None:
+    WALK_CURSOR.parent.mkdir(parents=True, exist_ok=True)
+    data = dict(data or {})
+    data["updated"] = datetime.now(timezone.utc).isoformat()
+    if atomic_write_json is not None:
+        atomic_write_json(WALK_CURSOR, data, indent=2)
+    else:
+        WALK_CURSOR.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
 def iter_candidates(
     root: Path,
     limit: int,
     skip_sources: set[str] | None = None,
     skip_hashes: set[str] | None = None,
     max_scan: int = 2_000_000,
-) -> list[Path]:
-    """Yield up to `limit` *new* candidates (skips known sources).
+    start_after: str | None = None,
+) -> tuple[list[Path], dict]:
+    """Return up to `limit` *new* candidates (skips known sources).
 
-    Walks until `limit` new files found or max_scan files seen.
+    2026-07-19 harden (skip-heavy Google_Backups / takeout veins):
+    - known skip_sources do NOT burn max_scan budget (only walk_cap bounds full walk)
+    - optional start_after resume cursor so waves advance past already-drained prefixes
+    - one automatic wrap if cursor leaves no candidates (tree may have new files earlier)
+
+    Walks until `limit` new files found, max_scan *new* files examined, or walk_cap.
     """
     out: list[Path] = []
+    stats = {
+        "walked_files": 0,
+        "skipped_known": 0,
+        "new_examined": 0,
+        "emitted": 0,
+        "last_path": None,
+        "start_after": start_after,
+        "wrapped": False,
+        "hit_walk_cap": False,
+        "hit_max_scan": False,
+    }
     if not root.exists():
-        return out
+        return out, stats
     skip_sources = skip_sources or set()
-    scanned = 0
-    for p in root.rglob("*"):
-        if scanned >= max_scan:
-            break
-        if not p.is_file():
-            continue
-        try:
-            _dec = land_decision(p)
-            if _dec == "skip":
-                continue
-            if _dec == "catalog":
-                continue  # full land skip; catalog job separate
-        except Exception:
-            pass
-        if p.name.startswith(".") or p.name.endswith(".meta.json"):
-            continue
-        if p.name.lower() in {"desktop.ini", "thumbs.db", "thumbs.db:encryptable"}:
-            continue
-        if p.suffix.lower() in {".tmp", ".crdownload", ".partial", ".jsonlz4", ".final"}:
-            continue
-        # Holistic nutrition: skip OS/app junk even inside personal trees (Booksbloom Carbonite dumps)
-        _low = str(p).lower().replace(chr(92), "/")
-        if any(
-            junk in _low
-            for junk in (
-                "/appdata/",
-                "/application data/",
-                "/local settings/",
-                "carbonite restored",
-                "/diagnostics/",
-                "/temp/",
-                "/tmp/",
-                "/cache/",
-                "/caches/",
-                "/node_modules/",
-                "/.git/",
-                "/__pycache__/",
-                "/windows/system32",
-                "/program files",
-                "$recycle.bin",
-                "system volume information",
-                "thumbs.db",
-                "/inetcache/",
-                "/packages/",
-                "/microsoft/windows/",
-                "old firefox data",
-                "/firefox/",
-                ".jsonlz4",
-            )
-        ):
-            continue
+    # Allow walking well past a large already-landed prefix (66k+ GB registry).
+    walk_cap = max(int(max_scan) * 4, int(max_scan) + 80_000, 120_000)
 
-        # Jeff 2026-07-13: catalog-only music — skip bulk audio land
-        if p.suffix.lower() in {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".wma"}:
-            continue
-        sp_l = str(p).lower().replace("/", "\\")
-        sp_n = str(p).lower().replace("\\", "/")
-        if any(m in sp_n for m in (
-            "/old_music/", "/music rip/", "z_jenni_kids_music",
-            "/virtualbox vms/", "/hyper-v/", "/vmware/",
-        )):
-            continue
-        try:
-            # Jeff 2026-07-13: game ISOs / disk images / huge archives = catalog-only, not land
-            if p.suffix.lower() in {".iso", ".vmdk", ".vdi", ".vhd", ".vhdx", ".qcow2", ".ova", ".img", ".nrg", ".mds", ".mdf", ".cue", ".bin"}:
-                continue
-            if p.suffix.lower() in {".7z", ".zip", ".rar"}:
-                sz = p.stat().st_size
-                low = (p.name + " " + str(p)).lower()
-                gold = any(
-                    k in low
-                    for k in (
-                        "medical", "navy", "nmcp", "records", "orders", "eval",
-                        "legal", "bcnr", "nvlsp", "export", "takeout", "mail",
-                        "dna", "genome", "journal", "bloom", "personal", "va ",
-                        "tax", "scan",
-                    )
-                )
-                # Jeff 2026-07-13: evaluate zips — keep gold/content archives; skip bulk junk
-                if sz > 500_000_000 and not gold:
-                    continue
-                if sz > 50_000_000 and not gold:
-                    # still skip large non-gold blobs (likely media/vm packs)
-                    if any(k in low for k in ("virtualbox", "vmdk", "vdi", "iso", "game", "steam", "music", "mp3")):
-                        continue
-                    if sz > 150_000_000:
-                        continue
-        except Exception:
-            continue
-        scanned += 1
-        if scanned >= max_scan:
-            break
-        sp = str(p)
+    def _known(sp: str) -> bool:
         sp_win = sp.replace("/", "\\")
         sp_nix = sp.replace("\\", "/")
-        if sp in skip_sources or sp_win in skip_sources or sp_nix in skip_sources:
-            continue
-        out.append(p)
-        if len(out) >= limit:
-            break
-    return out
+        return sp in skip_sources or sp_win in skip_sources or sp_nix in skip_sources
+
+    def _walk_once(resume_after: str | None, allow_wrap_marker: bool) -> None:
+        past = resume_after is None
+        resume_keys = set(_path_keys(resume_after)) if resume_after else set()
+        for p in root.rglob("*"):
+            if stats["walked_files"] >= walk_cap:
+                stats["hit_walk_cap"] = True
+                break
+            if not p.is_file():
+                continue
+            try:
+                _dec = land_decision(p)
+                if _dec == "skip":
+                    continue
+                if _dec == "catalog":
+                    continue  # full land skip; catalog job separate
+            except Exception:
+                pass
+            if p.name.startswith(".") or p.name.endswith(".meta.json"):
+                continue
+            if p.name.lower() in {"desktop.ini", "thumbs.db", "thumbs.db:encryptable"}:
+                continue
+            if p.suffix.lower() in {".tmp", ".crdownload", ".partial", ".jsonlz4", ".final"}:
+                continue
+            # Holistic nutrition: skip OS/app junk even inside personal trees (Booksbloom Carbonite dumps)
+            _low = str(p).lower().replace(chr(92), "/")
+            if any(
+                junk in _low
+                for junk in (
+                    "/appdata/",
+                    "/application data/",
+                    "/local settings/",
+                    "carbonite restored",
+                    "/diagnostics/",
+                    "/temp/",
+                    "/tmp/",
+                    "/cache/",
+                    "/caches/",
+                    "/node_modules/",
+                    "/.git/",
+                    "/__pycache__/",
+                    "/windows/system32",
+                    "/program files",
+                    "$recycle.bin",
+                    "system volume information",
+                    "thumbs.db",
+                    "/inetcache/",
+                    "/packages/",
+                    "/microsoft/windows/",
+                    "old firefox data",
+                    "/firefox/",
+                    ".jsonlz4",
+                )
+            ):
+                continue
+
+            # Jeff 2026-07-13: catalog-only music — skip bulk audio land
+            if p.suffix.lower() in {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".wma"}:
+                continue
+            sp_n = str(p).lower().replace("\\", "/")
+            if any(
+                m in sp_n
+                for m in (
+                    "/old_music/",
+                    "/music rip/",
+                    "z_jenni_kids_music",
+                    "/virtualbox vms/",
+                    "/hyper-v/",
+                    "/vmware/",
+                )
+            ):
+                continue
+            try:
+                # Jeff 2026-07-13: game ISOs / disk images / huge archives = catalog-only, not land
+                if p.suffix.lower() in {
+                    ".iso",
+                    ".vmdk",
+                    ".vdi",
+                    ".vhd",
+                    ".vhdx",
+                    ".qcow2",
+                    ".ova",
+                    ".img",
+                    ".nrg",
+                    ".mds",
+                    ".mdf",
+                    ".cue",
+                    ".bin",
+                }:
+                    continue
+                if p.suffix.lower() in {".7z", ".zip", ".rar"}:
+                    sz = p.stat().st_size
+                    low = (p.name + " " + str(p)).lower()
+                    gold = any(
+                        k in low
+                        for k in (
+                            "medical",
+                            "navy",
+                            "nmcp",
+                            "records",
+                            "orders",
+                            "eval",
+                            "legal",
+                            "bcnr",
+                            "nvlsp",
+                            "export",
+                            "takeout",
+                            "mail",
+                            "dna",
+                            "genome",
+                            "journal",
+                            "bloom",
+                            "personal",
+                            "va ",
+                            "tax",
+                            "scan",
+                        )
+                    )
+                    # Jeff 2026-07-13: evaluate zips — keep gold/content archives; skip bulk junk
+                    if sz > 500_000_000 and not gold:
+                        continue
+                    if sz > 50_000_000 and not gold:
+                        # still skip large non-gold blobs (likely media/vm packs)
+                        if any(
+                            k in low
+                            for k in (
+                                "virtualbox",
+                                "vmdk",
+                                "vdi",
+                                "iso",
+                                "game",
+                                "steam",
+                                "music",
+                                "mp3",
+                            )
+                        ):
+                            continue
+                        if sz > 150_000_000:
+                            continue
+            except Exception:
+                continue
+
+            sp = str(p)
+            stats["last_path"] = sp
+            stats["walked_files"] += 1
+
+            # Resume: skip until we pass the cursor path (exclusive).
+            if not past:
+                if sp in resume_keys or sp.replace("/", "\\") in resume_keys or sp.replace("\\", "/") in resume_keys:
+                    past = True
+                continue
+
+            if _known(sp):
+                stats["skipped_known"] += 1
+                continue
+
+            # New candidate (not yet in skip_sources)
+            stats["new_examined"] += 1
+            if stats["new_examined"] > max_scan:
+                stats["hit_max_scan"] = True
+                break
+            out.append(p)
+            stats["emitted"] = len(out)
+            if len(out) >= limit:
+                break
+
+        if allow_wrap_marker and resume_after and not out and past:
+            stats["wrapped"] = True
+
+    _walk_once(start_after, allow_wrap_marker=True)
+    # If cursor left us with nothing (past end, or cursor path missing), wrap once from root.
+    if not out and start_after:
+        stats["walked_files"] = 0
+        stats["skipped_known"] = 0
+        stats["new_examined"] = 0
+        stats["hit_walk_cap"] = False
+        stats["hit_max_scan"] = False
+        stats["wrap_pass"] = True
+        stats["wrapped"] = True
+        _walk_once(None, allow_wrap_marker=False)
+    return out, stats
 
 
 
@@ -575,6 +703,8 @@ def main() -> int:
         return base.with_name(safe_name(f"{base.stem}__{digest}{base.suffix}", 120))
 
     planned = []
+    walk_stats_by_root: dict[str, dict] = {}
+    cursor_state = load_walk_cursor()
     ai_used = 0
     # Oversample candidates: archive has many content-dupes of live GD.
     # Plan more than limit so apply can fill real copies after hash skips.
@@ -586,13 +716,23 @@ def main() -> int:
         need = plan_cap - len(planned)
         # Candidate pool + max_scan proportional to need (not 20k–2M unbounded walks)
         pool_limit = min(max(need * 12, args.limit * 20), 4000)
+        # new_examined budget (skip_sources no longer burns this)
         scan_budget = min(max(pool_limit * 40, 2000), 80_000)
-        pool = iter_candidates(
+        root_key = str(src_root).replace("/", "\\").rstrip("\\")
+        start_after = None
+        try:
+            ent = (cursor_state.get("roots") or {}).get(root_key) or {}
+            start_after = ent.get("last_path") or None
+        except Exception:
+            start_after = None
+        pool, wstats = iter_candidates(
             src_root,
             pool_limit,
             skip_sources=skip_sources,
             max_scan=scan_budget,
+            start_after=start_after,
         )
+        walk_stats_by_root[root_key] = wstats
         for f in pool:
             dom = domain_for(f.name)
             if args.ai_inbox and dom.endswith("_Inbox") and ai_used < args.ai_inbox_cap:
@@ -757,21 +897,77 @@ def main() -> int:
         "",
         f"**Copied:** {copied} · **Skipped:** {skipped} · **Planned rows:** {len(planned)}",
         "",
+        "## Walk stats",
+    ]
+    for rk, ws in (walk_stats_by_root or {}).items():
+        lines.append(
+            f"- `{rk}`: walked={ws.get('walked_files')} known_skip={ws.get('skipped_known')} "
+            f"new={ws.get('new_examined')} emitted={ws.get('emitted')} "
+            f"wrap={ws.get('wrap_pass') or ws.get('wrapped')} "
+            f"cursor_in={(ws.get('start_after') or '')[-80:]}"
+        )
+    lines += [
+        "",
         "## Guardrails",
         "- Copy only — sources untouched",
         "- No Drive purge in this script",
         "- Broad domains only (open taxonomy)",
         "- Full drain needs many waves + Jeff green light before any purge",
+        "- 2026-07-19: walk resume cursor + skip_sources no longer burn max_scan",
         "",
         "[[Operations/G-to-K-Drain-Assurance-2026-07-10]]",
         "",
     ]
-    RECEIPT.parent.mkdir(parents=True, exist_ok=True)
+    # Advance resume cursor only on apply waves (real progress).
+    if args.apply:
+        roots_cur = dict((cursor_state.get("roots") or {}))
+        for rk, ws in (walk_stats_by_root or {}).items():
+            lp = ws.get("last_path")
+            if not lp:
+                continue
+            # If we wrapped and still empty productive, reset cursor for that root.
+            if ws.get("wrap_pass") and int(ws.get("emitted") or 0) == 0:
+                roots_cur[rk] = {
+                    "last_path": None,
+                    "at": datetime.now(timezone.utc).isoformat(),
+                    "reset": "empty_after_wrap",
+                }
+            else:
+                roots_cur[rk] = {
+                    "last_path": lp,
+                    "at": datetime.now(timezone.utc).isoformat(),
+                    "walked_files": ws.get("walked_files"),
+                    "skipped_known": ws.get("skipped_known"),
+                    "emitted": ws.get("emitted"),
+                    "copied_wave": copied,
+                    "skipped_wave": skipped,
+                }
+        cursor_state["roots"] = roots_cur
+        try:
+            save_walk_cursor(cursor_state)
+        except Exception:
+            pass
+
+    receipt_path = RECEIPT if args.apply else RECEIPT_DRY
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
     if atomic_write_text is not None:
-        atomic_write_text(RECEIPT, "\n".join(lines), min_bytes=20)
+        atomic_write_text(receipt_path, "\n".join(lines), min_bytes=20)
     else:
-        RECEIPT.write_text("\n".join(lines), encoding="utf-8")
-    print(json.dumps({"mode": "apply" if args.apply else "dry-run", "planned": len(planned), "copied": copied, "receipt": str(RECEIPT)}, indent=2))
+        receipt_path.write_text("\n".join(lines), encoding="utf-8")
+    print(
+        json.dumps(
+            {
+                "mode": "apply" if args.apply else "dry-run",
+                "planned": len(planned),
+                "copied": copied,
+                "skipped": skipped,
+                "receipt": str(receipt_path),
+                "walk_stats": walk_stats_by_root,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     return 0
 
 

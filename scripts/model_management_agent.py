@@ -76,6 +76,13 @@ MAX_REMEDIATION_ACTIONS_PER_TICK = 4
 # Local smoke SLO (RTX 3060 12GB + 9B Q6): warn when OK but slow; not a hard fail.
 SMOKE_LATENCY_WARN_MS = 15000
 SMOKE_LATENCY_INFO_MS = 8000
+# 2026-07-19 L07 queue-aware: when GPU is busy (100% util / long Discord gen),
+# first short smoke may time out while health is GREEN. Retry with longer budget
+# and classify residual timeout as L07T (transient/low) not L07 medium.
+SMOKE_BUSY_TIMEOUT_S = 45.0
+SMOKE_BUSY_RETRIES = 2
+SMOKE_GPU_BUSY_UTIL_PCT = 85
+SMOKE_GPU_BUSY_MEM_MIB = 10000
 
 # Script toolbox (existing -- orchestrated, not duplicated)
 TOOLBOX = {
@@ -489,6 +496,45 @@ def _benchmark_age_days(meta: Optional[Dict[str, Any]]) -> Optional[float]:
         return None
 
 
+def _gpu_busy_hint() -> Dict[str, Any]:
+    """Best-effort NVIDIA busy signal for queue-aware smoke (Windows nvidia-smi).
+
+    Research 2026-07-19: L07 false amber when llama-server health=ok but slot is
+    mid long-context gen (~5 t/s, GPU 100%, VRAM ~11.7G). Do not thrash start-llama.
+    """
+    out: Dict[str, Any] = {"ok": False, "busy": False}
+    try:
+        proc = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=utilization.gpu,memory.used,memory.total",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+        line = (proc.stdout or "").strip().splitlines()[0] if proc.stdout else ""
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) >= 2:
+            util = float(parts[0])
+            mem = float(parts[1])
+            out.update(
+                {
+                    "ok": True,
+                    "util_pct": util,
+                    "mem_used_mib": mem,
+                    "busy": bool(
+                        util >= SMOKE_GPU_BUSY_UTIL_PCT or mem >= SMOKE_GPU_BUSY_MEM_MIB
+                    ),
+                    "raw": line,
+                }
+            )
+    except Exception as exc:  # pragma: no cover
+        out["error"] = str(exc)
+    return out
+
+
 def _local_smoke_probe(
     port: int = 8090,
     timeout: float = 20.0,
@@ -504,6 +550,7 @@ def _local_smoke_probe(
 
     2026-07-19: default timeout 20s / retries 2 (was 45/3 ≈ 140s wall) so light ticks
     stay inside agent/tool budgets. Callers can raise for full-tick deep smoke.
+    Queue-aware path (assess_local_models) may call again with SMOKE_BUSY_* budgets.
     """
     url = f"http://127.0.0.1:{port}/v1/chat/completions"
     # Prefer DEFAULT so models-preset router resolves; include enable_thinking=false
@@ -551,6 +598,7 @@ def _local_smoke_probe(
                     "finish_reason": (body.get("choices") or [{}])[0].get(
                         "finish_reason"
                     ),
+                    "timeout_budget_s": timeout,
                 }
                 if ok:
                     return last
@@ -561,10 +609,44 @@ def _local_smoke_probe(
                 "error": str(exc),
                 "latency_ms": int((time.perf_counter() - start) * 1000),
                 "attempt": attempt + 1,
+                "timeout_budget_s": timeout,
             }
         if attempt + 1 < retries:
             time.sleep(2.0)
     return last
+
+
+def _queue_aware_local_smoke(port: int = 8090) -> Dict[str, Any]:
+    """Short smoke first; busy-GPU timeout → L07T without thrashing the single slot.
+
+    Design (2026-07-19 measure): long Discord gen holds slot ~minutes at ~5 t/s.
+    A 45s×2 retry burns the light-tick budget and still loses. Prefer:
+      1) 15s single probe
+      2) if timeout + (gpu busy OR nvidia-smi unknown) → one 30s retry only
+      3) residual timeout → transient_timeout=True (caller emits L07T low)
+    """
+    gpu = _gpu_busy_hint()
+    smoke = _local_smoke_probe(port=port, timeout=15.0, retries=1)
+    smoke["gpu_busy"] = gpu
+    err = str(smoke.get("error") or "").lower()
+    timed_out = ("timed out" in err) or ("timeout" in err)
+    if smoke.get("ok") or not timed_out:
+        return smoke
+    # Busy or unknown GPU: one medium retry, then transient — never start-llama.
+    if gpu.get("busy") or gpu.get("ok") is False:
+        retry = _local_smoke_probe(port=port, timeout=30.0, retries=1)
+        retry["gpu_busy"] = gpu
+        retry["queue_aware_retry"] = True
+        retry["prior_error"] = smoke.get("error")
+        retry["prior_latency_ms"] = smoke.get("latency_ms")
+        if not retry.get("ok"):
+            rerr = str(retry.get("error") or "").lower()
+            if "timed out" in rerr or "timeout" in rerr:
+                retry["transient_timeout"] = True
+        return retry
+    # Timeout but GPU reports idle — still likely slot contention; mark transient.
+    smoke["transient_timeout"] = True
+    return smoke
 
 
 def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str, Any]:
@@ -706,7 +788,7 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
             )
 
     smoke = (
-        _local_smoke_probe(timeout=15.0, retries=1)
+        _queue_aware_local_smoke(port=8090)
         if node.get("up")
         else {"ok": False, "skipped": True}
     )
@@ -714,17 +796,38 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
         # Health up + smoke fail is NOT "start-llama" (would thrash a live PID for 150s+).
         # L07 → manual/retry path; start-llama only when port is actually down (L03).
         # Timeout on cold/busy 3060 is medium (not high) — health already proves process live.
+        # 2026-07-19: residual timeout after queue-aware retry → L07T low/transient (GPU busy).
         err = str(smoke.get("error") or smoke.get("preview") or "bad response")
-        sev = "medium" if "timed out" in err.lower() or "timeout" in err.lower() else "high"
-        issues.append(
-            {
-                "code": "L07",
-                "severity": sev,
-                "message": f"Local smoke inference failed: {err}",
-                "fix": "manual",
-                "hint": "health up but chat failed — check busy GPU / enable_thinking / template; do not dual-start",
-            }
-        )
+        is_timeout = "timed out" in err.lower() or "timeout" in err.lower()
+        if is_timeout and (
+            smoke.get("transient_timeout")
+            or (smoke.get("gpu_busy") or {}).get("busy")
+            or smoke.get("queue_aware_retry")
+        ):
+            issues.append(
+                {
+                    "code": "L07T",
+                    "severity": "low",
+                    "message": (
+                        f"Local smoke transient timeout under load: {err} "
+                        f"(gpu_busy={bool((smoke.get('gpu_busy') or {}).get('busy'))}; "
+                        "health up — do not restart llama)"
+                    ),
+                    "fix": "none",
+                    "hint": "queue-aware: Discord/long-gen owns the single slot; recheck after idle",
+                }
+            )
+        else:
+            sev = "medium" if is_timeout else "high"
+            issues.append(
+                {
+                    "code": "L07",
+                    "severity": sev,
+                    "message": f"Local smoke inference failed: {err}",
+                    "fix": "manual",
+                    "hint": "health up but chat failed — check busy GPU / enable_thinking / template; do not dual-start",
+                }
+            )
     elif node.get("up") and smoke.get("ok"):
         # SLO: success but slow — warn/info only (does not flip stack RED).
         try:

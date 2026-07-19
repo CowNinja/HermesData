@@ -53,6 +53,26 @@ def prefer_pythonw(executable: str) -> str:
     return str(pythonw) if pythonw.is_file() else executable
 
 
+def prefer_python_console(executable: str | None = None) -> str:
+    """Prefer python.exe over pythonw for long land writers.
+
+    2026-07-19: nested pythonw→pythonw under CREATE_NO_WINDOW + PIPEd stdio
+    exits 1 with empty stderr (focus_land never reached apply). Direct pythonw
+    drain works; nesting fails. Land drain must use console python.exe +
+    CREATE_NO_WINDOW instead of another pythonw layer.
+    Refs: Windows CreateProcess stdio inheritance; CPython pythonw no-console.
+    """
+    exe = executable or sys.executable
+    if sys.platform != "win32":
+        return exe
+    path = Path(exe)
+    if path.name.lower() == "pythonw.exe":
+        py = path.with_name("python.exe")
+        if py.is_file():
+            return str(py)
+    return exe
+
+
 def hidden_powershell_args(script: str, *extra: str) -> list[str]:
     """Build a PowerShell invocation that avoids visible windows on Windows."""
     args = [
