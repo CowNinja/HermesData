@@ -100,6 +100,15 @@ def main() -> int:
         )
     )
 
+    # A2) Index census SLO (report; exit 1 = under target, soft for pipeline)
+    steps.append(
+        run_step(
+            "vault_index_census",
+            [py, str(SCRIPTS / "vault_index_census.py"), "--json"],
+            min(args.timeout, 180),
+        )
+    )
+
     # B) Light VaultWalker dry-run — second brain only
     steps.append(
         run_step(
@@ -126,6 +135,10 @@ def main() -> int:
             risks.append(f"{s['step']}:exit_{s['exit']}")
             if s["step"] == "refresh_folder_indexes":
                 score -= 40
+            elif s["step"] == "vault_index_census":
+                score -= 10  # under SLO is advisory
+                notes.append(f"{s['step']} under SLO (exit {s['exit']})")
+                continue
             else:
                 score -= 15
             notes.append(f"{s['step']} exit {s['exit']}")

@@ -32,7 +32,8 @@ OPS_LOG = Path(r"D:\PhronesisVault\Operations\logs")
 OUT_JSON = OPS_LOG / "loop-registry-lint-latest.json"
 OUT_MD = OPS_LOG / "loop-registry-lint-latest.md"
 
-# Expected loop surfaces from Codifying-Loops-Guardrails-Map §2
+# Expected loop surfaces from Codifying-Loops-Guardrails-Map §2 + live cron inventory
+# (2026-07-20 cook: expand so unknown_enabled_script is signal, not noise)
 EXPECTED_SCRIPTS = {
     "silo_continuous_loop.py": {"plane": "kitchen", "stop": "silo_continuous.STOP", "single_writer": True},
     "silo_orchestrator_tick.py": {"plane": "kitchen", "stop": "silo_continuous.STOP", "single_writer": True},
@@ -40,10 +41,13 @@ EXPECTED_SCRIPTS = {
     "silo_self_heal_monitor.py": {"plane": "kitchen", "stop": None, "single_writer": False},
     "model_mgmt_light_cron.py": {"plane": "model", "stop": None, "single_writer": True},
     "model_mgmt_full_cron.py": {"plane": "model", "stop": None, "single_writer": True},
+    "model_rotation_cron.py": {"plane": "model", "stop": None, "single_writer": True},
+    "daily_model_audit.py": {"plane": "model", "stop": None, "single_writer": False},
     "vaultwalker.py": {"plane": "vw", "stop": "vaultwalker_travel.STOP", "single_writer": False},
     "vaultwalker_cron.py": {"plane": "vw", "stop": "vaultwalker_travel.STOP", "single_writer": False},
     "stack_healing_once.py": {"plane": "gateway", "stop": None, "single_writer": False},
     "single_gateway_instance_check.py": {"plane": "gateway", "stop": None, "single_writer": False},
+    "ensure_single_gateway.py": {"plane": "gateway", "stop": None, "single_writer": True},
     "skill_evo_loop.py": {"plane": "meta", "stop": None, "single_writer": False},
     "loop-lint-gate.py": {"plane": "meta", "stop": None, "single_writer": False},
     "detective_codify_smoke.py": {"plane": "codify", "stop": None, "single_writer": False},
@@ -52,11 +56,42 @@ EXPECTED_SCRIPTS = {
     "loop_registry_lint.py": {"plane": "meta", "stop": None, "single_writer": False},
     "prepare_grok_escalation_brief.py": {"plane": "judgment", "stop": None, "single_writer": False},
     "entity_mine.py": {"plane": "codify", "stop": None, "single_writer": False},
-    # kitchen scoreboard (Sovereign Ops Pulse v1+) — no_agent 30m rollup
     "sovereign_ops_pulse.py": {"plane": "kitchen", "stop": None, "single_writer": False},
-    # shared atomic publish SSOT (v1.7+)
     "atomic_io.py": {"plane": "kitchen", "stop": None, "single_writer": False},
-}
+    # hygiene / resilience / citadel (enabled crons)
+    "daily_skills_reflection_gate.py": {"plane": "meta", "stop": None, "single_writer": False},
+    "daily-vault-hygiene.py": {"plane": "vw", "stop": None, "single_writer": False},
+    "vault_hygiene_6h.py": {"plane": "vw", "stop": None, "single_writer": False},
+    "vault_index_census.py": {"plane": "vw", "stop": None, "single_writer": False},
+    "vault_gardener_autonomy_suite.py": {"plane": "vw", "stop": None, "single_writer": False},
+    "script_ascii_integrity_gate.py": {"plane": "meta", "stop": None, "single_writer": False},
+    "discord-nightly-dashboard.py": {"plane": "meta", "stop": None, "single_writer": False},
+    "discord-weekly-evolve.py": {"plane": "meta", "stop": None, "single_writer": False},
+    "citadel-daily-audit.py": {"plane": "meta", "stop": None, "single_writer": False},
+    "backup-resilience.py": {"plane": "meta", "stop": None, "single_writer": False},
+    "self-recovery-watchdog.py": {"plane": "meta", "stop": None, "single_writer": False},
+    "nanodb_benchmark.py": {"plane": "model", "stop": None, "single_writer": False},
+    "extract_x_wisdom.py": {"plane": "research", "stop": None, "single_writer": False},
+    "dawn_pulse_script.py": {"plane": "meta", "stop": None, "single_writer": False},
+    "conversation_intent_queue.py": {"plane": "judgment", "stop": "intent_queue.STOP", "single_writer": True},
+    "local_offline_mode_check.py": {"plane": "judgment", "stop": None, "single_writer": False},
+    "judgment_backlog.py": {"plane": "judgment", "stop": None, "single_writer": False},
+    "propose_recovery.py": {"plane": "judgment", "stop": None, "single_writer": False},
+    "stack_snapshot.py": {"plane": "judgment", "stop": None, "single_writer": False},
+    "silo_discord_six_numbers.py": {"plane": "kitchen", "stop": None, "single_writer": False},
+        # remaining enabled crons (2026-07-20 verify pass)
+        "cns_watchdog_gate.py": {"plane": "vw", "stop": None, "single_writer": False},
+        "comfy_gallery_refresh_script.py": {"plane": "image", "stop": None, "single_writer": False},
+        "rp-bottleneck-fix-cron.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "script_newline_integrity_gate.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "insights_lessons_monthly.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "vault_gardener_autonomy_daily.py": {"plane": "vw", "stop": None, "single_writer": False},
+        "vault_gardener_autonomy_weekly.py": {"plane": "vw", "stop": None, "single_writer": False},
+        "k_light_index_cron.py": {"plane": "kitchen", "stop": None, "single_writer": False},
+        "four_worlds_audit_cron.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "jsonl_log_rotator_cron.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "comfy_gallery_drift_gate.py": {"plane": "image", "stop": None, "single_writer": False},
+    }
 
 STOP_LOCK_PATHS = [
     STATE / "silo_continuous.STOP",

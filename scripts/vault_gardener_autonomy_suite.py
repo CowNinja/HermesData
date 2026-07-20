@@ -103,7 +103,12 @@ def main() -> int:
         results.append(run_script("backup_layers_status.py", timeout=60))
         results.append(run_script("k_test_ingest_domain_propose.py", timeout=180))
         results.append(run_script("orchestrator_quest_dispatch.py", timeout=120))
-        results.append(run_script("gardener_phase_b_proposals.py", ["--stale-days", "30"], timeout=600))
+        # 2026-07-20: phase_b proposals can run long; soft-fail timeout so suite finishes
+        r_prop = run_script("gardener_phase_b_proposals.py", ["--stale-days", "30"], timeout=480)
+        if r_prop.get("exit") == 124:
+            r_prop["exit"] = 0
+            r_prop["out"] = (r_prop.get("out") or "") + "\n[soft] phase_b proposals timeout non-fatal"
+        results.append(r_prop)
         if args.execute_safe:
             # Only scripts that implement digest+archive recoverable patterns
             for s in [
@@ -112,20 +117,38 @@ def main() -> int:
                 "phase_b_execute_wave5_ops_reports.py",
             ]:
                 # Idempotent-ish: re-run is ok if no matching files left
-                results.append(run_script(s, timeout=900))
-        results.append(run_script("refresh_folder_indexes.py", timeout=300))
-        results.append(run_script("fill_missing_indexes.py", timeout=300))
-        results.append(
-            run_script(
-                "vault_hub_backlink_pass.py",
-                ["--apply", "--limit", "400"],
-                timeout=900,
-            )
+                # Soft-fail timeout (exit 124) so weekly suite never dies mid-wave
+                r_wave = run_script(s, timeout=600)
+                if r_wave.get("exit") == 124:
+                    r_wave["exit"] = 0
+                    r_wave["out"] = (r_wave.get("out") or "") + "\n[soft] wave timeout non-fatal"
+                results.append(r_wave)
+        results.append(run_script("refresh_folder_indexes.py", timeout=420))
+        results.append(run_script("fill_missing_indexes.py", timeout=420))
+        # Index census SLO (report; non-fatal if under target)
+        r_census = run_script("vault_index_census.py", ["--json"], timeout=300)
+        if r_census.get("exit") == 1:
+            r_census["exit"] = 0
+            r_census["out"] = (r_census.get("out") or "") + "\n[soft] census under SLO non-fatal"
+        results.append(r_census)
+        r_hub = run_script(
+            "vault_hub_backlink_pass.py",
+            ["--apply", "--limit", "400"],
+            timeout=720,
         )
-        results.append(run_script("vault_wikilink_repair_after_distill.py", timeout=900))
+        if r_hub.get("exit") == 124:
+            r_hub["exit"] = 0
+            r_hub["out"] = (r_hub.get("out") or "") + "\n[soft] hub backlink timeout non-fatal"
+        results.append(r_hub)
+        r_wiki = run_script("vault_wikilink_repair_after_distill.py", timeout=720)
+        if r_wiki.get("exit") == 124:
+            r_wiki["exit"] = 0
+            r_wiki["out"] = (r_wiki.get("out") or "") + "\n[soft] wikilink repair timeout non-fatal"
+        results.append(r_wiki)
     else:
         # daily light: indexes (wikilinked) → hub backlinks for living orphans → repair
         results.append(run_script("refresh_folder_indexes.py", timeout=300))
+        results.append(run_script("vault_index_census.py", ["--json"], timeout=180))
         results.append(
             run_script(
                 "vault_hub_backlink_pass.py",
@@ -135,6 +158,7 @@ def main() -> int:
         )
         results.append(run_script("vault_wikilink_repair_after_distill.py", timeout=600))
 
+    # Hard failures only (timeouts already soft-failed where appropriate)
     worst = max((r.get("exit") or 0) for r in results) if results else 0
     payload = {
         "ts": ts,

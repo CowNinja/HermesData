@@ -270,12 +270,20 @@ function Clear-StaleGatewayMarkers {
     .SYNOPSIS
       Remove gateway.pid / gateway.lock / stale gateway_state when claimed PID is dead.
       Dead markers cause "looks running" operator confusion and can block clean starts.
+      2026-07-20: NEVER clear anything while :8642 health is OK (prevents restart thrash).
     #>
     $cleared = @()
+    $port = Get-GatewayPort
+    if ((Get-PortListenerPid -Port $port) -and (Test-GatewayHealth)) {
+        return $cleared
+    }
+    $homeHermes = Join-Path $env:USERPROFILE ".hermes"
     $markers = @(
         (Join-Path $HermesRoot "gateway.pid"),
         (Join-Path $HermesRoot "gateway.lock"),
-        (Join-Path $HermesRoot "gateway_state.json")
+        (Join-Path $HermesRoot "gateway_state.json"),
+        (Join-Path $homeHermes "gateway.pid"),
+        (Join-Path $homeHermes "gateway.lock")
     )
     foreach ($path in $markers) {
         if (-not (Test-Path $path)) { continue }
@@ -288,15 +296,20 @@ function Clear-StaleGatewayMarkers {
             if ($pidClaim -and $pidClaim -gt 0) {
                 $alive = [bool](Get-Process -Id $pidClaim -ErrorAction SilentlyContinue)
             }
-            # state file without pid: leave if port is healthy
+            # Also treat alive if ANY gateway role process exists with healthy port race
+            if (-not $alive -and (Get-PortListenerPid -Port $port)) {
+                continue
+            }
             if ($path -like '*gateway_state.json' -and -not $pidClaim) {
-                if ((Get-PortListenerPid -Port (Get-GatewayPort)) -and (Test-GatewayHealth)) { continue }
+                if ((Get-PortListenerPid -Port $port) -and (Test-GatewayHealth)) { continue }
             }
             if (-not $alive) {
                 Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
                 $cleared += $path
             }
         } catch {
+            # Do not delete on read errors if port came up mid-clear
+            if ((Get-PortListenerPid -Port $port) -and (Test-GatewayHealth)) { continue }
             Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
             $cleared += $path
         }

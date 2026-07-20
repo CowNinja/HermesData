@@ -4,8 +4,8 @@
 #
 # Root-cause lessons (2026-07-17 Discord silence):
 #   1. Gateway process can die silently mid/post heavy Discord tool turns (no exit-diag).
-#   2. Legacy v6 only matched hermes_cli.main — missed live `-m gateway.run` processes.
-#   3. Task pointed here while file lived only under archive/ — recovery never ran.
+#   2. Legacy v6 only matched hermes_cli.main - missed live `-m gateway.run` processes.
+#   3. Task pointed here while file lived only under archive/ - recovery never ran.
 #   4. Never kill a healthy single listener. Clear dead pid/lock only.
 #
 # Modes:
@@ -19,7 +19,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-# This file lives in scripts\ops\ → parent is scripts\
+# This file lives in scripts\ops\ -> parent is scripts\
 $scripts = if ($PSScriptRoot) { Split-Path $PSScriptRoot -Parent } else { "D:\HermesData\scripts" }
 if (-not (Test-Path (Join-Path $scripts "Phronesis-ForkGuard.ps1"))) {
     $scripts = "D:\HermesData\scripts"
@@ -42,17 +42,42 @@ function Invoke-GatewayWatchOnce {
         return 0
     }
 
-    $cleared = @(Clear-StaleGatewayMarkers)
-    if ($cleared.Count -gt 0) {
-        Log "cleared_stale count=$($cleared.Count)"
-    }
-
     $port = Get-GatewayPort
     $listenPid = Get-PortListenerPid -Port $port
     $health = $false
     try { $health = [bool](Test-GatewayHealth) } catch { $health = $false }
 
-    # Enumerate live gateway role processes (modern + legacy argv)
+    # 2026-07-20 permanent: NEVER clear markers or DEDUP while healthy.
+    # Prior thrash: Clear-Stale + DEDUP killed parent/child re-exec tree mid-turn
+    # (Discord silence; turns not redelivered). Heal only when truly DOWN.
+    if ($listenPid -and $health) {
+        $gwCount = @(
+            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $_.CommandLine -and (
+                        $_.CommandLine -match 'hermes_cli\.main.*gateway' -or
+                        $_.CommandLine -match 'gateway\.run' -or
+                        $_.CommandLine -match 'hermes-agent[\\/]gateway[\\/]run\.py'
+                    )
+                }
+        ).Count
+        # Parent+child re-exec is normal (1 listener, 2 role procs). Only log.
+        if ($gwCount -gt 2) {
+            Log "WARN multi_role_procs=$gwCount listener=$listenPid health=1 (no kill; observe)"
+        }
+        Log "OK port=$port listener=$listenPid gw_procs=$gwCount health=1 no_touch=1"
+        return 0
+    }
+
+    # DOWN path only: clear dead markers, then restore
+    $cleared = @(Clear-StaleGatewayMarkers)
+    if ($cleared.Count -gt 0) {
+        Log "cleared_stale count=$($cleared.Count)"
+    }
+
+    $listenPid = Get-PortListenerPid -Port $port
+    $health = $false
+    try { $health = [bool](Test-GatewayHealth) } catch { $health = $false }
     $gw = @(
         Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
             Where-Object {
@@ -65,7 +90,7 @@ function Invoke-GatewayWatchOnce {
     )
 
     if ($listenPid -and $health) {
-        Log "OK port=$port listener=$listenPid gw_procs=$($gw.Count) health=1"
+        Log "OK port=$port listener=$listenPid gw_procs=$($gw.Count) health=1 after_clear"
         return 0
     }
 
