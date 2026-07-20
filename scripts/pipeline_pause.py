@@ -90,9 +90,43 @@ def set_image_pipeline_paused(
     reason: str = "",
     note: str = "",
     hard: bool | None = None,
+    force: bool = False,
 ) -> Dict[str, Any]:
+    """Write pause gate.
+
+    Provenance hard-guard (2026-07-20): when already unpaused, soft auto-resume
+    callers (comfy_stack_start / vram_image_mode / empty reason) must NOT clobber
+    operator reason/note. Pass force=True to intentionally rewrite provenance.
+    """
     PAUSE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    current = load_pause_state()
     reason_s = reason or ("sovereign_router_phase" if paused else "operator_resume")
+
+    # API-level soft-resume noop (matches CLI) — protects operator_resume sticky note.
+    if (
+        not force
+        and not paused
+        and not current.get("paused")
+        and reason_s in _AUTO_RESUME_REASONS
+        and reason_s != "operator_resume"
+    ):
+        state = dict(current)
+        state["soft_resume_noop"] = reason_s or "auto"
+        state["soft_resume_noop_at"] = _utc_now()
+        PAUSE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        return state
+
+    # Preserve non-empty operator note when unpaused→unpaused operator_resume with empty note.
+    if (
+        not force
+        and not paused
+        and not current.get("paused")
+        and reason_s == "operator_resume"
+        and not (note or "").strip()
+        and (current.get("note") or "").strip()
+    ):
+        note = str(current.get("note") or "")
+
     if hard is None:
         hard = bool(paused) and (
             any(reason_s.lower().startswith(p) for p in _HARD_PAUSE_REASON_PREFIXES)
@@ -149,6 +183,16 @@ def main() -> int:
             state["resume_blocked"] = True
             state["resume_blocked_by"] = args.reason or "auto"
             state["resume_blocked_at"] = _utc_now()
+        elif (
+            not current.get("paused")
+            and (args.reason or "") in _AUTO_RESUME_REASONS
+            and (args.reason or "") != "operator_resume"
+        ):
+            # Already unpaused — soft stack/vram resume must not clobber reason/note.
+            state = dict(current)
+            state["soft_resume_noop"] = args.reason or "auto"
+            state["soft_resume_noop_at"] = _utc_now()
+            PAUSE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
         else:
             state = set_image_pipeline_paused(
                 False, reason=args.reason or "operator_resume", note=args.note, hard=False

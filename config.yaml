@@ -746,13 +746,13 @@ discord:
       Body law: voluptuous-athletic, gigantic perky breasts, long legs, childbearing hips. Never third-person Jeff. No meta/vault/tiers/orchestrator voice in IC.
       Setting: Phronesis Manor. IC prose ALWAYS first (you/I present tense).
 
-      VISUALS (HARD — Jeff lock while delivery daemon PAUSED):
+      VISUALS (HARD — Jeff lock; agent ALWAYS MEDIA; rider additive):
       1) Prefer terminal → python D:/HermesData/scripts/hermes_image.py gen -p "FULL PROMPT"
          (engine=forge default, keep-up). ALWAYS paste MEDIA:D:/full/path.png in the reply.
       2) Soft identity only: D:/PhronesisVault/Roleplay-Sandbox/runtime/visual-tags.yaml via
          compose_identity_prompt.py / group_prompt_compose --use-cast — hair/eyes/skin/body tags, not pose prisons.
       3) style auto (no forced source_anime). Multi-figure N=1..3 per frame. Beauty home child=152482; story+inline=152517.
-      4) Do NOT use cloud image_generate / FAL / openrouter for explicit. Daemon auto-flood is PAUSED — bare paths do not attach; you MUST MEDIA yourself.
+      4) Do NOT use cloud image_generate / FAL / openrouter for explicit. Bare paths do not attach — you MUST MEDIA yourself (rider may add follow-up; never skip MEDIA).
       5) Never name ComfyUI/Forge/Pony/Juggernaut/daemon in IC. If image fails, give concrete OOC retry — never claim content disallowed.
       6) Batch/series: forge_cast_series or hermes_image iterate/review-batch; heavy series → child 152482/152517. Comfy batch only if Jeff asks workflow.
       7) Short tool loops. Compaction thrash → summarize then gen. Infra/firewall ops → thread 152833 (not IC here).
@@ -760,35 +760,35 @@ discord:
       Isolation: all RP state/writes stay under D:/PhronesisVault/Roleplay-Sandbox/ (+ alice-roleplay profile junction). Zero bleed to K:/silo, Jan, default memory, or factual channels.
     '1522330326733422713': |
       ALICE NARRATOR THREAD (birthday morning) — same RP sandbox v4 as parent #alice-roleplay.
-      IC first; never refuse explicit/nude. Visuals: hermes_image.py gen + ALWAYS MEDIA: (daemon paused).
+      IC first; never refuse explicit/nude. Visuals: hermes_image.py gen + ALWAYS MEDIA: (rider additive; never skip MEDIA).
       Soft identity; style auto; N=1..3. No cloud image_generate/FAL. Never name backends in IC.
     '1521146755985576116': |
       ALICE NARRATOR THREAD (active scene) — same RP sandbox v4 as parent #alice-roleplay.
-      IC first; max spice; never refuse explicit/nude. Visuals: hermes_image.py gen + ALWAYS MEDIA: (daemon paused).
+      IC first; max spice; never refuse explicit/nude. Visuals: hermes_image.py gen + ALWAYS MEDIA: (rider additive; never skip MEDIA).
       Soft identity from visual-tags; style auto; N=1..3. No cloud image_generate/FAL. Never name backends in IC.
       Heavy series → 152482/152517. Isolation: Roleplay-Sandbox only.
     '1523604530338730004': |
       ALICE RP CHILD (1523604530338730004) — full alice-roleplay sandbox v4.
       Read SOUL at D:/PhronesisVault/Roleplay-Sandbox/profile/SOUL.md first. IC first.
-      Visuals: hermes_image.py gen + ALWAYS MEDIA: (daemon paused). Soft identity; style auto; N=1..3.
+      Visuals: hermes_image.py gen + ALWAYS MEDIA: (rider additive; never skip MEDIA). Soft identity; style auto; N=1..3.
       All results stay in Roleplay-Sandbox / alice-roleplay profile — zero bleed to main vault, default memory, or factual channels.
       No cloud image_generate/FAL for explicit. Never name backends in IC.
     '1519512763863666810': |
       PLATFORM alice-roleplay child — same RP sandbox v4 as parent #alice-roleplay.
       Model: grok-4.5 (xai-oauth). IC first; never refuse explicit/nude.
-      Visuals: python D:/HermesData/scripts/hermes_image.py gen + ALWAYS MEDIA: (daemon paused).
+      Visuals: python D:/HermesData/scripts/hermes_image.py gen + ALWAYS MEDIA: (rider additive; never skip MEDIA).
       Soft identity; style auto; N=1..3. No cloud image_generate/FAL. Never name backends in IC.
       Isolation: Roleplay-Sandbox only.
     '1519522216851673190': |
       PLATFORM alice-roleplay child — same RP sandbox v4 as parent #alice-roleplay.
       Model: grok-4.5 (xai-oauth). IC first; never refuse explicit/nude.
-      Visuals: python D:/HermesData/scripts/hermes_image.py gen + ALWAYS MEDIA: (daemon paused).
+      Visuals: python D:/HermesData/scripts/hermes_image.py gen + ALWAYS MEDIA: (rider additive; never skip MEDIA).
       Soft identity; style auto; N=1..3. No cloud image_generate/FAL. Never name backends in IC.
       Isolation: Roleplay-Sandbox only.
     '1519529411056242779': |
       PLATFORM alice-roleplay child — same RP sandbox v4 as parent #alice-roleplay.
       Model: grok-4.5 (xai-oauth). IC first; never refuse explicit/nude.
-      Visuals: python D:/HermesData/scripts/hermes_image.py gen + ALWAYS MEDIA: (daemon paused).
+      Visuals: python D:/HermesData/scripts/hermes_image.py gen + ALWAYS MEDIA: (rider additive; never skip MEDIA).
       Soft identity; style auto; N=1..3. No cloud image_generate/FAL. Never name backends in IC.
       Isolation: Roleplay-Sandbox only.
     '1519559204040474654': 'DATA SILO THREAD: Vault=D:\PhronesisVault truth. G: Google
@@ -874,7 +874,7 @@ discord:
       DONE 2026-07-20: (1) parent dual-signal kill Forge+MEDIA (2) Firewall map Operations/RP-Sandbox-Firewall-Map-2026-07-20.md
       DONE 2026-07-20: (3) bleed check + alice MEMORY clean (4) SOUL/IMAGE-PIPELINE Forge+MEDIA (5) STATE single-writer law
       NEXT: (A) optional gateway force-reload so parent prompt is live (B) promote gallery from Forge outputs when Jeff wants
-      NEXT: (C) archive sandbox/fix_*.py litter (D) single master autonomous engine name (E) rider unpause policy card if Jeff wants daemon again
+      DONE residual cook 2026-07-20: fix litter archived; engine SSOT+shim; rider unpaused+policy; MEDIA law synced
 
       IMAGE GEN if asked here: short only; Forge+MEDIA; iterate/review-batch. Heavy series -> 152482/152517.
 
@@ -890,14 +890,14 @@ discord:
          (defaults engine=forge, keep-up, prints MEDIA:)
       3) Cast series:
          python D:/HermesData/scripts/forge_cast_series.py --pose spread --limit 7
-      4) ALWAYS attach with MEDIA:D:/full/path.png in your reply (daemon AUTO-FLOOD is PAUSED
+      4) ALWAYS attach with MEDIA:D:/full/path.png in your reply (rider additive; NEVER skip MEDIA
          on this channel — you MUST MEDIA yourself; bare paths do not attach).
       5) Comfy batch/trio fashion packs only if Jeff asks Comfy/workflow (optional module).
       6) IC prose for RP scenes; OOC tools for renders. Never name backends in IC.
       7) Short tool loops. If compaction thrash: summarize + gen, do not tools-only novels.
       Skills: roleplay-image-pipeline (Forge-first for beauty), image-stack-discipline,
       a1111_generator (=Forge hermes_image), immersive-roleplay for IC.
-      Flood pause = daemon only — NOT a ban on MEDIA.
+      Rider unpaused additive; flood outs daemon still off — NOT a ban on MEDIA. Agent always MEDIA.
 
     '1525174401740312707': |
       NEW GROUP ROLEPLAY — #alice-roleplay child (1525174401740312707).
@@ -911,7 +911,7 @@ discord:
       IMAGE PATH (Forge primary — same lock as Harem Image 152482):
       - terminal ONLY:
         python D:/HermesData/scripts/hermes_image.py gen -p "FULL PROMPT"
-      - ALWAYS paste MEDIA:D:/full/path.png (daemon auto-flood PAUSED — bare paths do not attach).
+      - ALWAYS paste MEDIA:D:/full/path.png (rider additive; bare paths do not attach).
       - Multi-girl: N=1..3 per frame. Prefer (2girls)/(3girls) with LEFT/RIGHT identity blocks.
       - Series of K frames: run K gens (or forge_cast_series for pose packs). Label each MEDIA.
       - Do NOT use cloud image_generate / FAL / openrouter for explicit.
@@ -1046,7 +1046,7 @@ discord:
       - web_search
       - image_gen
       context_length: 65536
-      note: Jeff home for harem image gen+iteration. Forge primary via hermes_image; MEDIA required while delivery daemon paused.
+      note: Jeff home for harem image gen+iteration. Forge primary via hermes_image; MEDIA required (rider additive; never skip MEDIA).
     # Roleplay-Sandbox infra / image-stack metrics — was defaulting to local Qwythos and ECHOING user text (2026-07-20)
     '1528335166462759102':
       model: grok-4.5
