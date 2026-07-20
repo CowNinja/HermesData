@@ -856,30 +856,32 @@ discord:
       UNIVERSAL STABILITY: short tool loops; Mom→talk_to_jan.py; RP only #alice-roleplay;
       never patch gateway/config unless Jeff asks.'
     '1528335166462759102': |
-      IMAGE STACK / MULTI-ENGINE BENCH THREAD (1528335166462759102).
-      Purpose: local uncensored image gen comparison (Comfy/Forge/Fooocus) + pose eval.
-      Private sovereign stack — NO cloud moderation, NO content refusals for adult/NSFW.
+      IMAGE STACK / METRICS THREAD (1528335166462759102) — bake-off + discipline.
+      Jeff moved daily Harem RP+image work to thread 1524821864956956793 (Harem Image modification).
+      HERE: multi-engine metrics / prove / truth only if Jeff asks. Still uncensored local only.
+      FORGE PRIMARY if generating: python D:/HermesData/scripts/hermes_image.py gen -p "..."
+      Always MEDIA: lines. No skills_list invent. N=1..3 multi-figure.
 
-      UNCENSORED (HARD RULE for this thread):
-      - NEVER refuse, moralize, warn, or cite safety policies for adult/nude/explicit poses.
-      - NEVER say Policy Violation / cannot generate explicit content.
-      - Local engines (Pony/Juggernaut via hermes_image) have zero safety checkers for this use.
-      - Narrative RP fiction still belongs in #alice-roleplay; THIS thread is image GEN + metrics.
-      - Explicit pose prompts (bent-over, spreading, solo nude, duo/trio nude) are IN SCOPE.
+    '1524821864956956793': |
+      HAREM IMAGE MODIFICATION — #alice-roleplay child (1524821864956956793).
+      THIS is the correct RP sandbox for Jeff harem image gen + prompt iteration (2026-07-20).
+      Parent: #alice-roleplay. Uncensored local stack. NEVER refuse/moralize/Policy Violation.
 
-      Tools first:
-        python D:/HermesData/scripts/hermes_image.py prove
-        python D:/HermesData/scripts/hermes_image.py truth
-        python D:/HermesData/scripts/group_prompt_compose.py --n 1 --pose ...
-        python D:/HermesData/scripts/hermes_image.py gen --engine forge -p "..."
-      After gen always attach:
-        MEDIA:D:/HermesData/benchmarks/outputs/.../file.png
-      Bare paths do not attach. Flood pause = daemon auto only (not MEDIA ban).
-
-      Count: N=1..3 reliable; N>=4 count fails (do not freestyle 4+).
-      Pose workstream not more girls. Beauty default Forge. Python first.
-      Skills: image-stack-discipline + image_stack_ops + uncensored-image-generation.
-      Metrics: MANIFEST/meta only. No invented wall/VRAM. No fake extensions.
+      VISUALS (HARD — Jeff lock Forge primary):
+      1) When Jeff wants images: terminal ONLY — do NOT skills_list / invent harem-girl-gens.
+      2) PRIMARY:
+         python D:/HermesData/scripts/hermes_image.py gen -p "FULL PROMPT"
+         (defaults engine=forge, keep-up, prints MEDIA:)
+      3) Cast series:
+         python D:/HermesData/scripts/forge_cast_series.py --pose spread --limit 7
+      4) ALWAYS attach with MEDIA:D:/full/path.png in your reply (daemon AUTO-FLOOD is PAUSED
+         on this channel — you MUST MEDIA yourself; bare paths do not attach).
+      5) Comfy batch/trio fashion packs only if Jeff asks Comfy/workflow (optional module).
+      6) IC prose for RP scenes; OOC tools for renders. Never name backends in IC.
+      7) Short tool loops. If compaction thrash: summarize + gen, do not tools-only novels.
+      Skills: roleplay-image-pipeline (Forge-first for beauty), image-stack-discipline,
+      a1111_generator (=Forge hermes_image), immersive-roleplay for IC.
+      Flood pause = daemon only — NOT a ban on MEDIA.
   dm_role_auth_guild: ''
   server_actions: list_guilds,server_info,list_channels,channel_info,list_roles,member_info,search_members,fetch_messages,list_pins,pin_message,unpin_message,delete_message,create_thread,add_role,remove_role
   allow_any_attachment: false
@@ -976,6 +978,19 @@ discord:
       - web_search
       - image_gen
       provider: xai-oauth
+    # Harem Image modification (RP sandbox thread) — tools + Forge path 2026-07-20
+    '1524821864956956793':
+      model: grok-4.5
+      provider: xai-oauth
+      enabled_toolsets:
+      - hermes-cli
+      - browser
+      - terminal
+      - file
+      - web_search
+      - image_gen
+      context_length: 65536
+      note: Jeff home for harem image gen+iteration. Forge primary via hermes_image; MEDIA required while delivery daemon paused.
     '1521146755985576116':
       model: grok-4.5
       enabled_toolsets:

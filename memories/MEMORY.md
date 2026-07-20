@@ -8,7 +8,7 @@ THREAD LOCK: Grok Discord 1524846849360531456 = arch/VW/hybrid/escalations ONLY 
 §
 Discord recovery: propose_recovery.py --symptom → A/B/C; stack_snapshot.py; intent dry-run conversation_intent_queue.py; voice_after_recovery/voice_truth_speak. Skills: discord-issue-playbook + discord-skill-index. Canon Discord-Hermes-Creative-Recovery. compression=xai-oauth grok-4.5 only (local 65K collapses).
 §
-Comfy :8188 gen / :8189 gallery-only. Multi-engine REAL: hermes_image.py preflight|status|prove|truth|gen|vram|release. status=quick default; --full for rankings. ANTI-FREESTYLE: prove+status OR truth before claims. Skills image-stack-discipline+image_stack_ops. Thread 1528335166462759102: FACTUAL only; **always MEDIA:D:\path.png** for eval pics (bare paths do not attach). Flood hard-pause = daemon auto only NOT ban MEDIA. RP fiction ONLY #alice-roleplay. Fooocus oneshot 7865 DOWN=normal. Forge=7860. MANIFEST metrics only. One engine at a time.
+**PRIMARY IMAGE = Forge** (Jeff lock 2026-07-20, pony ckpt). Hermes image asks → `hermes_image gen -p` or `forge_cast_series.py` — NEVER skills_list / invent harem-girl-gens. MEDIA: always (daemon flood paused). **Home thread: 1524821864956956793 Harem Image modification** (#alice-roleplay child). Metrics/bake-off only: 1528335166462759102. Comfy only if Jeff asks batch/trio fashion.
 §
 Gateway restore: Stack-Healing-30m → stack_healing_once.py → schtasks Hermes_Gateway. Never raw daemon watchdog. multi-LISTEN :8642=double-boot. Operations/SINGLE-GATEWAY-RESTORE.md. Never taskkill gateway for silo stalls. Silo kill scope: exact silo_orchestrator_tick.py / silo_continuous_loop.py only.
 §
