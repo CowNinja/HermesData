@@ -151,14 +151,27 @@ ALLOWLIST: Dict[str, Dict[str, Any]] = {
     },
     "driver_judgment_pulse": {
         "patterns": [
-            r"\bdriver[_\s-]?judgment[_\s-]?pulse\b",
-            r"\bdriver[_\s-]?pulse\b",
-            r"\bjudgment[_\s-]?pulse\b",
+            r"\bdriver\s+(judgment\s+)?pulse\b",
+            r"\bjudgment\s+pulse\b",
+            r"\bpulse\s+driver\b",
+            r"\bdriver[_\\s-]?judgment[_\\s-]?pulse\b",
         ],
         "script": "driver_judgment_pulse.py",
         "argv": [],
         "risk_max": "low",
         "desc": "Driver/Judgment composite pulse (read-only)",
+    },
+    "ensure_qwythos_8090": {
+        "patterns": [
+            r"\bensure\s+qwythos\b",
+            r"\brestore\s+qwythos\b",
+            r"\bbring\s+up\s+:?8090\b",
+            r"\b8090\s+(down|restore|up)\b",
+        ],
+        "script": "ensure_qwythos_8090.py",
+        "argv": [],
+        "risk_max": "low",
+        "desc": "Ensure Qwythos :8090 up (release+hidden start; cooldown; no gateway kill)",
     },
 }
 

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Post a message to a Citadel Discord channel (bot token)."""
+"""Post a message to a Citadel Discord channel (bot token).
+
+For kitchen/ops posts prefer ops_discord_post.py (auto [GROK OPS] + dual-beauty guard).
+This low-level post() does not force prefix so helpers can compose bodies.
+CLI: optional --ops-prefix (default on) and --no-ops-prefix.
+"""
 from __future__ import annotations
 
 import json
@@ -10,6 +15,7 @@ from pathlib import Path
 
 ENV_FILE = Path(r"D:\HermesData\.env")
 API = "https://discord.com/api/v10"
+OPS_PREFIX = "[GROK OPS]"
 
 
 def token() -> str:
@@ -19,6 +25,15 @@ def token() -> str:
         if line.startswith("DISCORD_BOT_TOKEN="):
             return line.split("=", 1)[1].strip().strip('"')
     raise SystemExit("no token")
+
+
+def ensure_ops_prefix(content: str) -> str:
+    c = (content or "").strip()
+    if not c:
+        return OPS_PREFIX
+    if c.startswith(OPS_PREFIX) or c.upper().startswith("GROK OPS"):
+        return c
+    return OPS_PREFIX + " " + c
 
 
 def post(channel_id: str, content: str) -> dict:
@@ -38,8 +53,23 @@ def post(channel_id: str, content: str) -> dict:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("usage: citadel_post_message.py <channel_id> <message>")
+    argv = sys.argv[1:]
+    ops_prefix = True
+    if "--no-ops-prefix" in argv:
+        ops_prefix = False
+        argv = [a for a in argv if a != "--no-ops-prefix"]
+    if "--ops-prefix" in argv:
+        ops_prefix = True
+        argv = [a for a in argv if a != "--ops-prefix"]
+    if len(argv) < 2:
+        print(
+            "usage: citadel_post_message.py [--ops-prefix|--no-ops-prefix] "
+            "<channel_id> <message>"
+        )
         raise SystemExit(2)
-    result = post(sys.argv[1], " ".join(sys.argv[2:]))
-    print(json.dumps({"ok": True, "id": result.get("id")}))
+    channel_id = argv[0]
+    msg = " ".join(argv[1:])
+    if ops_prefix:
+        msg = ensure_ops_prefix(msg)
+    result = post(channel_id, msg)
+    print(json.dumps({"ok": True, "id": result.get("id"), "ops_prefix": ops_prefix}))

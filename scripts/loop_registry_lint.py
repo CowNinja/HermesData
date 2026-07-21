@@ -95,9 +95,15 @@ EXPECTED_SCRIPTS = {
         "rp_sandbox_firewall_selfcheck_cron.py": {"plane": "rp", "stop": None, "single_writer": False},
         "rp_sandbox_local_autonomy_cron.py": {"plane": "rp", "stop": None, "single_writer": False},
         "driver_judgment_pulse.py": {"plane": "judgment", "stop": None, "single_writer": False},
-        "silo_handoff_packet.py": {"plane": "judgment", "stop": None, "single_writer": False},
-        "discord_intent_propose.py": {"plane": "judgment", "stop": "intent_queue.STOP", "single_writer": False},
-    }
+                "silo_handoff_packet.py": {"plane": "judgment", "stop": None, "single_writer": False},
+                "discord_intent_propose.py": {"plane": "judgment", "stop": "intent_queue.STOP", "single_writer": False},
+                # 2026-07-21 full-method residual — live enabled crons
+                "router_tenant_tick_once.py": {"plane": "gateway", "stop": None, "single_writer": False},
+                "rp_sandbox_overnight_review_cron.py": {"plane": "rp", "stop": None, "single_writer": False},
+                "gallery_ingest_catchup_cron.py": {"plane": "image", "stop": None, "single_writer": False},
+                                "rp_sandbox_residual_lint_cron.py": {"plane": "rp", "stop": None, "single_writer": False},
+                                "ensure_qwythos_8090.py": {"plane": "grunt", "stop": None, "single_writer": False},
+                            }
 
 STOP_LOCK_PATHS = [
     STATE / "silo_continuous.STOP",

@@ -81,6 +81,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--discord", action="store_true")
     ap.add_argument("--force-post", action="store_true")
+    ap.add_argument(
+        "--heal-dry-run",
+        action="store_true",
+        help="print heal_dry_run actions only (default always included in JSON)",
+    )
     ap.add_argument("--channel", default="1524846849360531456")
     args = ap.parse_args()
 
@@ -119,10 +124,65 @@ def main() -> int:
         if rank.get(lv, 1) > rank[overall]:
             overall = lv
 
+    # v1.3: one recommended CLI + optional heal dry-run (never auto-kill)
+    heal_dry: list[dict] = []
+    rec_cli = "python D:/HermesData/scripts/orchestrator_scoreboard.py"
+    if board.get("dual_bad") or not (orch.get("sensors") or {}).get("continuous_live"):
+        rec_cli = "python D:/HermesData/scripts/silo_ctl.py start"
+        heal_dry.append(
+            {
+                "signal": "land dual/dead",
+                "would_run": "silo_ctl.py start",
+                "auto": False,
+            }
+        )
+    elif thr_h.get("level") == "RED" or thr_g.get("level") == "RED":
+        rec_cli = (
+            "python D:/HermesData/scripts/image_thrash_guard.py --all-beauty"
+            "  # then /reset thrashing thread; no dual gen"
+        )
+        heal_dry.append(
+            {
+                "signal": "thrash RED",
+                "would_run": "thrash_guard + Jeff/Hermes /reset",
+                "auto": False,
+            }
+        )
+    elif thr_h.get("level") == "YELLOW" or thr_g.get("level") == "YELLOW":
+        rec_cli = (
+            "python D:/HermesData/scripts/image_stack_preflight.py"
+            "  # one-gen-then-stop; MEDIA always"
+        )
+        heal_dry.append(
+            {
+                "signal": "thrash YELLOW",
+                "would_run": "preflight + one gen max",
+                "auto": False,
+            }
+        )
+    elif lock.get("held") and not lock.get("stale"):
+        rec_cli = "python D:/HermesData/scripts/image_job_queue.py status  # wait lock"
+        heal_dry.append(
+            {
+                "signal": "gpu lock held",
+                "would_run": "queue status; do not dual-start",
+                "auto": False,
+            }
+        )
+    elif orch.get("health") != "GREEN":
+        rec_cli = "python D:/HermesData/scripts/stack_supervisor.py status"
+        heal_dry.append(
+            {
+                "signal": "orch not green",
+                "would_run": "stack_supervisor status",
+                "auto": False,
+            }
+        )
+
     silent = overall == "GREEN" and not args.force_post
     rep = {
         "at": utc(),
-        "version": "1.2",
+        "version": "1.3",
         "overall": overall,
         "silent": silent,
         "orch_health": orch.get("health"),
@@ -133,18 +193,22 @@ def main() -> int:
         "lock_held": bool(lock.get("held")),
         "thrash_harem": thr_h.get("level"),
         "thrash_group": thr_g.get("level"),
+        "recommended_cli": rec_cli,
+        "heal_dry_run": heal_dry,
+        "heal_policy": "dry_run_only_never_auto_kill",
         "posted": False,
         "discord_id": None,
     }
 
     if args.discord and (not silent or args.force_post):
         msg = (
-            f"**Silent-green pulse v1.2** overall=**{overall}**\n"
+            f"**Silent-green pulse v1.3** overall=**{overall}**\n"
             f"orch={rep['orch_health']} score~{rep['orch_score']} "
             f"cont={rep['continuous_live']} dual_bad={rep['dual_bad']} "
             f"ocr_open={rep['ocr_open']} lock={rep['lock_held']}\n"
             f"thrash harem={rep['thrash_harem']} group={rep['thrash_group']}\n"
-            f"{'SILENT skip (all green)' if silent else 'ALERT -- see orch-score / thrash_guard'}"
+            f"**Do next:** `{rec_cli}`\n"
+            f"{'SILENT (all green)' if silent else 'ALERT -- one CLI above; no auto-kill'}"
         )
         if not silent or args.force_post:
             try:
