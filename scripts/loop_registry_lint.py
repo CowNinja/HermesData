@@ -78,7 +78,7 @@ EXPECTED_SCRIPTS = {
     "judgment_backlog.py": {"plane": "judgment", "stop": None, "single_writer": False},
     "propose_recovery.py": {"plane": "judgment", "stop": None, "single_writer": False},
     "stack_snapshot.py": {"plane": "judgment", "stop": None, "single_writer": False},
-    "silo_discord_six_numbers.py": {"plane": "kitchen", "stop": None, "single_writer": False},
+        "silo_discord_six_numbers.py": {"plane": "kitchen", "stop": None, "single_writer": False},
         # remaining enabled crons (2026-07-20 verify pass)
         "cns_watchdog_gate.py": {"plane": "vw", "stop": None, "single_writer": False},
         "comfy_gallery_refresh_script.py": {"plane": "image", "stop": None, "single_writer": False},
@@ -91,6 +91,12 @@ EXPECTED_SCRIPTS = {
         "four_worlds_audit_cron.py": {"plane": "meta", "stop": None, "single_writer": False},
         "jsonl_log_rotator_cron.py": {"plane": "meta", "stop": None, "single_writer": False},
         "comfy_gallery_drift_gate.py": {"plane": "image", "stop": None, "single_writer": False},
+        # 2026-07-20/21 Driver cook + live enabled RP sandbox crons
+        "rp_sandbox_firewall_selfcheck_cron.py": {"plane": "rp", "stop": None, "single_writer": False},
+        "rp_sandbox_local_autonomy_cron.py": {"plane": "rp", "stop": None, "single_writer": False},
+        "driver_judgment_pulse.py": {"plane": "judgment", "stop": None, "single_writer": False},
+        "silo_handoff_packet.py": {"plane": "judgment", "stop": None, "single_writer": False},
+        "discord_intent_propose.py": {"plane": "judgment", "stop": "intent_queue.STOP", "single_writer": False},
     }
 
 STOP_LOCK_PATHS = [

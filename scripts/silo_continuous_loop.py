@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Resource-aware continuous silo builder.
 
-Goal: constant G→K cook + light enrich WITHOUT crashing the box.
+Goal: constant G->K cook + light enrich WITHOUT crashing the box.
 Monitors VRAM/RAM/disk; backs off when Comfy or system is hot.
 
 Modes (auto):
-  aggressive — free GPU/RAM, larger drain
-  normal     — default
-  gentle     — Comfy/VRAM high: scripts only, smaller batches, longer sleep
-  pause      — critical resources; sleep only
+  aggressive - free GPU/RAM, larger drain
+  normal     - default
+  gentle     - Comfy/VRAM high: scripts only, smaller batches, longer sleep
+  pause      - critical resources; sleep only
 
 Usage:
   python D:\\HermesData\\scripts\\silo_continuous_loop.py --once
@@ -77,7 +77,7 @@ def acquire_singleton() -> bool:
     if LOCK.is_file():
         try:
             pid = int(LOCK.read_text(encoding="utf-8").split()[0])
-            # Never use bare wmic/powershell here — that flashes conhost on Windows.
+            # Never use bare wmic/powershell here - that flashes conhost on Windows.
             flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
             r = subprocess.run(
                 ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/V"],
@@ -141,9 +141,9 @@ def release_singleton() -> None:
 LOG = Path(r"D:\PhronesisVault\Operations\logs\silo-continuous-loop-latest.md")
 
 # Thresholds (RTX 3060 12GB class)
-VRAM_GENTLE_MIB = 9000      # above → no local LLM grunt (dual-stack / Comfy hot)
+VRAM_GENTLE_MIB = 9000      # above -> no local LLM grunt (dual-stack / Comfy hot)
 VRAM_SILO_PRIMARY_GENTLE_MIB = 11000  # Qwythos-only baseline ~9.3GB is expected
-VRAM_PAUSE_MIB = 11800      # above → pause cook
+VRAM_PAUSE_MIB = 11800      # above -> pause cook
 RAM_GENTLE_PCT = 85
 RAM_PAUSE_PCT = 93
 DISK_K_MIN_GB = 50
@@ -319,6 +319,20 @@ def port_up(port: int) -> bool:
     return False
 
 
+def image_gpu_lock_held() -> tuple[bool, str]:
+    """Yield to Forge/image gen when GPU tenant lock is held (2026-07-21 codify)."""
+    try:
+        from image_job_lock import status as ls
+
+        st = ls()
+        if st.get("held") and not st.get("stale"):
+            meta = st.get("meta") or {}
+            return True, f"image_lock owner={meta.get('owner')} job={meta.get('job')}"
+    except Exception:
+        pass
+    return False, ""
+
+
 def assess() -> Dict[str, Any]:
     vram = vram_used_mib()
     ram = ram_used_pct()
@@ -327,6 +341,7 @@ def assess() -> Dict[str, Any]:
     qwy = port_up(8090)
     proxy = port_up(8091)
     comfy = port_up(8188)
+    img_held, img_reason = image_gpu_lock_held()
 
     mode = "normal"
     reasons = []
@@ -336,35 +351,45 @@ def assess() -> Dict[str, Any]:
     if d_free is not None and d_free < DISK_D_MIN_GB:
         mode = "pause"
         reasons.append(f"D free {d_free:.0f}GB < {DISK_D_MIN_GB}")
+    # Image gen owns GPU - never aggressive; pause enrich/grunt (drain may still gentle)
+    if img_held:
+        mode = "gentle"
+        reasons.append(f"yield_image_gpu: {img_reason}")
     if vram is not None and vram >= VRAM_PAUSE_MIB:
-        mode = "pause"
-        reasons.append(f"VRAM {vram}MiB critical")
+        # Critical VRAM: pause unless only image lock (then already gentle)
+        if not img_held:
+            mode = "pause"
+            reasons.append(f"VRAM {vram}MiB critical")
+        else:
+            mode = "gentle"
+            reasons.append(f"VRAM {vram}MiB critical + image_lock - gentle land only")
     elif ram is not None and ram >= RAM_PAUSE_PCT:
         mode = "pause"
         reasons.append(f"RAM {ram}% critical")
     # Disk copy does NOT need GPU. Only pause when system is critically loaded.
     # "gentle" = reduce enrich/train + disable Qwythos grunt, NOT starve drain.
-    elif ram is not None and ram >= RAM_GENTLE_PCT:
+    elif mode != "gentle" and ram is not None and ram >= RAM_GENTLE_PCT:
         mode = "gentle"
         reasons.append(f"RAM {ram}% high")
-    elif (
+    elif mode != "gentle" and (
             silo_primary_active()
             and qwy
             and not comfy
             and vram is not None
             and vram < VRAM_PAUSE_MIB
+            and not img_held
         ):
             # Jeff overnight high-gear 2026-07-13: silo_primary still aggressive land
             mode = "aggressive"
             reasons.append(
-                f"silo_primary overnight high-gear — VRAM {vram}MiB Qwythos-only, drain max"
+                f"silo_primary overnight high-gear - VRAM {vram}MiB Qwythos-only, drain max"
             )
-    elif vram is not None and vram >= (
+    elif mode != "gentle" and vram is not None and vram >= (
         VRAM_SILO_PRIMARY_GENTLE_MIB if silo_primary_active() else VRAM_GENTLE_MIB
     ):
         mode = "gentle"
-        reasons.append(f"VRAM {vram}MiB high — drain full, no LLM grunt")
-    else:
+        reasons.append(f"VRAM {vram}MiB high - drain full, no LLM grunt")
+    elif mode != "gentle":
         mode = "aggressive" if (k_free or 0) > 200 else "normal"
         reasons.append("disk free enough for stepped-up drain")
 
@@ -378,11 +403,12 @@ def assess() -> Dict[str, Any]:
         "qwythos_8090": qwy,
         "proxy_8091": proxy,
         "comfy_8188": comfy,
+        "image_lock_held": img_held,
     }
 
 
 def limits_for(mode: str) -> Dict[str, int]:
-    # FULL THROTTLE (Jeff 2026-07-12) — still pauses on critical resources.
+    # FULL THROTTLE (Jeff 2026-07-12) - still pauses on critical resources.
     if mode == "aggressive":
         return {"drain": 1800, "enrich": 60, "train": 40, "reroute": 30, "sleep": 15}
     if mode == "gentle":
@@ -390,8 +416,67 @@ def limits_for(mode: str) -> Dict[str, int]:
         return {"drain": 700, "enrich": 20, "train": 12, "reroute": 15, "sleep": 45}
     if mode == "pause":
         return {"drain": 0, "enrich": 0, "train": 0, "reroute": 0, "sleep": 600}
-    # normal — elevated (night-capable)
+    # normal - elevated (night-capable)
     return {"drain": 1500, "enrich": 50, "train": 35, "reroute": 28, "sleep": 18}
+
+
+def apply_force_resource_contract(
+    assess_info: Dict[str, Any], forced: str
+) -> Dict[str, Any]:
+    """Apply --force-mode without violating resource / image_lock safety.
+
+    Rules (2026-07-21 dual-verify harden):
+      - image_lock held or VRAM >= VRAM_PAUSE_MIB -> floor to gentle (pause if assess pause)
+      - assess already gentle/pause -> force cannot upgrade to aggressive/normal
+      - otherwise force may set mode
+    """
+    base = str(assess_info.get("mode") or "normal")
+    reasons = list(assess_info.get("reasons") or [])
+    vram = assess_info.get("vram_mib")
+    lock_held = bool(assess_info.get("image_lock_held"))
+    vram_critical = vram is not None and float(vram or 0) >= VRAM_PAUSE_MIB
+    hard_floor = lock_held or vram_critical
+    if hard_floor and forced in ("aggressive", "normal"):
+        # Keep pause if assess already paused; else gentle land only
+        floor = "pause" if base == "pause" and not lock_held else "gentle"
+        if lock_held and base == "pause":
+            floor = "gentle"  # land may still gentle-copy while gen holds GPU
+        assess_info["mode"] = floor
+        reasons.append(f"force={forced}_downgraded_to_{floor}_resource_contract")
+    elif base in ("gentle", "pause") and forced in ("aggressive", "normal"):
+        # Never force past resource assess (high VRAM/RAM already soft)
+        assess_info["mode"] = base
+        reasons.append(f"force={forced}_blocked_resource_assess_keeps_{base}")
+    else:
+        assess_info["mode"] = forced
+        reasons.append(f"force={forced}")
+    assess_info["reasons"] = reasons
+    return assess_info
+
+
+def recheck_hard_yield(assess_info: Dict[str, Any]) -> Dict[str, Any]:
+    """Second-look image lock / VRAM critical immediately before tick start."""
+    img_held, img_reason = image_gpu_lock_held()
+    vram = assess_info.get("vram_mib")
+    if vram is None:
+        vram = vram_used_mib()
+        assess_info["vram_mib"] = vram
+    assess_info["image_lock_held"] = img_held
+    reasons = list(assess_info.get("reasons") or [])
+    mode = str(assess_info.get("mode") or "normal")
+    if img_held and mode in ("aggressive", "normal"):
+        assess_info["mode"] = "gentle"
+        reasons.append(f"pre_tick_yield_image_gpu: {img_reason}")
+    elif (
+        vram is not None
+        and float(vram) >= VRAM_PAUSE_MIB
+        and mode in ("aggressive", "normal")
+        and not img_held
+    ):
+        assess_info["mode"] = "pause"
+        reasons.append(f"pre_tick_VRAM {vram}MiB critical")
+    assess_info["reasons"] = reasons
+    return assess_info
 
 
 
@@ -440,7 +525,7 @@ def run_tick(limits: Dict[str, int], allow_grunt: bool) -> Dict[str, Any]:
     if limits["drain"] == 0:
         cmd.append("--no-drain")
     # 2026-07-19: parent must exceed focus_land worker timeout (2700s) + depth tail.
-    # Was 2400 with focus_land 1800 → skip-heavy waves tree-killed mid-copy (exit 124)
+    # Was 2400 with focus_land 1800 -> skip-heavy waves tree-killed mid-copy (exit 124)
     # and wasted drain budget. Keep single-writer: tree-kill still on true hang only.
     code, out = _run(cmd, timeout=4200)
     try:
@@ -460,12 +545,12 @@ def write_state(state: Dict[str, Any]) -> None:
         STATE.write_text(json.dumps(state, indent=2), encoding="utf-8")
     LOG.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Silo continuous loop — {state.get('at')}",
+        f"# Silo continuous loop - {state.get('at')}",
         "",
-        f"**Cycle:** {state.get('cycle')} · **mode:** `{state.get('assess', {}).get('mode')}`",
+        f"**Cycle:** {state.get('cycle')} | **mode:** `{state.get('assess', {}).get('mode')}`",
         f"**Sleep next:** {state.get('sleep_s')}s",
-        f"**VRAM:** {state.get('assess', {}).get('vram_mib')} MiB · **RAM:** {state.get('assess', {}).get('ram_pct')}%",
-        f"**Qwythos:** {state.get('assess', {}).get('qwythos_8090')} · **Comfy:** {state.get('assess', {}).get('comfy_8188')}",
+        f"**VRAM:** {state.get('assess', {}).get('vram_mib')} MiB | **RAM:** {state.get('assess', {}).get('ram_pct')}%",
+        f"**Qwythos:** {state.get('assess', {}).get('qwythos_8090')} | **Comfy:** {state.get('assess', {}).get('comfy_8188')}",
         f"**Last tick:** {json.dumps(state.get('last_tick', {}), default=str)[:400]}",
         "",
         "Stop: create `D:\\\\HermesData\\\\state\\\\silo_continuous.STOP`",
@@ -507,10 +592,14 @@ def _main_loop(args) -> int:
         cycle += 1
         assess_info = assess()
         if args.force_mode:
-            assess_info["mode"] = args.force_mode
-            assess_info["reasons"] = list(assess_info.get("reasons") or []) + [
-                f"force={args.force_mode}"
-            ]
+            # force-mode resource contract (2026-07-21 rock-solid):
+            # 1) NEVER override image_lock yield or VRAM>=critical pause
+            # 2) NEVER upgrade past assess gentle/pause (high VRAM/RAM already chose soft)
+            # Was stuck aggressive at ~11.8GB + Forge when force ignored assess.
+            forced = args.force_mode
+            assess_info = apply_force_resource_contract(assess_info, forced)
+        # Re-check lock immediately before tick (sleep gap / mid-cycle gen start)
+        assess_info = recheck_hard_yield(assess_info)
         mode = assess_info["mode"]
         limits = limits_for(mode)
         allow_grunt = bool(

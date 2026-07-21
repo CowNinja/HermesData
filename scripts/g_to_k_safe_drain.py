@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Safe G→K drain: COPY ONLY with provenance. Default = dry-run.
+"""Safe G->K drain: COPY ONLY with provenance. Default = dry-run.
 
-Sources: MemoryCard Google Drive (+archive) only — NOT live D: My Drive.
+Sources: MemoryCard Google Drive (+archive) only - NOT live D: My Drive.
 Dest: K:\\Phronesis-Sovereign\\Personal-Digital-Silo (broad domains).
 
 NEVER deletes source. NEVER purges Drive.
@@ -93,7 +93,7 @@ def copy_file(src: Path, dest: Path) -> str:
     """Efficient copy: robocopy for multi-MB files, buffered shutil otherwise.
 
     Returns method tag: robocopy|shutil_buf|shutil
-    Full-tree robocopy is intentionally NOT used — we must classify per file.
+    Full-tree robocopy is intentionally NOT used - we must classify per file.
     """
     import subprocess
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -139,7 +139,7 @@ def _path_keys(s: str) -> list[str]:
 
 def sha256_file(path: Path, limit: int = 32 * 1024 * 1024) -> str:
     """Content fingerprint. Large files (>20MB) use size+mtime+head for speed
-    (Booksbloom ebooks) — still unique enough for land dedupe; fidelity rehash later.
+    (Booksbloom ebooks) - still unique enough for land dedupe; fidelity rehash later.
     """
     try:
         st = path.stat()
@@ -287,7 +287,7 @@ def iter_candidates(
             ):
                 continue
 
-            # Jeff 2026-07-13: catalog-only music — skip bulk audio land
+            # Jeff 2026-07-13: catalog-only music - skip bulk audio land
             if p.suffix.lower() in {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".wma"}:
                 continue
             sp_n = str(p).lower().replace("\\", "/")
@@ -349,7 +349,7 @@ def iter_candidates(
                             "scan",
                         )
                     )
-                    # Jeff 2026-07-13: evaluate zips — keep gold/content archives; skip bulk junk
+                    # Jeff 2026-07-13: evaluate zips - keep gold/content archives; skip bulk junk
                     if sz > 500_000_000 and not gold:
                         continue
                     if sz > 50_000_000 and not gold:
@@ -454,7 +454,7 @@ def load_priority_sources():
                         "SELECT COUNT(*) FROM ingest WHERE source_path LIKE ?",
                         (root_n + "\\" + "%",),
                     ).fetchone()[0]
-                    # light disk sample cap (was 120k — hung weekly smoke / drain planning)
+                    # light disk sample cap (was 120k - hung weekly smoke / drain planning)
                     disk_n = 0
                     for i, fp in enumerate(root.rglob("*")):
                         if fp.is_file():
@@ -535,9 +535,9 @@ def _count_live_drains() -> list[int]:
 
 
 def acquire_single_writer_lock() -> tuple[bool, str]:
-    """Singleton land writer for apply mode — SQLite registry is one-writer.
+    """Singleton land writer for apply mode - SQLite registry is one-writer.
 
-    Research: sqlite.org/wal.html — WAL allows concurrent readers but still
+    Research: sqlite.org/wal.html - WAL allows concurrent readers but still
     one writer; dual drain = lock storms / stalled ticks / corrupt risk.
     """
     import atexit
@@ -592,7 +592,7 @@ def main() -> int:
         ok_lock, lock_msg = acquire_single_writer_lock()
         if not ok_lock:
             print(json.dumps({"status": "skip_single_writer", "reason": lock_msg}, indent=2))
-            return 0  # soft skip — not an error; chef/continuous continues
+            return 0  # soft skip - not an error; chef/continuous continues
     # Default: MemoryCard first; full-throttle adds C2 personal G: trees
     default_sources = load_priority_sources() or [
         Path(r"G:/MemoryCard_Backups/Google Drive(archive)"),
@@ -623,8 +623,24 @@ def main() -> int:
         except Exception:
             pass
     sources = [Path(s) for s in args.source] or default_sources
+    # Skip walk-cursor roots marked complete (hash-known trees) - auto-advance 2026-07-21
+    try:
+        cur0 = load_walk_cursor()
+        roots0 = cur0.get("roots") or {}
+        filtered_src = []
+        for s in sources:
+            rk = str(s).replace("/", "\\").rstrip("\\")
+            ent = roots0.get(rk) or {}
+            if ent.get("complete"):
+                print(json.dumps({"skip_complete_root": rk}))
+                continue
+            filtered_src.append(s)
+        if filtered_src:
+            sources = filtered_src
+    except Exception:
+        pass
 
-    # Known sources from ingest registry → skip early (wave efficiency)
+    # Known sources from ingest registry -> skip early (wave efficiency)
     # Scope skip load to active source roots (huge speed win on Booksbloom mid-tree)
     skip_sources: set[str] = set()
     icon_pre = ingest_connect() if ingest_connect else None
@@ -659,7 +675,7 @@ def main() -> int:
         except Exception:
                 pass
 
-    # In-memory hash set — O(1) dupe checks (archive overlaps live heavily)
+    # In-memory hash set - O(1) dupe checks (archive overlaps live heavily)
     known_hashes: set[str] = set()
     if icon_pre is not None:
         try:
@@ -708,13 +724,13 @@ def main() -> int:
     ai_used = 0
     # Oversample candidates: archive has many content-dupes of live GD.
     # Plan more than limit so apply can fill real copies after hash skips.
-    # Bound hard — scanning millions of already-ingested paths hung weekly smoke (180s+).
+    # Bound hard - scanning millions of already-ingested paths hung weekly smoke (180s+).
     plan_cap = min(max(args.limit * 8, args.limit + 40), max(args.limit * 20, 400))
     for src_root in sources:
         if len(planned) >= plan_cap:
             break
         need = plan_cap - len(planned)
-        # Candidate pool + max_scan proportional to need (not 20k–2M unbounded walks)
+        # Candidate pool + max_scan proportional to need (not 20k-2M unbounded walks)
         pool_limit = min(max(need * 12, args.limit * 20), 4000)
         # new_examined budget (skip_sources no longer burns this)
         scan_budget = min(max(pool_limit * 40, 2000), 80_000)
@@ -750,7 +766,7 @@ def main() -> int:
                 break
 
     # Class filter: 2 always; class 3 hybrid OK for approved G: personal campaigns
-    # (touch_policy defaults unknown→3 — was blocking C2 NMCP/Alex/music entirely).
+    # (touch_policy defaults unknown->3 - was blocking C2 NMCP/Alex/music entirely).
     # Still skip class 1 and relevance noise. Never Hermes/Vault/OS.
     NEVER_ROOTS = (
         r"D:/HermesData",
@@ -783,7 +799,7 @@ def main() -> int:
 
     copied = skipped = 0
     lines = [
-        f"# G→K safe drain receipt — {TS}",
+        f"# G->K safe drain receipt - {TS}",
         f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'}",
         f"**Limit:** {args.limit}",
         "",
@@ -801,7 +817,7 @@ def main() -> int:
             status = "skip-exists"
             skipped += 1
             # Lesson 2026-07-12: dest already on K but source not in registry
-            # → endless re-plans. Register alias so skip_sources works next wave.
+            # -> endless re-plans. Register alias so skip_sources works next wave.
             if args.apply and icon is not None and ingest_register:
                 try:
                     digest = sha256_file(src) if src.is_file() else ""
@@ -895,7 +911,7 @@ def main() -> int:
 
     lines += [
         "",
-        f"**Copied:** {copied} · **Skipped:** {skipped} · **Planned rows:** {len(planned)}",
+        f"**Copied:** {copied} | **Skipped:** {skipped} | **Planned rows:** {len(planned)}",
         "",
         "## Walk stats",
     ]
@@ -909,7 +925,7 @@ def main() -> int:
     lines += [
         "",
         "## Guardrails",
-        "- Copy only — sources untouched",
+        "- Copy only - sources untouched",
         "- No Drive purge in this script",
         "- Broad domains only (open taxonomy)",
         "- Full drain needs many waves + Jeff green light before any purge",
@@ -933,14 +949,37 @@ def main() -> int:
                     "reset": "empty_after_wrap",
                 }
             else:
+                prev = dict(roots_cur.get(rk) or {})
+                walked = int(ws.get("walked_files") or 0)
+                skipped_k = int(ws.get("skipped_known") or 0)
+                emitted = int(ws.get("emitted") or 0)
+                complete = bool(prev.get("complete"))
+                # Auto-complete fully hash-known roots (skip thrash)
+                if (
+                    not complete
+                    and walked >= 100
+                    and emitted == 0
+                    and copied == 0
+                    and skipped_k >= int(walked * 0.98)
+                ):
+                    complete = True
                 roots_cur[rk] = {
                     "last_path": lp,
                     "at": datetime.now(timezone.utc).isoformat(),
-                    "walked_files": ws.get("walked_files"),
-                    "skipped_known": ws.get("skipped_known"),
-                    "emitted": ws.get("emitted"),
+                    "walked_files": walked,
+                    "skipped_known": skipped_k,
+                    "emitted": emitted,
                     "copied_wave": copied,
                     "skipped_wave": skipped,
+                    "complete": complete,
+                    **(
+                        {
+                            "completed_at": datetime.now(timezone.utc).isoformat(),
+                            "complete_reason": "auto_hash_known_wave",
+                        }
+                        if complete and not prev.get("complete")
+                        else {}
+                    ),
                 }
         cursor_state["roots"] = roots_cur
         try:

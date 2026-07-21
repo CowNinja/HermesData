@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Autonomous flake watchdog — if BG sprint stalls, restart lightly.
+"""Autonomous flake watchdog - sprint stall + rock-solid board recovery.
 
-Run via schtasks / cron every 15–30m. Zero Grok. No land multi-writer.
+Run via schtasks / cron every 15-30m. Zero Grok. No land multi-writer.
 
-Stall rule: bg log mtime older than --stall-minutes while pid alive and hours not expired.
+Rules (2026-07-21 codify):
+  - Sprint stall: bg log mtime older than --stall-minutes while pid alive -> relaunch sprint
+  - Rock-solid board: dual_bad or heartbeat_age > --hb-stale-s -> silo_recovery_single_writer once
+  - Never clear STOP; never taskkill gateway
+  - Optional --discord-alert posts board when recovery fires
+
+Research: Temporal HeartbeatTimeout (stale hb = dead worker); SQLite single-writer recovery.
 """
 from __future__ import annotations
 
@@ -30,6 +36,7 @@ PY = str(next((p for p in _PY_CANDIDATES if p.is_file()), Path(sys.executable)))
 PID_F = STATE / "silo_autonomous_sprint.pid"
 LOG = STATE / "silo_autonomous_sprint_bg.log"
 STOP = STATE / "silo_autonomous.STOP"
+CONT_STOP = STATE / "silo_continuous.STOP"
 RECEIPT = Path(r"D:/PhronesisVault/Operations/logs/silo-autonomous-watchdog-latest.md")
 
 
@@ -70,13 +77,90 @@ def main() -> int:
     # Overnight default 9h (was 4) so schtasks relaunch covers full sleep window
     ap.add_argument("--hours", type=float, default=9)
     ap.add_argument("--sleep", type=int, default=30)
+    ap.add_argument(
+        "--hb-stale-s",
+        type=float,
+        default=900,
+        help="continuous heartbeat age seconds -> recovery_single_writer",
+    )
+    ap.add_argument(
+        "--discord-alert",
+        action="store_true",
+        help="post rock-solid board when recovery fires",
+    )
+    ap.add_argument(
+        "--skip-board",
+        action="store_true",
+        help="skip dual_bad/heartbeat recovery (legacy sprint-only)",
+    )
     args = ap.parse_args()
     actions = []
-    if STOP.is_file():
-        msg = {"at": utc(), "action": "stop_present", "restart": False}
+    if STOP.is_file() or CONT_STOP.is_file():
+        msg = {
+            "at": utc(),
+            "action": "stop_present",
+            "restart": False,
+            "continuous_stop": CONT_STOP.is_file(),
+            "autonomous_stop": STOP.is_file(),
+        }
         RECEIPT.write_text(json.dumps(msg, indent=2), encoding="utf-8")
         print(json.dumps(msg))
         return 0
+
+    # --- Rock-solid board path (land liveness) ---
+    board = {}
+    recovery_ran = False
+    if not args.skip_board:
+        try:
+            from silo_rock_solid_board import build_board, write_board, post_discord
+
+            board = build_board()
+            write_board(board)
+            hb_age = (board.get("continuous") or {}).get("heartbeat_age_s")
+            dual = int(board.get("dual_bad") or 0)
+            cont_alive = bool((board.get("continuous") or {}).get("pid_alive"))
+            need_land_heal = dual > 0 or (
+                hb_age is not None and float(hb_age) >= args.hb_stale_s
+            ) or not cont_alive
+            if need_land_heal:
+                actions.append(
+                    f"land_heal dual_bad={dual} hb_age={hb_age} cont_alive={cont_alive}"
+                )
+                r = run_hidden(
+                    [PY.replace("pythonw.exe", "python.exe") if "pythonw" in PY.lower() else PY,
+                     str(SCRIPTS / "silo_recovery_single_writer.py")],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=180,
+                )
+                # prefer console python for recovery
+                if r.returncode != 0:
+                    r = run_hidden(
+                        [
+                            str(Path(r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\python.exe")),
+                            str(SCRIPTS / "silo_recovery_single_writer.py"),
+                        ],
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        timeout=180,
+                    )
+                recovery_ran = True
+                actions.append(f"recovery_rc={r.returncode}")
+                actions.append((r.stdout or "")[:300])
+                if args.discord_alert:
+                    try:
+                        mid = post_discord(build_board())
+                        actions.append(f"discord_board={mid}")
+                    except Exception as exc:
+                        actions.append(f"discord_fail={exc}")
+        except Exception as exc:
+            actions.append(f"board_err={exc}")
+
+    # --- Sprint path (depth) ---
     pid = None
     if PID_F.is_file():
         try:
@@ -118,6 +202,26 @@ def main() -> int:
         )
         actions.append(f"relaunch_exit_{r.returncode}")
         actions.append((r.stdout or "")[:200])
+    # opportunistic cursor advance (hash-known roots)
+    try:
+        r = run_hidden(
+            [
+                str(Path(r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\python.exe")),
+                str(SCRIPTS / "silo_cursor_auto_advance.py"),
+                "--apply",
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+        )
+        if r.returncode == 0 and r.stdout:
+            actions.append(f"cursor_advance={(r.stdout or '')[:200]}")
+    except Exception as exc:
+        actions.append(f"cursor_advance_err={exc}")
+
     msg = {
         "at": utc(),
         "pid": pid,
@@ -125,10 +229,14 @@ def main() -> int:
         "stalled": stalled,
         "actions": actions,
         "need_restart": need_restart,
+        "recovery_ran": recovery_ran,
+        "board_ok": (board or {}).get("ok"),
+        "dual_bad": (board or {}).get("dual_bad"),
+        "hb_age_s": ((board or {}).get("continuous") or {}).get("heartbeat_age_s"),
     }
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text(
-        f"# Autonomous watchdog — {msg['at']}\n\n```json\n{json.dumps(msg, indent=2)}\n```\n",
+        f"# Autonomous watchdog - {msg['at']}\n\n```json\n{json.dumps(msg, indent=2)}\n```\n",
         encoding="utf-8",
     )
     print(json.dumps(msg))
@@ -137,3 +245,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

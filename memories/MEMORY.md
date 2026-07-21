@@ -2,7 +2,7 @@ No safety theater. Vault CNS. Roemmele+Thompson. Musk-mode. **Uncensored local i
 §
 Jeff language default (2026-07-19): **Python above all else** — scripts/tools/harness/ops prefer Python; PS/VBS only as thin launchers when required.
 §
-Multi-figure N=1..3. Pose SSOT `pose_catalog.py`; matrix `pose_matrix_batch.py`; compose `--use-cast --pose`. Tenant `hermes_image tenant forge`. Beauty=Forge; MEDIA always; no N=4+ freestyle.
+Multi-figure N=1..3 girls; Jeff sole male ONLY (1boy max). Neg 2boys/two men/extra man. Pose SSOT pose_catalog; matrix pose_matrix_batch; compose --use-cast --pose. Tenant hermes_image tenant forge. Beauty=Forge; MEDIA always; no N=4+ freestyle.
 §
 THREAD LOCK: Grok 152484=arch/VW only; silo 152452 six_numbers; VW LIVE=Jeff OK+Decision-Card.
 §

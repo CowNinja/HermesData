@@ -56,21 +56,44 @@ def vram_ram() -> dict:
 
 
 def chef_count() -> int:
+    """Count live continuous-loop chefs.
+
+    2026-07-21 fix: continuous is launched via pythonw.exe (headless). Prior
+    filter only matched python.exe → perpetual false NO_CHEF while chef lived.
+    Lessons: process inventory must match real launcher (python + pythonw);
+    secondary heartbeat age is a fallback when WMI flakes.
+    """
     try:
         r = subprocess.run(
             [
                 "powershell.exe",
                 "-NoProfile",
                 "-Command",
-                "(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -like '*silo_continuous_loop.py*' } | Measure-Object).Count",
+                (
+                    "(Get-CimInstance Win32_Process | Where-Object { "
+                    "($_.Name -eq 'python.exe' -or $_.Name -eq 'pythonw.exe') "
+                    "-and $_.CommandLine -like '*silo_continuous_loop.py*' "
+                    "} | Measure-Object).Count"
+                ),
             ],
             capture_output=True,
             text=True,
             timeout=25,
         )
-        return int((r.stdout or "0").strip() or "0")
+        n = int((r.stdout or "0").strip() or "0")
+        if n > 0:
+            return n
     except Exception:
-        return -1
+        pass
+    # Fallback: fresh continuous state heartbeat = chef alive (single-writer)
+    try:
+        if CONT.is_file():
+            age = time.time() - CONT.stat().st_mtime
+            if age < 600:
+                return 1
+    except Exception:
+        pass
+    return 0
 
 
 def folder_stats(con: sqlite3.Connection, root: str) -> dict:

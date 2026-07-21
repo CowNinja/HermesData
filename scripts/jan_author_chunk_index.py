@@ -173,11 +173,22 @@ def retrieve(query: str, k: int = 8) -> list[dict]:
                 ("foundational five", 4),
                 ("cradle to grade", 5),
                 ("tally ho", 3),
-                ("yee haw", 3),
+                ("yee haw", 4),
+                ("books for boys", 4),
                 ("before romance", 3),
                 ("business by the books", 4),
                 ("creating capacity", 3),
+                ("help! i'm failing", 5),
+                ("help i'm failing", 5),
+                ("faint of heart", 4),
                 ("living books", 3),
+                ("author list", 4),
+                ("author→edition", 5),
+                ("author edition", 4),
+                ("revised and expanded", 4),
+                ("152 authors", 5),
+                ("new authors added", 4),
+                ("spiral", 2),
                 ("hi-ho silver", 6),
                 ("hi ho silver", 6),
                 ("mighty whitey", 6),
@@ -190,11 +201,21 @@ def retrieve(query: str, k: int = 8) -> list[dict]:
                 ("booksbloom", 3),
                 ("homeschool", 2),
                 ("conference", 2),
-                ("greenville", 2),
+                ("convention", 2),
+                ("greenville", 3),
+                ("cincinnati", 2),
+                ("st charles", 2),
+                ("st. charles", 2),
                 ("fpea", 3),
+                ("orlando", 2),
                 ("round rock", 2),
+                ("niche", 3),
+                ("west des moines", 3),
+                ("tpa", 3),
                 ("new book", 2),
                 ("merge", 1),
+                ("synaptic", 3),
+                ("connection", 1),
             ):
                 if phrase in ql and phrase in tl:
                     score += boost
@@ -203,7 +224,14 @@ def retrieve(query: str, k: int = 8) -> list[dict]:
             if lane == "jan_shelf":
                 score += 0.5
             # labeled vault packs should win on living/road/workshop queries
-            if lane in {"family_living", "workshop_catalog", "convention_master", "public"}:
+            if lane in {
+                "family_living",
+                "workshop_catalog",
+                "convention_master",
+                "public",
+                "author_list",
+                "synaptic",
+            }:
                 score += 0.75
             if score > 0:
                 scored.append((score, rec))
@@ -221,9 +249,25 @@ def retrieve(query: str, k: int = 8) -> list[dict]:
         # Allow multiple chunks from same big gold/shelf source, but keep
         # vault packs to one hit once any chunk of that pack is chosen.
         if key in seen_src:
-            if lane in {"family_living", "workshop_catalog", "convention_master", "public"}:
+            # Single-pack lanes: one hit is enough. Multi-chunk deep packs
+            # (workshop/convention/author_list/synaptic) may contribute 2.
+            if lane in {"family_living", "public"}:
                 continue
-            if len(out) >= max(k // 2, 3):
+            if lane in {
+                "workshop_catalog",
+                "convention_master",
+                "author_list",
+                "synaptic",
+            }:
+                already = sum(
+                    1
+                    for o in out
+                    if (o.get("lane") or "") == lane
+                    and Path(o.get("source") or "").name == key
+                )
+                if already >= 2:
+                    continue
+            elif len(out) >= max(k // 2, 3):
                 continue
         seen_src.add(key)
         if rid:

@@ -2,11 +2,15 @@
 """Report silo leaf folders that violate soft layout limits (anti-flat discipline).
 
 Does not move files. Writes Operations/logs/silo-layout-health-latest.md
+
+2026-07-21: --budget-s + registry-first path so orch no longer exit-124 on full K rglob.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sqlite3
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,13 +39,20 @@ def is_sidecar(name: str, suffixes: List[str]) -> bool:
     return False
 
 
-def scan_leaf_counts(root: Path, suffixes: List[str], max_dirs: int = 50000) -> List[Tuple[str, int]]:
-    """Count non-sidecar files per directory (any dir that contains files)."""
+def scan_leaf_counts_budgeted(
+    root: Path, suffixes: List[str], budget_s: float = 240.0
+) -> Tuple[List[Tuple[str, int]], dict]:
+    """Count non-sidecar files per directory with wall-clock budget."""
     counts: Dict[str, int] = defaultdict(int)
     n = 0
+    t0 = time.time()
+    timed_out = False
     if not root.is_dir():
-        return []
+        return [], {"files_seen": 0, "timed_out": False, "mode": "rglob", "elapsed_s": 0}
     for p in root.rglob("*"):
+        if time.time() - t0 >= budget_s:
+            timed_out = True
+            break
         if not p.is_file():
             continue
         if is_sidecar(p.name, suffixes):
@@ -50,13 +61,64 @@ def scan_leaf_counts(root: Path, suffixes: List[str], max_dirs: int = 50000) -> 
         n += 1
         if n > 2_000_000:
             break
-    return sorted(counts.items(), key=lambda x: -x[1])
+    ranked = sorted(counts.items(), key=lambda x: -x[1])
+    return ranked, {
+        "files_seen": n,
+        "timed_out": timed_out,
+        "mode": "rglob",
+        "elapsed_s": round(time.time() - t0, 2),
+    }
+
+
+def scan_from_registry(suffixes: List[str], limit_rows: int = 80000) -> Tuple[List[Tuple[str, int]], dict]:
+    """Fast path: folder counts from dest_path parents in ingest_registry."""
+    counts: Dict[str, int] = defaultdict(int)
+    t0 = time.time()
+    if not REG.is_file():
+        return [], {"files_seen": 0, "mode": "registry", "error": "no registry"}
+    con = sqlite3.connect(str(REG), timeout=30)
+    con.execute("PRAGMA busy_timeout=30000")
+    try:
+        rows = con.execute(
+            "SELECT dest_path FROM ingest WHERE dest_path IS NOT NULL AND dest_path != '' "
+            "ORDER BY rowid DESC LIMIT ?",
+            (limit_rows,),
+        ).fetchall()
+    finally:
+        con.close()
+    n = 0
+    suf_tuple = tuple(suffixes)
+    for (dp,) in rows:
+        if not dp:
+            continue
+        # basename without Path()
+        base = dp.replace("\\", "/").rsplit("/", 1)[-1]
+        if base.endswith(".meta.json") or ".train." in base:
+            continue
+        skip = False
+        for s in suf_tuple:
+            if base.endswith(s) or f"{s}." in base:
+                skip = True
+                break
+        if skip:
+            continue
+        parent = dp.replace("\\", "/").rsplit("/", 1)[0] if ("/" in dp.replace("\\", "/")) else dp
+        counts[parent] += 1
+        n += 1
+    ranked = sorted(counts.items(), key=lambda x: -x[1])
+    return ranked, {
+        "files_seen": n,
+        "mode": "registry",
+        "elapsed_s": round(time.time() - t0, 2),
+        "timed_out": False,
+        "rows": len(rows),
+    }
 
 
 def registry_summary() -> dict:
     if not REG.exists():
         return {}
-    con = sqlite3.connect(str(REG))
+    con = sqlite3.connect(str(REG), timeout=30)
     total = con.execute("SELECT COUNT(*) FROM ingest").fetchone()[0]
     by_dom = dict(con.execute("SELECT domain, COUNT(*) FROM ingest GROUP BY domain"))
     inbox = by_dom.get("Core-Personal/_Inbox", 0)
@@ -71,11 +133,29 @@ def registry_summary() -> dict:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--budget-s", type=float, default=240.0, help="wall-clock budget for FS scan")
+    ap.add_argument(
+        "--mode",
+        choices=("auto", "registry", "rglob"),
+        default="auto",
+        help="auto=registry first (fast); rglob only if requested",
+    )
+    ap.add_argument("--limit-rows", type=int, default=120000)
+    args = ap.parse_args()
+
     pol = load_policy()
     lim = int(pol.get("soft_limits", {}).get("max_files_per_leaf_folder", 500))
     suf = list(pol.get("soft_limits", {}).get("exclude_from_count_suffixes") or [])
 
-    ranked = scan_leaf_counts(SILO, suf)
+    scan_meta = {}
+    if args.mode in ("auto", "registry"):
+        ranked, scan_meta = scan_from_registry(suf, limit_rows=int(args.limit_rows))
+        if args.mode == "auto" and not ranked and args.budget_s > 30:
+            ranked, scan_meta = scan_leaf_counts_budgeted(SILO, suf, budget_s=min(args.budget_s, 90))
+    else:
+        ranked, scan_meta = scan_leaf_counts_budgeted(SILO, suf, budget_s=args.budget_s)
+
     offenders = [(d, c) for d, c in ranked if c > lim][:40]
     top = ranked[:25]
 
@@ -85,6 +165,7 @@ def main() -> int:
         f"# Silo layout health — {utc()}",
         "",
         f"**Soft limit:** {lim} non-sidecar files per folder",
+        f"**Scan mode:** {scan_meta.get('mode')} · elapsed {scan_meta.get('elapsed_s')}s · timed_out={scan_meta.get('timed_out')}",
         f"**Folders scanned (with files):** {len(ranked)}",
         f"**Offenders (> limit):** {len(offenders)}",
         "",
@@ -101,7 +182,6 @@ def main() -> int:
     ]
     for d, c in top:
         flag = " ⚠️" if c > lim else ""
-        # shorten path
         short = d.replace(str(SILO), "SILO")
         lines.append(f"| {c} | `{short[:100]}`{flag} |")
 
@@ -125,6 +205,7 @@ def main() -> int:
         "offenders": len(offenders),
         "top": [{"count": c, "dir": d} for d, c in top[:10]],
         "registry": {k: reg[k] for k in ("total", "inbox", "shelved", "inbox_pct") if k in reg},
+        "scan": scan_meta,
         "receipt": str(RECEIPT),
     }
     print(json.dumps(out, indent=2))

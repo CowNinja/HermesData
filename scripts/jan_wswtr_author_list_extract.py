@@ -43,6 +43,28 @@ PRIMARY = [
 SECONDARY_NEW = [
     "2010-06-10_1451_-_WSWTR_part1_final.wpd.md",
 ]
+# Tertiary: body heading / entry lines (Last, First) from gold WSWTR bodies only
+BODY_HEADING = [
+    "newwswtr313.wpd.md",
+    "wswtr_extra.wpd.md",
+    "2010-06-10_1451_-_WSWTR_part1_final.wpd.md",
+]
+# Reject false-positive "Last, First" lines from prose/places
+REJECT_LAST = {
+    "cokato",
+    "jan bloom",
+    "who should",
+    "sata",
+    "dlb",
+    "source",
+}
+REJECT_FIRST_SUBSTR = (
+    "who should",
+    "living books",
+    "http",
+    "www.",
+    "volume",
+)
 
 LAST_FIRST = re.compile(
     r"^(?P<last>[A-Z][A-Za-z'’\-\.]*(?:[\s][A-Z][A-Za-z'’\-\.]*){0,2}),\s*"
@@ -152,9 +174,117 @@ def parse_new_authors_block(path: Path) -> list[dict]:
     return authors
 
 
+def _clean_body_first(first: str) -> str | None:
+    """Normalize first-name field from body lines; return None if reject."""
+    first = first.strip()
+    # tab-separated body rows: "Louisa May\t1832 - 1888\tLittle Women..."
+    if "\t" in first:
+        first = first.split("\t", 1)[0].strip()
+    # trailing volume markers: "Louisa May -1" / "Streeter-1"
+    first = re.sub(r"\s*-\d+\s*$", "", first).strip()
+    first = first.strip(" .;:")
+    if not first or len(first) > 48:
+        return None
+    low = first.lower()
+    if any(s in low for s in REJECT_FIRST_SUBSTR):
+        return None
+    if " by " in low or low.startswith("by "):
+        return None
+    # bare state/code junk
+    if re.fullmatch(r"[A-Z]{2}", first):
+        return None
+    # ALL-CAPS multi-token codes (ABYP, JR, LOC)
+    if first.isupper() and len(first) >= 2:
+        return None
+    # years-only junk
+    if re.fullmatch(r"\d{4}(\s*-\s*\d{4})?", first):
+        return None
+    # must look like a personal name token sequence
+    if not re.match(
+        r"^[A-Z][A-Za-z'’\-\.]+(?:\s+[A-Z][A-Za-z'’\-\.]+){0,3}$",
+        first,
+    ):
+        # allow nicknames in quotes: Isabella "Pansy"
+        if not re.match(
+            r"^[A-Z][A-Za-z'’\-\.]+(?:\s+[A-Z][A-Za-z'’\-\.]+)*(?:\s+[“\"][^”\"]+[”\"])?$",
+            first,
+        ):
+            return None
+    return first
+
+
+def parse_body_heading_file(path: Path) -> list[dict]:
+    """Deeper WSWTR body pass: Last, First entry lines only (gold file, no invention)."""
+    raw = strip_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+    name_l = path.name.lower()
+    # part1 final: only AUTHOR INFORMATION section (tab/year entries)
+    if "part1_final" in name_l:
+        m = re.search(
+            r"AUTHOR INFORMATION\s*(.+?)(?:\nBAAA\b|\nAPPENDIX|\Z)",
+            raw,
+            re.I | re.S,
+        )
+        if not m:
+            return []
+        body = m.group(1)
+        require_tab_or_year = True
+    else:
+        body = raw
+        require_tab_or_year = False
+
+    authors: list[dict] = []
+    seen: set[str] = set()
+    for line in body.splitlines():
+        line = line.strip()
+        if not line or SKIP_LINE.search(line):
+            continue
+        if len(line) < 3 or len(line) > 120:
+            continue
+        if require_tab_or_year and ("\t" not in line) and not re.search(r"\b1[7-9]\d{2}\b", line):
+            # AUTHOR INFORMATION rows are tab/year structured; skip prose
+            continue
+        candidate = line.replace("\u2013", "-").replace("\u2014", "-")
+        m = LAST_FIRST.match(candidate)
+        if not m:
+            continue
+        last = m.group("last").strip(" .")
+        first_raw = m.group("first").strip()
+        if last.lower() in REJECT_LAST:
+            continue
+        if len(last) < 2 or last.isupper():
+            continue
+        # reject title-like lasts with internal hyphens + lowercase (Alice-All-by-Herself)
+        if re.search(r"[a-z]-[a-z]", last):
+            continue
+        first = _clean_body_first(first_raw)
+        if not first:
+            continue
+        if not re.search(r"[A-Za-z]", first):
+            continue
+        # articles/titles as "first"
+        if first.lower() in {"the", "a", "an", "and", "or", "of"}:
+            continue
+        key = f"{last.lower()}|{first.lower()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        authors.append(
+            {
+                "last": last,
+                "first": first,
+                "display": f"{last}, {first}",
+                "source_file": path.name,
+                "form": "body_heading_last_first",
+                "note": "WSWTR body/entry line (gold only)",
+            }
+        )
+    return authors
+
+
 def build(min_count: int = 50) -> dict:
     primary_rows: list[dict] = []
     secondary_rows: list[dict] = []
+    body_rows: list[dict] = []
     sources_used: list[str] = []
     warnings: list[str] = []
 
@@ -176,16 +306,28 @@ def build(min_count: int = 50) -> dict:
         secondary_rows.extend(rows)
         sources_used.append(str(p) + "#New_authors_added")
 
+    for name in BODY_HEADING:
+        p = GOLD / name
+        if not p.exists():
+            warnings.append(f"missing body_heading: {name}")
+            continue
+        rows = parse_body_heading_file(p)
+        body_rows.extend(rows)
+        sources_used.append(str(p) + "#body_heading")
+
     # merge unique by last|first
     merged: dict[str, dict] = {}
-    for r in primary_rows + secondary_rows:
+    # Prefer primary, then secondary new-authors, then body headings
+    for r in primary_rows + secondary_rows + body_rows:
         key = f"{r['last'].lower()}|{r['first'].lower()}"
         if key not in merged:
             merged[key] = r
         else:
-            # keep primary form; note secondary if both
-            if r.get("form") != merged[key].get("form"):
+            # keep earlier (higher-trust) form; note additional sources
+            if r.get("source_file") and r.get("source_file") != merged[key].get("source_file"):
                 merged[key].setdefault("also_in", []).append(r.get("source_file"))
+            if r.get("form") != merged[key].get("form"):
+                merged[key].setdefault("also_forms", []).append(r.get("form"))
 
     authors = sorted(merged.values(), key=lambda a: (a["last"].lower(), a["first"].lower()))
     report = {
@@ -193,6 +335,7 @@ def build(min_count: int = 50) -> dict:
         "policy": "gold extracts only — never invent authors/ISBNs",
         "primary_count": len(primary_rows),
         "secondary_new_count": len(secondary_rows),
+        "body_heading_count": len(body_rows),
         "unique_count": len(authors),
         "min_count": min_count,
         "ok": len(authors) >= min_count,
@@ -201,8 +344,9 @@ def build(min_count: int = 50) -> dict:
         "authors": authors,
         "public_blurb_note": (
             "Public site says 157 authors per WSWTR volume — this extract is a "
-            "partial gold index (jan-authors list + revised new-authors block), "
-            "not a claim of completeness."
+            "partial gold index (jan-authors + revised new-authors block + "
+            "body-heading Last, First lines), not a claim of completeness. "
+            "Never pad to 157."
         ),
     }
     return report
@@ -233,6 +377,7 @@ def write_outputs(report: dict) -> None:
         f"**Unique authors:** {report['unique_count']}  ",
         f"**Primary (jan-authors Last, First):** {report['primary_count']}  ",
         f"**Secondary (part1 'New authors added'):** {report['secondary_new_count']}  ",
+        f"**Body heading (Last, First entries):** {report.get('body_heading_count', 0)}  ",
         f"**OK (≥{report['min_count']}):** {'yes' if report['ok'] else 'NO'}  ",
         "",
         "## Policy",
@@ -241,6 +386,7 @@ def write_outputs(report: dict) -> None:
         "- **Do not** treat as complete 157-author public blurb fulfillment.",
         "- Curator may say “on the gold author index…” and cite this pack + source file.",
         "- Never invent missing surnames to reach 157.",
+        "- Body-heading pass merges extra Last, First entry lines; primary wins on conflicts.",
         "",
         "## Sources",
         "",

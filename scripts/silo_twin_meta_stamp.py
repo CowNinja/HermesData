@@ -108,6 +108,28 @@ def process_train_md(train: Path) -> dict | None:
     return meta
 
 
+def _already_fully_stamped(train: Path) -> bool:
+    """Fast pre-check so already-stamped heads don't burn the scan budget."""
+    if str(train).endswith(".train.md"):
+        src = Path(str(train)[:-9])
+    else:
+        src = train
+    meta_path = Path(str(src) + ".train.meta.json")
+    if not meta_path.is_file():
+        return False
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8", errors="replace"))
+    except Exception:
+        return False
+    return bool(
+        meta.get("temporal")
+        and meta.get("tags")
+        and meta.get("stamped_at")
+        and meta.get("twin_scopes")
+        and meta.get("primary_scope")
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -122,7 +144,19 @@ def main() -> int:
         "--max-scan",
         type=int,
         default=2500,
-        help="stop walking after N train.md files (avoid multi-minute rglob hangs)",
+        help="stop walking after N *candidate* train.md files (already-stamped fast-skips are separate)",
+    )
+    ap.add_argument(
+        "--skip-offset",
+        type=int,
+        default=0,
+        help="skip first N train.md encounters (cursor resume past already-stamped head)",
+    )
+    ap.add_argument(
+        "--max-already-skip",
+        type=int,
+        default=20000,
+        help="max already-stamped fast-skips before giving up on this root (cursor burn protection)",
     )
     args = ap.parse_args()
     roots = [Path(args.root)]
@@ -137,17 +171,33 @@ def main() -> int:
     stamped = 0
     skipped = 0
     scanned = 0
+    offset_skipped = 0
+    already_fast = 0
     light_rows = []
+    skip_left = max(0, int(args.skip_offset or 0))
+    walked = 0  # every train.md seen (for cursor advance)
     for root in roots:
         if not root.is_dir():
             continue
         for train in root.rglob("*.train.md"):
             if stamped >= args.limit:
                 break
-            if scanned >= args.max_scan:
-                break
             if train.name.endswith(".train.meta.json"):
                 continue
+            walked += 1
+            if skip_left > 0:
+                skip_left -= 1
+                offset_skipped += 1
+                continue
+            # Prefer unstamped: fast-skip full stamps without counting toward max_scan
+            if _already_fully_stamped(train):
+                skipped += 1
+                already_fast += 1
+                if already_fast >= int(args.max_already_skip or 20000):
+                    break
+                continue
+            if scanned >= args.max_scan:
+                break
             scanned += 1
             meta = process_train_md(train)
             if meta is None:
@@ -165,7 +215,7 @@ def main() -> int:
                     "train": str(train),
                 }
             )
-        if stamped >= args.limit or scanned >= args.max_scan:
+        if stamped >= args.limit or scanned >= args.max_scan or already_fast >= int(args.max_already_skip or 20000):
             break
     # append light index then compact unique paths
     LIGHT.parent.mkdir(parents=True, exist_ok=True)
@@ -195,25 +245,39 @@ def main() -> int:
             light_n = 0
     except Exception:
         light_n = -1
+    payload = {
+        "at": utc(),
+        "root": str(args.root),
+        "skip_offset_in": int(args.skip_offset or 0),
+        "stamped": stamped,
+        "skipped_already": skipped,
+        "scanned": scanned,
+        "offset_skipped": offset_skipped,
+        "already_fast_skipped": already_fast,
+        "walked": walked,
+        # next cursor resume position within this root walk order
+        "next_skip_offset": int(args.skip_offset or 0) + offset_skipped + already_fast + scanned,
+        "k_light_unique": light_n,
+        "light_index": str(LIGHT),
+        "receipt": str(RECEIPT),
+    }
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text(
-        f"# Twin meta stamp — {utc()}\n\n"
+        f"# Twin meta stamp — {payload['at']}\n\n"
         f"Stamped **{stamped}** · skipped already **{skipped}** · scanned {scanned} · "
-        f"k_light unique **{light_n}** · `{LIGHT}`\n",
+        f"offset_skipped {offset_skipped} · already_fast {already_fast} · walked {walked} · "
+        f"k_light unique **{light_n}** · `{LIGHT}`\n\n"
+        f"```json\n{json.dumps(payload, indent=2)}\n```\n",
         encoding="utf-8",
     )
-    print(
-        json.dumps(
-            {
-                "stamped": stamped,
-                "skipped_already": skipped,
-                "scanned": scanned,
-                "k_light_unique": light_n,
-                "light_index": str(LIGHT),
-                "receipt": str(RECEIPT),
-            }
+    # machine receipt for board (survives md parse flakes)
+    try:
+        Path(r"D:/HermesData/state/silo_twin_meta_stamp_latest.json").write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
         )
-    )
+    except Exception:
+        pass
+    print(json.dumps(payload))
     return 0
 
 

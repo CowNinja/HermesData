@@ -140,7 +140,8 @@ def main() -> int:
     if cont_vbs.is_file():
         start_via_wscript(cont_vbs)
         actions.append("started continuous_vbs")
-    time.sleep(3.0)
+    # VBS detaches; allow process + lock settle (was 3s - too short 2026-07-21)
+    time.sleep(8.0)
     # sprint second (depth; no land multi-write if focus is continuous)
     sprint_vbs = SCRIPTS / "start_silo_sprint_only_hidden.vbs"
     if not sprint_vbs.is_file():
@@ -186,7 +187,7 @@ def main() -> int:
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Silo recovery single-writer — {report['at']}",
+        f"# Silo recovery single-writer ? {report['at']}",
         "",
         f"- continuous_pid: `{report.get('continuous_pid')}`",
         f"- sprint_pid: `{report.get('sprint_pid')}`",

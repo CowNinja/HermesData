@@ -1,194 +1,168 @@
 #!/usr/bin/env python3
-"""Silent-green stack pulse: GREEN when healthy (quiet), YELLOW/RED when not.
+"""Option C v1.2 silent-green pulse -- Discord only on YELLOW/RED.
 
-Research (2026-07-18): silent-green when healthy; soft-fail + receipts; circuit breakers;
-single-instance checks (TrueFoundry loop engineering / our Codifying-Loops map).
-
-Combines:
-- single_gateway_instance_check (measure-only)
-- :8091 sovereign proxy health
-- optional silo six_numbers (metrics only)
-
-Never kills or restarts. Exit 0 on GREEN/YELLOW (job ran); exit 2 on RED misconfig hard;
-exit 1 on RED down (alert-worthy).
+Aggregates: orchestrator scoreboard + silo board + thrash levels.
+Silent when all GREEN (exit 0). Alerts when not (exit 1) + optional Discord.
 
 Usage:
   python silent_green_pulse.py
-  python silent_green_pulse.py --with-silo
-  python silent_green_pulse.py --json
+  python silent_green_pulse.py --discord
+  python silent_green_pulse.py --force-post   # even when green
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from atomic_io import atomic_append_jsonl, atomic_write_json
-
-ROOT = Path(r"D:\HermesData")
-SCRIPTS = ROOT / "scripts"
+SCRIPTS = Path(r"D:\HermesData\scripts")
+STATE = Path(r"D:\HermesData\state\silent_green_pulse.json")
+MD = Path(r"D:\PhronesisVault\Operations\logs\silent-green-pulse-latest.md")
 PY = sys.executable
-VAULT = Path(r"D:\PhronesisVault\Operations\logs")
-RECEIPT = VAULT / "silent-green-pulse-latest.json"
-JSONL = ROOT / "logs" / "silent-green-pulse.jsonl"
+CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 
 
 def utc() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(timezone.utc).isoformat()
 
 
-def probe(url: str, timeout: float = 3.0) -> dict:
+def run_json(script: str, extra: list[str] | None = None) -> dict:
+    cmd = [PY, str(SCRIPTS / script)] + (extra or [])
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "silent-green/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = (resp.read() or b"")[:300].decode("utf-8", errors="replace")
-            return {"up": 200 <= int(resp.status) < 300, "status": int(resp.status), "body": body}
-    except Exception as e:
-        return {"up": False, "status": None, "error": f"{type(e).__name__}:{e}"}
+        r = subprocess.run(
+            cmd,
+            cwd=str(SCRIPTS),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=CREATE_NO_WINDOW,
+        )
+        out = (r.stdout or "").strip()
+        # find last JSON object
+        i = out.find("{")
+        if i < 0:
+            return {"ok": False, "raw": out[:500], "rc": r.returncode}
+        return json.loads(out[i:])
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200]}
 
 
-def run_single_gateway() -> dict:
-    r = subprocess.run(
-        [PY, str(SCRIPTS / "single_gateway_instance_check.py")],
-        capture_output=True,
-        text=True,
-        timeout=45,
-        cwd=str(SCRIPTS),
+def post_discord(content: str, channel: str) -> str:
+    token = os.getenv("DISCORD_BOT_TOKEN", "")
+    env = Path(r"D:\HermesData\.env")
+    if not token and env.is_file():
+        for line in env.read_text(encoding="utf-8").splitlines():
+            if line.startswith("DISCORD_BOT_TOKEN="):
+                token = line.split("=", 1)[1].strip().strip('"')
+                break
+    data = json.dumps({"content": content[:1900]}).encode()
+    req = urllib.request.Request(
+        f"https://discord.com/api/v10/channels/{channel}/messages",
+        data=data,
+        method="POST",
+        headers={
+            "Authorization": f"Bot {token}",
+            "Content-Type": "application/json",
+            "User-Agent": "SilentGreen/1.2",
+        },
     )
-    # Prefer receipt file
-    rec = Path(r"D:\PhronesisVault\Operations\logs\single-gateway-instance-latest.json")
-    if rec.is_file():
-        try:
-            data = json.loads(rec.read_text(encoding="utf-8"))
-            data["_check_rc"] = r.returncode
-            return data
-        except Exception:
-            pass
-    return {
-        "status": "unknown",
-        "ok": r.returncode == 0,
-        "stdout": (r.stdout or "")[:400],
-        "stderr": (r.stderr or "")[:200],
-        "_check_rc": r.returncode,
-    }
-
-
-def run_silo_six() -> dict:
-    r = subprocess.run(
-        [PY, str(SCRIPTS / "silo_discord_six_numbers.py")],
-        capture_output=True,
-        text=True,
-        timeout=120,
-        cwd=str(SCRIPTS),
-    )
-    nums = {}
-    for line in (r.stdout or "").splitlines():
-        line = line.strip()
-        if "=" in line and line[0:1].isdigit():
-            # 1 registry_total=123
-            parts = line.split()
-            for p in parts:
-                if "=" in p:
-                    k, v = p.split("=", 1)
-                    if v.isdigit():
-                        nums[k] = int(v)
-    return {"ok": r.returncode == 0, "nums": nums, "raw_head": (r.stdout or "")[:300]}
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode()).get("id", "?")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--with-silo", action="store_true")
-    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--discord", action="store_true")
+    ap.add_argument("--force-post", action="store_true")
+    ap.add_argument("--channel", default="1524846849360531456")
     args = ap.parse_args()
 
-    gw = run_single_gateway()
-    p8091 = probe("http://127.0.0.1:8091/health")
-    p8090 = probe("http://127.0.0.1:8090/health")  # may 404 but port up varies
-    # 8090 may only expose /v1/models
-    if not p8090.get("up"):
-        p8090 = probe("http://127.0.0.1:8090/v1/models")
+    sys.path.insert(0, str(SCRIPTS))
+    from image_job_lock import status as ls
+    import image_thrash_guard as tg
+    import orchestrator_scoreboard as osc
 
-    silo = run_silo_six() if args.with_silo else None
+    orch = osc.build()
+    thr_h = tg.analyze("1524821864956956793")
+    thr_g = tg.analyze("1525174401740312707")
+    lock = ls()
+    board = {}
+    bp = Path(r"D:\HermesData\state\silo_rock_solid_board.json")
+    if bp.is_file():
+        try:
+            board = json.loads(bp.read_text(encoding="utf-8"))
+        except Exception:
+            board = {}
 
-    gw_status = (gw.get("status") or "").lower()
-    gw_ok = bool(gw.get("ok")) or gw_status == "ok"
-    multi = "multi" in gw_status
-    llama_ok = bool(p8090.get("up"))
-    proxy_ok = bool(p8091.get("up"))
+    levels = [
+        orch.get("health") or "YELLOW",
+        thr_h.get("level") or "YELLOW",
+        thr_g.get("level") or "YELLOW",
+    ]
+    if board.get("dual_bad"):
+        levels.append("RED")
+    if board.get("freeze"):
+        levels.append("RED")
+    if not (orch.get("sensors") or {}).get("continuous_live"):
+        levels.append("YELLOW")
 
-    # Honesty 2026-07-19: GREEN = full local inference path (gw + 8091 + 8090).
-    # Prior bug: GREEN on gateway+8091 while llama down → false silent-green vs ops pulse RED.
-    # Research: Google SRE readiness vs liveness — edge up ≠ dependency ready.
-    if multi:
-        color = "RED"
-        summary = "multi-LISTEN :8642 (double-boot risk)"
-    elif gw_ok and proxy_ok and llama_ok:
-        color = "GREEN"
-        summary = "silent-green: gateway single + 8091 + 8090 up"
-    elif gw_ok and proxy_ok and not llama_ok:
-        color = "YELLOW"
-        summary = "degraded: gateway+8091 up but llama :8090 down"
-    elif multi or (not gw_ok and proxy_ok):
-        color = "YELLOW"
-        summary = "advisory: multi-listener or gateway soft issue; 8091 may still serve"
-    elif gw_ok or proxy_ok or llama_ok:
-        color = "YELLOW"
-        summary = "partial: some core ports only"
-    else:
-        color = "RED"
-        summary = "down: gateway and/or 8091 unhealthy"
+    rank = {"GREEN": 0, "YELLOW": 1, "RED": 2}
+    overall = "GREEN"
+    for lv in levels:
+        if rank.get(lv, 1) > rank[overall]:
+            overall = lv
 
-    payload = {
-        "ts": utc(),
-        "color": color,
-        "summary": summary,
-        "gateway": {
-            "status": gw.get("status"),
-            "ok": gw.get("ok"),
-            "reason": gw.get("reason"),
-            "listeners": gw.get("listeners") or gw.get("listener_pids"),
-        },
-        "proxy_8091": p8091,
-        "llama_8090": p8090,
-        "silo": silo,
-        "requires_llama_8090": True,
-        "ok_for_silent_green": color == "GREEN",
-        "honesty_note": "GREEN requires :8090 (fixed 2026-07-19; was gateway+8091 only)",
-        "actions": {
-            "GREEN": "none (silent)",
-            "YELLOW": "receipt only; heal authority = stack_healing / service loop",
-            "RED": "alert; do not dual-start; use Phronesis gateway service restore",
-        },
-        "never": ["taskkill gateway from Discord", "clear STOP without Jeff", "invent KPIs"],
+    silent = overall == "GREEN" and not args.force_post
+    rep = {
+        "at": utc(),
+        "version": "1.2",
+        "overall": overall,
+        "silent": silent,
+        "orch_health": orch.get("health"),
+        "orch_score": orch.get("option_c_score_pct"),
+        "continuous_live": (orch.get("sensors") or {}).get("continuous_live"),
+        "dual_bad": board.get("dual_bad"),
+        "ocr_open": (board.get("six") or {}).get("6_ocr_open"),
+        "lock_held": bool(lock.get("held")),
+        "thrash_harem": thr_h.get("level"),
+        "thrash_group": thr_g.get("level"),
+        "posted": False,
+        "discord_id": None,
     }
 
-    VAULT.mkdir(parents=True, exist_ok=True)
-    JSONL.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(RECEIPT, payload, indent=2)
-    atomic_append_jsonl(JSONL, payload)
+    if args.discord and (not silent or args.force_post):
+        msg = (
+            f"**Silent-green pulse v1.2** overall=**{overall}**\n"
+            f"orch={rep['orch_health']} score~{rep['orch_score']} "
+            f"cont={rep['continuous_live']} dual_bad={rep['dual_bad']} "
+            f"ocr_open={rep['ocr_open']} lock={rep['lock_held']}\n"
+            f"thrash harem={rep['thrash_harem']} group={rep['thrash_group']}\n"
+            f"{'SILENT skip (all green)' if silent else 'ALERT -- see orch-score / thrash_guard'}"
+        )
+        if not silent or args.force_post:
+            try:
+                rep["discord_id"] = post_discord(msg, args.channel)
+                rep["posted"] = True
+            except Exception as exc:
+                rep["discord_error"] = str(exc)[:160]
 
-    if args.json:
-        print(json.dumps(payload, indent=2))
-    else:
-        print(f"{color} | {summary}")
-        print(f"  gateway={gw.get('status')} 8091_up={p8091.get('up')} 8090_up={p8090.get('up')}")
-        if silo and silo.get("nums"):
-            n = silo["nums"]
-            print(
-                f"  silo registry={n.get('registry_total')} landed={n.get('status_landed')} "
-                f"ocr_open={n.get('ocr_open')}"
-            )
-        print(f"  receipt={RECEIPT}")
-
-    if color == "GREEN":
-        return 0
-    if color == "YELLOW":
-        return 0  # soft-fail seal: job succeeded with advisory
-    return 1
+    STATE.write_text(json.dumps(rep, indent=2), encoding="utf-8")
+    MD.parent.mkdir(parents=True, exist_ok=True)
+    MD.write_text(
+        f"# Silent green pulse - {rep['at']}\n\n"
+        f"overall=**{overall}** silent={silent} posted={rep['posted']}\n\n"
+        f"```json\n{json.dumps(rep, indent=2)[:2000]}\n```\n",
+        encoding="utf-8",
+    )
+    print(json.dumps(rep, indent=2))
+    return 0 if overall == "GREEN" else 1
 
 
 if __name__ == "__main__":

@@ -1,10 +1,16 @@
 # Ensure singleton RP delivery daemon + folder watcher for Discord thread.
 # Always uses hermes-agent venv; kills any python/pythonw copies of these scripts.
 # Stay-up: after launch, verify lock PID is alive + hermes-agent venv; retry once.
+# Cook Defined-3 2026-07-21:
+#   -StatusOnly = stamp status JSON (autonomy surface) and exit; no starts
+#   -AllowDelivery = Jeff gate; default OFF (outs flood never auto)
+#   Image Rider is NOT legacy - do not kill; sole launcher = Start-Image-Rider.ps1
 param(
     [string]$Channel = "1524821864956956793",
     [switch]$Quiet,
-    [switch]$ForceRestart
+    [switch]$ForceRestart,
+    [switch]$StatusOnly,
+    [switch]$AllowDelivery
 )
 
 $root = "D:\HermesData"
@@ -90,9 +96,8 @@ function Start-DeliveryDaemon {
         Log "delivery daemon started channel=$Channel pid=$pidNow attempt=$attempt"
         return $true
     }
-    # Retry once after clearing stale lock again
     if ($attempt -lt 2) {
-        Log "delivery daemon lock/PID verify failed attempt=$attempt — retry"
+        Log "delivery daemon lock/PID verify failed attempt=$attempt - retry"
         Start-Sleep -Seconds 1
         return (Start-DeliveryDaemon -attempt ($attempt + 1))
     }
@@ -102,13 +107,93 @@ function Start-DeliveryDaemon {
 
 function Write-Status([hashtable]$fields) {
     try {
+        $autonomyPath = Join-Path $root "state\rp-sandbox-local-autonomy-latest.json"
+        $autonomyOk = $null
+        $autonomyTs = $null
+        $autonomyDegraded = $null
+        $autonomyDual = $null
+        $autonomySoft = $null
+        if (Test-Path $autonomyPath) {
+            try {
+                $aj = Get-Content $autonomyPath -Raw | ConvertFrom-Json
+                $autonomyOk = $aj.ok
+                $autonomyTs = $aj.ts
+                $autonomyDegraded = $aj.degraded
+                $autonomyDual = $aj.dual_tenant
+                $autonomySoft = $aj.soft_infos
+            } catch {}
+        }
+        $riderLockPath = "D:\PhronesisVault\Roleplay-Sandbox\runtime\continuity\.image-rider.lock"
+        $riderPid = 0
+        $riderAlive = $false
+        if (Test-Path $riderLockPath) {
+            $rr = (Get-Content $riderLockPath -Raw -ErrorAction SilentlyContinue).Trim()
+            [void][int]::TryParse($rr, [ref]$riderPid)
+            $riderAlive = Test-PidAlive $riderPid
+        }
+        # Defined-4 P4: surface schtask Image-Rider (measure only)
+        $schtaskName = "Phronesis-Image-Rider"
+        $schtaskState = "MISSING"
+        $schtaskLastResult = $null
+        $schtaskLastRun = $null
+        $schtaskNextRun = $null
+        $schtaskAction = $null
+        $schtaskOk = $false
+        try {
+            $t = Get-ScheduledTask -TaskName $schtaskName -ErrorAction SilentlyContinue
+            if ($t) {
+                $info = $t | Get-ScheduledTaskInfo -ErrorAction SilentlyContinue
+                $schtaskState = [string]$t.State
+                if ($info) {
+                    $schtaskLastResult = $info.LastTaskResult
+                    if ($info.LastRunTime) { $schtaskLastRun = $info.LastRunTime.ToString("s") }
+                    if ($info.NextRunTime) { $schtaskNextRun = $info.NextRunTime.ToString("s") }
+                }
+                try {
+                    $acts = @($t.Actions)
+                    if ($acts.Count -ge 1) {
+                        $a0 = $acts[0]
+                        $exe = [string]$a0.Execute
+                        $arg = [string]$a0.Arguments
+                        $schtaskAction = ($exe + " " + $arg).Trim()
+                    }
+                } catch {}
+                $schtaskOk = $true
+            }
+        } catch {
+            $schtaskState = "ERROR"
+            $schtaskOk = $false
+        }
         $obj = [ordered]@{
             at = (Get-Date).ToString("s")
             channel = $Channel
             image_pipeline_paused = $imagePaused
+            allow_delivery = [bool]$AllowDelivery
+            status_only = [bool]$StatusOnly
+            autonomy_status_path = $autonomyPath
+            autonomy_ok = $autonomyOk
+            autonomy_ts = $autonomyTs
+            autonomy_degraded = $autonomyDegraded
+            autonomy_dual_tenant = $autonomyDual
+            autonomy_soft_infos = $autonomySoft
+            rider_lock_pid = $riderPid
+            rider_lock_alive = $riderAlive
+            image_rider_sole_launcher = "D:\PhronesisVault\Roleplay-Sandbox\scripts\Start-Image-Rider.ps1"
+            schtask_image_rider = [ordered]@{
+                name = $schtaskName
+                present = $schtaskOk
+                state = $schtaskState
+                last_result = $schtaskLastResult
+                last_run = $schtaskLastRun
+                next_run = $schtaskNextRun
+                action = $schtaskAction
+            }
         }
         foreach ($k in $fields.Keys) { $obj[$k] = $fields[$k] }
-        ($obj | ConvertTo-Json -Depth 4) | Set-Content -Path $statusPath -Encoding UTF8
+        # UTF-8 no BOM so Python json.load does not need utf-8-sig
+        $json = ($obj | ConvertTo-Json -Depth 6)
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($statusPath, $json, $utf8NoBom)
     } catch {}
 }
 
@@ -119,7 +204,43 @@ $watcherOk = $false
 $daemonPidOut = 0
 $watcherPidOut = 0
 
-# --- Delivery daemon (singleton; off when image pipeline paused) ---
+if ($StatusOnly) {
+    Write-Status @{
+        daemon_ok = $null
+        watcher_ok = $null
+        daemon_pid = 0
+        watcher_pid = 0
+        force_restart = $false
+        note = "status_only_no_starts"
+    }
+    Log "StatusOnly: wrote $statusPath (autonomy + rider surface); no starts"
+    exit 0
+}
+
+# Delivery daemon Jeff-gated: default OFF (AllowDelivery required)
+if (-not $AllowDelivery) {
+    Log "AMBER: AllowDelivery off (Jeff gate) - delivery daemon/watcher not started"
+    if (Test-Path $lock) {
+        [void][int]::TryParse((Get-Content $lock -Raw -ErrorAction SilentlyContinue).Trim(), [ref]$daemonPidOut)
+    }
+    $watchProcsSkip = @(Get-MatchingProcs 'watch_comfy_delivery\.py')
+    if ($watchProcsSkip.Count -ge 1) {
+        $watcherPidOut = [int]$watchProcsSkip[0].ProcessId
+    }
+    Write-Status @{
+        daemon_ok = $true
+        watcher_ok = $true
+        daemon_pid = $daemonPidOut
+        watcher_pid = $watcherPidOut
+        force_restart = [bool]$ForceRestart
+        delivery_skipped_jeff_gate = $true
+        note = "delivery_not_started_allowdelivery_off"
+    }
+    Log "Image Rider sole launcher remains Start-Image-Rider.ps1 (not managed here)"
+    exit 0
+}
+
+# --- Delivery daemon (singleton; only when -AllowDelivery) ---
 if ($imagePaused) {
     $stopped = Stop-Matching 'comfy_delivery_daemon\.py' 'delivery daemon (paused)'
     if ($stopped -gt 0) { Log "image pipeline paused - stopped delivery daemon" }
@@ -127,8 +248,8 @@ if ($imagePaused) {
         Remove-Item $lock -Force -ErrorAction SilentlyContinue
         Log "cleared delivery daemon lock (paused)"
     }
-    Log "AMBER: image pipeline paused — delivery stay-up skipped (daemon intentionally down)"
-    $daemonOk = $true  # intentional off
+    Log "AMBER: image pipeline paused - delivery stay-up skipped (daemon intentionally down)"
+    $daemonOk = $true
 } else {
     $daemonPid = 0
     if (Test-Path $lock) {
@@ -154,7 +275,6 @@ if ($imagePaused) {
     if (Test-Path $lock) {
         [void][int]::TryParse((Get-Content $lock -Raw).Trim(), [ref]$daemonPidOut)
     }
-    # Final health gate
     if (-not (Test-DaemonHealthy)) {
         $daemonOk = $false
         Log "ERROR delivery daemon not healthy after ensure"
@@ -187,7 +307,6 @@ if ($imagePaused) {
     }
 
     if ($goodWatch.Count -gt 1) {
-        # keep oldest, kill extras
         $keep = $goodWatch | Sort-Object ProcessId | Select-Object -First 1
         foreach ($p in $goodWatch) {
             if ($p.ProcessId -ne $keep.ProcessId) {
@@ -220,8 +339,9 @@ if ($imagePaused) {
     }
 }
 
-# Rider disabled: agent gateway + comfy_delivery_daemon are the only posters (no triple delivery).
-[void](Stop-Matching 'roleplay-image-rider' 'legacy image rider')
+# Image Rider is additive (Jeff unpaused 2026-07-20). Sole launcher = Start-Image-Rider.ps1.
+# Do NOT stop roleplay-image-rider here (legacy kill broke sole-path durability).
+Log "Image Rider not managed here - sole launcher Start-Image-Rider.ps1"
 
 Write-Status @{
     daemon_ok = $daemonOk
@@ -229,6 +349,8 @@ Write-Status @{
     daemon_pid = $daemonPidOut
     watcher_pid = $watcherPidOut
     force_restart = [bool]$ForceRestart
+    delivery_skipped_jeff_gate = $false
+    note = "allowdelivery_path"
 }
 
 if (-not $imagePaused -and (-not $daemonOk -or -not $watcherOk)) {

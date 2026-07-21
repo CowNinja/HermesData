@@ -212,12 +212,21 @@ def cmd_inventory(args: argparse.Namespace) -> int:
     if not root.exists():
         print(json.dumps({"error": f"missing {root}"}))
         return 1
+    # skip already-indexed paths so --limit advances into unseen territory
+    already = {str(r[0]) for r in con.execute("SELECT path FROM files").fetchall()}
     n = 0
+    skipped_known = 0
     ai_n = 0
+    scanned = 0
     for p in root.rglob("*"):
         if not p.is_file():
             continue
         if p.name.startswith("."):
+            continue
+        scanned += 1
+        sp = str(p)
+        if sp in already:
+            skipped_known += 1
             continue
         rel = score_path(p, use_ai=bool(args.ai and ai_n < args.ai_limit))
         if args.ai and rel.get("ai") is not None:
@@ -238,12 +247,19 @@ def cmd_inventory(args: argparse.Namespace) -> int:
             relevance_score=int(rel.get("score") or 0),
             silo_action=str(rel.get("silo_action") or ""),
         )
+        already.add(sp)
         n += 1
         if n >= args.limit:
             break
     con.commit()
     write_receipt(con)
-    print(json.dumps({"inventoried_wave": n, "ai_calls": ai_n, "db": str(DB)}, indent=2))
+    print(json.dumps({
+        "inventoried_wave": n,
+        "skipped_known": skipped_known,
+        "scanned": scanned,
+        "ai_calls": ai_n,
+        "db": str(DB),
+    }, indent=2))
     return 0
 
 

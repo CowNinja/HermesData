@@ -149,6 +149,17 @@ ALLOWLIST: Dict[str, Dict[str, Any]] = {
         "risk_max": "low",
         "desc": "List judgment backlog",
     },
+    "driver_judgment_pulse": {
+        "patterns": [
+            r"\bdriver[_\s-]?judgment[_\s-]?pulse\b",
+            r"\bdriver[_\s-]?pulse\b",
+            r"\bjudgment[_\s-]?pulse\b",
+        ],
+        "script": "driver_judgment_pulse.py",
+        "argv": [],
+        "risk_max": "low",
+        "desc": "Driver/Judgment composite pulse (read-only)",
+    },
 }
 
 

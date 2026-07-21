@@ -108,6 +108,31 @@ CASES: list[dict] = [
         "expect_any": ["business by the books", "business", "bookselling", "ministry"],
         "prefer_lanes": ["workshop_catalog", "booksbloom_gold"],
     },
+    # Extended 2026-07-21 cook — still corpus-only expectations
+    {
+        "id": "yee_haw_boys",
+        "q": "What is the Yee Haw Books for Boys workshop about?",
+        "expect_any": ["yee haw", "boys", "adventure", "heroic"],
+        "prefer_lanes": ["workshop_catalog", "booksbloom_gold"],
+    },
+    {
+        "id": "wswtr_edition_2001",
+        "q": "What does the gold WSWTR text say about the 2001 revised edition?",
+        "expect_any": ["2001", "revised", "152", "expanded"],
+        "prefer_lanes": ["author_list", "booksbloom_gold", "jan_shelf"],
+    },
+    {
+        "id": "author_list_partial",
+        "q": "Which authors appear on the gold WSWTR author list extract?",
+        "expect_any": ["author", "alcott", "alger", "partial", "edition"],
+        "prefer_lanes": ["author_list", "booksbloom_gold"],
+    },
+    {
+        "id": "convention_niche_2019",
+        "q": "Where was the 2019 NICHE Homeschool Iowa BooksBloom speaking engagement?",
+        "expect_any": ["des moines", "niche", "iowa", "valley", "2019"],
+        "prefer_lanes": ["convention_master", "booksbloom_gold"],
+    },
 ]
 
 

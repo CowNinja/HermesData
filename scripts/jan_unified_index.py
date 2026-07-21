@@ -197,62 +197,80 @@ def vault_pack_rows() -> list[dict]:
     talk_to_jan already injects these into the system prompt; indexing them
     also lets retrieve() surface Hi-Ho Silver / workshop titles / public
     schedule facts when the query is about living/road life.
+
+    author_list packs are multi-chunked on purpose so the gold author→edition
+    table is fully retrievable (not truncated to a single stub chunk).
     """
+    # path, lane, title, max_read, force_chunk
     packs = [
         (
             Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Public-Context-2026-07-14.md"),
             "public",
             "public BooksBloom context",
             4500,
+            False,
         ),
         (
             Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Family-Living-Facts-2026-07-14.md"),
             "family_living",
             "family living facts (labeled)",
             3500,
+            False,
         ),
         (
             Path(r"D:\PhronesisVault\Operations\Jan-Bloom-Workshop-Catalog-2026-07-18.md"),
             "workshop_catalog",
             "workshop catalog (business docs)",
             4000,
+            False,
         ),
         (
             Path(r"D:\PhronesisVault\Operations\BooksBloom-Convention-Master-Table-2026-07-19.md"),
             "convention_master",
             "convention master table",
             5000,
+            False,
         ),
         (
             Path(r"D:\PhronesisVault\Operations\WSWTR-Author-List-Extract-2026-07-19.md"),
             "author_list",
             "WSWTR author list extract (gold only, partial)",
-            12000,
+            200_000,
+            True,
+        ),
+        (
+            Path(r"D:\PhronesisVault\Operations\WSWTR-Author-Edition-Table-2026-07-21.md"),
+            "author_list",
+            "WSWTR author→edition table (gold only, partial)",
+            400_000,
+            True,
         ),
     ]
     rows: list[dict] = []
-    for path, lane, title, cap in packs:
+    lane_i: dict[str, int] = {}
+    for path, lane, title, max_read, force_chunk in packs:
         if not path.exists():
             continue
         t = path.read_text(encoding="utf-8", errors="ignore").strip()
         if len(t) < 80:
             continue
-        body = t[:cap]
-        # Keep vault CNS packs whole whenever possible so tables (schedules,
-        # family facts, workshop lists) don't fragment across retrieve hits.
-        # Only chunk packs larger than the read cap window.
-        if len(body) <= cap:
-            pieces = [body]
+        body = t[:max_read]
+        # Keep small vault CNS packs whole (schedules / family facts).
+        # Large author tables must multi-chunk so retrieve can hit deep letters.
+        if force_chunk or len(body) > 6000:
+            pieces = chunk_text(body, size=1400, overlap=200) or [body]
         else:
-            pieces = chunk_text(body, size=1200, overlap=200) or [body]
-        for i, ch in enumerate(pieces):
+            pieces = [body]
+        for ch in pieces:
+            idx = lane_i.get(lane, 0)
+            lane_i[lane] = idx + 1
             rows.append(
                 {
-                    "id": f"{lane}_{i}",
+                    "id": f"{lane}_{idx}",
                     "file": str(path),
                     "source": str(path),
                     "title": title,
-                    "i": i,
+                    "i": idx,
                     "text": ch,
                     "lane": lane,
                 }

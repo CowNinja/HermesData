@@ -273,7 +273,7 @@ PLAYBOOK: dict[str, dict] = {
         "recommend": "A",
     },
     "proxy_model": {
-        "patterns": [r"8091", r"8090", r"sovereign", r"proxy", r"qwythos", r"model.?mgmt"],
+        "patterns": [r"8091", r"sovereign.?proxy", r"proxy.?health", r"model.?mgmt"],
         "title": "Sovereign proxy / local models",
         "plays": [
             {
@@ -299,6 +299,85 @@ PLAYBOOK: dict[str, dict] = {
             },
         ],
         "do_not": ["fleet ON without arm", "dual proxy"],
+        "recommend": "A",
+    },
+    "llama_8090_down": {
+        "patterns": [
+            r"8090",
+            r"llama.?down",
+            r"qwythos.?down",
+            r"silent.?green.?yellow",
+            r"requires_llama_8090",
+        ],
+        "title": "Qwythos llama-server :8090 down",
+        "plays": [
+            {
+                "id": "A",
+                "label": "Measure supervisor + silent-green",
+                "risk": "low",
+                "cmd": r"python D:\HermesData\scripts\stack_supervisor.py status --json && python D:\HermesData\scripts\silent_green_pulse.py --json",
+                "why": "Confirm :8090 down + dual_tenant color before any start",
+            },
+            {
+                "id": "B",
+                "label": "Release image tenant then start Qwythos hidden",
+                "risk": "medium",
+                "cmd": r"python D:\HermesData\scripts\image_stack_single_tenant.py --active release && wscript //B D:\HermesData\scripts\start_qwythos_8090_hidden.vbs",
+                "why": "12GB law: release Forge/Comfy weights before ngl=99 Qwythos",
+            },
+            {
+                "id": "C",
+                "label": "Router start (models-preset) if Jeff wants multi-model",
+                "risk": "medium",
+                "cmd": r"powershell -File D:\HermesData\scripts\Start-8090-Router.ps1",
+                "why": "Alternate path via models-8090.ini; still needs free VRAM",
+            },
+        ],
+        "do_not": [
+            "start 8090 while Forge holds ~12GB without release",
+            "taskkill gateway to free VRAM",
+            "dual llama-server on 8090",
+        ],
+        "recommend": "A",
+    },
+    "dual_tenant": {
+        "patterns": [
+            r"dual.?tenant",
+            r"forge.?and.?comfy",
+            r"vram.?risk",
+            r"co.?resident",
+            r"single.?tenant",
+            r"gpu.?tenant",
+        ],
+        "title": "Dual-tenant VRAM / single GPU guard",
+        "plays": [
+            {
+                "id": "A",
+                "label": "Supervisor dual_tenant_risk board",
+                "risk": "low",
+                "cmd": r"python D:\HermesData\scripts\stack_supervisor.py status --json",
+                "why": "Emit dual_tenant_risk color + active tenant; no kill",
+            },
+            {
+                "id": "B",
+                "label": "Enforce Forge primary (free Comfy weights)",
+                "risk": "low",
+                "cmd": r"python D:\HermesData\scripts\image_stack_single_tenant.py --active forge --json",
+                "why": "Daily default: Forge owns GPU; Comfy free_vram not stop unless asked",
+            },
+            {
+                "id": "C",
+                "label": "Hard stop idle Comfy (only if RED co-resident)",
+                "risk": "medium",
+                "cmd": r"python D:\HermesData\scripts\image_stack_single_tenant.py --active forge --stop-idle-comfy --json",
+                "why": "Fail-closed when both LISTEN; Jeff-gated if a Comfy batch is live",
+            },
+        ],
+        "do_not": [
+            "silent Forge+Comfy co-resident drift",
+            "start Comfy without explicit batch",
+            "gateway kill for VRAM",
+        ],
         "recommend": "A",
     },
     "generic": {

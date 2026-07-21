@@ -63,6 +63,16 @@ def load_public() -> str:
             "WSWTR AUTHOR LIST EXTRACT (gold only, PARTIAL — not full 157; never invent missing names):\n"
             + authors.read_text(encoding="utf-8", errors="ignore")[:5000]
         )
+    edition = Path(
+        r"D:\PhronesisVault\Operations\WSWTR-Author-Edition-Table-2026-07-21.md"
+    )
+    if edition.exists():
+        # Prefer policy + edition facts + counts; full A–Z lives in author_list lane chunks
+        ed_txt = edition.read_text(encoding="utf-8", errors="ignore")
+        bits.append(
+            "WSWTR AUTHOR→EDITION TABLE (gold only, PARTIAL — edition labels from source files; never pad to 157):\n"
+            + ed_txt[:6500]
+        )
     return "\n\n".join(bits)
 
 
@@ -87,6 +97,7 @@ def groundedness(answer: str, hits: list[dict]) -> dict:
         WORKSHOPS,
         Path(r"D:\PhronesisVault\Operations\BooksBloom-Convention-Master-Table-2026-07-19.md"),
         Path(r"D:\PhronesisVault\Operations\WSWTR-Author-List-Extract-2026-07-19.md"),
+        Path(r"D:\PhronesisVault\Operations\WSWTR-Author-Edition-Table-2026-07-21.md"),
     ]
     for p in pack_paths:
         if p.exists():
