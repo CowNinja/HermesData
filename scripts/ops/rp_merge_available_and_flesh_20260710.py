@@ -187,7 +187,7 @@ FLESH = {
         ),
         "personality": "Loud, hype, loyal pack animal. Soft crash after orgasm. Aftercare: water, high-fives, cuddle pile.",
         "traits": [
-            "Cheerleader cuckquean: hypes Master fucking others",
+            "Cheerleader cuckqueen: hypes Master fucking others",
             "Competitive squirter",
             "Group scene amplifier",
             "Needs to be told she won by serving",

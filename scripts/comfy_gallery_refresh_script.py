@@ -23,14 +23,17 @@ from typing import Any, Dict, List
 ROOTS = [
     Path(r"D:\ComfyUI\output"),
     Path(r"D:\ComfyUI\gallery"),
+    Path(r"D:\HermesData\benchmarks\outputs\forge"),  # primary engine outs (Jeff 2026-07-21)
 ]
 OUT_JSON = Path(r"D:\ComfyUI\gallery\manifest-latest.json")
 JSONL = Path(r"D:\PhronesisVault\Operations\logs\comfy-gallery-refresh.jsonl")
 PURGE = Path(r"D:\HermesData\scripts\comfy_purge_duplicate_images.py")
+INGEST = Path(r"D:\HermesData\scripts\gallery_ingest.py")
 EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 MAX_ITEMS = 200
 # Reconcile is light; cap so daily cron cannot hang the gateway tick
 RECONCILE_TIMEOUT_SEC = 180
+INGEST_TIMEOUT_SEC = 900
 
 
 def collect() -> List[Dict[str, Any]]:
@@ -90,13 +93,60 @@ def run_reconcile() -> dict:
         return {"ok": False, "skip": False, "exit": 1, "detail": f"{type(e).__name__}: {e}"}
 
 
+def run_ingest_catchup() -> dict:
+    """Idempotent Forge/Comfy/Fooocus → album catch-up (hash anti-dupe). Soft-fail."""
+    if not INGEST.is_file():
+        return {"ok": False, "skip": True, "detail": f"missing {INGEST}"}
+    # Prefer Comfy venv (Pillow) when present for PNG parameters parse
+    py = sys.executable
+    comfy_py = Path(r"D:\ComfyUI\venv\Scripts\python.exe")
+    if comfy_py.is_file():
+        py = str(comfy_py)
+    cmd = [
+        py,
+        str(INGEST),
+        "backfill",
+        "--roots",
+        "forge,comfy,fooocus",
+        "--no-rebuild-index",
+    ]
+    try:
+        r = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=INGEST_TIMEOUT_SEC,
+            cwd=str(Path(r"D:\HermesData")),
+        )
+        out = ((r.stdout or "") + "\n" + (r.stderr or "")).strip()
+        return {
+            "ok": r.returncode == 0,
+            "skip": False,
+            "exit": r.returncode,
+            "tail": out[-1000:],
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "skip": False, "exit": 124, "detail": "TIMEOUT"}
+    except Exception as e:
+        return {"ok": False, "skip": False, "exit": 1, "detail": f"{type(e).__name__}: {e}"}
+
+
 def main() -> int:
+    # Catch-up first so phone album sees new Forge gens before manifest cut
+    ingest = run_ingest_catchup()
     items = collect()
     recon = run_reconcile()
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "count": len(items),
         "items": [{k: v for k, v in it.items() if k != "mtime_epoch"} for it in items],
+        "ingest": {
+            "ok": ingest.get("ok"),
+            "skip": ingest.get("skip"),
+            "exit": ingest.get("exit"),
+        },
         "reconcile": {
             "ok": recon.get("ok"),
             "skip": recon.get("skip"),
@@ -113,6 +163,8 @@ def main() -> int:
                     "ts": payload["generated_at"],
                     "count": payload["count"],
                     "out": str(OUT_JSON),
+                    "ingest_ok": ingest.get("ok"),
+                    "ingest_exit": ingest.get("exit"),
                     "reconcile_ok": recon.get("ok"),
                     "reconcile_exit": recon.get("exit"),
                 }
@@ -120,9 +172,13 @@ def main() -> int:
             + "\n"
         )
     # Non-empty stdout so cron can deliver a one-liner if desired
+    istat = "ok" if ingest.get("ok") or ingest.get("skip") else f"fail exit={ingest.get('exit')}"
     rstat = "ok" if recon.get("ok") else f"fail exit={recon.get('exit')} {recon.get('detail') or ''}".strip()
-    print(f"gallery refresh: {payload['count']} images -> {OUT_JSON} | reconcile={rstat}")
-    # Manifest write is the primary job; reconcile failure is soft (exit 0) so travel cron stays green
+    print(
+        f"gallery refresh: {payload['count']} images -> {OUT_JSON} "
+        f"| ingest={istat} | reconcile={rstat}"
+    )
+    # Manifest write is the primary job; ingest/reconcile failure is soft (exit 0)
     return 0
 
 

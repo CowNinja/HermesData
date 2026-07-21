@@ -82,12 +82,18 @@ def add_sidecar_text_evidence(
     if limit <= 0:
         return {"scanned": 0, "inserted": 0, "skipped": "limit_0"}
     SILO = Path(r"K:/Phronesis-Sovereign/Personal-Digital-Silo")
+    # cook6: grow evidence beyond first five shelves (mix was frozen at 621)
     roots = roots or [
         SILO / "Medical-Records",
         SILO / "Navy-Service",
         SILO / "Core-Personal" / "Family",
         SILO / "Core-Personal" / "Career",
         SILO / "Core-Personal" / "Projects" / "from-g-drive" / "Booksbloom",
+        SILO / "Core-Personal" / "Health",
+        SILO / "Core-Personal" / "Finance",
+        SILO / "Core-Personal" / "Life-Archive",
+        SILO / "Digital-Footprint",
+        SILO / "Life-Archive",
     ]
     # multiword names only (already cleaned in person_rows)
     name_index: list[tuple[str, str, int]] = []  # (name_lower, canonical, pid)
