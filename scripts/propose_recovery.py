@@ -44,7 +44,7 @@ PLAYBOOK: dict[str, dict] = {
                 "id": "A",
                 "label": "Measure silent-green",
                 "risk": "low",
-                "cmd": r"python D:\HermesData\scripts\silent_green_pulse.py --json",
+                "cmd": r"python D:\HermesData\scripts\silent_green_pulse.py",
                 "why": "Confirm single listener + 8091 before any restart",
             },
             {
@@ -142,7 +142,7 @@ PLAYBOOK: dict[str, dict] = {
                 "id": "C",
                 "label": "Watch / wait",
                 "risk": "low",
-                "cmd": r"python D:\HermesData\scripts\silent_green_pulse.py --with-silo",
+                "cmd": r"python D:\HermesData\scripts\silent_green_pulse.py",
                 "why": "If writers 1/1/1/1 and HB fresh, do not thrash",
             },
         ],
@@ -280,7 +280,7 @@ PLAYBOOK: dict[str, dict] = {
                 "id": "A",
                 "label": "Silent green + 8091",
                 "risk": "low",
-                "cmd": r"python D:\HermesData\scripts\silent_green_pulse.py --json",
+                "cmd": r"python D:\HermesData\scripts\silent_green_pulse.py",
                 "why": "Measure before restart",
             },
             {
@@ -315,7 +315,7 @@ PLAYBOOK: dict[str, dict] = {
                 "id": "A",
                 "label": "Measure supervisor + silent-green",
                 "risk": "low",
-                "cmd": r"python D:\HermesData\scripts\stack_supervisor.py status --json && python D:\HermesData\scripts\silent_green_pulse.py --json",
+                "cmd": r"python D:\HermesData\scripts\stack_supervisor.py status --json && python D:\HermesData\scripts\silent_green_pulse.py",
                 "why": "Confirm :8090 down + dual_tenant color before any start",
             },
             {

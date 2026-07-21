@@ -1,6 +1,9 @@
-# Locked schtask launches: powershell.exe -File this script (cannot rebind TR).
-# Exit in milliseconds after starting real work via pythonw + CREATE_NO_WINDOW.
+# Locked schtask may launch bare powershell.exe (cannot rebind without Admin).
+# Focus mode: exit immediately (no child). Else hand off to pythonw CREATE_NO_WINDOW.
 $ErrorActionPreference = "SilentlyContinue"
+if (Test-Path "D:\HermesData\state\silo_continuous.STOP") { exit 0 }
+if (Test-Path "D:\HermesData\state\silo_autonomous.STOP") { exit 0 }
+if (Test-Path "D:\HermesData\state\focus_mode.STOP") { exit 0 }
 if ($env:HERMES_HIDDEN_CHILD -eq "1") {
     & (Join-Path $PSScriptRoot "Phronesis-Guardian-Body.ps1")
     exit $LASTEXITCODE

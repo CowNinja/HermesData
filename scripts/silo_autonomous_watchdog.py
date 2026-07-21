@@ -126,20 +126,20 @@ def main() -> int:
                 actions.append(
                     f"land_heal dual_bad={dual} hb_age={hb_age} cont_alive={cont_alive}"
                 )
+                # Prefer pythonw + run_hidden (CREATE_NO_WINDOW). Do NOT force
+                # bare python.exe — schtask/parent already focus-safe via pythonw.
                 r = run_hidden(
-                    [PY.replace("pythonw.exe", "python.exe") if "pythonw" in PY.lower() else PY,
-                     str(SCRIPTS / "silo_recovery_single_writer.py")],
+                    [PY, str(SCRIPTS / "silo_recovery_single_writer.py")],
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
                     errors="replace",
                     timeout=180,
                 )
-                # prefer console python for recovery
                 if r.returncode != 0:
                     r = run_hidden(
                         [
-                            str(Path(r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\python.exe")),
+                            str(Path(r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\pythonw.exe")),
                             str(SCRIPTS / "silo_recovery_single_writer.py"),
                         ],
                         capture_output=True,
@@ -206,7 +206,7 @@ def main() -> int:
     try:
         r = run_hidden(
             [
-                str(Path(r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\python.exe")),
+                PY,
                 str(SCRIPTS / "silo_cursor_auto_advance.py"),
                 "--apply",
                 "--json",

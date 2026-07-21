@@ -1,5 +1,9 @@
-# Phronesis-Guardian-Body.ps1 — real 5-min heal work (must run under HERMES_HIDDEN_CHILD).
+# Phronesis-Guardian-Body.ps1 - real 5-min heal work (must run under HERMES_HIDDEN_CHILD).
 $ErrorActionPreference = "SilentlyContinue"
+# Focus mode: no heal work while Jeff types / RDP
+if (Test-Path "D:\HermesData\state\silo_continuous.STOP") { exit 0 }
+if (Test-Path "D:\HermesData\state\silo_autonomous.STOP") { exit 0 }
+if (Test-Path "D:\HermesData\state\focus_mode.STOP") { exit 0 }
 $root = if ($PSScriptRoot) { $PSScriptRoot } else { "D:\HermesData\scripts" }
 $hermesRoot = "D:\HermesData"
 $lockPath = Join-Path $hermesRoot "state\phronesis-guardian.lock"

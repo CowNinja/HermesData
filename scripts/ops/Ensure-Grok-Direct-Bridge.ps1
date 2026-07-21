@@ -5,6 +5,11 @@ param(
     [string]$Model = ""
 )
 
+# Focus mode: no work, no child spawn (RDP typing / remote)
+if (Test-Path "D:\HermesData\state\silo_continuous.STOP") { exit 0 }
+if (Test-Path "D:\HermesData\state\silo_autonomous.STOP") { exit 0 }
+if (Test-Path "D:\HermesData\state\focus_mode.STOP") { exit 0 }
+
 # If Task Scheduler started bare powershell (focus steal), bounce into pythonw CREATE_NO_WINDOW.
 if ($env:HERMES_HIDDEN_CHILD -ne "1" -and $MyInvocation.InvocationName -ne '.' -and $MyInvocation.Line -notmatch '^\s*\.') {
     # Only trampoline when this file is the entry script, not when dot-sourced from Guardian-Body

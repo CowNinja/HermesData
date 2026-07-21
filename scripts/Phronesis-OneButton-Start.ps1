@@ -13,10 +13,17 @@ param(
     [switch]$SkipGateway = $false,
     [switch]$SkipDashboard = $false,
     [switch]$SkipWorkspace = $false,
-    [switch]$SkipSmoke = $false
+    [switch]$SkipSmoke = $false,
+    [switch]$Force = $false
 )
 
 $ErrorActionPreference = "Continue"
+# Focus mode: refuse auto start-at-logon stack while STOP files present (unless -Force)
+if (-not $Force) {
+    if (Test-Path "D:\HermesData\state\silo_continuous.STOP") { exit 0 }
+    if (Test-Path "D:\HermesData\state\silo_autonomous.STOP") { exit 0 }
+    if (Test-Path "D:\HermesData\state\focus_mode.STOP") { exit 0 }
+}
 $corePath = Join-Path $PSScriptRoot "phronesis-core.json"
 if (-not (Test-Path $corePath)) { Write-Host "FATAL: phronesis-core.json missing" -ForegroundColor Red; exit 1 }
 $core = Get-Content $corePath -Raw | ConvertFrom-Json

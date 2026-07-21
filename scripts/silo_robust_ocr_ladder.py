@@ -61,34 +61,57 @@ def quality(text: str, size: int) -> dict[str, Any]:
     t = (text or "").strip()
     alnum = sum(c.isalnum() for c in t)
     ratio = alnum / max(len(t), 1)
-    # garbage patterns: replacement chars, mostly symbols
-    bad = t.count("\ufffd") + t.count("�")
-    if len(t) < 40 and size > 50_000:
+    bad = t.count("\ufffd") + t.count("\uFFFD")
+    n = len(t)
+    # digital/short stubs
+    if n < 40 and size > 50_000:
         status, reason = "needs_ocr", "little_text_large_file"
-    elif len(t) < 40:
+    elif n < 40:
         status, reason = ("needs_ocr", "almost_no_text") if size > 3_000 else ("empty", "tiny_or_stub")
-    elif len(t) >= 800 and bad < 50:
-        # plenty of extractable text even if OCR noisy
-        status, reason = "ok_text", "long_extract"
-    elif ratio < 0.40 or bad > 20:
+    elif n >= 80 and bad < 50 and ratio >= 0.30:
+        # OCR diagrams / short clinical notes still train-useful
+        status, reason = "ok_text", "extractable"
+    elif ratio < 0.30 or bad > 40:
         status, reason = "needs_ocr", "garbled_or_low_alnum"
-    elif len(t) < 180 and size > 80_000:
+    elif n < 180 and size > 400_000:
         status, reason = "needs_ocr", "sparse_text_large_file"
     else:
         status, reason = "ok_text", "extractable"
+    twin = n >= 40 and ratio >= 0.28 and bad < 80
+    if status == "ok_text":
+        twin = n >= 40
     return {
         "status": status,
         "reason": reason,
-        "chars": len(t),
+        "chars": n,
         "alnum_ratio": round(ratio, 3),
-        "twin_useful": status == "ok_text" and len(t) >= 120,
+        "twin_useful": twin,
     }
 
 
-def extract_pypdf(path: Path) -> tuple[str, list[str]]:
+
+def pdftotext_bin() -> str | None:
+    tp = tools().get("pdftotext")
+    if tp and Path(tp).is_file():
+        return tp
+    # sibling of pdftoppm
+    ppm = pdftoppm_bin()
+    if ppm:
+        sib = Path(ppm).with_name("pdftotext.exe")
+        if sib.is_file():
+            return str(sib)
+        sib2 = Path(ppm).with_name("pdftotext")
+        if sib2.is_file():
+            return str(sib2)
+    return shutil.which("pdftotext")
+
+
+def extract_digital_pdf(path: Path) -> tuple[str, list[str]]:
+    """Digital text layer: pypdf if present, else poppler pdftotext (no Python dep)."""
     notes: list[str] = []
+    # 1) pypdf optional
     try:
-        from pypdf import PdfReader
+        from pypdf import PdfReader  # type: ignore
 
         reader = PdfReader(str(path), strict=False)
         parts = []
@@ -97,10 +120,34 @@ def extract_pypdf(path: Path) -> tuple[str, list[str]]:
                 parts.append(page.extract_text() or "")
             except Exception as e:
                 notes.append(f"page_{i}:{e}")
-        return "\n".join(parts), notes
+        text = "\n".join(parts)
+        if text.strip():
+            notes.append("engine:pypdf")
+            return text, notes
+        notes.append("pypdf_empty")
     except Exception as e:
-        notes.append(f"pypdf:{e}")
-        return "", notes
+        notes.append(f"pypdf:{type(e).__name__}")
+
+    # 2) poppler pdftotext (reliable Windows path; no pip)
+    bin_ = pdftotext_bin()
+    if bin_:
+        try:
+            r = subprocess.run(
+                [bin_, "-layout", "-enc", "UTF-8", str(path), "-"],
+                capture_output=True,
+                timeout=120,
+            )
+            # pdftotext writes UTF-8 to stdout when dest is -
+            text = (r.stdout or b"").decode("utf-8", errors="replace")
+            if text.strip():
+                notes.append("engine:pdftotext")
+                return text, notes
+            notes.append("pdftotext_empty")
+        except Exception as e:
+            notes.append(f"pdftotext:{type(e).__name__}:{e}")
+    else:
+        notes.append("pdftotext_missing")
+    return "", notes
 
 
 def preprocess_image(img: Path) -> Path:
@@ -152,19 +199,31 @@ def ocr_image(img: Path, tess: str) -> str:
                 pass
 
 
-def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 8) -> list[Path]:
+def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 8) -> tuple[list[Path], list[str]]:
+    """Render PDF pages to PNG. Returns (pages, notes). Notes carry password/errors."""
     out_dir.mkdir(parents=True, exist_ok=True)
+    notes: list[str] = []
     ppm = pdftoppm_bin()
     if ppm:
         prefix = out_dir / "page"
-        subprocess.run(
-            [ppm, "-png", "-r", "300", "-l", str(max_pages), str(pdf), str(prefix)],
-            capture_output=True,
-            timeout=240,
-        )
+        try:
+            cp = subprocess.run(
+                [ppm, "-png", "-r", "300", "-l", str(max_pages), str(pdf), str(prefix)],
+                capture_output=True,
+                timeout=240,
+                text=True,
+                errors="replace",
+            )
+            err = ((cp.stderr or "") + "\n" + (cp.stdout or "")).strip()
+            if err:
+                notes.append("pdftoppm:" + err[:300].replace("\n", " | "))
+            if cp.returncode != 0 and not err:
+                notes.append(f"pdftoppm_rc={cp.returncode}")
+        except Exception as e:
+            notes.append(f"pdftoppm_exc:{type(e).__name__}:{e}"[:200])
         pages = sorted(out_dir.glob("page*.png"))
         if pages:
-            return pages
+            return pages, notes
     # fallback: pypdfium2
     try:
         import pypdfium2 as pdfium  # type: ignore
@@ -178,9 +237,11 @@ def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 8) -> list[Path]:
             dest = out_dir / f"page-{i+1:02d}.png"
             pil.save(dest)
             out.append(dest)
-        return out
-    except Exception:
-        pass
+        if out:
+            notes.append("engine:pypdfium2")
+        return out, notes
+    except Exception as e:
+        notes.append(f"pypdfium2_exc:{type(e).__name__}:{e}"[:160])
     # last resort: pymupdf render
     try:
         import pymupdf  # type: ignore
@@ -195,9 +256,12 @@ def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 8) -> list[Path]:
             pix.save(str(dest))
             out.append(dest)
         doc.close()
-        return out
-    except Exception:
-        return []
+        if out:
+            notes.append("engine:pymupdf")
+        return out, notes
+    except Exception as e:
+        notes.append(f"pymupdf_exc:{type(e).__name__}:{e}"[:160])
+        return [], notes
 
 
 def ocr_pdf(pdf: Path, tess: str, max_pages: int = 8, short_temp_copy: bool = True) -> tuple[str, list[str]]:
@@ -213,7 +277,8 @@ def ocr_pdf(pdf: Path, tess: str, max_pages: int = 8, short_temp_copy: bool = Tr
     notes: list[str] = []
     work = Path(tempfile.mkdtemp(prefix="silo_ocr_"))
     try:
-        pages = pdf_to_pngs(pdf, work, max_pages=max_pages)
+        pages, n2 = pdf_to_pngs(pdf, work, max_pages=max_pages)
+        notes.extend(n2)
         if not pages:
             notes.append("no_page_render")
             return "", notes
@@ -244,15 +309,18 @@ def write_sidecars(path: Path, text: str, rec: dict, write_train: bool) -> None:
     if write_train and rec.get("quality", {}).get("twin_useful"):
         train = Path(str(path) + ".train.md")
         # don't clobber large existing train
-        if not train.is_file() or train.stat().st_size < 100:
-            train.write_text(
-                f"# Train extract — {path.name}\n\n"
-                f"source: robust_ocr_ladder\n\n"
-                f"{(text or '')[:8000]}\n",
-                encoding="utf-8",
-            )
+        tbody = (
+            f"# Train extract — {path.name}\n\n"
+            f"source: robust_ocr_ladder\n"
+            f"engine: {rec.get('engine')}\n"
+            f"status: {rec.get('quality', {}).get('status')}\n\n"
+            f"{(text or '')[:12000]}\n"
+        )
+        if (not train.is_file()) or train.stat().st_size < max(80, int(len(tbody) * 0.5)):
+            train.write_text(tbody, encoding="utf-8")
     flag = Path(str(path) + ".needs_ocr")
-    if rec.get("quality", {}).get("status") == "needs_ocr":
+    st = rec.get("quality", {}).get("status")
+    if st in ("needs_ocr", "encrypted"):
         flag.write_text(json.dumps(rec, indent=2), encoding="utf-8")
     elif flag.is_file():
         try:
@@ -270,9 +338,12 @@ def process_one(path: Path, tess: str | None, write_train: bool, max_pages: int)
     engine = "none"
 
     if ext in PDF_EXT:
-        text, n1 = extract_pypdf(path)
+        text, n1 = extract_digital_pdf(path)
         notes.extend(n1)
-        engine = "pypdf"
+        engine = "digital_pdf"
+        for n in n1:
+            if n.startswith("engine:"):
+                engine = n.split(":", 1)[1]
         q = quality(text, size)
         if q["status"] == "needs_ocr" and tess:
             otext, n2 = ocr_pdf(path, tess, max_pages=max_pages)
@@ -281,6 +352,19 @@ def process_one(path: Path, tess: str | None, write_train: bool, max_pages: int)
                 text = otext
                 engine = "tesseract+pdftoppm"
                 q = quality(text, size)
+            # encrypted / password PDFs: fail closed, do not loop forever as needs_ocr
+            joined = " ".join(str(x) for x in notes).lower()
+            if (not text.strip()) and any(
+                x in joined for x in ("incorrect password", "password", "encrypted")
+            ):
+                q = {
+                    "status": "encrypted",
+                    "reason": "password_protected",
+                    "chars": 0,
+                    "alnum_ratio": 0.0,
+                    "twin_useful": False,
+                }
+                engine = "encrypted_pdf"
         rec = {
             "path": str(path),
             "size": size,
@@ -321,8 +405,73 @@ def process_one(path: Path, tess: str | None, write_train: bool, max_pages: int)
     return {"path": str(path), "status": "skip_ext", "ext": ext}
 
 
+def _ocr_score(path: Path) -> int:
+    """Higher = cook first. Prefer flagged PDFs + clinical names; skip portraits."""
+    s = str(path).lower().replace("\\", "/")
+    name = path.name.lower()
+    ext = path.suffix.lower()
+    # hard skips: portraits / chrome
+    if re.search(r"(logo|icon|wallpaper|screenshot|portrait|headshot|badge)", name):
+        return -1
+    if ext in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
+        # only keep images that look like scanned docs
+        if not re.search(r"(lab|scan|record|note|order|dd214|les|eval|phr|page)", name):
+            return -1
+    score = 0
+    if Path(str(path) + ".needs_ocr").is_file():
+        score += 500
+    if ext == ".pdf":
+        score += 200
+    for k, w in (
+        ("medical-records", 80),
+        ("navy-service", 70),
+        ("nmcp", 60),
+        ("vamc", 60),
+        ("pha", 50),
+        ("labwork", 90),
+        ("lab", 40),
+        ("cnp", 70),
+        ("quest", 50),
+        ("dd214", 80),
+        ("orders", 50),
+        ("eval", 40),
+        ("les", 40),
+        ("bluebutton", 60),
+        ("tricare", 40),
+        ("chiro", 40),
+    ):
+        if k in s or k in name:
+            score += w
+    # deprioritize empty secure-messaging stubs / tiny images later via size
+    try:
+        sz = path.stat().st_size
+        if ext == ".pdf" and sz < 1500:
+            score -= 100
+        if sz > 50_000:
+            score += 20
+        if sz > 200_000:
+            score += 20
+    except Exception:
+        pass
+    # already attempted extract with low chars — still allow if needs_ocr flag
+    ej = Path(str(path) + ".extract.json")
+    if ej.is_file():
+        try:
+            d = json.loads(ej.read_text(encoding="utf-8"))
+            q = d.get("quality") or {}
+            if q.get("twin_useful"):
+                return -1
+            if q.get("status") == "encrypted":
+                return -1
+            if q.get("status") == "empty" and not Path(str(path) + ".needs_ocr").is_file():
+                score -= 50
+        except Exception:
+            pass
+    return score
+
+
 def iter_candidates(roots: list[Path], limit: int) -> list[Path]:
-    out: list[Path] = []
+    scored: list[tuple[int, Path]] = []
     for root in roots:
         if not root.is_dir():
             continue
@@ -333,21 +482,16 @@ def iter_candidates(roots: list[Path], limit: int) -> list[Path]:
                 continue
             if p.suffix.lower() not in PDF_EXT | IMAGE_EXT:
                 continue
-            # skip if already twin-useful extract
-            ej = Path(str(p) + ".extract.json")
-            if ej.is_file():
-                try:
-                    d = json.loads(ej.read_text(encoding="utf-8"))
-                    if d.get("quality", {}).get("twin_useful"):
-                        continue
-                except Exception:
-                    pass
-            out.append(p)
-            if len(out) >= limit * 3:
+            sc = _ocr_score(p)
+            if sc < 0:
+                continue
+            scored.append((sc, p))
+            if len(scored) >= max(limit * 40, 200):
                 break
-        if len(out) >= limit * 3:
+        if len(scored) >= max(limit * 40, 200):
             break
-    return out[: limit * 3]
+    scored.sort(key=lambda x: (-x[0], str(x[1]).lower()))
+    return [p for _, p in scored[: max(limit * 3, limit)]]
 
 
 def main() -> int:

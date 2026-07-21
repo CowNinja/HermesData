@@ -416,7 +416,64 @@ def main() -> int:
         )
     )
 
-    
+    # Multimodal fabric (T18): gold STT backlog - CPU-only, slightly higher drain
+    if (SCRIPTS / "silo_audio_stt_backlog_worker.py").is_file():
+        workers.append(
+            (
+                "stt_backlog_worker",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "silo_audio_stt_backlog_worker.py"),
+                    "--process-only",
+                    "--limit",
+                    "4",
+                ],
+                1800,
+            )
+        )
+    # STT->registry truth after STT drain
+    if (SCRIPTS / "silo_sync_stt_to_registry.py").is_file():
+        workers.append(
+            (
+                "stt_registry_sync",
+                [sys.executable, str(SCRIPTS / "silo_sync_stt_to_registry.py"), "--limit", "500"],
+                120,
+            )
+        )
+    # HTML thin gold extract (stdlib only)
+    if (SCRIPTS / "silo_html_thin_extract.py").is_file():
+        workers.append(
+            (
+                "html_thin_extract",
+                [sys.executable, str(SCRIPTS / "silo_html_thin_extract.py"), "--limit", "12"],
+                300,
+            )
+        )
+    # Train manifest for side projects
+    if (SCRIPTS / "silo_train_manifest_builder.py").is_file():
+        workers.append(
+            (
+                "train_manifest",
+                [sys.executable, str(SCRIPTS / "silo_train_manifest_builder.py")],
+                180,
+            )
+        )
+
+    # Periodic gold OCR requeue when open queue is thin (registry residual)
+    if (SCRIPTS / "silo_ocr_gold_requeue.py").is_file():
+        workers.append(
+            (
+                "ocr_gold_requeue",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "silo_ocr_gold_requeue.py"),
+                    "--limit",
+                    "80",
+                ],
+                120,
+            )
+        )
+
     workers.append(
         (
             "pko_entity_cards",

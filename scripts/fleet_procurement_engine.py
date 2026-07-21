@@ -29,6 +29,41 @@ HERMES_SCRIPTS = Path(__file__).resolve().parent
 PROCUREMENT_LOG = Path(r"D:\PhronesisVault\Operations\logs\fleet-procurement.jsonl")
 PROCUREMENT_STATE = Path(r"D:\PhronesisVault\Operations\logs\fleet-procurement-state.json")
 PROCUREMENT_REPORT = Path(r"D:\PhronesisVault\Operations\logs\fleet-procurement-report.json")
+# P4/P5 role-matrix SSOT — procurement must never promote forbidden lanes
+ROLE_MATRIX_REGISTRY = Path(r"D:\PhronesisVault\Operations\Free-Model-Registry-v0.2.json")
+ROLE_MATRIX_MD = Path(
+    r"D:\PhronesisVault\Operations\Free-Model-Creative-Role-Matrix-CANONICAL-2026-07-21.md"
+)
+
+# Hard forbid: dead slugs + moderated cloud image + RP body fleet (role matrix).
+# Research: OpenRouter model-fallbacks ordered lists; Groq deprecations 400-poison;
+# Hermes Hybrid-Local-Grok policy; never free cloud for adult image / RP IC.
+DEFAULT_FORBID_IDS = frozenset(
+    {
+        "groq-free-mixtral",
+        "openrouter-free-llama",
+        "openrouter-free-deepseek-v2",
+        "smoke-expand-registry-proof",
+    }
+)
+DEFAULT_FORBID_MODEL_SUBSTR = (
+    "mixtral-8x7b-32768",  # Groq decommissioned
+    "mixtral-8x7b",
+    "deepseek-chat-v2",
+)
+DEFAULT_FORBID_URL_SUBSTR = (
+    "fal.ai",
+    "fal.run",
+    "api.fal.ai",
+)
+DEFAULT_FORBID_CAP_TAGS = frozenset(
+    {
+        "adult-image-cloud",
+        "nsfw-image-cloud",
+        "roleplay-body",
+        "rp-ic-body",
+    }
+)
 
 # --- Discovery seeds (expandable without code changes via registry procurement.discovery_seeds) ---
 DEFAULT_DISCOVERY_SEEDS = [
@@ -98,6 +133,91 @@ def infer_capabilities_from_text(*parts: str) -> List[str]:
         elif any(h in text.lower() for h in COMPUTE_HINTS):
             caps.add("synthesis")
     return sorted(caps)
+
+
+def load_role_matrix_forbid() -> Dict[str, Any]:
+    """Load forbid lists from Free-Model-Registry-v0.2.json (+ hard defaults).
+
+    Aligns procurement promote/inject with P4 creative role matrix:
+      adult_image → local Forge only (no openrouter/free, fal, moderated cloud)
+      rp_ic → never opportunistic free fleet body
+      disabled_compute_* → stay disabled (mixtral decommission, dead OR slugs)
+    """
+    forbid_ids: Set[str] = set(DEFAULT_FORBID_IDS)
+    forbid_model_substr: List[str] = list(DEFAULT_FORBID_MODEL_SUBSTR)
+    forbid_url_substr: List[str] = list(DEFAULT_FORBID_URL_SUBSTR)
+    forbid_caps: Set[str] = set(DEFAULT_FORBID_CAP_TAGS)
+    roles_loaded: Dict[str, Any] = {}
+    version = None
+    if ROLE_MATRIX_REGISTRY.is_file():
+        try:
+            data = json.loads(ROLE_MATRIX_REGISTRY.read_text(encoding="utf-8"))
+            version = data.get("version")
+            roles_loaded = data.get("roles") or {}
+            for pid in data.get("disabled_compute_2026_07_21") or []:
+                if pid:
+                    forbid_ids.add(str(pid))
+            for role_name, role in (roles_loaded or {}).items():
+                for f in role.get("forbidden") or []:
+                    fs = str(f).strip()
+                    if not fs:
+                        continue
+                    # token-ish ids
+                    if fs in {"openrouter/free", "fal", "any_moderated_cloud"}:
+                        if fs == "fal":
+                            forbid_url_substr.extend(["fal.ai", "fal.run"])
+                        elif fs == "openrouter/free":
+                            # free text router is OK for non-image roles; only block
+                            # image-tagged promotion — handled via caps + kind checks
+                            forbid_caps.add("adult-image-cloud")
+                        elif fs == "any_moderated_cloud":
+                            forbid_caps.add("nsfw-image-cloud")
+                        continue
+                    if fs == "opportunistic_free_fleet_body":
+                        forbid_caps.add("roleplay-body")
+                        continue
+                    forbid_ids.add(fs)
+        except Exception as exc:
+            _log({"event": "role_matrix_load_fail", "error": str(exc)[:200]})
+    return {
+        "version": version,
+        "forbid_ids": sorted(forbid_ids),
+        "forbid_model_substr": sorted(set(forbid_model_substr)),
+        "forbid_url_substr": sorted(set(forbid_url_substr)),
+        "forbid_caps": sorted(forbid_caps),
+        "matrix_path": str(ROLE_MATRIX_REGISTRY),
+        "matrix_md": str(ROLE_MATRIX_MD),
+    }
+
+
+def candidate_forbidden(
+    candidate: Dict[str, Any], forbid: Dict[str, Any] | None = None
+) -> Tuple[bool, str]:
+    """Return (blocked, reason) if candidate violates role-matrix forbid list."""
+    f = forbid or load_role_matrix_forbid()
+    pid = str(candidate.get("id") or "")
+    name = str(candidate.get("name") or "")
+    model = str(candidate.get("model") or candidate.get("default_model") or "")
+    url = str(candidate.get("base_url") or "").lower()
+    caps = {str(c).lower() for c in (candidate.get("capabilities") or [])}
+    blob = f"{pid} {name} {model}".lower()
+
+    if pid and pid in set(f.get("forbid_ids") or []):
+        return True, f"forbid_id:{pid}"
+    for sub in f.get("forbid_model_substr") or []:
+        if sub and sub.lower() in blob:
+            return True, f"forbid_model_substr:{sub}"
+    for sub in f.get("forbid_url_substr") or []:
+        if sub and sub.lower() in url:
+            return True, f"forbid_url:{sub}"
+    for cap in f.get("forbid_caps") or []:
+        if cap.lower() in caps:
+            return True, f"forbid_cap:{cap}"
+    # Image-gen cloud providers never enter compute fleet via procurement
+    if any(x in blob for x in ("stable-diffusion", "sdxl", "image-gen", "text-to-image")):
+        if any(x in url for x in ("fal.", "openai.com", "openrouter.ai")):
+            return True, "forbid_cloud_image_gen"
+    return False, ""
 
 
 def _slug_id(*parts: str) -> str:
@@ -231,6 +351,10 @@ class FleetProcurementEngine:
 
     def inject_sandbox(self, candidate: Dict[str, Any], kind: str) -> Dict[str, Any]:
         """Inject discovered resource into sandbox tier (not routed until promoted)."""
+        blocked, reason = candidate_forbidden(candidate)
+        if blocked:
+            _log({"event": "inject_blocked_forbid", "id": candidate.get("id"), "reason": reason})
+            return {"ok": False, "reason": f"role_matrix_forbid:{reason}", "id": candidate.get("id")}
         pid = str(candidate.get("id") or _slug_id(candidate.get("name", ""), candidate.get("base_url", "")))
         if self._provider_exists(pid):
             return {"ok": False, "reason": "already_exists", "id": pid}
@@ -447,6 +571,12 @@ class FleetProcurementEngine:
         if not entry:
             return {"ok": False, "reason": "not_in_sandbox", "id": provider_id}
 
+        blocked, reason = candidate_forbidden(entry)
+        if blocked:
+            # Keep out of production; disable in sandbox
+            self.disable_provider(provider_id, f"role_matrix_forbid:{reason}")
+            return {"ok": False, "reason": f"role_matrix_forbid:{reason}", "id": provider_id}
+
         kind = "context" if entry.get("api_mode") in (
             "duckduckgo_instant", "brave_search", "serper_search", "generic_search", "searxng"
         ) or "search" in str(entry.get("base_url", "")).lower() else "compute"
@@ -635,6 +765,7 @@ class FleetProcurementEngine:
                 _log({"event": "procure_deferred", "reason": defer_reason})
 
         self.governor.reset_tick_counters()
+        forbid = load_role_matrix_forbid()
         report: Dict[str, Any] = {
             "timestamp": _utc_now(),
             "phase": "procure_tick",
@@ -643,7 +774,22 @@ class FleetProcurementEngine:
             "benchmarked": [],
             "promoted": [],
             "disabled": [],
+            "forbid_blocked": [],
+            "role_matrix": {
+                "version": forbid.get("version"),
+                "forbid_ids": forbid.get("forbid_ids"),
+            },
         }
+
+        # Phase 0: enforce role-matrix forbid on anything still enabled
+        for p in list(self.fm.list_providers(healthy_only=False) or []):
+            blocked, why = candidate_forbidden(p, forbid)
+            if blocked and p.get("enabled"):
+                pid = str(p.get("id") or "")
+                if pid:
+                    self.disable_provider(pid, f"role_matrix_forbid:{why}")
+                    report["disabled"].append(pid)
+                    report["forbid_blocked"].append({"id": pid, "reason": why, "phase": "enforce"})
 
         # Phase 1: Re-validate production providers
         benchmarks_run = 0
@@ -652,6 +798,12 @@ class FleetProcurementEngine:
                 break
             pid = str(p.get("id") or "")
             if not pid:
+                continue
+            blocked, why = candidate_forbidden(p, forbid)
+            if blocked:
+                self.disable_provider(pid, f"role_matrix_forbid:{why}")
+                report["disabled"].append(pid)
+                report["forbid_blocked"].append({"id": pid, "reason": why, "phase": "pre_bench"})
                 continue
             bench = self.benchmark_provider(pid)
             benchmarks_run += 1
@@ -672,6 +824,12 @@ class FleetProcurementEngine:
                     continue
                 if not str(c.get("base_url", "")).startswith("http"):
                     continue
+                blocked, why = candidate_forbidden(c, forbid)
+                if blocked:
+                    report["forbid_blocked"].append(
+                        {"id": c.get("id"), "reason": why, "phase": "discover"}
+                    )
+                    continue
                 kind = "context" if c.get("api_mode") in (
                     "duckduckgo_instant", "searxng", "brave_search", "generic_search"
                 ) else "compute"
@@ -686,6 +844,10 @@ class FleetProcurementEngine:
                     prom = self.promote_provider(inj["id"], bench)
                     if prom.get("ok"):
                         report["promoted"].append(inj["id"])
+                    elif "role_matrix_forbid" in str(prom.get("reason") or ""):
+                        report["forbid_blocked"].append(
+                            {"id": inj["id"], "reason": prom.get("reason"), "phase": "promote"}
+                        )
                 else:
                     self.disable_provider(inj["id"], "benchmark_fail")
                     report["disabled"].append(inj["id"])
@@ -697,11 +859,12 @@ class FleetProcurementEngine:
             "promoted": len(report["promoted"]),
             "disabled": len(report["disabled"]),
             "sandboxed": len(report["sandboxed"]),
+            "forbid_blocked": len(report["forbid_blocked"]),
         }
         self.governor.save_state(state)
         report["ok"] = True
         PROCUREMENT_REPORT.write_text(json.dumps(report, indent=2), encoding="utf-8")
-        _log({"event": "procure_tick_complete", **report})
+        _log({"event": "procure_tick_complete", **{k: report[k] for k in report if k != "benchmarked"}})
         tel = self.governor._telemetry()
         if tel:
             tick_started = datetime.fromisoformat(str(report["timestamp"]).replace("Z", "+00:00"))

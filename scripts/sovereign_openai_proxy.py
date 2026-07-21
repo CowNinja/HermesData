@@ -310,10 +310,12 @@ class _CircuitBreaker:
         self._opened_at: float = 0.0
         self._lock = threading.Lock()
         self._state = "closed"  # closed | open | half-open
+        self._force_open = False  # W2-P1 lab: admin force-open (skips cooldown)
 
     def record_success(self):
         with self._lock:
             self._failures = 0
+            self._force_open = False
             self._state = "closed"
 
     def record_failure(self):
@@ -323,9 +325,27 @@ class _CircuitBreaker:
                 self._state = "open"
                 self._opened_at = time.time()
 
+    def force_open(self) -> None:
+        """Lab/admin: pin circuit OPEN until force_close or success."""
+        with self._lock:
+            self._force_open = True
+            self._state = "open"
+            self._opened_at = time.time()
+            self._failures = max(self._failures, self._threshold)
+
+    def force_close(self) -> None:
+        """Lab/admin: clear force-open and reset breaker."""
+        with self._lock:
+            self._force_open = False
+            self._failures = 0
+            self._state = "closed"
+            self._opened_at = 0.0
+
     @property
     def allow_request(self) -> bool:
         with self._lock:
+            if self._force_open:
+                return False
             if self._state == "closed":
                 return True
             if self._state == "open":
@@ -337,7 +357,21 @@ class _CircuitBreaker:
 
     @property
     def state(self) -> str:
-        return self._state
+        with self._lock:
+            if self._force_open:
+                return "open"
+            return self._state
+
+    def snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "state": "open" if self._force_open else self._state,
+                "failures": self._failures,
+                "force_open": self._force_open,
+                "opened_at": self._opened_at,
+                "threshold": self._threshold,
+                "cooldown_sec": self._cooldown,
+            }
 
 
 # Per-upstream circuit breakers keyed by port
@@ -2046,10 +2080,10 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             except Exception:
                 status = "UNKNOWN"
             # Gather per-port circuit breaker states
-            breaker_states: Dict[str, str] = {}
+            breaker_states: Dict[str, Any] = {}
             with _breakers_lock:
                 for port, br in _breakers.items():
-                    breaker_states[str(port)] = br.state
+                    breaker_states[str(port)] = br.snapshot() if hasattr(br, "snapshot") else br.state
             payload: Dict[str, Any] = {
                 "status": status,
                 "service": MOE_GATEWAY_ID,
@@ -2160,10 +2194,67 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                     return
             self._send_json(404, {"error": "model_not_found", "id": model_id})
             return
+        # W2-P1 lab: circuit status (localhost only)
+        if path in ("/v1/admin/circuit", "/admin/circuit"):
+            if not self._client_is_loopback():
+                self._send_json(403, {"error": "loopback_only"})
+                return
+            with _breakers_lock:
+                ports = {str(p): br.snapshot() for p, br in _breakers.items()}
+            # always include 8090 even if never touched
+            if "8090" not in ports:
+                ports["8090"] = _get_breaker(8090).snapshot()
+            self._send_json(200, {"circuit_breakers": ports, "ts": _utc_now()})
+            return
         self._send_json(404, {"error": "not_found"})
+
+    def _client_is_loopback(self) -> bool:
+        try:
+            host = (self.client_address[0] or "").strip()
+            return host in ("127.0.0.1", "::1", "localhost")
+        except Exception:
+            return False
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
+        # W2-P1 lab: force-open / force-close circuit (loopback only)
+        if path in ("/v1/admin/circuit", "/admin/circuit"):
+            if not self._client_is_loopback():
+                self._send_json(403, {"error": "loopback_only"})
+                return
+            try:
+                body = self._read_json()
+            except Exception as exc:
+                self._send_json(400, {"error": f"invalid JSON: {exc}"})
+                return
+            if body.get("__error__"):
+                return
+            action = str(body.get("action") or "").strip().lower()
+            try:
+                port = int(body.get("port") or 8090)
+            except Exception:
+                port = 8090
+            br = _get_breaker(port)
+            if action in ("open", "force_open"):
+                br.force_open()
+            elif action in ("close", "force_close", "reset"):
+                br.force_close()
+            elif action in ("status", "", "get"):
+                pass
+            else:
+                self._send_json(400, {"error": "action must be open|close|status"})
+                return
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "port": port,
+                    "action": action or "status",
+                    "breaker": br.snapshot(),
+                    "ts": _utc_now(),
+                },
+            )
+            return
         if path not in ("/v1/chat/completions", "/chat/completions"):
             self._send_json(404, {"error": "not_found"})
             return
@@ -2392,24 +2483,43 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                         body,
                         trimmed_messages,
                         model,
-                        routing=routing,
-                        trim_meta=trim_meta,
-                    )
-                else:
-                    result = dispatch_via_bridge(
-                        prompt, model, trim_meta=trim_meta, routing=routing,
-                    )
-                try:
-                    from escalation_router import resolve_post_local_dispatch
+                        result = dispatch_via_native_router(
+                                        prompt, model, stream=stream, body=body, routing=routing
+                                    )
+                                else:
+                                    result = dispatch_via_bridge(
+                                        prompt, model, stream=stream, body=body, routing=routing
+                                    )
+                                # W2-P1: stamp proxy path + live circuit state before escalation
+                                try:
+                                    br_snap = _get_breaker(8090).snapshot()
+                                    prov0 = result.setdefault("provenance", {})
+                                    prov0["path"] = "proxy_8091"
+                                    prov0["circuit_8090"] = br_snap.get("state")
+                                    prov0["circuit_force_open"] = bool(br_snap.get("force_open"))
+                                    if not result.get("success"):
+                                        routing = {
+                                            **routing,
+                                            "path": "proxy_8091",
+                                            "circuit_8090": br_snap.get("state"),
+                                            "local_fail_reason": result.get("error"),
+                                        }
+                                except Exception:
+                                    routing = {**routing, "path": "proxy_8091"}
+                                try:
+                                    from escalation_router import resolve_post_local_dispatch
 
-                    if augment_meta.get("augmented"):
-                        result.setdefault("provenance", {})["context_augment"] = augment_meta
-                    result = resolve_post_local_dispatch(prompt, routing, result)
-                except Exception as esc_exc:
-                    _log_event({"event": "escalation_resolve_skip", "error": str(esc_exc)})
-            except Exception as exc:
-                _log_event({"event": "dispatch_exception", "error": str(exc), "model": model})
-                status, err = openai_error(503, f"dispatch failed: {exc}")
+                                    if augment_meta.get("augmented"):
+                                        result.setdefault("provenance", {})["context_augment"] = augment_meta
+                                    result = resolve_post_local_dispatch(prompt, routing, result)
+                                except Exception as esc_exc:
+                                    _log_event({"event": "post_local_escalation_error", "error": str(esc_exc)})
+                                # Ensure path stamped on final result
+                                try:
+                                    result.setdefault("provenance", {})["path"] = "proxy_8091"
+                                except Exception:
+                                    pass
+                            except Exception as exc:
                 if queue_ticket is not None:
                     err["phronesis_queue"] = _queue_ticket_dict(queue_ticket)
                 self._send_json(status, err, extra_headers=queue_headers or None)

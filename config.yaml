@@ -1303,9 +1303,9 @@ local_sovereign:
     on_fail: warn
     timeout_seconds: 20
   opportunistic_fleet:
-    enabled: false
+    enabled: true
     registry: D:/HermesData/config/fleet_registry.yaml
-    prefer_free_before_grok: false
+    prefer_free_before_grok: true
     augment_local_with_context: true
     fallback_on_local_fail: true
     proactive_realtime_triggers: true

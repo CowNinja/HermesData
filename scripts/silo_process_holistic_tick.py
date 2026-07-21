@@ -8,8 +8,9 @@ Coordinates (does not fight land chef):
   4) Clean OCR → .train.md for RAG/twin
   5) Re-queue thin/garbled OCR for re-OCR
   6) Medical/Navy text index
+  7) Multimodal fabric: gold OCR requeue, STT, office, email (T17)
 
-$0 Grok. Fail-soft. Jeff 2026-07-13 holistic streamlining.
+$0 Grok. Fail-soft. Jeff 2026-07-13 holistic streamlining; T17 multimodal 2026-07-21.
 """
 from __future__ import annotations
 
@@ -146,6 +147,36 @@ def main() -> int:
     # 2 requeue thin medical/navy
     report["steps"]["requeue_thin"] = requeue_thin_ocr(40)
 
+    # 2b gold OCR residual: registry ocr_failed -> queue (false-clean fix)
+    gold_rq = SCRIPTS / "silo_ocr_gold_requeue.py"
+    if gold_rq.is_file():
+        report["steps"]["ocr_gold_requeue"] = run(
+            [PY, str(gold_rq), "--limit", "120", "--reset-attempts"],
+            timeout=120,
+        )
+
+    # 2c gold STT discover+process (CPU) - multimodal fabric; limit 3
+    stt_w = SCRIPTS / "silo_audio_stt_backlog_worker.py"
+    if stt_w.is_file():
+        report["steps"]["stt_discover"] = run(
+            [PY, str(stt_w), "--discover-only"],
+            timeout=240,
+        )
+        report["steps"]["stt_process"] = run(
+            [PY, str(stt_w), "--process-only", "--limit", "3"],
+            timeout=1800,
+        )
+
+    # 2d office + email + html thin (gold-first) extract waves
+    for name, script, lim in (
+        ("office_extract", "silo_office_extract.py", "8"),
+        ("email_extract", "silo_email_extract.py", "8"),
+        ("html_thin_extract", "silo_html_thin_extract.py", "15"),
+    ):
+        sp = SCRIPTS / script
+        if sp.is_file():
+            report["steps"][name] = run([PY, str(sp), "--limit", lim], timeout=360)
+
     # 3 OCR process-only
     if not args.skip_ocr:
         report["steps"]["ocr"] = run(
@@ -156,10 +187,10 @@ def main() -> int:
                 str(args.ocr_limit),
                 "--process-only",
             ],
-            timeout=420,
+            timeout=600,
         )
 
-    # 4 process status backfill (prefer unprocessed)
+    # 4 process status backfill + OCR/STT registry truth
     report["steps"]["process_status"] = run(
         [
             PY,
@@ -173,6 +204,16 @@ def main() -> int:
         [PY, str(SCRIPTS / "silo_sync_ocr_to_registry.py"), "--limit", str(args.status_limit)],
         timeout=120,
     )
+    stt_sync = SCRIPTS / "silo_sync_stt_to_registry.py"
+    if stt_sync.is_file():
+        report["steps"]["stt_registry_sync"] = run(
+            [PY, str(stt_sync), "--limit", str(args.status_limit)],
+            timeout=120,
+        )
+    # train manifest refresh (side-project consumption)
+    man = SCRIPTS / "silo_train_manifest_builder.py"
+    if man.is_file():
+        report["steps"]["train_manifest"] = run([PY, str(man)], timeout=180)
 
     # 5 text clean → train.md
     clean = SCRIPTS / "silo_ocr_text_clean.py"
@@ -199,34 +240,38 @@ def main() -> int:
         oc.close()
     except Exception as e:
         report["ocr"] = {"err": str(e)}
-    try:
-        rg = sqlite3.connect(str(REG), timeout=30)
-        report["process"] = dict(
-            rg.execute(
-                "SELECT process_status, COUNT(*) FROM ingest GROUP BY process_status"
-            ).fetchall()
-        )
-        rg.close()
-    except Exception as e:
-        report["process"] = {"err": str(e)}
 
-    LOG.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        rc = sqlite3.connect(str(REG), timeout=30)
+        report["registry_process"] = dict(
+                    rc.execute(
+                        "SELECT process_status, COUNT(*) FROM ingest GROUP BY process_status"
+                    ).fetchall()
+                )
+        rc.close()
+    except Exception as e:
+        report["registry_process"] = {"err": str(e)}
+
+    STATE.mkdir(parents=True, exist_ok=True)
+    (STATE / "silo_process_holistic_latest.json").write_text(
+        json.dumps(report, indent=2), encoding="utf-8"
+    )
     lines = [
-        f"# Process holistic tick — {report['at'][:19]} UTC",
+        f"# Process holistic — {report['at']}",
         "",
-        f"- retire_corrupt: **{report['steps'].get('retire_corrupt')}**",
-        f"- requeue_thin: **{report['steps'].get('requeue_thin')}**",
+        f"- retire_corrupt: {report['steps'].get('retire_corrupt')}",
+        f"- requeue_thin: {report['steps'].get('requeue_thin')}",
         f"- ocr: exit={report['steps'].get('ocr', {}).get('exit')}",
-        f"- process_status: exit={report['steps'].get('process_status', {}).get('exit')}",
-        f"- text_clean: exit={report['steps'].get('text_clean', {}).get('exit')}",
-        f"- medical_navy_index: exit={report['steps'].get('medical_navy_index', {}).get('exit')}",
-        "",
-        f"OCR: `{report.get('ocr')}`",
-        f"Process: `{report.get('process')}`",
+        f"- stt_discover: exit={report['steps'].get('stt_discover', {}).get('exit')}",
+        f"- office: exit={report['steps'].get('office_extract', {}).get('exit')}",
+        f"- email: exit={report['steps'].get('email_extract', {}).get('exit')}",
+        f"- ocr_queue: {report.get('ocr')}",
+        f"- registry_process: {report.get('registry_process')}",
         "",
     ]
+    LOG.parent.mkdir(parents=True, exist_ok=True)
     LOG.write_text("\n".join(lines), encoding="utf-8")
-    print(json.dumps(report, indent=2, default=str)[:3500])
+    print(json.dumps(report, indent=2)[:4000])
     return 0
 
 
