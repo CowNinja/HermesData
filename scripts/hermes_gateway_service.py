@@ -10,11 +10,12 @@ Research (2026-07-17):
 This process:
   1. Breaks away from parent Job Objects
   2. Clears ghost gateway locks
-  3. Spawns gateway.run, WAITS for exit, logs exit code
-  4. Backs off and restarts (sole owner — no dual Start-VenvGateway)
+  3. Spawns hermes_cli.main gateway run (SSOT argv), WAITS for exit
+  4. Backs off and restarts (prefer Hermes_Gateway schtask when possible)
 
 Do NOT also run hermes_gateway_supervisor as a second starter while this is up.
 Meta-watchdog should only ensure THIS service is alive.
+Never -m gateway.run (dual-argv true dual trees).
 """
 from __future__ import annotations
 
@@ -125,7 +126,10 @@ def clear_ghosts() -> None:
 
 
 def kill_stray_gateways() -> None:
-    """Kill orphan gateway.run not started by us (shouldn't dual-run)."""
+    """Kill orphan gateway role processes not started by us (shouldn't dual-run).
+
+    Matches both SSOT hermes_cli.main gateway and legacy gateway.run.
+    """
     try:
         r = subprocess.run(
             [
@@ -136,8 +140,10 @@ def kill_stray_gateways() -> None:
                 "Hidden",
                 "-Command",
                 "Get-CimInstance Win32_Process | Where-Object { "
-                "$_.Name -match 'python' -and $_.CommandLine -match 'gateway\\.run' } | "
-                "ForEach-Object { $_.ProcessId }",
+                "$_.Name -match 'python' -and ("
+                "$_.CommandLine -match 'gateway\\.run' -or "
+                "$_.CommandLine -match 'hermes_cli\\.main.*gateway'"
+                ") } | ForEach-Object { $_.ProcessId }",
             ],
             capture_output=True,
             text=True,
@@ -270,9 +276,9 @@ def run_gateway_once() -> int:
                 f"len={len(env.get('TWILIO_ACCOUNT_SID') or '')}\n"
             )
             child_log.flush()
-            # Don't use DETACHED if we need wait — CREATE_NO_WINDOW + breakaway is enough
+            # SSOT: same argv as Hermes_Gateway owner task (never -m gateway.run).
             proc = subprocess.Popen(
-                [str(pyw), "-m", "gateway.run"],
+                [str(pyw), "-m", "hermes_cli.main", "gateway", "run"],
                 cwd=str(ROOT),
                 stdin=subprocess.DEVNULL,
                 stdout=child_log,
@@ -285,7 +291,7 @@ def run_gateway_once() -> int:
         flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
         with open(log_path, "a", encoding="utf-8") as child_log:
             proc = subprocess.Popen(
-                [str(pyw), "-m", "gateway.run"],
+                [str(pyw), "-m", "hermes_cli.main", "gateway", "run"],
                 cwd=str(ROOT),
                 stdin=subprocess.DEVNULL,
                 stdout=child_log,

@@ -406,9 +406,28 @@ function Start-VenvGateway {
     if ((Test-VenvOwnsGateway) -and (Test-GatewayHealth)) {
         return
     }
+    # SSOT 2026-07-21: sole durable owner is schtask Hermes_Gateway
+    # (argv: -m hermes_cli.main gateway run). Never dual-boot via -m gateway.run
+    # while that task exists — dual argv was the recurring multi-gateway root.
+    $task = Get-ScheduledTask -TaskName "Hermes_Gateway" -ErrorAction SilentlyContinue
+    if ($task) {
+        try {
+            if ($task.State -ne "Running") {
+                Start-ScheduledTask -TaskName "Hermes_Gateway" -ErrorAction Stop
+            }
+            # Give task a moment to bind; if health comes up, done.
+            for ($i = 1; $i -le 20; $i++) {
+                Start-Sleep -Milliseconds 500
+                if ((Get-PortListenerPid -Port $gwPort) -and (Test-GatewayHealth)) { return }
+            }
+        } catch {
+            # fall through to direct start with SAME argv as the task
+        }
+    }
     $pyw = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
+    # Match Hermes_Gateway task argv exactly (not -m gateway.run).
     Start-HiddenProcess -FilePath $pyw `
-        -ArgumentList @("-m", "gateway.run") `
+        -ArgumentList @("-m", "hermes_cli.main", "gateway", "run") `
         -WorkingDirectory $HermesRoot | Out-Null
 }
 

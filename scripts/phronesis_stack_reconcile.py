@@ -272,11 +272,26 @@ def main() -> int:
                 f"WARN supervisor count={report['roles']['supervisor']['count']} (expected 1–2 for re-exec)"
             )
 
-        # gateway
+        # gateway — SSOT owner first (schtask), never -m gateway.run dual-argv
         if not report["ports"]["8642"]["listen_pid"] or not health(8642):
-            start_hidden([pyw(), "-m", "gateway.run"], cwd=ROOT)
-            report["actions"].append("started_gateway")
-            log("started gateway")
+            try:
+                import subprocess as _sp
+
+                _sp.call(
+                    ["schtasks", "/Run", "/TN", "Hermes_Gateway"],
+                    timeout=60,
+                    stdout=_sp.DEVNULL,
+                    stderr=_sp.DEVNULL,
+                )
+                report["actions"].append("started_gateway_schtask")
+                log("started gateway via Hermes_Gateway schtask")
+            except Exception as exc:
+                log(f"schtask gateway start err: {exc}")
+                start_hidden(
+                    [pyw(), "-m", "hermes_cli.main", "gateway", "run"], cwd=ROOT
+                )
+                report["actions"].append("started_gateway_direct_hermes_cli")
+                log("started gateway direct hermes_cli.main")
             # wait health
             for _ in range(35):
                 if health(8642):

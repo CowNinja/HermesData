@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional
 HERMES_ROOT = Path(r"D:\HermesData")
 CONFIG_PATH = HERMES_ROOT / "config.yaml"
 VAULT_LOG = Path(r"D:\PhronesisVault\Operations\logs\escalation-router.jsonl")
+PROVENANCE_LOG = Path(r"D:\PhronesisVault\Operations\logs\router-fleet-failover-provenance.jsonl")
 
 ROLEPLAY_PLATFORMS = frozenset({
     "alice-roleplay",
@@ -30,8 +31,27 @@ ROLEPLAY_PLATFORMS = frozenset({
     "immersive_roleplay",
 })
 
+# W3-P2 hop constants (mirrored; pick_backend is SSOT when importable)
+BACKEND_LOCAL = "local"
+BACKEND_FREE = "free"
+BACKEND_GROK = "grok"
+DEFAULT_HOP = (BACKEND_LOCAL, BACKEND_FREE, BACKEND_GROK)
+
 _FLEET_POLICY_CACHE: Dict[str, Any] = {"loaded_at": 0.0, "policy": {}}
 _FLEET_POLICY_TTL_SEC = 30.0
+
+
+def _append_provenance(event: Dict[str, Any]) -> None:
+    """Append durable failover provenance (W2-P1/P5 thrift signal)."""
+    try:
+        from datetime import datetime, timezone
+        row = dict(event)
+        row.setdefault("ts", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        PROVENANCE_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(PROVENANCE_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=True) + "\n")
+    except Exception:
+        pass
 
 
 def _log(event: Dict[str, Any]) -> None:
@@ -510,32 +530,153 @@ def resolve_post_local_dispatch(
     routing: Dict[str, Any],
     local_result: Dict[str, Any],
 ) -> Dict[str, Any]:
+    """After native/bridge local attempt: free fleet on fail, then T3 if configured.
+
+    W2-P1: stamp path=proxy_8091 (or routing.path) and write provenance on failover.
+    W3-P2: hop order from router_backend_policy.pick_backend (local->free->grok).
+    Prefer free before Grok when prefer_free_before_grok is true.
     """
-    After native/bridge local attempt: apply T2 fallback then T3 if configured.
-    """
+    path_stamp = str(routing.get("path") or "proxy_8091")
+
+    # Central hop policy (never invent order per call site)
+    decision = None
+    try:
+        from router_backend_policy import pick_backend
+
+        decision = pick_backend(
+            prompt=prompt or "",
+            task_type=routing.get("task_type"),
+            routing=routing,
+            local_available=bool(local_result.get("success")),
+            skip_local_reason=(
+                str(routing.get("local_fail_reason") or "local_failed")
+                if not local_result.get("success")
+                else (
+                    "circuit_8090_open"
+                    if routing.get("circuit_8090") in (True, "open", "OPEN")
+                    else None
+                )
+            ),
+            prefer_free_before_grok=bool(fleet_policy().get("prefer_free_before_grok", True)),
+            force_tier=routing.get("escalation_tier"),
+        )
+        if hasattr(decision, "to_dict"):
+            routing = dict(routing)
+            routing["backend_policy"] = decision.to_dict()
+    except Exception:
+        decision = None
+
     if local_result.get("success"):
         prov = local_result.setdefault("provenance", {})
+        prov.setdefault("path", path_stamp)
+        if decision is not None and hasattr(decision, "to_dict"):
+            prov.setdefault("backend_policy", decision.to_dict())
+            prov.setdefault("selected_backend", "local")
+            prov.setdefault("tier_bucket", "local")
         if prov.get("context_augment"):
             return local_result
         return local_result
 
+    hop = list(DEFAULT_HOP if decision is None else (decision.hop_order or DEFAULT_HOP))
+    # If pick_backend skipped free (RP/adult), do not fleet
+    blocked_free = None
+    if decision is not None:
+        blocked_free = getattr(decision, "blocked_free_reason", None)
+
     ok, block_reason, fleet_prompt = _prepare_fleet_prompt(prompt, routing)
+    if blocked_free:
+        ok = False
+        block_reason = blocked_free
     if not ok:
         local_result.setdefault("provenance", {})["fleet_escalation_blocked"] = block_reason
+        local_result.setdefault("provenance", {})["path"] = path_stamp
+        if decision is not None and hasattr(decision, "to_dict"):
+            local_result.setdefault("provenance", {})["backend_policy"] = decision.to_dict()
         return local_result
 
+    pol = fleet_policy()
     tier = str(routing.get("escalation_tier") or "")
-    if fleet_routing_enabled():
+    want_free = BACKEND_FREE in hop and pol.get("prefer_free_before_grok", True)
+    want_grok = BACKEND_GROK in hop or tier == "T3"
+
+    # Free fleet first on local fail (prefer_free_before_grok)
+    if want_free and fleet_routing_enabled():
         t2 = try_t2_fleet_dispatch(fleet_prompt, routing, local_failed=True)
         if t2.get("success"):
+            prov = t2.setdefault("provenance", {})
+            prov["path"] = path_stamp
+            prov["failover"] = "local_fail_to_free_fleet"
+            prov["selected_backend"] = "free"
+            prov["tier_bucket"] = "free"
+            if decision is not None and hasattr(decision, "to_dict"):
+                prov["backend_policy"] = decision.to_dict()
+            if routing.get("circuit_8090") is not None:
+                prov["circuit_8090"] = routing.get("circuit_8090")
+            if routing.get("local_fail_reason"):
+                prov["local_fail_reason"] = routing.get("local_fail_reason")
+            _append_provenance(
+                {
+                    "event": "local_fail_to_free_fleet",
+                    "path": path_stamp,
+                    "provider_id": t2.get("provider_id") or prov.get("provider_id"),
+                    "model": t2.get("model"),
+                    "tier": t2.get("tier"),
+                    "tier_bucket": "free",
+                    "selected_backend": "free",
+                    "role": getattr(decision, "role", None) if decision is not None else None,
+                    "circuit_8090": routing.get("circuit_8090"),
+                    "local_fail_reason": str(routing.get("local_fail_reason") or "")[:300],
+                }
+            )
+            return t2
+        _append_provenance(
+            {
+                "event": "local_fail_free_fleet_miss",
+                "path": path_stamp,
+                "error": str((t2 or {}).get("error") or "")[:300],
+                "circuit_8090": routing.get("circuit_8090"),
+                "tier_bucket": "free",
+            }
+        )
+    elif fleet_routing_enabled() and BACKEND_FREE in hop:
+        t2 = try_t2_fleet_dispatch(fleet_prompt, routing, local_failed=True)
+        if t2.get("success"):
+            t2.setdefault("provenance", {})["path"] = path_stamp
+            t2.setdefault("provenance", {})["tier_bucket"] = "free"
             return t2
 
-    if tier == "T3":
-        return try_t3_paid_dispatch(fleet_prompt, routing)
+    if want_grok and tier == "T3":
+        t3 = try_t3_paid_dispatch(fleet_prompt, routing)
+        try:
+            t3.setdefault("provenance", {})["path"] = path_stamp
+            t3.setdefault("provenance", {})["failover"] = "local_fail_to_t3_after_free"
+            t3.setdefault("provenance", {})["selected_backend"] = "grok"
+            t3.setdefault("provenance", {})["tier_bucket"] = "grok"
+            if decision is not None and hasattr(decision, "to_dict"):
+                t3.setdefault("provenance", {})["backend_policy"] = decision.to_dict()
+        except Exception:
+            pass
+        _append_provenance(
+            {
+                "event": "local_fail_to_t3",
+                "path": path_stamp,
+                "success": bool(t3.get("success")),
+                "tier": t3.get("tier"),
+                "tier_bucket": "grok",
+                "selected_backend": "grok",
+            }
+        )
+        return t3
 
-    if tier == "T2" and fleet_routing_enabled():
+    if tier == "T2" and fleet_routing_enabled() and BACKEND_FREE in hop:
         t2 = try_t2_fleet_dispatch(fleet_prompt, routing, local_failed=False)
         if t2.get("success"):
+            t2.setdefault("provenance", {})["path"] = path_stamp
+            t2.setdefault("provenance", {})["tier_bucket"] = "free"
             return t2
 
+    local_result.setdefault("provenance", {})["path"] = path_stamp
+    if decision is not None and hasattr(decision, "to_dict"):
+        local_result.setdefault("provenance", {})["backend_policy"] = decision.to_dict()
     return local_result
+

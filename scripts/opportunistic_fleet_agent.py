@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-opportunistic_fleet_agent.py — Autonomous Opportunistic Fleet Procurement Curator.
+opportunistic_fleet_agent.py - Autonomous Opportunistic Fleet Procurement Curator.
 
-Delegates to fleet_procurement_engine for discover → sandbox → benchmark → promote/disable.
+Delegates to fleet_procurement_engine for discover -> sandbox -> benchmark -> promote/disable.
 Provider-agnostic: routing uses capability tags only.
 
 Usage:
@@ -48,7 +48,7 @@ def procure_tick(*, discover: bool = True, force: bool = False) -> Dict[str, Any
 
 
 def simulate_loop() -> Dict[str, Any]:
-    """Simulated discovery→sandbox→benchmark→promote without registry pollution."""
+    """Simulated discovery->sandbox->benchmark->promote without registry pollution."""
     report = _engine().simulate_loop()
     _write_report(report)
     return report
@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Opportunistic Fleet Procurement Curator")
     parser.add_argument("--procure-tick", action="store_true", help="Autonomous procurement tick")
-    parser.add_argument("--simulate-loop", action="store_true", help="Simulated discover→promote loop")
+    parser.add_argument("--simulate-loop", action="store_true", help="Simulated discover->promote loop")
     parser.add_argument("--discover-only", action="store_true", help="Discovery candidates only")
     parser.add_argument("--health-cycle", action="store_true", help="Production health cycle")
     parser.add_argument("--full-tick", action="store_true", help="Procurement + health (cron)")

@@ -88,15 +88,31 @@ def main() -> int:
                     continue
         if new_dest:
             if not args.dry_run:
-                con.execute(
-                    f"UPDATE ingest SET dest_path=?, domain=COALESCE(?, domain), process_status=COALESCE(process_status,'unprocessed') WHERE {id_col}=?",
-                    (new_dest, new_dom, rid),
-                )
-            repointed += 1
-            if len(examples["repointed"]) < 5:
-                examples["repointed"].append(
-                    {"from": dest[:120], "to": new_dest[:120], "domain": new_dom}
-                )
+                try:
+                    con.execute(
+                        f"UPDATE ingest SET dest_path=?, domain=COALESCE(?, domain), process_status=COALESCE(process_status,'unprocessed') WHERE {id_col}=?",
+                        (new_dest, new_dom, rid),
+                    )
+                    repointed += 1
+                    if len(examples["repointed"]) < 5:
+                        examples["repointed"].append(
+                            {"from": dest[:120], "to": new_dest[:120], "domain": new_dom}
+                        )
+                except sqlite3.IntegrityError:
+                    # UNIQUE(source_path, dest_path) collision — mark cleared instead
+                    con.execute(
+                        f"UPDATE ingest SET process_status='ghost_cleared' WHERE {id_col}=?",
+                        (rid,),
+                    )
+                    cleared += 1
+                    if len(examples["cleared"]) < 5:
+                        examples["cleared"].append(f"collision:{dest[:120]}")
+            else:
+                repointed += 1
+                if len(examples["repointed"]) < 5:
+                    examples["repointed"].append(
+                        {"from": dest[:120], "to": new_dest[:120], "domain": new_dom}
+                    )
         else:
             if not args.dry_run:
                 con.execute(

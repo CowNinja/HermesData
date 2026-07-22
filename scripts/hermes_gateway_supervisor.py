@@ -237,8 +237,9 @@ def start_gateway() -> bool:
             | CREATE_NO_WINDOW
         )
     try:
+        # SSOT: match Hermes_Gateway task argv (never -m gateway.run dual-argv).
         subprocess.Popen(
-            [str(pyw), "-m", "gateway.run"],
+            [str(pyw), "-m", "hermes_cli.main", "gateway", "run"],
             cwd=str(ROOT),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -247,7 +248,7 @@ def start_gateway() -> bool:
             close_fds=True,
             env=env,
         )
-        log(f"started {pyw} -m gateway.run")
+        log(f"started {pyw} -m hermes_cli.main gateway run")
     except Exception as exc:
         log(f"ERR start: {exc}")
         return False

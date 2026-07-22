@@ -1,28 +1,25 @@
 #!/usr/bin/env python3
-"""Single 30m stack/gateway healer — one shot, never daemonize.
+"""Single 30m stack/gateway healer - one shot, never daemonize.
 
-FIRST PRINCIPLES (one authority, no double-boot):
-  1. Port probe is truth for "remote access healthy" (:8642).
+FIRST PRINCIPLES (one authority, no double-boot) SSOT 2026-07-21:
+  1. Port + HTTP /health is truth for "gateway healthy" (:8642).
   2. Process probe is truth for "something already starting/running".
-  3. Exactly ONE automatic restorer: this script (cron Stack-Healing-30m).
-  4. Exactly ONE launcher: Phronesis.ps1 gateway start (ForkGuard
-     Start-VenvGateway, -m gateway.run). schtasks Hermes_Gateway is
-     legacy fallback only. Direct pythonw --replace is LAST RESORT.
-  5. Exclusive file lock → concurrent healers cannot both start gateways.
+  3. Exactly ONE durable owner: schtask Hermes_Gateway
+     (argv: -m hermes_cli.main gateway run).
+  4. Restore order: schtasks /Run FIRST -> Phronesis gateway start ->
+     direct pythonw hermes_cli.main gateway run LAST.
+     NEVER -m gateway.run (dual-argv true dual trees).
+  5. Exclusive file lock - concurrent healers cannot both start gateways.
   6. Cooldown is enforced (not merely logged).
-  7. Boot-wait: if a gateway PID exists but port is closed, WAIT — do not
+  7. Boot-wait: if a gateway PID exists but port is closed, WAIT - do not
      spawn a second instance.
   8. Never kill a healthy listener. Kill orphans only when port is down.
-  9. Clear restart_loop when restoring (breaker must not block recovery).
- 10. Optional stack tick (watchdog --once) under hard timeout; it does NOT
-     start the gateway.
+  9. Parent(venv)+child(system) re-exec is ONE instance - do not thrash.
+ 10. Optional stack tick under hard timeout; it does NOT start the gateway.
  11. Silent empty stdout when green + no action (cron no_agent).
 
-Cron pitfall: no_agent runs [python, script] with NO argv — never point
-cron at sovereign_stack_watchdog.py (defaults to infinite daemon → timeout).
-
-Canonical home for this host: HERMES_HOME=D:\\HermesData
-(matches Hermes_Gateway scheduled task WorkingDirectory + dual pid files).
+Canonical home: HERMES_HOME=D:\\HermesData
+(matches Hermes_Gateway scheduled task WorkingDirectory).
 """
 from __future__ import annotations
 
@@ -542,7 +539,7 @@ def start_via_phronesis_gateway() -> dict:
 
 
 def start_via_schtasks() -> dict:
-    """Legacy fallback — Hermes_Gateway task may use an older argv."""
+    """SSOT primary: durable Hermes_Gateway owner task (same argv always)."""
     try:
         r = subprocess.run(
             ["schtasks", "/Run", "/TN", TASK_NAME],
@@ -564,9 +561,9 @@ def start_via_schtasks() -> dict:
 def start_via_direct_pythonw() -> dict:
     """Last-resort single launch. HERMES_HOME forced to canonical ROOT.
 
-    Never use --replace here: legacy watchdogs treated --replace as an eviction
-    trigger and killed the process. Clear dead pid/lock first, then start clean
-    via -m gateway.run (same as ForkGuard Start-VenvGateway).
+    Never use --replace. Clear dead pid/lock first, then start clean with
+    hermes_cli.main gateway run (same argv as Hermes_Gateway schtask).
+    Never -m gateway.run.
     """
     clear_stale_pid_files()
     pyw = ROOT / "hermes-agent" / "venv" / "Scripts" / "pythonw.exe"
@@ -585,9 +582,10 @@ def start_via_direct_pythonw() -> dict:
             | 0x08000000  # CREATE_NO_WINDOW
         )
     try:
-        # Prefer -m gateway.run (matches live Windows process tree).
+        # SSOT 2026-07-21: match Hermes_Gateway task argv exactly.
+        # Never -m gateway.run (dual-argv true dual trees / restart storms).
         subprocess.Popen(
-            [str(pyw), "-m", "gateway.run"],
+            [str(pyw), "-m", "hermes_cli.main", "gateway", "run"],
             cwd=str(ROOT),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -596,7 +594,13 @@ def start_via_direct_pythonw() -> dict:
             close_fds=True,
             env=env,
         )
-        return {"step": "direct_pythonw", "ok": True, "pyw": str(pyw), "replace": False, "argv": "gateway.run"}
+        return {
+            "step": "direct_pythonw",
+            "ok": True,
+            "pyw": str(pyw),
+            "replace": False,
+            "argv": "hermes_cli.main gateway run",
+        }
     except Exception as exc:
         return {"step": "direct_pythonw", "error": str(exc), "ok": False}
 
@@ -684,11 +688,42 @@ def restore_gateway(*, force: bool = False) -> dict:
         actions.append({"step": "taskkill_orphan_listeners", **kill_pids(listeners)})
         time.sleep(1)
 
-    # --- Single primary launcher (Phronesis / ForkGuard) ---
-    primary = start_via_phronesis_gateway()
+    # --- SSOT primary: durable Hermes_Gateway task (same argv always) ---
+    primary = start_via_schtasks()
     actions.append(primary)
     write_last_heal()  # stamp even if start fails — cooldown still applies
 
+    up = wait_until(health_ok, START_WAIT_SEC, 2.0)
+    if up:
+        return {
+            "action": "restore",
+            "restored": True,
+            "port_8642": True,
+            "health": True,
+            "method": "schtasks_Hermes_Gateway",
+            "pids": list_gateway_pids(),
+            "actions": actions,
+        }
+
+    # After owner task wait: if a process appeared, wait more — never dual-start.
+    spawned = list_gateway_pids()
+    if spawned:
+        actions.append({"step": "post_schtasks_boot_wait", "pids": spawned})
+        up = wait_until(health_ok, BOOT_WAIT_SEC, 2.0)
+        if up:
+            return {
+                "action": "restore",
+                "restored": True,
+                "port_8642": True,
+                "health": True,
+                "method": "schtasks_Hermes_Gateway_boot_wait",
+                "pids": list_gateway_pids(),
+                "actions": actions,
+            }
+
+    # Fallback: Phronesis / ForkGuard (now also uses hermes_cli.main argv)
+    ph = start_via_phronesis_gateway()
+    actions.append(ph)
     up = wait_until(health_ok, START_WAIT_SEC, 2.0)
     if up:
         return {
@@ -701,7 +736,6 @@ def restore_gateway(*, force: bool = False) -> dict:
             "actions": actions,
         }
 
-    # After primary wait: if a process appeared, wait more — never dual-start.
     spawned = list_gateway_pids()
     if spawned:
         actions.append({"step": "post_phronesis_boot_wait", "pids": spawned})
@@ -712,46 +746,15 @@ def restore_gateway(*, force: bool = False) -> dict:
                 "restored": True,
                 "port_8642": True,
                 "health": True,
-                "method": "phronesis_slow_bind",
+                "method": "phronesis_gateway_start_boot_wait",
                 "pids": list_gateway_pids(),
                 "actions": actions,
             }
         actions.append({"step": "kill_hung_after_phronesis", **kill_pids(spawned)})
         time.sleep(2)
 
-    # Legacy schtasks fallback (disabled Hermes_Gateway task may no-op)
-    sch = start_via_schtasks()
-    actions.append(sch)
-    up = wait_until(health_ok, START_WAIT_SEC, 2.0)
-    if up:
-        return {
-            "action": "restore",
-            "restored": True,
-            "port_8642": True,
-            "health": True,
-            "method": "schtasks_fallback",
-            "pids": list_gateway_pids(),
-            "actions": actions,
-        }
-
-    spawned = list_gateway_pids()
-    if spawned:
-        actions.append({"step": "post_schtasks_boot_wait", "pids": spawned})
-        up = wait_until(health_ok, BOOT_WAIT_SEC, 2.0)
-        if up:
-            return {
-                "action": "restore",
-                "restored": True,
-                "port_8642": True,
-                "health": True,
-                "method": "schtasks_slow_bind",
-                "pids": list_gateway_pids(),
-                "actions": actions,
-            }
-        actions.append({"step": "kill_hung_after_schtasks", **kill_pids(spawned)})
-        time.sleep(2)
-
-    # --- Last resort: only if still zero processes and still down ---
+    # Last resort: direct pythonw with SAME argv as Hermes_Gateway task
+    # (schtasks already tried first — do not call it again)
     if list_gateway_pids() or health_ok():
         return {
             "action": "restore",

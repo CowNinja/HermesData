@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-external_fleet_manager.py — Tier 1.5 Opportunistic Fleet manager.
+external_fleet_manager.py -- Tier 1.5 Opportunistic Fleet manager.
 
 Configuration-driven dispatch to free compute (LLM APIs) and context (search APIs).
 Registry: D:\\HermesData\\config\\fleet_registry.yaml
@@ -198,8 +198,37 @@ def _resolve_api_key(provider: Dict[str, Any]) -> Optional[str]:
     return direct or None
 
 
+_ENV_LOADED = False
+
+
+def _ensure_hermes_env_loaded() -> None:
+    """Load D:/HermesData/.env once so schtasks/CLI fleet dispatch sees GROQ/OR keys.
+
+    Root cause 2026-07-21: list_providers filtered all compute as key-missing when
+    process inherited no shell env (matrix smoke no_compute_provider). Proxy path
+    often had keys; bare pythonw cron did not.
+    """
+    global _ENV_LOADED
+    if _ENV_LOADED:
+        return
+    env_path = Path(r"D:\HermesData\.env")
+    if env_path.is_file():
+        try:
+            for line in env_path.read_text(encoding="utf-8").splitlines():
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, val = line.split("=", 1)
+                key = key.strip()
+                if not key:
+                    continue
+                os.environ.setdefault(key, val.strip().strip('"').strip("'"))
+        except Exception:
+            pass
+    _ENV_LOADED = True
+
+
 class FleetManager:
-    """Universal Opportunistic Fleet — compute + context from YAML registry."""
+    """Universal Opportunistic Fleet -- compute + context from YAML registry."""
 
     def __init__(self, registry_path: Path = REGISTRY_PATH):
         self.registry_path = registry_path
@@ -208,6 +237,7 @@ class FleetManager:
         self.reload()
 
     def reload(self) -> None:
+        _ensure_hermes_env_loaded()
         self._registry = self._load_registry()
         self._health_state = self._load_health_state()
 
@@ -341,24 +371,78 @@ class FleetManager:
         capabilities: Optional[List[str]] = None,
         *,
         healthy_only: bool = True,
+        preferred_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
-        """Ranked provider list for failover — highest score first."""
+        """Ranked provider list for failover - highest score first.
+
+        W2-P3: optional preferred_ids (from free_model_role_matrix) pin order.
+        """
         caps = [str(c).lower() for c in (capabilities or [])]
         candidates = self.list_providers(kind=kind, healthy_only=healthy_only)
         if not candidates and healthy_only:
             candidates = self.list_providers(kind=kind, healthy_only=False)
+        pref = [str(x) for x in (preferred_ids or []) if str(x).strip()]
+        if pref:
+            by_id = {str(p.get("id")): p for p in candidates}
+            ordered: List[Dict[str, Any]] = []
+            seen = set()
+            for pid in pref:
+                if pid in by_id and pid not in seen:
+                    ordered.append(by_id[pid])
+                    seen.add(pid)
+            for p in candidates:
+                pid = str(p.get("id"))
+                if pid not in seen:
+                    ordered.append(p)
+                    seen.add(pid)
+            candidates = ordered
         if not caps:
             return candidates
         scored: List[Tuple[int, Dict[str, Any]]] = []
         for p in candidates:
             pcaps = {str(c).lower() for c in (p.get("capabilities") or [])}
-            score = sum(2 for c in caps if c in pcaps) + int(p.get("_effective_priority") or p.get("priority") or 0)
-            if any(c in pcaps for c in caps):
+            score = sum(2 for c in caps if c in pcaps) + int(
+                p.get("_effective_priority") or p.get("priority") or 0
+            )
+            if pref:
+                pid = str(p.get("id"))
+                if pid in pref:
+                    score += 1000 - pref.index(pid)
+            if any(c in pcaps for c in caps) or not caps:
                 scored.append((score, p))
         if not scored:
             return candidates
         scored.sort(key=lambda x: (-x[0], str(x[1].get("id"))))
         return [p for _, p in scored]
+
+    def _role_preferred_ids(
+        self,
+        prompt: str,
+        task_type: Optional[str] = None,
+    ) -> List[str]:
+        """W2-P3 + W3-P2: preferred free ids via central backend policy, then RoleMatrix."""
+        # Central policy first (hop-order companion)
+        try:
+            from router_backend_policy import preferred_free_provider_ids, is_roleplay_or_adult
+
+            if is_roleplay_or_adult(task_type=task_type, prompt=prompt or ""):
+                return []
+            ids = list(
+                preferred_free_provider_ids(task_type=task_type, prompt=prompt or "") or []
+            )
+            if ids:
+                return ids
+        except Exception:
+            pass
+        try:
+            from free_model_role_matrix import RoleMatrix
+
+            rm = RoleMatrix.load()
+            if rm.blocked(task_type=task_type, prompt=prompt):
+                return []
+            return list(rm.preferred_provider_ids(task_type=task_type, prompt=prompt) or [])
+        except Exception:
+            return []
 
     def _max_provider_retries(self) -> int:
         try:
@@ -441,28 +525,126 @@ class FleetManager:
             return {"ok": False, "error": "provider_not_found", "id": provider_id}
         kind = provider.get("_kind") or "compute"
         started = time.time()
+        prev = (self._health_state.get("providers") or {}).get(provider_id) or {}
         try:
             if kind == "compute":
                 result = self._probe_compute(provider)
             else:
                 result = self._probe_context(provider)
             elapsed = round(time.time() - started, 2)
-            status = "up" if result.get("ok") else "down"
-            entry = {
-                "status": status,
-                "last_check": _utc_now(),
-                "latency_sec": elapsed,
-                "detail": result,
-            }
+            ok = bool(result.get("ok"))
+            if ok:
+                entry = {
+                    "status": "up",
+                    "last_check": _utc_now(),
+                    "latency_sec": elapsed,
+                    "fail_streak": 0,
+                    "consecutive_failures": 0,
+                    "detail": result,
+                }
+            else:
+                streak = int(prev.get("fail_streak") or prev.get("consecutive_failures") or 0) + 1
+                entry = {
+                    "status": "down",
+                    "last_check": _utc_now(),
+                    "latency_sec": elapsed,
+                    "fail_streak": streak,
+                    "consecutive_failures": streak,
+                    "detail": result,
+                }
             self._health_state.setdefault("providers", {})[provider_id] = entry
             self._save_health_state()
             _log(HEALTH_LOG, {"event": "health_check", "id": provider_id, **entry})
-            return {"ok": result.get("ok", False), "id": provider_id, **entry}
+            return {"ok": ok, "id": provider_id, **entry}
         except Exception as exc:
-            entry = {"status": "down", "last_check": _utc_now(), "error": str(exc)}
+            streak = int(prev.get("fail_streak") or prev.get("consecutive_failures") or 0) + 1
+            entry = {
+                "status": "down",
+                "last_check": _utc_now(),
+                "fail_streak": streak,
+                "consecutive_failures": streak,
+                "error": str(exc),
+            }
             self._health_state.setdefault("providers", {})[provider_id] = entry
             self._save_health_state()
             return {"ok": False, "id": provider_id, **entry}
+
+    def demote_on_fail_streak(
+        self,
+        *,
+        threshold: int = 3,
+        write_receipt: bool = True,
+    ) -> Dict[str, Any]:
+        """W3-P5: demote-only self-heal. Disable enabled providers with fail_streak>=N.
+
+        Never auto-enables. Operator promote only (procurement / manual).
+        """
+        threshold = max(1, int(threshold or 3))
+        demoted: List[Dict[str, Any]] = []
+        skipped: List[Dict[str, Any]] = []
+        providers_health = (self._health_state.get("providers") or {})
+        changed = False
+        for section in ("compute_providers", "context_providers"):
+            for p in self._registry.get(section) or []:
+                if not isinstance(p, dict):
+                    continue
+                pid = str(p.get("id") or "")
+                if not pid:
+                    continue
+                if not p.get("enabled", True):
+                    skipped.append({"id": pid, "reason": "already_disabled"})
+                    continue
+                if self._provider_lifecycle(p) not in ("enabled", ""):
+                    skipped.append({"id": pid, "reason": f"lifecycle={self._provider_lifecycle(p)}"})
+                    continue
+                h = providers_health.get(pid) or {}
+                streak = int(h.get("fail_streak") or h.get("consecutive_failures") or 0)
+                status = str(h.get("status") or "")
+                if status == "down" and streak >= threshold:
+                    reason = f"health_fail_streak_{streak}_ge_{threshold}"
+                    p["enabled"] = False
+                    p["lifecycle"] = "disabled"
+                    p["disabled_at"] = _utc_now()
+                    p["disabled_reason"] = reason
+                    demoted.append({
+                        "id": pid,
+                        "section": section,
+                        "fail_streak": streak,
+                        "reason": reason,
+                    })
+                    changed = True
+                else:
+                    skipped.append({
+                        "id": pid,
+                        "reason": "below_threshold_or_up",
+                        "fail_streak": streak,
+                        "status": status,
+                    })
+        receipt: Dict[str, Any] = {
+            "event": "fleet_demote_on_fail_streak",
+            "ts": _utc_now(),
+            "threshold": threshold,
+            "demoted": demoted,
+            "demoted_n": len(demoted),
+            "skipped_n": len(skipped),
+            "never_auto_enable": True,
+        }
+        if changed:
+            try:
+                self.save_registry()
+                self.reload()
+            except Exception as exc:
+                receipt["save_error"] = f"{type(exc).__name__}:{exc}"[:200]
+            _log(HEALTH_LOG, receipt)
+            if write_receipt:
+                try:
+                    path = HEALTH_LOG.parent / "fleet-demote-receipts.jsonl"
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(path, "a", encoding="utf-8") as f:
+                        f.write(json.dumps(receipt, ensure_ascii=True) + "\n")
+                except Exception:
+                    pass
+        return receipt
 
     def _infer_provider_kind(self, provider: Dict[str, Any]) -> str:
         api_mode = str(provider.get("api_mode") or "")
@@ -762,9 +944,14 @@ class FleetManager:
         if not self.enabled:
             return {"success": False, "tier": TIER_NAME, "error": "fleet_disabled"}
         caps = capabilities or self.infer_capabilities(prompt, task_type=task_type)
-        candidates = self.select_provider_candidates("compute", caps, healthy_only=True)
+        preferred = self._role_preferred_ids(prompt, task_type=task_type)
+        candidates = self.select_provider_candidates(
+            "compute", caps, healthy_only=True, preferred_ids=preferred or None,
+        )
         if not candidates:
-            candidates = self.select_provider_candidates("compute", caps, healthy_only=False)
+            candidates = self.select_provider_candidates(
+                "compute", caps, healthy_only=False, preferred_ids=preferred or None,
+            )
         if not candidates:
             return {"success": False, "tier": TIER_NAME, "error": "no_compute_provider", "capabilities": caps}
 
@@ -803,6 +990,7 @@ class FleetManager:
                     "latency_sec": one.get("latency_sec"),
                     "http_status": one.get("http_status"),
                     "failover_attempts": len(attempts),
+                    "role_preferred_ids": preferred or [],
                 }
                 _log(DISPATCH_LOG, {"event": "compute_dispatch", **{k: result.get(k) for k in result}})
                 return result
@@ -958,7 +1146,7 @@ class FleetManager:
         triggers: Optional[List[str]] = None,
         include_context: bool = False,
     ) -> Dict[str, Any]:
-        """Unified Tier 1.5 dispatch — parallel context prefetch + compute race when enabled."""
+        """Unified Tier 1.5 dispatch -- parallel context prefetch + compute race when enabled."""
         caps = self.infer_capabilities(prompt, task_type=task_type, triggers=triggers)
         need_context = bool(include_context or "real-time-search" in caps)
         context_block = ""
@@ -1000,7 +1188,7 @@ class FleetManager:
                 "success": True,
                 "tier": TIER_NAME,
                 "response": (
-                    "[T2 CONTEXT-ONLY — compute providers unavailable; synthesize from prefetch]\n"
+                    "[T2 CONTEXT-ONLY -- compute providers unavailable; synthesize from prefetch]\n"
                     + snippet
                 ),
                 "model": "context-only-fallback",
@@ -1044,6 +1232,13 @@ class FleetManager:
                 results.append(self.health_check(pid))
         self._save_health_state()
         up = sum(1 for r in results if r.get("ok"))
+        # W3-P5: demote-only after consecutive downs (never auto-enable)
+        demote = {"demoted_n": 0, "skipped": True if shadow else False}
+        if not shadow:
+            try:
+                demote = self.demote_on_fail_streak(threshold=3, write_receipt=True)
+            except Exception as exc:
+                demote = {"demoted_n": 0, "error": f"{type(exc).__name__}:{exc}"[:160]}
         summary = {
             "timestamp": _utc_now(),
             "mode": "shadow" if shadow else "production",
@@ -1052,8 +1247,15 @@ class FleetManager:
             "down": len(results) - up,
             "missing_env": sum(1 for r in results if r.get("status") == "missing_env"),
             "results": results,
+            "demote": {
+                "demoted_n": int(demote.get("demoted_n") or 0),
+                "demoted": demote.get("demoted") or [],
+                "threshold": demote.get("threshold"),
+                "never_auto_enable": True,
+                "error": demote.get("error"),
+            },
         }
-        _log(HEALTH_LOG, {"event": "health_cycle", **summary})
+        _log(HEALTH_LOG, {"event": "health_cycle", **{k: v for k, v in summary.items() if k != "results"}})
         return summary
 
     def status(self) -> Dict[str, Any]:
@@ -1095,7 +1297,7 @@ class FleetManager:
 
 
 def _config_fleet_enabled() -> bool:
-    """Operator gate in config.yaml — registry alone is not enough."""
+    """Operator gate in config.yaml -- registry alone is not enough."""
     try:
         cfg_path = Path(r"D:\HermesData\config.yaml")
         if not cfg_path.is_file():

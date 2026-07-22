@@ -327,6 +327,15 @@ def write_sidecars(path: Path, text: str, rec: dict, write_train: bool) -> None:
             flag.unlink()
         except Exception:
             pass
+    # durable thin_image marker (not train yield)
+    thin = Path(str(path) + ".thin_image.json")
+    if st == "thin_image":
+        thin.write_text(json.dumps(rec, indent=2), encoding="utf-8")
+    elif thin.is_file():
+        try:
+            thin.unlink()
+        except Exception:
+            pass
 
 
 def process_one(path: Path, tess: str | None, write_train: bool, max_pages: int) -> dict:
@@ -365,6 +374,36 @@ def process_one(path: Path, tess: str | None, write_train: bool, max_pages: int)
                     "twin_useful": False,
                 }
                 engine = "encrypted_pdf"
+            # corrupt / unrenderable PDFs
+            elif (not text.strip()) and any(
+                x in joined
+                for x in (
+                    "no_page_render",
+                    "invalid xref",
+                    "xref num",
+                    "wrong page range",
+                    "top-level pages object is wrong",
+                    "file not found",
+                )
+            ):
+                q = {
+                    "status": "corrupt_retired",
+                    "reason": "unrenderable_pdf",
+                    "chars": 0,
+                    "alnum_ratio": 0.0,
+                    "twin_useful": False,
+                }
+                engine = "corrupt_pdf"
+            # graphics-heavy forms with multi-pass OCR garbage
+            elif q.get("status") == "needs_ocr" and int(q.get("chars") or 0) < 40:
+                # second chance already used max_pages; park as thin_image so queue drains
+                q = {
+                    "status": "thin_image",
+                    "reason": "ocr_exhausted_low_yield",
+                    "chars": int(q.get("chars") or 0),
+                    "alnum_ratio": q.get("alnum_ratio") or 0.0,
+                    "twin_useful": False,
+                }
         rec = {
             "path": str(path),
             "size": size,
@@ -391,6 +430,20 @@ def process_one(path: Path, tess: str | None, write_train: bool, max_pages: int)
         text = ocr_image(path, tess)
         engine = "tesseract_image"
         q = quality(text, size)
+        # pure photos / neuroimaging: fail closed as thin_image (not endless needs_ocr)
+        s_low = str(path).lower().replace("\\", "/")
+        if q.get("status") == "needs_ocr" and (
+            "volbrain" in s_low
+            or "00-pics" in s_low
+            or len((text or "").strip()) < 40
+        ):
+            q = {
+                "status": "thin_image",
+                "reason": "image_sparse_or_non_document",
+                "chars": len((text or "").strip()),
+                "alnum_ratio": q.get("alnum_ratio") or 0.0,
+                "twin_useful": False,
+            }
         rec = {
             "path": str(path),
             "size": size,
@@ -410,12 +463,15 @@ def _ocr_score(path: Path) -> int:
     s = str(path).lower().replace("\\", "/")
     name = path.name.lower()
     ext = path.suffix.lower()
-    # hard skips: portraits / chrome
-    if re.search(r"(logo|icon|wallpaper|screenshot|portrait|headshot|badge)", name):
+    # hard skips: portraits / chrome / pure neuroimaging blobs
+    if re.search(r"(logo|icon|wallpaper|screenshot|portrait|headshot|badge|dr\.\s)", name):
+        return -1
+    if "volbrain" in s or "00-pics" in s:
+        # radiology imagery / doctor portraits — not twin train text
         return -1
     if ext in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
         # only keep images that look like scanned docs
-        if not re.search(r"(lab|scan|record|note|order|dd214|les|eval|phr|page)", name):
+        if not re.search(r"(lab|scan|record|note|order|dd214|les|eval|phr|page|rfa|labwork)", name):
             return -1
     score = 0
     if Path(str(path) + ".needs_ocr").is_file():
@@ -439,6 +495,9 @@ def _ocr_score(path: Path) -> int:
         ("bluebutton", 60),
         ("tricare", 40),
         ("chiro", 40),
+        ("rfa", 70),
+        ("pharmacy", 50),
+        ("medication", 40),
     ):
         if k in s or k in name:
             score += w
@@ -461,10 +520,17 @@ def _ocr_score(path: Path) -> int:
             q = d.get("quality") or {}
             if q.get("twin_useful"):
                 return -1
-            if q.get("status") == "encrypted":
+            if q.get("status") in ("encrypted", "image_sparse", "thin_image"):
                 return -1
             if q.get("status") == "empty" and not Path(str(path) + ".needs_ocr").is_file():
                 score -= 50
+            # already OCR'd once with low yield — only retry if clinical PDF + needs_ocr flag
+            chars = int(q.get("chars") or 0)
+            eng = str(d.get("engine") or "")
+            if chars < 40 and "tesseract" in eng and ext != ".pdf":
+                return -1
+            if chars < 40 and "tesseract" in eng and ext == ".pdf":
+                score -= 80  # allow one more deep pass via explicit paths, not bulk
         except Exception:
             pass
     return score

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-sovereign_openai_proxy.py — Phronesis MoE gateway (OpenAI-compatible wire format).
+sovereign_openai_proxy.py -- Phronesis MoE gateway (OpenAI-compatible wire format).
 
-Bridges Hermes primary agent loop → router_bridge → local MoE 8081/8082/8083.
+Bridges Hermes primary agent loop -> router_bridge -> local MoE 8081/8082/8083.
 Hermes config: custom_providers phronesis-sovereign @ http://127.0.0.1:8091/v1
 
 The /v1/* paths follow the OpenAI Chat Completions *protocol* so Hermes
 custom_providers (api_mode: chat_completions) work without cloud OpenAI.
-Service identity: phronesis-moe-gateway — local mixture-of-experts only.
+Service identity: phronesis-moe-gateway -- local mixture-of-experts only.
 
 Tier-aware context: Hermes may send up to 64K-equivalent payloads; this proxy
 trims/compresses to per-tier safe budgets before llama-server dispatch.
@@ -81,7 +81,7 @@ FACTUAL_TOOL_MARKERS = (
     "image_gen",
     "generate an image",
     "golden toaster",
-    # File / collab — Qwythos narrates tools unless tool_choice=required
+    # File / collab -- Qwythos narrates tools unless tool_choice=required
     "read_file",
     "write_file",
     "must use tools",
@@ -102,7 +102,7 @@ _THINK_BLOCK_RE = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 
-# Model id suffix → task_type (config extensible via env JSON path later)
+# Model id suffix -> task_type (config extensible via env JSON path later)
 MODEL_TASK_MAP = {
     "auto": None,
     "code": "code",
@@ -173,11 +173,11 @@ def _utc_now() -> str:
 _LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB per log file
 _LOG_BACKUP_COUNT = 3
 
-# ──────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 # Batch 5 (2026-06-29): Connection pool, prompt cache, circuit breaker
 # Research: iunera.com middleware pattern, Vercel AI SDK connection reuse,
 #           Gravitee semantic caching, circuit breaker standard pattern.
-# ──────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 
 class _ConnectionPool:
     """Reusable HTTP connections to upstream llama-server (avoids TCP handshake per request)."""
@@ -256,7 +256,7 @@ _upstream_pool = _ConnectionPool(max_per_host=4, keep_alive_sec=60)
 
 
 class _PromptCache:
-    """Tiny LRU cache for identical prompt → response (stdinference save for repeated tool schemas)."""
+    """Tiny LRU cache for identical prompt -> response (stdinference save for repeated tool schemas)."""
 
     def __init__(self, max_items: int = 64, ttl_sec: int = 120):
         self._cache: Dict[str, Tuple[float, str]] = {}
@@ -301,7 +301,7 @@ _prompt_cache = _PromptCache(max_items=64, ttl_sec=120)
 
 
 class _CircuitBreaker:
-    """Prevent hammering a down upstream — half-open after cooldown."""
+    """Prevent hammering a down upstream -- half-open after cooldown."""
 
     def __init__(self, failure_threshold: int = 5, cooldown_sec: float = 30.0):
         self._failures = 0
@@ -430,7 +430,7 @@ def _dispatch_upstream_with_pool(url: str, payload: bytes,
     port = parsed.port or 80
     breaker = _get_breaker(port)
     if not breaker.allow_request:
-        raise ConnectionError(f"Circuit breaker OPEN for port {port} — upstream appears down")
+        raise ConnectionError(f"Circuit breaker OPEN for port {port} - upstream appears down")
     headers = {"Content-Type": content_type}
     last_exc: Optional[Exception] = None
     for attempt in range(max(1, max_attempts)):
@@ -462,9 +462,9 @@ def _dispatch_upstream_with_pool(url: str, payload: bytes,
     raise ConnectionError("upstream dispatch failed")
 
 
-# ──────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 # Batch 5 END
-# ──────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 
 
 def _rotate_if_needed(path: Path) -> None:
@@ -492,7 +492,7 @@ def _rotate_if_needed(path: Path) -> None:
             first.unlink()
         path.rename(first)
     except Exception:
-        # Never block inference on log I/O — but do not mask forever:
+        # Never block inference on log I/O -- but do not mask forever:
         # size stuck above max would skip writes if rotate keeps failing.
         # Caller still tries append; if rename failed, append may still work.
         pass
@@ -812,7 +812,7 @@ def trim_messages_tier_aware(
     """
     Trim chat history to the safe input budget for the resolved MoE tier.
     Preserves system prompts + recent turns; middle history becomes a stub.
-    Roleplay tier bypasses trim — full unfiltered working memory preserved.
+    Roleplay tier bypasses trim -- full unfiltered working memory preserved.
     """
     from model_resource_manager import context_budget_for_tier, input_budget_for_tier
 
@@ -1015,7 +1015,7 @@ def _message_blob(messages: List[Dict[str, Any]]) -> str:
 
 
 def _user_developer_blob(messages: List[Dict[str, Any]]) -> str:
-    """User/developer text only — system prompts mention #alice-roleplay as policy."""
+    """User/developer text only -- system prompts mention #alice-roleplay as policy."""
     parts: List[str] = []
     for msg in messages or []:
         if str(msg.get("role") or "").lower() in ("user", "developer"):
@@ -1598,7 +1598,7 @@ def dispatch_via_native_router(
             if cached is not None:
                 data = json.loads(cached)
                 _log_event({"event": "prompt_cache_hit", "model": logical, "port": UNIFIED_ROUTER_PORT})
-                # Skip upstream call — go straight to response parsing
+                # Skip upstream call -- go straight to response parsing
                 choice = (data.get("choices") or [{}])[0]
                 raw_msg = choice.get("message") or {}
                 content = _assistant_visible_content(raw_msg, allow_reasoning_fallback=True)
@@ -2483,43 +2483,47 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                         body,
                         trimmed_messages,
                         model,
-                        result = dispatch_via_native_router(
-                                        prompt, model, stream=stream, body=body, routing=routing
-                                    )
-                                else:
-                                    result = dispatch_via_bridge(
-                                        prompt, model, stream=stream, body=body, routing=routing
-                                    )
-                                # W2-P1: stamp proxy path + live circuit state before escalation
-                                try:
-                                    br_snap = _get_breaker(8090).snapshot()
-                                    prov0 = result.setdefault("provenance", {})
-                                    prov0["path"] = "proxy_8091"
-                                    prov0["circuit_8090"] = br_snap.get("state")
-                                    prov0["circuit_force_open"] = bool(br_snap.get("force_open"))
-                                    if not result.get("success"):
-                                        routing = {
-                                            **routing,
-                                            "path": "proxy_8091",
-                                            "circuit_8090": br_snap.get("state"),
-                                            "local_fail_reason": result.get("error"),
-                                        }
-                                except Exception:
-                                    routing = {**routing, "path": "proxy_8091"}
-                                try:
-                                    from escalation_router import resolve_post_local_dispatch
+                        routing=routing,
+                        trim_meta=trim_meta,
+                    )
+                else:
+                    result = dispatch_via_bridge(
+                        prompt, model, trim_meta=trim_meta, routing=routing,
+                    )
+                # W2-P1: stamp proxy path + live circuit state before escalation
+                try:
+                    br_snap = _get_breaker(8090).snapshot()
+                    prov0 = result.setdefault("provenance", {})
+                    prov0["path"] = "proxy_8091"
+                    prov0["circuit_8090"] = br_snap.get("state")
+                    prov0["circuit_force_open"] = bool(br_snap.get("force_open"))
+                    if not result.get("success"):
+                        routing = {
+                            **routing,
+                            "path": "proxy_8091",
+                            "circuit_8090": br_snap.get("state"),
+                            "local_fail_reason": str(
+                                result.get("error") or result.get("response") or ""
+                            )[:300],
+                        }
+                except Exception:
+                    routing = {**routing, "path": "proxy_8091"}
+                try:
+                    from escalation_router import resolve_post_local_dispatch
 
-                                    if augment_meta.get("augmented"):
-                                        result.setdefault("provenance", {})["context_augment"] = augment_meta
-                                    result = resolve_post_local_dispatch(prompt, routing, result)
-                                except Exception as esc_exc:
-                                    _log_event({"event": "post_local_escalation_error", "error": str(esc_exc)})
-                                # Ensure path stamped on final result
-                                try:
-                                    result.setdefault("provenance", {})["path"] = "proxy_8091"
-                                except Exception:
-                                    pass
-                            except Exception as exc:
+                    if augment_meta.get("augmented"):
+                        result.setdefault("provenance", {})["context_augment"] = augment_meta
+                    result = resolve_post_local_dispatch(prompt, routing, result)
+                except Exception as esc_exc:
+                    _log_event({"event": "post_local_escalation_error", "error": str(esc_exc)})
+                # Ensure path stamped on final result
+                try:
+                    result.setdefault("provenance", {})["path"] = "proxy_8091"
+                except Exception:
+                    pass
+            except Exception as exc:
+                _log_event({"event": "dispatch_exception", "error": str(exc), "model": model})
+                status, err = openai_error(503, f"dispatch failed: {exc}")
                 if queue_ticket is not None:
                     err["phronesis_queue"] = _queue_ticket_dict(queue_ticket)
                 self._send_json(status, err, extra_headers=queue_headers or None)
@@ -2622,7 +2626,7 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 "completion_tokens": usage_out,
                 "total_tokens": usage_in + usage_out,
             },
-            # Phase 1–2 decision-log hygiene (2026-07-19): align with decision_log_schema
+            # Phase 1-2 decision-log hygiene (2026-07-19): align with decision_log_schema
             "policy_version": "hybrid-local-grok-2026-07-17",
             "routing_reasons": [
                 r for r in [
@@ -2635,7 +2639,60 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 ] if r
             ],
             "failure_class": None,
+            # W3-P3 continuous fields
+            "path": prov.get("path") or "proxy_8091",
+            "provider_id": prov.get("provider_id") or result.get("provider_id"),
+            "tier_bucket": prov.get("tier_bucket"),
+            "role": (prov.get("backend_policy") or {}).get("role") if isinstance(prov.get("backend_policy"), dict) else None,
+            "success": True,
         })
+        # W3-P3: dual-write continuous completion stamp (never block inference)
+        try:
+            from router_thrift_rollup import append_completion_provenance, tier_bucket as _tb  # type: ignore
+        except Exception:
+            try:
+                import sys as _sys
+                from pathlib import Path as _P
+                _sp = str(_P(r"D:\HermesData\scripts"))
+                if _sp not in _sys.path:
+                    _sys.path.insert(0, _sp)
+                from router_thrift_rollup import append_completion_provenance
+            except Exception:
+                append_completion_provenance = None  # type: ignore
+        if append_completion_provenance is not None:
+            try:
+                from router_backend_policy import tier_bucket as _tier_bucket
+            except Exception:
+                _tier_bucket = None  # type: ignore
+            backend_s = str(prov.get("selected_backend") or result.get("tier") or "")
+            pid_s = str(prov.get("provider_id") or result.get("provider_id") or "")
+            model_s = str(resolved_model or model or "")
+            tb = prov.get("tier_bucket")
+            if not tb and _tier_bucket:
+                try:
+                    tb = _tier_bucket(backend_s, provider_id=pid_s, model=model_s)
+                except Exception:
+                    tb = None
+            role_s = None
+            bp = prov.get("backend_policy")
+            if isinstance(bp, dict):
+                role_s = bp.get("role")
+            append_completion_provenance({
+                "event": "completion_ok",
+                "success": True,
+                "path": prov.get("path") or "proxy_8091",
+                "backend": backend_s,
+                "selected_backend": backend_s,
+                "provider_id": pid_s,
+                "model": model_s,
+                "tier": result.get("tier"),
+                "tier_bucket": tb,
+                "role": role_s,
+                "task_type": routing.get("task_type") or resolve_task_type(model),
+                "latency_sec": latency,
+                "input_tokens": usage_in,
+                "output_tokens": usage_out,
+            })
         # Keep /health last_dispatch live (not frozen LRU from pre-unified path).
         _touch_last_dispatch(
             logical_model=str(resolved_model or model or ""),
