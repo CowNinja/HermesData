@@ -103,7 +103,12 @@ EXPECTED_SCRIPTS = {
                 "gallery_ingest_catchup_cron.py": {"plane": "image", "stop": None, "single_writer": False},
                                 "rp_sandbox_residual_lint_cron.py": {"plane": "rp", "stop": None, "single_writer": False},
                                 "ensure_qwythos_8090.py": {"plane": "grunt", "stop": None, "single_writer": False},
-                            }
+                                        # 2026-07-22 Driver cook P1 — Wave-2/4 enabled crons
+                                        "fleet_health_tick.py": {"plane": "model", "stop": None, "single_writer": False},
+                                        "pick_backend_matrix_lab.py": {"plane": "model", "stop": None, "single_writer": False},
+                                        "stack_single_instance_audit.py": {"plane": "gateway", "stop": None, "single_writer": False},
+                                        "router_thrift_rollup.py": {"plane": "model", "stop": None, "single_writer": False},
+                                    }
 
 STOP_LOCK_PATHS = [
     STATE / "silo_continuous.STOP",

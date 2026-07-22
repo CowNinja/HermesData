@@ -644,6 +644,23 @@ class FleetManager:
                         f.write(json.dumps(receipt, ensure_ascii=True) + "\n")
                 except Exception:
                     pass
+        # W4-P3: always refresh latest demote surface (even demoted_n=0) for snapshot
+        if write_receipt:
+            try:
+                latest = HEALTH_LOG.parent / "fleet-demote-latest.json"
+                latest.parent.mkdir(parents=True, exist_ok=True)
+                with open(latest, "w", encoding="utf-8") as f:
+                    f.write(json.dumps(receipt, indent=2, ensure_ascii=True))
+                try:
+                    state_latest = Path(r"D:\HermesData\state") / "fleet-demote-latest.json"
+                    state_latest.parent.mkdir(parents=True, exist_ok=True)
+                    state_latest.write_text(
+                        json.dumps(receipt, indent=2, ensure_ascii=True), encoding="utf-8"
+                    )
+                except Exception:
+                    pass
+            except Exception:
+                pass
         return receipt
 
     def _infer_provider_kind(self, provider: Dict[str, Any]) -> str:

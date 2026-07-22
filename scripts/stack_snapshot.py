@@ -275,23 +275,48 @@ def fleet_color() -> dict:
         summary = f"fleet degraded up={up} down={down}" + (" stale" if stale else "")
 
     return {
-            "color": color,
-            "summary": summary,
-            "source": "fleet_health_enabled_only",
-            "up": up,
-            "down": down,
-            "unknown": unknown,
-            "providers_n": providers_n,
-            "enabled_ids": sorted(enabled_ids),
-            "max_age_hours": round(max_age_h, 2) if max_age_h is not None else None,
-            "stale_gt_6h": stale,
-            "ids_up": ids_up[:12],
-            "ids_down": ids_down[:12],
-            "tick_age_h": tick_age_h,
-            "guard_ok": guard_ok,
-            "last_demote": last_json(VAULT / "fleet-demote-latest.json")
-            or last_json(ROOT / "state" / "fleet-demote-latest.json"),
-        }
+        "color": color,
+        "summary": summary,
+        "source": "fleet_health_enabled_only",
+        "up": up,
+        "down": down,
+        "unknown": unknown,
+        "providers_n": providers_n,
+        "enabled_ids": sorted(enabled_ids),
+        "max_age_hours": round(max_age_h, 2) if max_age_h is not None else None,
+        "stale_gt_6h": stale,
+        "ids_up": ids_up[:12],
+        "ids_down": ids_down[:12],
+        "tick_age_h": tick_age_h,
+        "guard_ok": guard_ok,
+        "last_demote": _last_demote_surface(),
+    }
+
+
+def _last_demote_surface() -> dict | None:
+    """W4-P3: prefer latest.json, else tail of demote receipts jsonl."""
+    for path in (
+        VAULT / "fleet-demote-latest.json",
+        ROOT / "state" / "fleet-demote-latest.json",
+    ):
+        d = last_json(path)
+        if d:
+            return d
+    jsonl = VAULT / "fleet-demote-receipts.jsonl"
+    try:
+        if jsonl.is_file() and jsonl.stat().st_size > 0:
+            raw = jsonl.read_text(encoding="utf-8", errors="replace").splitlines()
+            for line in reversed(raw[-40:]):
+                line = line.strip()
+                if not line.startswith("{"):
+                    continue
+                try:
+                    return json.loads(line)
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return None
 
 
 def proxy_circuit_color() -> dict:
@@ -310,7 +335,9 @@ def proxy_circuit_color() -> dict:
         if force_open or state in {"open", "half_open"}:
             color = "YELLOW"
         stack = body.get("stack") or {}
-        if body.get("status") not in {"GREEN", "OK", "ok", None} and not stack.get("proxy_ready", True):
+        if body.get("status") not in {"GREEN", "OK", "ok", None} and not stack.get(
+            "proxy_ready", True
+        ):
             color = "RED"
         return {
             "color": color,
@@ -331,7 +358,7 @@ def proxy_circuit_color() -> dict:
 
 
 def thrift_plane() -> dict:
-    """Always-on thrift rollup plane (W3-P3)."""
+    """Always-on thrift rollup plane (W3-P3 / W4-P2/P5)."""
     try:
         if str(SCRIPTS) not in sys.path:
             sys.path.insert(0, str(SCRIPTS))
@@ -346,6 +373,8 @@ def thrift_plane() -> dict:
             "source": "router_thrift_rollup",
             "thrift": roll.get("thrift"),
             "share": roll.get("share"),
+            "latency_ms": roll.get("latency_ms"),
+            "unknown_samples": roll.get("unknown_samples"),
             "notes": roll.get("notes") or [],
             "window_hours": roll.get("window_hours"),
             "provenance_lines": roll.get("provenance_lines"),
@@ -359,6 +388,7 @@ def thrift_plane() -> dict:
                 "source": "router-thrift-rollup-latest.json",
                 "thrift": stale.get("thrift"),
                 "share": stale.get("share"),
+                "latency_ms": stale.get("latency_ms"),
                 "error": f"{type(exc).__name__}:{exc}"[:160],
             }
         return {
