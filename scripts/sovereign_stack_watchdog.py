@@ -38,14 +38,35 @@ _WATCHDOG_LOG_MAX_BYTES = 8 * 1024 * 1024  # 8 MiB
 _WATCHDOG_LOG_BACKUPS = 3
 
 LOG_PATTERNS: Dict[str, tuple[str, ...]] = {
-    "grammar_crash": ("unable to generate parser", "grammar parser"),
-    "provider_503": ("dispatch failed", "provider unreachable", '"code": 503'),
+    "grammar_crash": ("unable to generate parser", "grammar parser", "callexpression"),
+    "provider_503": ("provider unreachable", '"code": 503', "service unavailable"),
+    # Permanent (non-retryable) vs retriable — prevents thrashing on template/400s.
+    "permanent_fail": (
+        '"failure_class": "permanent"',
+        '"failure_class":"permanent"',
+        "invalid_request_error",
+        "template/grammar permanent fail",
+        "client_http_status\": 400",
+        "client_http_status\":400",
+    ),
+    "retriable_fail": (
+        '"failure_class": "transient"',
+        '"failure_class":"transient"',
+        '"failure_class": "capacity"',
+        '"retryable": true',
+        "connection refused",
+        "winerror 10061",
+    ),
+    "proactive_flatten": ("proactive_tool_history_flatten",),
     "tool_halt": ("same_tool_failure_halt", "guardrail halted", "infra_failure_halt"),
     "comfy_down": ("comfyui not reachable", "comfy_bootstrap_failed", ":8188"),
     "vram_pressure": ("out of memory", "insufficient vram", "vram free"),
     "path_drift": (r"k:\hermesdata", "path not found: k:"),
     "image_stall": ("stream_request_complete", "tool image_generate"),
 }
+
+# Proxy log is the SSOT for router fail classes (agent.log alone misses them).
+PROXY_LOG = VAULT / "Operations" / "logs" / "sovereign-proxy.jsonl"
 
 COMFY_URL = "http://127.0.0.1:8188"
 COMFY_OUTPUT = Path(r"D:\ComfyUI\output")
@@ -521,19 +542,43 @@ def _tail_lines(path: Path, max_lines: int = 400) -> list[str]:
 
 
 def scan_log_patterns() -> Dict[str, Any]:
-    """Scan recent agent/errors logs for recurring sovereign failure signatures."""
+    """Scan recent agent/errors/proxy logs for recurring sovereign failure signatures.
+
+    Classifies permanent (do not thrash) vs retriable failures. Storm alert only when
+    retriable_fail or provider_503 dominate — permanent grammar/400s are fail-closed.
+    """
     hits: Dict[str, int] = {k: 0 for k in LOG_PATTERNS}
     samples: Dict[str, str] = {}
-    for path in (AGENT_LOG, ERRORS_LOG):
-        for line in _tail_lines(path, 500):
+    scan_paths = (AGENT_LOG, ERRORS_LOG, PROXY_LOG)
+    for path in scan_paths:
+        # Proxy jsonl is hotter; sample more lines.
+        n = 800 if path == PROXY_LOG else 500
+        for line in _tail_lines(path, n):
             lower = line.lower()
             for key, markers in LOG_PATTERNS.items():
-                if any(m in lower for m in markers):
+                if any(m.lower() in lower for m in markers):
                     hits[key] += 1
                     if key not in samples:
                         samples[key] = line[-240:]
     active = [k for k, n in hits.items() if n > 0]
-    return {"hits": hits, "active_patterns": active, "samples": samples}
+    permanent = int(hits.get("permanent_fail") or 0)
+    retriable = int(hits.get("retriable_fail") or 0) + int(hits.get("provider_503") or 0)
+    grammar = int(hits.get("grammar_crash") or 0)
+    # Storm = retriable infrastructure loop; permanent 400s alone are not a storm.
+    storm = retriable >= 5 and retriable >= permanent
+    return {
+        "hits": hits,
+        "active_patterns": active,
+        "samples": samples,
+        "failure_class_summary": {
+            "permanent": permanent,
+            "retriable": retriable,
+            "grammar_crash": grammar,
+            "proactive_flatten": int(hits.get("proactive_flatten") or 0),
+            "storm_retriable": storm,
+            "alert_policy": "alert_only_if_storm_retriable",
+        },
+    }
 
 
 def _load_vram_state() -> dict:

@@ -818,7 +818,23 @@ def trim_messages_tier_aware(
     """
     from model_resource_manager import context_budget_for_tier, input_budget_for_tier
 
+    # Flatten Grok/OpenAI tool-call history before budgeting — primary fix path for
+    # llama-server template 400s (CallExpression). Logged so soak/watchdog can see it.
+    pre_flat = messages or []
+    had_tool_shape = any(
+        isinstance(m, dict)
+        and (m.get("role") == "tool" or (m.get("role") == "assistant" and m.get("tool_calls")))
+        for m in pre_flat
+    )
     messages = _flatten_tool_history_for_llama(messages)
+    if had_tool_shape:
+        _log_event({
+            "event": "proactive_tool_history_flatten",
+            "phase": "trim_messages_tier_aware",
+            "model": model,
+            "orig_turns": len(pre_flat),
+            "flat_turns": len(messages or []),
+        })
 
     if _roleplay_route_requested(model, messages):
         original_tokens = sum(_message_tokens(m) for m in messages)
