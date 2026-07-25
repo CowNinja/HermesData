@@ -14,6 +14,9 @@ custom_providers:
   models:
     phronesis-sovereign-auto:
       context_length: 65536
+    # Alias: same backbone as auto (Qwythos-9B via 8091 → 8090)
+    qwythos-9b:
+      context_length: 65536
     phronesis-sovereign-classify:
       context_length: 65536
     phronesis-sovereign-code:

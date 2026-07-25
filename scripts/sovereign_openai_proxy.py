@@ -125,6 +125,8 @@ MOE_OWNER = "phronesis-moe"
 
 MODEL_SPECS: List[Dict[str, Any]] = [
     {"id": "phronesis-sovereign-auto", "name": "Phronesis MoE Auto", "tier": "auto", "task_type": None},
+    # Explicit Qwythos alias (same unified 8090 backbone as auto)
+    {"id": "qwythos-9b", "name": "Qwythos 9B Local Backbone", "tier": "auto", "task_type": None},
     {"id": "phronesis-sovereign-code", "name": "Phronesis MoE Code", "tier": "local_hot", "task_type": "code"},
     {"id": "phronesis-sovereign-synthesis", "name": "Phronesis MoE Synthesis", "tier": "local_warm", "task_type": "synthesis"},
     {"id": "phronesis-sovereign-classify", "name": "Phronesis MoE Classify", "tier": "local_hot", "task_type": "classify"},
@@ -1563,9 +1565,36 @@ def dispatch_via_native_router(
     if tool_passthrough or factual_tools:
         max_tokens = max(max_tokens, min(2048, safe_max))
 
+    # Proactive: flatten cloud/Grok tool-call history before first llama-server hit.
+    # Prevents HTTP 400 "Unable to generate parser for this template / CallExpression"
+    # storms that used to surface as retriable 503s.
+    history_has_tools = any(
+        isinstance(m, dict)
+        and (m.get("role") == "tool" or (m.get("role") == "assistant" and m.get("tool_calls")))
+        for m in (messages or [])
+    )
+    prep_messages = messages
+    history_flattened = False
+    if history_has_tools:
+        prep_messages = _flatten_tool_history_for_llama(messages)
+        history_flattened = True
+        try:
+            prep_messages, _ = trim_messages_tier_aware(
+                prep_messages,
+                gateway_model or "phronesis-sovereign-auto",
+            )
+        except Exception:
+            pass
+        _log_event({
+            "event": "proactive_tool_history_flatten",
+            "model": logical,
+            "orig_turns": len(messages or []),
+            "flat_turns": len(prep_messages or []),
+        })
+
     forward: Dict[str, Any] = {
         "model": logical,
-        "messages": messages,
+        "messages": prep_messages,
         "max_tokens": max_tokens,
         "temperature": body.get("temperature", 0.7),
         "stream": False,
@@ -1607,6 +1636,7 @@ def dispatch_via_native_router(
                     "logical_model": logical,
                     "native_passthrough": True,
                     "cached": True,
+                    "history_flattened": history_flattened,
                 }
                 return {
                     "success": True,
@@ -1630,7 +1660,11 @@ def dispatch_via_native_router(
             err_text = err_body.decode("utf-8", errors="replace") if isinstance(err_body, (bytes, bytearray)) else str(err_body)
             grammar_fail = (
                 result["status"] == 400
-                and "unable to generate parser" in err_text.lower()
+                and (
+                    "unable to generate parser" in err_text.lower()
+                    or "callexpression" in err_text.lower()
+                    or "template" in err_text.lower()
+                )
             )
             if grammar_fail:
                 retry_candidates: List[Dict[str, Any]] = []
@@ -1639,6 +1673,7 @@ def dispatch_via_native_router(
                     no_tools.pop("tools", None)
                     no_tools.pop("tool_choice", None)
                     retry_candidates.append(no_tools)
+                # Always offer a flat-history + no-tools candidate (even if already flattened).
                 flat_msgs = _flatten_tool_history_for_llama(forward.get("messages") or [])
                 try:
                     flat_msgs, _ = trim_messages_tier_aware(
@@ -1669,8 +1704,10 @@ def dispatch_via_native_router(
                 if not recovered:
                     rb = result.get("body") or b""
                     err_tail = rb.decode("utf-8", errors="replace") if isinstance(rb, (bytes, bytearray)) else str(rb)
+                    # Permanent template failure — surface as 400 upstream HTTP so
+                    # the proxy maps to invalid_request_error (not retriable 503).
                     raise RuntimeError(
-                        f"upstream returned HTTP {result['status']}: {err_tail[:200]!r}"
+                        f"upstream returned HTTP 400: template/grammar permanent fail: {err_tail[:200]!r}"
                     )
             else:
                 raise RuntimeError(f"upstream returned HTTP {result['status']}: {err_text[:200]}")
@@ -1680,13 +1717,32 @@ def dispatch_via_native_router(
         if use_cache and data:
             _prompt_cache.put(logical, cache_key_for_body, result["body"].decode("utf-8"))
     except Exception as exc:
+        err_s = str(exc)
+        try:
+            from sovereign_failure_taxonomy import classify_dispatch_failure
+
+            fail_meta = classify_dispatch_failure(err_s)
+        except Exception:
+            fail_meta = {
+                "failure_class": "unknown",
+                "http_status": 503,
+                "error_type": "server_error",
+                "retryable": True,
+            }
         return {
             "success": False,
             "response": f"[NATIVE ROUTER] dispatch failed: {exc}",
             "model": logical,
             "tier": "local_generalist",
-            "provenance": {"selected_backend": "native_8090", "error": str(exc)},
+            "provenance": {
+                "selected_backend": "native_8090",
+                "error": err_s,
+                "history_flattened": history_flattened,
+                **fail_meta,
+            },
             "latency_sec": round(time.time() - started, 2),
+            "failure_class": fail_meta.get("failure_class"),
+            "client_http_status": fail_meta.get("http_status"),
         }
 
     choice = (data.get("choices") or [{}])[0]
@@ -2523,7 +2579,26 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                     pass
             except Exception as exc:
                 _log_event({"event": "dispatch_exception", "error": str(exc), "model": model})
-                status, err = openai_error(503, f"dispatch failed: {exc}")
+                try:
+                    from sovereign_failure_taxonomy import classify_dispatch_failure
+
+                    fm = classify_dispatch_failure(str(exc))
+                except Exception:
+                    fm = {
+                        "http_status": 503,
+                        "error_type": "server_error",
+                        "failure_class": "unknown",
+                        "retryable": True,
+                    }
+                status, err = openai_error(
+                    int(fm.get("http_status") or 503),
+                    f"dispatch failed: {exc}",
+                    str(fm.get("error_type") or "server_error"),
+                )
+                err["phronesis_failure"] = {
+                    "failure_class": fm.get("failure_class"),
+                    "retryable": fm.get("retryable"),
+                }
                 if queue_ticket is not None:
                     err["phronesis_queue"] = _queue_ticket_dict(queue_ticket)
                 self._send_json(status, err, extra_headers=queue_headers or None)
@@ -2552,7 +2627,20 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 + str(prov.get("escalation_reason") or result.get("response", ""))
             )
             _log_event({"event": "escalation", "model": model, "triggers": prov.get("escalation_triggers")})
-            status, err = openai_error(503, msg, "escalation_required")
+            # Escalation remaining is capacity-ish: client may failover providers.
+            # Prefer 503 only when not a permanent local template error.
+            try:
+                from sovereign_failure_taxonomy import classify_dispatch_failure
+
+                fm = classify_dispatch_failure(msg, provenance=prov)
+                esc_status = int(fm.get("http_status") or 503)
+                esc_type = str(fm.get("error_type") or "escalation_required")
+                if fm.get("failure_class") != "permanent":
+                    esc_status = 503
+                    esc_type = "escalation_required"
+            except Exception:
+                esc_status, esc_type = 503, "escalation_required"
+            status, err = openai_error(esc_status, msg, esc_type)
             if queue_ticket is not None:
                 err["phronesis_queue"] = _queue_ticket_dict(queue_ticket)
             self._send_json(status, err, extra_headers=queue_headers or None)
@@ -2560,8 +2648,37 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
 
         if not result.get("success"):
             msg = result.get("response") or "local dispatch failed"
-            _log_event({"event": "dispatch_fail", "model": model, "attempts": result.get("attempts")})
-            status, err = openai_error(503, msg)
+            try:
+                from sovereign_failure_taxonomy import classify_dispatch_failure
+
+                fm = classify_dispatch_failure(str(msg), provenance=prov)
+                # Prefer explicit client_http_status from native path if present
+                if result.get("client_http_status"):
+                    fm["http_status"] = int(result["client_http_status"])
+                if result.get("failure_class"):
+                    fm["failure_class"] = result["failure_class"]
+            except Exception:
+                fm = {
+                    "http_status": 503,
+                    "error_type": "server_error",
+                    "failure_class": "unknown",
+                    "retryable": True,
+                }
+            status = int(fm.get("http_status") or 503)
+            err_type = str(fm.get("error_type") or "server_error")
+            _log_event({
+                "event": "dispatch_fail",
+                "model": model,
+                "attempts": result.get("attempts"),
+                "failure_class": fm.get("failure_class"),
+                "client_http_status": status,
+                "retryable": fm.get("retryable"),
+            })
+            status, err = openai_error(status, msg, err_type)
+            err["phronesis_failure"] = {
+                "failure_class": fm.get("failure_class"),
+                "retryable": fm.get("retryable"),
+            }
             if queue_ticket is not None:
                 err["phronesis_queue"] = _queue_ticket_dict(queue_ticket)
             self._send_json(status, err, extra_headers=queue_headers or None)
