@@ -19,8 +19,8 @@ from popup_storm_suppress import suppress  # noqa: E402
 
 PID_FILE = STATE / "popup_storm_daemon.pid"
 STOP_FILE = STATE / "popup_storm_daemon.STOP"
-# Travel mode: tighter than minute schtask so flash windows die before user notices.
-INTERVAL_SEC = 5
+# Travel mode: sub-second snuff for RDP console flashes (Admin disable still pending).
+INTERVAL_SEC = 2
 
 
 def main() -> int:

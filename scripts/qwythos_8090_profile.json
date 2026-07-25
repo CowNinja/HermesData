@@ -1,0 +1,51 @@
+{
+  "name": "qwythos-9b-3060-12gb",
+  "phase": 3,
+  "as_of": "2026-07-25",
+  "hardware": {
+    "gpu": "NVIDIA RTX 3060 12GB GDDR6",
+    "system_ram_gb": 128,
+    "os": "Windows 11 native (no Docker/WSL)"
+  },
+  "model": {
+    "gguf": "D:\\PhronesisModels\\models\\current\\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q6_K.gguf",
+    "binary": "D:\\PhronesisModels\\binaries\\test-prebuilts\\2026-06-28-b9828-cuda13\\llama-server.exe",
+    "port": 8090
+  },
+  "launch_entry": "D:\\HermesData\\scripts\\start_qwythos_8090_hidden.vbs",
+  "args": {
+    "ctx_size": 65536,
+    "n_gpu_layers": 99,
+    "parallel": 1,
+    "cont_batching": true,
+    "flash_attn": "on",
+    "jinja": true,
+    "cache_type_k": "q8_0",
+    "cache_type_v": "q8_0",
+    "kv_offload": true,
+    "mmap": true,
+    "mlock": false,
+    "batch_size": 512,
+    "ubatch_size": 256
+  },
+  "rationale": {
+    "ngl_99": "Single dense 9B Q6_K fits fully on 12GB; models-max 1 law.",
+    "ctx_65536": "Hermes agent multi-tool floor is 64k context.",
+    "kv_q8_0": "Canon-safe KV quant; large VRAM win vs f16; avoid q4_0 (tunnel vision).",
+    "kv_offload": "Overflow KV pages to system RAM (128GB) without dual-GPU residents.",
+    "mmap": "Map weights; leave free RAM for OS/RDP/Discord/Comfy coexistence.",
+    "no_mlock": "mlock would pin multi-GB and fight the memory bus under RDP load.",
+    "batch_512_ubatch_256": "Lower prefill peaks on 3060 vs defaults 2048/512.",
+    "parallel_1": "One slot; dual parallel exploded KV OOM historically on 65k."
+  },
+  "budget": {
+    "target_vram_used_mib_idle": "6500-8500",
+    "target_vram_free_mib_min": 3000,
+    "image_stack": "release Comfy before LLM heal (12GB law)"
+  },
+  "verify": [
+    "nvidia-smi memory.used after /health UP",
+    "curl http://127.0.0.1:8090/health",
+    "proxy :8091 GREEN"
+  ]
+}

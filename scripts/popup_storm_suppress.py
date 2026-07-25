@@ -41,7 +41,14 @@ FLASY = [
 FLASHY_CMD_RE = re.compile(
     r"(Phronesis-Guardian|Ensure-Grok-Direct-Bridge|grok_hermes_loop|"
     r"Phronesis-Image-Rider|AgentCursorOverlay|cua-driver\.exe.*serve|"
-    r"Start-At-Logon|popup_storm_suppress\.ps1)",
+    r"Start-At-Logon|popup_storm_suppress\.ps1|GPU\s*Tweak|"
+    r"Phronesis-Guardian-Body|launch_hidden_ps)",
+    re.I,
+)
+# Window titles that flash/steal focus under RDP (hide, do not kill OS-critical).
+FLASHY_TITLE_RE = re.compile(
+    r"(SOUI_DUMMY_WND|Windows PowerShell|Administrator:|C:\\WINDOWS\\system32\\cmd|"
+    r"GPU Tweak|Select\s+.*\.ps1)",
     re.I,
 )
 # Never kill these even if pattern matches.
@@ -192,7 +199,11 @@ def kill_flashy_console_procs() -> list[int]:
 
 
 def hide_visible_flash_windows() -> int:
-    """SW_HIDE any top-level window owned by flashy console PIDs."""
+    """SW_HIDE flashy console + dummy GPU-tweak windows under focus mode.
+
+    Under focus STOP: hide *any* visible powershell/python/cmd console window
+    (catches the 100–500ms flash before FreeConsole in trampolines).
+    """
     if sys.platform != "win32":
         return 0
     try:
@@ -200,40 +211,58 @@ def hide_visible_flash_windows() -> int:
         from ctypes import wintypes
 
         user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
         SW_HIDE = 0
-        flash_pids = set()
+        focus = (STATE / "focus_mode.STOP").is_file() or (
+            STATE / "popup_emergency.STOP"
+        ).is_file()
+        flash_pids: set[int] = set()
+        console_pids: set[int] = set()
         for pid, name, cmd in _list_processes():
             nlow = (name or "").lower()
-            if nlow not in ("powershell.exe", "pwsh.exe", "python.exe", "cmd.exe"):
-                continue
-            if SAFE_CMD_RE.search(cmd or ""):
-                continue
-            if FLASHY_CMD_RE.search(cmd or ""):
+            if nlow in ("powershell.exe", "pwsh.exe", "python.exe", "cmd.exe"):
+                console_pids.add(pid)
+                if SAFE_CMD_RE.search(cmd or ""):
+                    continue
+                if FLASHY_CMD_RE.search(cmd or "") or focus:
+                    # Under focus: any console may flash; hide it.
+                    if focus or FLASHY_CMD_RE.search(cmd or ""):
+                        flash_pids.add(pid)
+            if nlow in ("gpu tweak iii.exe", "monitor.exe", "gpu_tweak_iii.exe"):
                 flash_pids.add(pid)
-        if not flash_pids:
-            return 0
 
         WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
         hidden = [0]
+        buf = ctypes.create_unicode_buffer(512)
 
         def _enum(hwnd, _lparam):
             if not user32.IsWindowVisible(hwnd):
                 return True
             pid = wintypes.DWORD()
             user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            title = ""
+            try:
+                user32.GetWindowTextW(hwnd, buf, 512)
+                title = buf.value or ""
+            except Exception:
+                title = ""
+            kill = False
             if pid.value in flash_pids:
+                kill = True
+            elif title and FLASHY_TITLE_RE.search(title):
+                kill = True
+            elif focus and pid.value in console_pids and title:
+                # Bare "Windows PowerShell" / cmd flashes under RDP
+                if re.search(r"(PowerShell|Command Prompt|cmd\.exe|C:\\)", title, re.I):
+                    kill = True
+            if kill:
                 user32.ShowWindow(hwnd, SW_HIDE)
                 hidden[0] += 1
             return True
 
         user32.EnumWindows(WNDENUMPROC(_enum), 0)
-        # FreeConsole on self is no-op when pythonw; keep kernel32 ref
-        _ = kernel32
         return hidden[0]
     except Exception:
         return 0
-
 
 def dedup_pythonw(match: str) -> list[int]:
     """Kill older pythonw processes matching cmdline; keep lowest PID. No PowerShell."""
