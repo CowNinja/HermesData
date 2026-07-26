@@ -161,7 +161,8 @@ def enforce() -> dict:
             "user_ticks_while_focus": "disabled",
             "cua": "stop while focus_mode; on-demand for computer_use only",
             "admin_residual": "trampoline no-op under STOP; elevate bat for permanent rebind",
-            "admin_bat": r"D:\HermesData\scripts\ops\Run-Popup-Kill-Admin-Once.bat",
+            "admin_bat": r"D:\HermesData\scripts\ops\Run-Popup-Kill-Admin-Once.REAL.bat",
+            "admin_bat_stub_travel": r"D:\HermesData\scripts\ops\Run-Popup-Kill-Admin-Once.bat",
             "cua_task": "cua-driver-serve",
         },
     }

@@ -92,35 +92,65 @@ def requeue_thin_ocr(limit: int = 40) -> int:
     """Re-queue ok_text with very short sidecar or thin chars for re-OCR."""
     if not OCR_DB.is_file():
         return 0
-    con = sqlite3.connect(str(OCR_DB), timeout=60)
-    rows = con.execute(
-        """SELECT path, chars FROM ocr_queue
-           WHERE status='ok_text' AND (chars IS NULL OR chars < 120)
-           LIMIT ?""",
-        (limit,),
-    ).fetchall()
-    n = 0
-    for path, chars in rows:
-        p = Path(path)
-        ocr = Path(str(p) + ".ocr.md")
-        thin = True
-        if ocr.is_file() and ocr.stat().st_size > 400:
-            thin = False
-        if not thin and (chars or 0) >= 120:
-            continue
-        # medical/navy only for auto requeue
-        low = path.lower()
-        if not any(k in low for k in ("medical", "navy", "nmcp", "vamc", "ncdoc", "orders")):
-            continue
-        con.execute(
-            """UPDATE ocr_queue SET status='needs_ocr', score=score+30, updated_at=?
-               WHERE path=?""",
-            (utc(), path),
-        )
-        n += 1
-    con.commit()
-    con.close()
-    return n
+    # 2026-07-26: never fail holistic on OCR lock races with ocr_backlog_worker
+    # (SQLite busy_timeout + soft return; Celery-style partial progress).
+    try:
+        con = sqlite3.connect(str(OCR_DB), timeout=120)
+        try:
+            con.execute("PRAGMA busy_timeout=120000")
+        except Exception:
+            pass
+        rows = con.execute(
+            """SELECT path, chars FROM ocr_queue
+               WHERE status='ok_text' AND (chars IS NULL OR chars < 120)
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        n = 0
+        for path, chars in rows:
+            p = Path(path)
+            ocr = Path(str(p) + ".ocr.md")
+            thin = True
+            if ocr.is_file() and ocr.stat().st_size > 400:
+                thin = False
+            if not thin and (chars or 0) >= 120:
+                continue
+            # medical/navy only for auto requeue
+            low = path.lower().replace("\\", "/")
+            if not any(k in low for k in ("medical", "navy", "nmcp", "vamc", "ncdoc", "orders")):
+                continue
+            # 2026-07-26 SSOT: never re-arm park paths
+            try:
+                from ocr_park_patterns import is_ocr_park_path
+
+                if is_ocr_park_path(path):
+                    continue
+            except Exception:
+                if any(
+                    k in low
+                    for k in (
+                        "volbrain",
+                        "glass all lesion",
+                        "all lesion_jobs",
+                        "demo images",
+                        "depositphotos",
+                        "00-pics",
+                        "stock-photo",
+                    )
+                ):
+                    continue
+            con.execute(
+                """UPDATE ocr_queue SET status='needs_ocr', score=score+30, updated_at=?
+                   WHERE path=?""",
+                (utc(), path),
+            )
+            n += 1
+        con.commit()
+        con.close()
+        return n
+    except sqlite3.OperationalError as e:
+        # database is locked / busy — skip this tick; OCR worker owns the queue
+        return 0 if "locked" in str(e).lower() or "busy" in str(e).lower() else 0
 
 
 def main() -> int:
@@ -156,15 +186,16 @@ def main() -> int:
         )
 
     # 2c gold STT discover+process (CPU) - multimodal fabric; limit 3
+    # 2026-07-26: cap STT wall time — 1800s was stalling holistic inside orch tick
     stt_w = SCRIPTS / "silo_audio_stt_backlog_worker.py"
     if stt_w.is_file():
         report["steps"]["stt_discover"] = run(
             [PY, str(stt_w), "--discover-only"],
-            timeout=240,
+            timeout=180,
         )
         report["steps"]["stt_process"] = run(
-            [PY, str(stt_w), "--process-only", "--limit", "3"],
-            timeout=1800,
+            [PY, str(stt_w), "--process-only", "--limit", "2"],
+            timeout=420,
         )
 
     # 2d office + email + html thin (gold-first) extract waves
@@ -211,9 +242,13 @@ def main() -> int:
             timeout=120,
         )
     # train manifest refresh (side-project consumption)
+    # 2026-07-26: ALWAYS pass --limit — unbounded rglob ran 5h+ and burned CPU
     man = SCRIPTS / "silo_train_manifest_builder.py"
     if man.is_file():
-        report["steps"]["train_manifest"] = run([PY, str(man)], timeout=180)
+        report["steps"]["train_manifest"] = run(
+            [PY, str(man), "--limit", "4000", "--budget-s", "90"],
+            timeout=120,
+        )
 
     # 5 text clean → train.md
     clean = SCRIPTS / "silo_ocr_text_clean.py"

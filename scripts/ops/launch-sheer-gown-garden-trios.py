@@ -61,7 +61,7 @@ SHARED_SCENE = (
     "no underwear, no panties, no bra, no lingerie, no lining, "
     "glamorous night-out hair, big statement chandelier earrings, bold collars and necklaces, "
     "arm cuffs, evening jewelry overload, "
-    "voluptuous athletic bodies, gigantic perky breasts, long legs, childbearing hips, "
+    "voluptuous athletic bodies, large firm perky breasts, soft squish, breasts pressing together, long legs, childbearing hips, "
     "coherent multi-person composition, photorealistic lighting"
 )
 

@@ -48,10 +48,16 @@ HEAL_COOLDOWN_SEC = 180
 WATCHDOG_INTERVAL_SEC = 15
 LATENCY_HISTORY_MAX = 48
 DONE_HISTORY_MAX = 32
-MAX_NORMAL_DEPTH_WHEN_RP_BUSY = 4
-MAX_INTERACTIVE_FIFO_DEPTH = 10
-ADMISSION_REJECT_RETRY_SEC = 90
+# Defaults; live values from state/inference_fifo_policy.json + env (see _resolve_fifo_policy).
+# Hard-coded 10 caused Discord burst 503s "GPU FIFO at capacity (10 ahead)" 2026-07-26.
+MAX_NORMAL_DEPTH_WHEN_RP_BUSY = 8
+MAX_INTERACTIVE_FIFO_DEPTH = 24
+BACKGROUND_DEFER_AT_PRESSURE = 16
+ADMISSION_REJECT_RETRY_SEC = 60
 BACKGROUND_DEFER_RETRY_SEC = 120
+FIFO_DEPTH_MIN = 10
+FIFO_DEPTH_HARD_CAP = 48
+FIFO_POLICY_PATH = r"D:\HermesData\state\inference_fifo_policy.json"
 BACKGROUND_CALLER_MARKERS = (
     "cron",
     "grok-inbox",
@@ -70,7 +76,77 @@ COMFY_RENDER_LOCK = r"D:\HermesData\state\roleplay-render.lock"
 COMFY_LOCK_STALE_SEC = 1800
 COMFY_YIELD_FIFO_DEPTH = 3
 COMFY_YIELD_INTERACTIVE_WAITING = 2
+
 COMFY_YIELD_VRAM_PCT = 88.0
+
+
+def _clamp_int(val, lo: int, hi: int, default: int) -> int:
+    try:
+        n = int(val)
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, n))
+
+
+def _resolve_fifo_policy():
+    """Load FIFO admission depths from SSOT file + env. Clamp always."""
+    depth = MAX_INTERACTIVE_FIFO_DEPTH
+    bg_pressure = BACKGROUND_DEFER_AT_PRESSURE
+    rp_busy_normal = MAX_NORMAL_DEPTH_WHEN_RP_BUSY
+    retry_sec = ADMISSION_REJECT_RETRY_SEC
+    try:
+        with open(FIFO_POLICY_PATH, "r", encoding="utf-8") as fh:
+            pol = json.load(fh) or {}
+        if isinstance(pol, dict):
+            if "max_interactive_fifo_depth" in pol:
+                depth = _clamp_int(pol["max_interactive_fifo_depth"], FIFO_DEPTH_MIN, FIFO_DEPTH_HARD_CAP, depth)
+            if "background_defer_at_pressure" in pol:
+                bg_pressure = _clamp_int(pol["background_defer_at_pressure"], 4, FIFO_DEPTH_HARD_CAP, bg_pressure)
+            if "max_normal_depth_when_rp_busy" in pol:
+                rp_busy_normal = _clamp_int(pol["max_normal_depth_when_rp_busy"], 2, 32, rp_busy_normal)
+            if "admission_reject_retry_sec" in pol:
+                retry_sec = _clamp_int(pol["admission_reject_retry_sec"], 15, 300, retry_sec)
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    env_depth = os.environ.get("PHRONESIS_MAX_INTERACTIVE_FIFO_DEPTH") or os.environ.get(
+        "INFERENCE_FIFO_MAX_DEPTH"
+    )
+    if env_depth:
+        depth = _clamp_int(env_depth, FIFO_DEPTH_MIN, FIFO_DEPTH_HARD_CAP, depth)
+    env_bg = os.environ.get("PHRONESIS_FIFO_BG_DEFER_AT")
+    if env_bg:
+        bg_pressure = _clamp_int(env_bg, 4, FIFO_DEPTH_HARD_CAP, bg_pressure)
+    if bg_pressure >= depth:
+        bg_pressure = max(4, depth - 4)
+    return {
+        "max_interactive_fifo_depth": depth,
+        "background_defer_at_pressure": bg_pressure,
+        "max_normal_depth_when_rp_busy": rp_busy_normal,
+        "admission_reject_retry_sec": retry_sec,
+    }
+
+
+_FIFO_POLICY = _resolve_fifo_policy()
+MAX_INTERACTIVE_FIFO_DEPTH = int(_FIFO_POLICY["max_interactive_fifo_depth"])
+BACKGROUND_DEFER_AT_PRESSURE = int(_FIFO_POLICY["background_defer_at_pressure"])
+MAX_NORMAL_DEPTH_WHEN_RP_BUSY = int(_FIFO_POLICY["max_normal_depth_when_rp_busy"])
+ADMISSION_REJECT_RETRY_SEC = int(_FIFO_POLICY["admission_reject_retry_sec"])
+
+
+def reload_fifo_policy():
+    """Hot-reload policy into module globals (proxy soft-reload / tests)."""
+    global MAX_INTERACTIVE_FIFO_DEPTH, BACKGROUND_DEFER_AT_PRESSURE
+    global MAX_NORMAL_DEPTH_WHEN_RP_BUSY, ADMISSION_REJECT_RETRY_SEC, _FIFO_POLICY
+    _FIFO_POLICY = _resolve_fifo_policy()
+    MAX_INTERACTIVE_FIFO_DEPTH = int(_FIFO_POLICY["max_interactive_fifo_depth"])
+    BACKGROUND_DEFER_AT_PRESSURE = int(_FIFO_POLICY["background_defer_at_pressure"])
+    MAX_NORMAL_DEPTH_WHEN_RP_BUSY = int(_FIFO_POLICY["max_normal_depth_when_rp_busy"])
+    ADMISSION_REJECT_RETRY_SEC = int(_FIFO_POLICY["admission_reject_retry_sec"])
+    return dict(_FIFO_POLICY)
+
+
 
 
 class QueueWaitTimeout(Exception):
@@ -255,7 +331,7 @@ class InferenceQueue:
                     f"roleplay_busy_normal_depth_{normal_depth}",
                     retry_after_sec=BACKGROUND_DEFER_RETRY_SEC,
                 )
-            if waiting_total >= 8:
+            if waiting_total >= BACKGROUND_DEFER_AT_PRESSURE:
                 raise BackgroundDeferred(
                     f"queue_pressure_{waiting_total}",
                     retry_after_sec=BACKGROUND_DEFER_RETRY_SEC,
@@ -422,7 +498,11 @@ class InferenceQueue:
                     "stuck_heal_sec": STUCK_HEAL_SEC,
                     "max_fifo_wait_sec": MAX_QUEUE_WAIT_SEC,
                     "max_interactive_depth": MAX_INTERACTIVE_FIFO_DEPTH,
+                    "background_defer_at_pressure": BACKGROUND_DEFER_AT_PRESSURE,
+                    "max_normal_depth_when_rp_busy": MAX_NORMAL_DEPTH_WHEN_RP_BUSY,
                     "admission_retry_sec": ADMISSION_REJECT_RETRY_SEC,
+                    "depth_hard_cap": FIFO_DEPTH_HARD_CAP,
+                    "policy_path": FIFO_POLICY_PATH,
                     "priority_eta_weight": PRIORITY_ETA_WEIGHT,
                 },
                 "admission": {
@@ -434,11 +514,15 @@ class InferenceQueue:
                     "normal_waiting": prio_counts.get(PRIORITY_NORMAL, 0),
                     "background_waiting": prio_counts.get(PRIORITY_BACKGROUND, 0),
                     "max_interactive_depth": MAX_INTERACTIVE_FIFO_DEPTH,
+                    "background_defer_at_pressure": BACKGROUND_DEFER_AT_PRESSURE,
+                    "max_normal_depth_when_rp_busy": MAX_NORMAL_DEPTH_WHEN_RP_BUSY,
+                    "admission_reject_retry_sec": ADMISSION_REJECT_RETRY_SEC,
                     "priority_classes": list(PRIORITY_CLASSES),
                     "pressure_tier": fifo_pressure_tier(
                         waiting_count,
                         prio_counts.get(PRIORITY_INTERACTIVE, 0),
                     ),
+                    "policy_ssot": str(FIFO_POLICY_PATH),
                 },
                 "comfy_yield": _comfy_yield_fields(
                     waiting_count=waiting_count,
@@ -614,16 +698,28 @@ def admission_snapshot() -> Dict[str, Any]:
     active = 1 if snap.get("active") else 0
     rp_waiting = int((snap.get("fifo_lanes") or {}).get("roleplay", {}).get("count") or 0)
     admission = snap.get("admission") or {}
+    pressure = waiting + active
+    if pressure >= max(1, MAX_INTERACTIVE_FIFO_DEPTH):
+        tier = "hot"
+    elif pressure >= max(1, MAX_INTERACTIVE_FIFO_DEPTH // 2):
+        tier = "warm"
+    else:
+        tier = "cool"
     return {
         "waiting_count": waiting,
         "active_count": active,
-        "total_pressure": waiting + active,
+        "total_pressure": pressure,
         "roleplay_waiting": rp_waiting,
         "interactive_waiting": int(admission.get("interactive_waiting") or 0),
         "normal_waiting": int(admission.get("normal_waiting") or 0),
         "background_waiting": int(admission.get("background_waiting") or 0),
         "max_interactive_depth": MAX_INTERACTIVE_FIFO_DEPTH,
+        "background_defer_at_pressure": BACKGROUND_DEFER_AT_PRESSURE,
+        "max_normal_depth_when_rp_busy": MAX_NORMAL_DEPTH_WHEN_RP_BUSY,
+        "admission_reject_retry_sec": ADMISSION_REJECT_RETRY_SEC,
         "priority_classes": list(PRIORITY_CLASSES),
+        "pressure_tier": tier,
+        "policy_ssot": str(FIFO_POLICY_PATH),
     }
 
 

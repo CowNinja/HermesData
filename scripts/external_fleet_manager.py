@@ -259,7 +259,21 @@ class FleetManager:
         return {"providers": {}}
 
     def _save_health_state(self) -> None:
+        """Persist health map + reconcile enabled_ids from live registry.
+
+        Disabled providers may remain in providers{} history for forensics, but
+        enabled_ids must never list them — stale disabled last_check poisoned
+        operator reads (YELLOW "stale") even when stack_snapshot filters ages.
+        """
         HEALTH_STATE.parent.mkdir(parents=True, exist_ok=True)
+        enabled: list[str] = []
+        for key in ("compute_providers", "context_providers"):
+            for item in self._registry.get(key) or []:
+                if isinstance(item, dict) and item.get("enabled") and item.get("id"):
+                    if self._is_routable(item):
+                        enabled.append(str(item["id"]))
+        self._health_state["enabled_ids"] = sorted(set(enabled))
+        self._health_state["pruned_at"] = _utc_now()
         HEALTH_STATE.write_text(json.dumps(self._health_state, indent=2), encoding="utf-8")
 
     def save_registry(self) -> None:

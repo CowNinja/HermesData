@@ -21,9 +21,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 STATE = Path(r"D:/HermesData/state")
+# Popup/typing focus only. Silo STOP files are operator-owned via silo_ctl
+# (Jeff clear/start). Writing silo_continuous/autonomous.STOP from focus_mode
+# froze land/depth after intentional unfreeze (2026-07-26 cook).
 STOPS = [
-    STATE / "silo_continuous.STOP",
-    STATE / "silo_autonomous.STOP",
     STATE / "focus_mode.STOP",
 ]
 VBS = Path(r"D:/HermesData/scripts/start_silo_daemons_hidden.vbs")
@@ -44,17 +45,25 @@ def utc() -> str:
 
 
 def status() -> dict:
+    focus = (STATE / "focus_mode.STOP").is_file()
+    # Report silo STOP presence for observability without owning them.
+    silo_stops = {
+        "silo_continuous.STOP": (STATE / "silo_continuous.STOP").is_file(),
+        "silo_autonomous.STOP": (STATE / "silo_autonomous.STOP").is_file(),
+    }
     return {
         "at": utc(),
         "stops": {p.name: p.is_file() for p in STOPS},
-        "focus_mode": all(p.is_file() for p in STOPS),
+        "silo_stops_readonly": silo_stops,
+        "focus_mode": focus,
+        "silo_stop_owner": "silo_ctl",
     }
 
 
 def _stop_cua_driver() -> dict:
     """Stop Cua computer-use daemon (AgentCursorOverlay steals RDP focus).
 
-    On-demand only during human typing: never leave serve running under focus_mode.
+    On-demand only during human typing: never leave serve OR mcp running under focus_mode.
     """
     out: dict = {"attempted": True, "stopped": False}
     candidates = [
@@ -98,6 +107,22 @@ def _stop_cua_driver() -> dict:
         out["schtask_end"] = "cua-driver-serve"
     except Exception:
         pass
+    # Hermes computer_use spawns cua-driver.exe mcp (not serve) — taskkill all
+    try:
+        r2 = subprocess.run(
+            ["taskkill", "/IM", "cua-driver.exe", "/F", "/T"],
+            capture_output=True,
+            text=True,
+            timeout=12,
+            creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+        blob = ((r2.stdout or "") + (r2.stderr or ""))
+        out["taskkill_im_rc"] = r2.returncode
+        out["taskkill_im_msg"] = blob[-200:]
+        if r2.returncode == 0 or "SUCCESS" in blob.upper() or "not found" in blob.lower():
+            out["stopped"] = True
+    except Exception as exc:
+        out["taskkill_im_error"] = str(exc)[:160]
     return out
 
 

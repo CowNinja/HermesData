@@ -30,8 +30,13 @@ QUEUE = Path(r"D:\HermesData\config\land_priority_queue.json")
 REG = Path(r"D:\HermesData\state\ingest_registry.sqlite3")
 CACHE = Path(r"D:\HermesData\state\land_folder_disk_cache.json")
 EMPTY_STATE = Path(r"D:\HermesData\state\focus_land_empty_plan.json")
+WALK_CURSOR = Path(r"D:\HermesData\state\g_to_k_walk_cursor.json")
 RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\g-to-k-drain-receipt-latest.md")
 SCRIPTS = Path(r"D:\HermesData\scripts")
+# 2026-07-26: pct-only gate skipped Ballas (~212 residual) and Google Drive (~564)
+# because both sat just over 97%. Prefer absolute residual + walk_cursor complete.
+MIN_RESIDUAL_ABS = 8
+RESIDUAL_PCT_FLOOR = 0.003  # 0.3% of disk still counts as incomplete
 # Land drain child must be python.exe — nested pythonw under orch PIPEs fails
 # silent exit 1 (2026-07-19 repro). See windows_subprocess.prefer_python_console.
 try:
@@ -137,12 +142,24 @@ def mark_queue_complete(item_id: str, note: str) -> bool:
 
 
 def parse_drain_receipt() -> dict:
-    """Read latest APPLY drain receipt for copied/skipped/planned.
+    """Read latest APPLY drain receipt for copied/skipped/planned + walk stats.
 
     Ignores dry-run receipts (separate file since 2026-07-19) so empty-plan
     auto-advance never fires on probe waves.
+
+    2026-07-26: drain receipt uses ASCII ' | ' separators; older parser only
+    matched middle-dot '·' so empty-plan never fired (GDrive thrash).
     """
-    out = {"copied": None, "skipped": None, "planned": None, "mode": None}
+    out: dict = {
+        "copied": None,
+        "skipped": None,
+        "planned": None,
+        "mode": None,
+        "walked": None,
+        "known_skip": None,
+        "emitted": None,
+        "wrap": None,
+    }
     if not RECEIPT.is_file():
         return out
     try:
@@ -153,23 +170,124 @@ def parse_drain_receipt() -> dict:
         out["mode"] = mode or None
         if mode and mode != "APPLY":
             return out
+        # Accept · or | or plain spaces between fields
         m = re.search(
-            r"\*\*Copied:\*\*\s*(\d+)\s*·\s*\*\*Skipped:\*\*\s*(\d+)\s*·\s*\*\*Planned rows:\*\*\s*(\d+)",
+            r"\*\*Copied:\*\*\s*(\d+)\s*[·|]\s*\*\*Skipped:\*\*\s*(\d+)\s*[·|]\s*\*\*Planned rows:\*\*\s*(\d+)",
             text,
         )
+        if not m:
+            # ultra-loose fallback
+            m = re.search(
+                r"Copied:\*\*\s*(\d+).*?Skipped:\*\*\s*(\d+).*?Planned rows:\*\*\s*(\d+)",
+                text,
+                re.S,
+            )
         if m:
-            out = {
-                "copied": int(m.group(1)),
-                "skipped": int(m.group(2)),
-                "planned": int(m.group(3)),
-                "mode": mode or "APPLY",
-            }
+            out["copied"] = int(m.group(1))
+            out["skipped"] = int(m.group(2))
+            out["planned"] = int(m.group(3))
+            out["mode"] = mode or "APPLY"
+        wm = re.search(
+            r"walked=(\d+)\s+known_skip=(\d+)\s+new=(\d+)\s+emitted=(\d+)\s+wrap=(\w+)",
+            text,
+        )
+        if wm:
+            out["walked"] = int(wm.group(1))
+            out["known_skip"] = int(wm.group(2))
+            out["new"] = int(wm.group(3))
+            out["emitted"] = int(wm.group(4))
+            out["wrap"] = wm.group(5).lower() in ("true", "1", "yes")
     except Exception:
         pass
     return out
 
 
-def top_incomplete(threshold: float = 0.97) -> tuple[str | None, dict]:
+def _walk_cursor_complete(path: str) -> bool:
+    """True when g_to_k_walk_cursor marks this root complete (empty-wrap/catalog done)."""
+    if not WALK_CURSOR.is_file():
+        return False
+    try:
+        data = json.loads(WALK_CURSOR.read_text(encoding="utf-8"))
+        roots = data.get("roots") or {}
+        want = str(Path(path)).replace("/", "\\").rstrip("\\").lower()
+        for k, v in roots.items():
+            kn = str(k).replace("/", "\\").rstrip("\\").lower()
+            if kn == want and isinstance(v, dict) and v.get("complete") is True:
+                return True
+        return False
+    except Exception:
+        return False
+
+
+def _mark_walk_complete(path: str, reason: str) -> bool:
+    """Mark walk cursor root complete so residual gate / board stop thrashing it."""
+    if not WALK_CURSOR.is_file():
+        return False
+    try:
+        data = json.loads(WALK_CURSOR.read_text(encoding="utf-8"))
+        roots = dict(data.get("roots") or {})
+        want = str(Path(path)).replace("/", "\\").rstrip("\\").lower()
+        hit = None
+        for k in list(roots.keys()):
+            kn = str(k).replace("/", "\\").rstrip("\\").lower()
+            if kn == want:
+                hit = k
+                break
+        if hit is None:
+            # create entry under canonical path form
+            hit = str(Path(path)).replace("/", "\\")
+            roots[hit] = {}
+        ent = dict(roots.get(hit) or {})
+        ent["complete"] = True
+        ent["completed_at"] = utc()
+        ent["complete_reason"] = (reason or "focus_auto_advance")[:400]
+        ent["at"] = utc()
+        roots[hit] = ent
+        data["roots"] = roots
+        data["updated"] = utc()
+        if atomic_write_json is not None:
+            atomic_write_json(WALK_CURSOR, data, indent=2)
+        else:
+            WALK_CURSOR.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def _meaningful_residual(disk_n: int, reg_n: int, threshold: float) -> tuple[bool, int, float]:
+    """Return (still_incomplete, residual, pct).
+
+    Industry lesson (NiFi backpressure / Celery ack): never treat a large tree as
+    done on percentage alone — absolute residual is the real backlog signal.
+    disk_n==0 is unknown (not complete).
+    """
+    if disk_n <= 0:
+        return True, -1, 0.0  # unknown — do not auto-skip
+    residual = max(0, int(disk_n) - int(reg_n))
+    pct = (reg_n / disk_n) if disk_n else 1.0
+    # Over-registry (reg>disk) => residual 0, complete for land purposes
+    if residual <= 0:
+        return False, 0, pct
+    floor = max(MIN_RESIDUAL_ABS, int(RESIDUAL_PCT_FLOOR * disk_n))
+    if residual > floor:
+        return True, residual, pct
+    if pct < threshold:
+        return True, residual, pct
+    return False, residual, pct
+
+
+def reconcile_queue(threshold: float = 0.97) -> dict:
+    """Mark walk-complete + residual-gate-done roots land_complete (full pass).
+
+    top_incomplete() returns at the first still-open root, so lower-priority
+    walk-complete items (e.g. Misc_Other) never got synced while GDrive/arch
+    blocked the head. Call this each focus dry-run / tick start.
+
+    Research: Celery inspect + NiFi backlog — reconcile side state so the
+    priority head is real work, not stale open rows.
+    """
+    if not QUEUE.is_file():
+        return {"ok": False, "err": "no_queue"}
     data = json.loads(QUEUE.read_text(encoding="utf-8"))
     items = sorted(
         data.get("land_priority_queue") or [],
@@ -178,12 +296,22 @@ def top_incomplete(threshold: float = 0.97) -> tuple[str | None, dict]:
     cache = load_cache()
     con = sqlite3.connect(str(REG), timeout=60)
     con.execute("PRAGMA busy_timeout=60000")
+    walk_done: list[str] = []
+    residual_done: list[str] = []
+    still_open: list[dict] = []
     try:
         for it in items:
             if it.get("mode") in ("catalog_only", "never", "land_complete"):
                 continue
             path = it.get("path")
-            if not path or not Path(path).exists():
+            iid = str(it.get("id") or "")
+            if not path:
+                continue
+            if not Path(path).exists():
+                continue
+            if _walk_cursor_complete(path):
+                if iid and mark_queue_complete(iid, "walk_cursor.complete=True reconcile"):
+                    walk_done.append(iid)
                 continue
             root = Path(path)
             root_n = str(root).replace("/", "\\").rstrip("\\")
@@ -192,20 +320,74 @@ def top_incomplete(threshold: float = 0.97) -> tuple[str | None, dict]:
                 (root_n + "\\" + "%",),
             ).fetchone()[0]
             disk_n = disk_file_count(root, cache)
-            pct = (reg_n / disk_n) if disk_n else 1.0
-            info = {
-                "id": it.get("id"),
-                "path": path,
-                "priority": it.get("priority"),
-                "reg": reg_n,
-                "disk": disk_n,
-                "pct": round(100 * pct, 1),
-            }
-            if pct < threshold:
-                return path, info
-        return None, {"done": True}
+            still, residual, pct = _meaningful_residual(disk_n, reg_n, threshold)
+            if not still:
+                if iid:
+                    mark_queue_complete(
+                        iid,
+                        f"residual_gate reconcile residual={residual} "
+                        f"pct={round(100 * pct, 1)} disk={disk_n}",
+                    )
+                    residual_done.append(iid)
+                # 2026-07-26: residual_gate closed queue but left walk cursor open
+                # (Images/Safari board thrash). Always sync walk complete here.
+                try:
+                    _mark_walk_complete(
+                        str(path),
+                        f"residual_gate reconcile residual={residual} "
+                        f"pct={round(100 * pct, 1)} disk={disk_n}",
+                    )
+                except Exception as exc:
+                    print(
+                        json.dumps(
+                            {
+                                "walk_complete_warn": f"{iid}:{type(exc).__name__}:{exc}"[
+                                    :200
+                                ]
+                            }
+                        )
+                    )
+                continue
+            still_open.append(
+                {
+                    "id": iid,
+                    "path": path,
+                    "priority": it.get("priority"),
+                    "reg": reg_n,
+                    "disk": disk_n,
+                    "residual": residual,
+                    "pct": round(100 * pct, 1),
+                }
+            )
     finally:
         con.close()
+    out = {
+        "at": utc(),
+        "walk_done": walk_done,
+        "residual_done": residual_done,
+        "still_open": still_open,
+        "n_open": len(still_open),
+    }
+    print(json.dumps({"reconcile_queue": out}, indent=2))
+    return out
+
+
+def top_incomplete(threshold: float = 0.97) -> tuple[str | None, dict]:
+    # Full reconcile first so stale walk-complete rows leave the open set
+    recon = reconcile_queue(threshold=threshold)
+    still = recon.get("still_open") or []
+    if not still:
+        return None, {
+            "done": True,
+            "auto_completed_ids": (recon.get("walk_done") or [])
+            + (recon.get("residual_done") or []),
+        }
+    top = still[0]
+    top = dict(top)
+    top["auto_completed_ids"] = (recon.get("walk_done") or []) + (
+        recon.get("residual_done") or []
+    )
+    return top.get("path"), top
 
 
 def main() -> int:
@@ -301,51 +483,87 @@ def main() -> int:
             }
         )
     )
-    # Empty-plan auto-advance only when NOTHING left to plan (not skip-heavy mid-tree).
-    # Skip-only waves reset progress tracking but do NOT complete — next wave may
-    # still find landable files deeper (hash/skip_sources catch-up).
+    # Empty-plan / residual-exhausted auto-advance.
+    # Research: Celery ack + NiFi backpressure — do not requeue work that produced
+    # zero durable progress after a full skip-pass (poison / already-known tree).
     receipt = parse_drain_receipt()
+    copied = receipt.get("copied")
+    planned = receipt.get("planned")
+    walked = int(receipt.get("walked") or 0)
+    known_skip = int(receipt.get("known_skip") or 0)
     empty = (
-        receipt.get("copied") == 0
-        and receipt.get("planned") == 0
+        copied == 0
+        and planned == 0
         and r.returncode == 0
+    )
+    # residual_exhausted: large walk, >=98% already known, zero copies, AND no
+    # planned apply rows. planned>0 with copied=0 is failure (path ERR / hash
+    # skip-all after filter) — do NOT auto-complete; operator/fix can retry.
+    # Research: Celery reject vs ack — only ack when broker work is truly done.
+    # 2026-07-26: tiny roots (Images=2, Safari=1) never hit walked>=50; still
+    # residual-exhausted when the full walk produced zero durable plan/copy.
+    # Research: Celery ack tiny tasks — complete when broker work is done, not
+    # only when batch size exceeds an arbitrary floor.
+    residual_exhausted = (
+        r.returncode == 0
+        and copied == 0
+        and planned == 0
+        and walked >= 1
+        and known_skip >= int(walked * 0.98)
+        and (walked >= 50 or known_skip >= walked)
     )
     st = load_empty_state()
     key = str(info.get("id") or path)
-    if empty:
+    if empty or residual_exhausted:
         ent = st.get(key) or {"strikes": 0}
         ent["strikes"] = int(ent.get("strikes") or 0) + 1
         ent["at"] = utc()
         ent["last_receipt"] = receipt
-        ent["reason"] = "empty_plan"
+        ent["reason"] = "empty_plan" if empty else "residual_exhausted"
         st[key] = ent
         save_empty_state(st)
-        if ent["strikes"] >= args.empty_plan_strikes:
-            note = f"empty_plan x{ent['strikes']} receipt={receipt}"
+        # residual_exhausted advances on 1 strike (full tree already known);
+        # classic empty_plan still needs N strikes (default 2).
+        need = 1 if residual_exhausted else args.empty_plan_strikes
+        if ent["strikes"] >= need:
+            note = (
+                f"{ent['reason']} x{ent['strikes']} "
+                f"copied={copied} planned={planned} walked={walked} "
+                f"known_skip={known_skip} receipt={receipt}"
+            )
             ok = mark_queue_complete(str(info.get("id") or ""), note)
+            # Mark walk cursor complete so residual gate stops re-picking this root
+            try:
+                _mark_walk_complete(path, note)
+            except Exception as exc:
+                print(json.dumps({"walk_complete_warn": str(exc)[:160]}))
             print(
                 json.dumps(
                     {
                         "auto_advance": ok,
                         "id": info.get("id"),
                         "strikes": ent["strikes"],
+                        "reason": ent["reason"],
+                        "need": need,
                         "receipt": receipt,
                     },
                     indent=2,
                 )
             )
-            st[key] = {"strikes": 0, "at": utc(), "advanced": ok}
+            st[key] = {"strikes": 0, "at": utc(), "advanced": ok, "reason": ent["reason"]}
             save_empty_state(st)
     else:
-        # productive or skip-catchup wave — reset empty strikes
-        if key in st and int((st.get(key) or {}).get("strikes") or 0) > 0:
-            st[key] = {
-                "strikes": 0,
-                "at": utc(),
-                "last_receipt": receipt,
-                "reset": "productive_or_skip_wave",
-            }
-            save_empty_state(st)
+        # productive wave (copied>0) — reset strikes
+        if copied and int(copied) > 0:
+            if key in st and int((st.get(key) or {}).get("strikes") or 0) > 0:
+                st[key] = {
+                    "strikes": 0,
+                    "at": utc(),
+                    "last_receipt": receipt,
+                    "reset": "productive_copy_wave",
+                }
+                save_empty_state(st)
+        # skip-only mid-tree without exhaustion: keep strikes (do NOT reset)
     return int(r.returncode or 0)
 
 

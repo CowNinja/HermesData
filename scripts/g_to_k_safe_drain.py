@@ -89,16 +89,48 @@ def domain_for(name: str, path_hint: str = "") -> str:
     return _domain_for((name or "").strip(), path_hint)
 
 
+def _win_long(p: Path | str) -> str:
+    """Prefix \\\\?\\ for Win32 paths >= ~240 chars (MAX_PATH).
+
+    Research: MS Learn Maximum Path Length Limitation — extended-length
+    paths require \\\\?\\ + absolute normalized backslashes. Python 3.11
+    open()/mkdir honor this when passed as the path string.
+    """
+    s = str(p)
+    if s.startswith("\\\\?\\"):
+        return s
+    s = s.replace("/", "\\")
+    # already UNC
+    if s.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + s.lstrip("\\")
+    if len(s) < 240:
+        return s
+    return "\\\\?\\" + s
+
+
+def _mkdir_p(path: Path) -> None:
+    """mkdir parents with long-path fallback."""
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        return
+    except OSError:
+        pass
+    import os
+    os.makedirs(_win_long(path), exist_ok=True)
+
+
 def copy_file(src: Path, dest: Path) -> str:
     """Efficient copy: robocopy for multi-MB files, buffered shutil otherwise.
 
-    Returns method tag: robocopy|shutil_buf|shutil
+    Returns method tag: robocopy|shutil_buf|shutil|shutil_long
     Full-tree robocopy is intentionally NOT used - we must classify per file.
+    2026-07-26: long-path (\\\\?\\) fallback for Amazon Drive deep trees.
     """
     import subprocess
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    import os
+    _mkdir_p(dest.parent)
     size = src.stat().st_size
-    # robocopy: large files on Windows (unbuffered I/O)
+    # robocopy: large files on Windows (unbuffered I/O); /NFL etc quiet
     if size >= 2 * 1024 * 1024:  # 2 MB+
         cmd = [
             "robocopy",
@@ -120,16 +152,23 @@ def copy_file(src: Path, dest: Path) -> str:
         if r.returncode < 8 and dest.exists() and dest.stat().st_size == size:
             return "robocopy"
     # buffered binary copy for medium/small (faster than tiny default)
-    if size >= 64 * 1024:
-        with src.open("rb") as rf, dest.open("wb") as wf:
+    try:
+        if size >= 64 * 1024:
+            with src.open("rb") as rf, dest.open("wb") as wf:
+                shutil.copyfileobj(rf, wf, length=8 * 1024 * 1024)
+            try:
+                shutil.copystat(src, dest)
+            except Exception:
+                pass
+            return "shutil_buf"
+        shutil.copy2(src, dest)
+        return "shutil"
+    except OSError:
+        # Long path / trailing-space parent: use extended-length API
+        dlong = _win_long(dest)
+        with open(src, "rb") as rf, open(dlong, "wb") as wf:
             shutil.copyfileobj(rf, wf, length=8 * 1024 * 1024)
-        try:
-            shutil.copystat(src, dest)
-        except Exception:
-            pass
-        return "shutil_buf"
-    shutil.copy2(src, dest)
-    return "shutil"
+        return "shutil_long"
 
 
 def _path_keys(s: str) -> list[str]:
@@ -694,29 +733,47 @@ def main() -> int:
         bad = '<>:"|?*'
         for ch in bad:
             name = name.replace(ch, "_")
-        name = name.strip(" .")
+        # Win32 forbids trailing space/dot; also collapse whitespace
+        name = re.sub(r"\s+", " ", name).strip(" .")
         if len(name) > max_len:
             stem, dot, ext = name.rpartition(".")
-            if dot and len(ext) <= 12:
+            if dot and 0 < len(ext) <= 12 and len(stem) > 0:
                 name = stem[: max_len - len(ext) - 1] + "." + ext
             else:
                 name = name[:max_len]
+            # CRITICAL: truncation can land on a space ("...Photo Video" ->
+            # "...Photo ") which Win32 cannot create as a directory segment.
+            # 2026-07-26 archive eBay drone listing ERRs.
+            name = name.strip(" .")
         return name or "file"
 
     def unique_dest(src: Path, src_root: Path, dom: str) -> Path:
-        """Avoid false skip-exists when same filename already on K from another source."""
+        """Avoid false skip-exists when same filename already on K from another source.
+
+        2026-07-26: flatten when full dest would exceed ~200 chars (MAX_PATH margin)
+        OR any single segment stays long. Archive Amazon/eBay deep trees failed
+        mkdir with Errno 2 when safe_name truncation left trailing spaces.
+        """
         try:
             rel = src.relative_to(src_root)
         except Exception:
             rel = Path(src.name)
-        # sanitize each part
-        parts = [safe_name(part, 80) for part in rel.parts[:-1]] + [safe_name(rel.name, 120)]
+        # sanitize each part (strip trailing spaces that Win32 cannot create)
+        parts = [safe_name(part, 60) for part in rel.parts[:-1]] + [safe_name(rel.name, 100)]
+        parts = [p for p in parts if p]
         rel = Path(*parts) if parts else Path(safe_name(src.name))
         base = K_SILO / dom / "from-g-drive" / rel
+        # Flatten overlong / deep paths -> stable short dest under _longpath/
+        too_long = len(str(base)) >= 200
+        too_deep = len(parts) >= 6
+        if too_long or too_deep:
+            digest8 = hashlib.sha256(str(src).encode("utf-8", errors="replace")).hexdigest()[:8]
+            flat_name = safe_name(f"{digest8}_{src.name}", 100)
+            base = K_SILO / dom / "from-g-drive" / "_longpath" / flat_name
         if not base.exists():
             return base
-        digest = __import__("hashlib").sha256(str(src).encode("utf-8", errors="replace")).hexdigest()[:8]
-        return base.with_name(safe_name(f"{base.stem}__{digest}{base.suffix}", 120))
+        digest = hashlib.sha256(str(src).encode("utf-8", errors="replace")).hexdigest()[:8]
+        return base.with_name(safe_name(f"{base.stem}__{digest}{base.suffix}", 100))
 
     planned = []
     walk_stats_by_root: dict[str, dict] = {}
@@ -864,7 +921,7 @@ def main() -> int:
                     except Exception:
                         pass
                 else:
-                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    _mkdir_p(dest.parent)
                     method = copy_file(src, dest)
                     meta = {
                         "source": str(src),
@@ -941,46 +998,71 @@ def main() -> int:
             lp = ws.get("last_path")
             if not lp:
                 continue
-            # If we wrapped and still empty productive, reset cursor for that root.
-            if ws.get("wrap_pass") and int(ws.get("emitted") or 0) == 0:
+            prev = dict(roots_cur.get(rk) or {})
+            walked = int(ws.get("walked_files") or 0)
+            skipped_k = int(ws.get("skipped_known") or 0)
+            emitted = int(ws.get("emitted") or 0)
+            # Prefer wave-local copy/skip counts; fall back to prev (never bare globals).
+            copied_w = int(ws.get("copied_wave") if ws.get("copied_wave") is not None else (prev.get("copied_wave") or 0))
+            skipped_w = int(ws.get("skipped_wave") if ws.get("skipped_wave") is not None else (prev.get("skipped_wave") or 0))
+            # Once complete, stay complete (auto-advance / operator). Never wipe.
+            complete = bool(prev.get("complete"))
+            # Auto-complete fully hash-known roots (skip thrash).
+            # min walked 50: small trees (Misc_Other=60) must not thrash forever.
+            # 2026-07-26: emitted>0 can still be residual-exhausted when plan rows
+            # are filtered (policy/symlink) and nothing copies — do not thrash.
+            if (
+                not complete
+                and walked >= 50
+                and copied_w == 0
+                and skipped_k >= int(walked * 0.98)
+                and (emitted == 0 or skipped_k >= int(walked * 0.995))
+            ):
+                complete = True
+            # Empty wrap on all-known root: mark complete, do NOT wipe stats/complete.
+            if (
+                not complete
+                and ws.get("wrap_pass")
+                and emitted == 0
+                and walked > 0
+                and skipped_k >= int(walked * 0.98)
+            ):
+                complete = True
+            newly_done = complete and not prev.get("complete")
+            if ws.get("wrap_pass") and emitted == 0 and complete:
                 roots_cur[rk] = {
-                    "last_path": None,
+                    "last_path": lp,
                     "at": datetime.now(timezone.utc).isoformat(),
-                    "reset": "empty_after_wrap",
+                    "walked_files": walked or int(prev.get("walked_files") or 0),
+                    "skipped_known": skipped_k or int(prev.get("skipped_known") or 0),
+                    "emitted": 0,
+                    "copied_wave": 0,
+                    "skipped_wave": skipped_w,
+                    "complete": True,
+                    "completed_at": prev.get("completed_at")
+                    or datetime.now(timezone.utc).isoformat(),
+                    "complete_reason": prev.get("complete_reason")
+                    or "empty_wrap_hash_known",
                 }
             else:
-                prev = dict(roots_cur.get(rk) or {})
-                walked = int(ws.get("walked_files") or 0)
-                skipped_k = int(ws.get("skipped_known") or 0)
-                emitted = int(ws.get("emitted") or 0)
-                complete = bool(prev.get("complete"))
-                # Auto-complete fully hash-known roots (skip thrash)
-                if (
-                    not complete
-                    and walked >= 100
-                    and emitted == 0
-                    and copied == 0
-                    and skipped_k >= int(walked * 0.98)
-                ):
-                    complete = True
-                roots_cur[rk] = {
+                ent = {
                     "last_path": lp,
                     "at": datetime.now(timezone.utc).isoformat(),
                     "walked_files": walked,
                     "skipped_known": skipped_k,
                     "emitted": emitted,
-                    "copied_wave": copied,
-                    "skipped_wave": skipped,
+                    "copied_wave": copied_w,
+                    "skipped_wave": skipped_w,
                     "complete": complete,
-                    **(
-                        {
-                            "completed_at": datetime.now(timezone.utc).isoformat(),
-                            "complete_reason": "auto_hash_known_wave",
-                        }
-                        if complete and not prev.get("complete")
-                        else {}
-                    ),
                 }
+                if newly_done:
+                    ent["completed_at"] = datetime.now(timezone.utc).isoformat()
+                    ent["complete_reason"] = "auto_hash_known_wave"
+                elif prev.get("completed_at"):
+                    ent["completed_at"] = prev.get("completed_at")
+                    if prev.get("complete_reason"):
+                        ent["complete_reason"] = prev.get("complete_reason")
+                roots_cur[rk] = ent
         cursor_state["roots"] = roots_cur
         try:
             save_walk_cursor(cursor_state)

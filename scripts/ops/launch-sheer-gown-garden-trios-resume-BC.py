@@ -42,7 +42,7 @@ SHARED_SCENE = (
     "soft elegant sheer silhouette and nipple shadow visible through fabric, tasteful dusk, "
     "no lining, nude under sheer gown, no underwear, no panties, no bra, no lingerie, "
     "statement evening jewelry, mixed formal updos and loose waves, "
-    "voluptuous athletic bodies, gigantic perky breasts, long legs, childbearing hips, "
+    "voluptuous athletic bodies, large firm perky breasts, soft squish, breasts pressing together, long legs, childbearing hips, "
     "masterpiece, best quality, ultra detailed, coherent multi-person composition"
 )
 

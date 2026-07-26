@@ -30,10 +30,21 @@ TOOL_PATHS = Path(r"D:\HermesData\config\tool_paths.json")
 LOG = Path(r"D:\PhronesisVault\Operations\logs\silo-robust-ocr-latest.md")
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
 PDF_EXT = {".pdf"}
+# Windows 11 WT-as-console-host: bare console children become WT tabs titled
+# with the exe path (looks like "error popups"). Always hide console.
+_CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 
 
 def utc() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+    """subprocess.run with CREATE_NO_WINDOW on Windows (no WT tab flash)."""
+    kwargs.setdefault("stdin", subprocess.DEVNULL)
+    if _CREATE_NO_WINDOW:
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | _CREATE_NO_WINDOW
+    return subprocess.run(cmd, **kwargs)
 
 
 def tools() -> dict:
@@ -132,7 +143,7 @@ def extract_digital_pdf(path: Path) -> tuple[str, list[str]]:
     bin_ = pdftotext_bin()
     if bin_:
         try:
-            r = subprocess.run(
+            r = _run(
                 [bin_, "-layout", "-enc", "UTF-8", str(path), "-"],
                 capture_output=True,
                 timeout=120,
@@ -179,7 +190,7 @@ def ocr_image(img: Path, tess: str) -> str:
     try:
         best = ""
         for psm in ("6", "4", "3", "11"):
-            r = subprocess.run(
+            r = _run(
                 [tess, str(prep), "stdout", "-l", "eng", "--oem", "1", "--psm", psm],
                 capture_output=True,
                 text=True,
@@ -207,7 +218,7 @@ def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 8) -> tuple[list[Path
     if ppm:
         prefix = out_dir / "page"
         try:
-            cp = subprocess.run(
+            cp = _run(
                 [ppm, "-png", "-r", "300", "-l", str(max_pages), str(pdf), str(prefix)],
                 capture_output=True,
                 timeout=240,

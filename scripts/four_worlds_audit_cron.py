@@ -31,13 +31,14 @@ def main() -> int:
         print("FourWorldsAudit missing_script")
         return 1
     try:
+        # Hermes no_agent outer kill is ~120s; finish inside that window.
         r = subprocess.run(
             [sys.executable, str(script)],
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=230,
+            timeout=90,
             cwd=str(HERMES),
         )
         out = ((r.stdout or "") + "\n" + (r.stderr or ""))[-2000:]

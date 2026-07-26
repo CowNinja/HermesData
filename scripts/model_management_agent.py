@@ -1139,7 +1139,10 @@ def assess_fleet_recommendations(*, locked: bool) -> Dict[str, Any]:
             }
         )
     unbench = int(suggest.get("unbenchmarked_count") or 0)
-    if unbench > 3:
+    # F03: when rotation is LOCKED (Qwythos pin law), unbenchmarked inventory is
+    # informational only — do not emit an actionable issue that nags full-tick.
+    # Operator can still read suggest.unbenchmarked_count / f03_suppressed.
+    if unbench > 3 and not locked:
         issues.append(
             {
                 "code": "F03",
@@ -1149,6 +1152,13 @@ def assess_fleet_recommendations(*, locked: bool) -> Dict[str, Any]:
                 "hint": "model_benchmark_harness.py --tier warm --candidate <file>",
             }
         )
+    elif unbench > 3 and locked:
+        suggest = dict(suggest) if isinstance(suggest, dict) else {"raw": suggest}
+        suggest["f03_suppressed"] = {
+            "reason": "model_rotation_locked",
+            "unbenchmarked_count": unbench,
+            "law": "Qwythos-9B pin — fleet suggest is observe-only until unlock",
+        }
     return {"suggest": suggest, "issues": issues}
 
 

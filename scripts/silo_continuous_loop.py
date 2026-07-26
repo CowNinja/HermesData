@@ -202,6 +202,18 @@ def _run(cmd, timeout=120) -> Tuple[int, str]:
                 return code, ((out or "") + (err or ""))[-2000:]
             except subprocess.TimeoutExpired:
                 elapsed = time.time() - t0
+                # 2026-07-26: dead-child guard — Windows PIPE can hang after early exit
+                try:
+                    if proc.poll() is not None:
+                        try:
+                            out, err = proc.communicate(timeout=5)
+                        except Exception:
+                            out, err = "", "child_exited_pre_communicate"
+                        return int(proc.returncode if proc.returncode is not None else 1), (
+                            (out or "") + (err or "")
+                        )[-2000:]
+                except Exception:
+                    pass
                 if elapsed >= timeout:
                     # Tree-kill: parent-only kill orphans drain/focus (dual-writer).
                     try:
@@ -227,6 +239,7 @@ def _run(cmd, timeout=120) -> Tuple[int, str]:
                         "phase": "tick_running",
                         "elapsed_s": int(elapsed),
                         "child_pid": proc.pid,
+                        "child_alive": True,
                     }
                     hb_path = Path(r"D:/HermesData/state") / "silo_tick_heartbeat.json"
                     if atomic_write_json is not None:
@@ -239,6 +252,7 @@ def _run(cmd, timeout=120) -> Tuple[int, str]:
                             cur["phase"] = "tick_running"
                             cur["heartbeat_at"] = hb["at"]
                             cur["tick_elapsed_s"] = int(elapsed)
+                            cur["child_alive"] = True
                             if atomic_write_json is not None:
                                 atomic_write_json(STATE, cur, indent=2, min_bytes=20)
                             else:
@@ -356,13 +370,12 @@ def assess() -> Dict[str, Any]:
         mode = "gentle"
         reasons.append(f"yield_image_gpu: {img_reason}")
     if vram is not None and vram >= VRAM_PAUSE_MIB:
-        # Critical VRAM: pause unless only image lock (then already gentle)
-        if not img_held:
-            mode = "pause"
-            reasons.append(f"VRAM {vram}MiB critical")
-        else:
-            mode = "gentle"
-            reasons.append(f"VRAM {vram}MiB critical + image_lock - gentle land only")
+        # Disk land does NOT need GPU. Separate I/O vs GPU queues (research 2026-07-26:
+        # k8s GPU scheduling, CUDA_VISIBLE_DEVICES isolation, Celery queue split).
+        # Critical VRAM: gentle land only - cut enrich/train/grunt, keep drain hot.
+        # True pause reserved for disk/RAM critical below.
+        mode = "gentle"
+        reasons.append(f"VRAM {vram}MiB critical - gentle land only (disk I/O OK)")
     elif ram is not None and ram >= RAM_PAUSE_PCT:
         mode = "pause"
         reasons.append(f"RAM {ram}% critical")
@@ -437,10 +450,11 @@ def apply_force_resource_contract(
     vram_critical = vram is not None and float(vram or 0) >= VRAM_PAUSE_MIB
     hard_floor = lock_held or vram_critical
     if hard_floor and forced in ("aggressive", "normal"):
-        # Keep pause if assess already paused; else gentle land only
-        floor = "pause" if base == "pause" and not lock_held else "gentle"
-        if lock_held and base == "pause":
-            floor = "gentle"  # land may still gentle-copy while gen holds GPU
+        # VRAM/image lock: floor to gentle land (disk I/O OK). Keep true pause
+        # only if assess already paused for disk/RAM (not VRAM-only).
+        floor = "gentle"
+        if base == "pause" and not lock_held and not vram_critical:
+            floor = "pause"
         assess_info["mode"] = floor
         reasons.append(f"force={forced}_downgraded_to_{floor}_resource_contract")
     elif base in ("gentle", "pause") and forced in ("aggressive", "normal"):
@@ -471,10 +485,10 @@ def recheck_hard_yield(assess_info: Dict[str, Any]) -> Dict[str, Any]:
         vram is not None
         and float(vram) >= VRAM_PAUSE_MIB
         and mode in ("aggressive", "normal")
-        and not img_held
     ):
-        assess_info["mode"] = "pause"
-        reasons.append(f"pre_tick_VRAM {vram}MiB critical")
+        # Disk land OK under VRAM pressure; do not hard-pause drain.
+        assess_info["mode"] = "gentle"
+        reasons.append(f"pre_tick_VRAM {vram}MiB critical - gentle land")
     assess_info["reasons"] = reasons
     return assess_info
 

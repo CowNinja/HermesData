@@ -1,6 +1,12 @@
 # Phronesis-Guardian-Body.ps1 - real 5-min heal work (must run under HERMES_HIDDEN_CHILD).
 $ErrorActionPreference = "SilentlyContinue"
+try {
+  Add-Type -Name K -Namespace W -MemberDefinition '[DllImport("kernel32.dll")] public static extern bool FreeConsole();' -ErrorAction SilentlyContinue
+  [W.K]::FreeConsole() | Out-Null
+} catch {}
 # Focus mode: no heal work while Jeff types / RDP
+if (Test-Path "D:\HermesData\state\popup_lockdown.ON") { exit 0 }
+if (Test-Path "D:\HermesData\state\popup_emergency.STOP") { exit 0 }
 if (Test-Path "D:\HermesData\state\silo_continuous.STOP") { exit 0 }
 if (Test-Path "D:\HermesData\state\silo_autonomous.STOP") { exit 0 }
 if (Test-Path "D:\HermesData\state\focus_mode.STOP") { exit 0 }

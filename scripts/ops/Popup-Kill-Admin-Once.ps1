@@ -74,8 +74,53 @@ Set-HiddenPywTask "Hermes_Gateway_ForceReload_Once" "`"$scripts\ops\gateway_forc
 try { Enable-ScheduledTask -TaskName "Phronesis-Guardian-Hidden" -ErrorAction SilentlyContinue | Out-Null } catch {}
 try { Enable-ScheduledTask -TaskName "Phronesis-Grok-Direct-Bridge-Hidden" -ErrorAction SilentlyContinue | Out-Null } catch {}
 
-# Focus mode on
+# GPU Tweak III / Monitor.exe — SOUI_DUMMY_WND focus steal under RDP
+# Disable/delete logon task (Highest often; try anyway when elevated)
+Disable-TaskSafe "GPU Tweak III"
+try {
+  Unregister-ScheduledTask -TaskName "GPU Tweak III" -Confirm:$false -ErrorAction Stop
+  Write-Host "OK unregister GPU Tweak III"
+} catch {
+  Write-Host "FAIL unregister GPU Tweak III : $($_.Exception.Message)"
+}
+$gpuDir = "C:\Program Files (x86)\ASUS\GPUTweakIII"
+foreach ($img in @("GPU Tweak III.exe", "Monitor.exe", "GT3 mobile service.exe", "ASUSGPUFanService.exe", "ASUSGPUFanServiceEx.exe", "ASGT.exe")) {
+  try {
+    & taskkill /IM $img /F 2>$null | Out-Null
+    # WMIC terminate works when taskkill Access-denied
+    & wmic process where "name='$img'" call terminate 2>$null | Out-Null
+    Write-Host "OK terminate $img"
+  } catch {
+    Write-Host "WARN terminate $img : $($_.Exception.Message)"
+  }
+}
+# Stop ASUS GPU fan service if present (elevated)
+foreach ($svc in @("ASUSGPUFanService", "ASUS GPU Fan Service")) {
+  try {
+    Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
+    Set-Service -Name $svc -StartupType Disabled -ErrorAction SilentlyContinue
+    Write-Host "OK service disable attempt $svc"
+  } catch {}
+}
+try {
+  $marker = Join-Path $gpuDir "PHRONESIS_DISABLED_AUTOSTART.txt"
+  if (Test-Path $gpuDir) {
+    "disabled by Popup-Kill-Admin-Once $(Get-Date -Format o)" | Set-Content -Path $marker -Encoding ASCII
+    Write-Host "OK wrote $marker"
+  }
+} catch {}
+
+# Focus mode on + start lightweight storm daemon
 & $pyw "D:\HermesData\scripts\focus_mode.py" on --reason "admin_popup_kill"
+try {
+  $stopD = "D:\HermesData\state\popup_storm_daemon.STOP"
+  if (Test-Path $stopD) { Remove-Item $stopD -Force -ErrorAction SilentlyContinue }
+  Start-Process -FilePath $pyw -ArgumentList "`"D:\HermesData\scripts\popup_storm_daemon.py`"" -WindowStyle Hidden
+  Write-Host "OK popup_storm_daemon start"
+} catch {
+  Write-Host "WARN daemon: $($_.Exception.Message)"
+}
 
 Write-Host "=== Done. Keep Guardian-Hidden + Grok-Direct-Bridge-Hidden. Typing: focus_mode ON. ==="
 Write-Host "When kitchen wanted: pythonw D:\HermesData\scripts\focus_mode.py off --resume-hidden"
+Write-Host "GPU Tweak: if still running after reboot, uninstall or disable in Task Manager > Startup"

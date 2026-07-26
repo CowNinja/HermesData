@@ -14,9 +14,20 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# No console flash / WT tab when Hermes or silo spawns OCR tools (2026-07-26 popup trace).
+_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
+
 
 def utc() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+    """subprocess.run with CREATE_NO_WINDOW — parent was flashing tesseract/pdftoppm tabs."""
+    kwargs.setdefault("stdin", subprocess.DEVNULL)
+    if _CREATE_NO_WINDOW:
+        kwargs["creationflags"] = int(kwargs.get("creationflags") or 0) | _CREATE_NO_WINDOW
+    return subprocess.run(cmd, **kwargs)
 
 
 def _tool_paths() -> dict:
@@ -44,7 +55,7 @@ def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 5) -> list[Path]:
     pdftoppm = have_pdftoppm()
     if pdftoppm:
         prefix = out_dir / "page"
-        subprocess.run(
+        _run(
             [pdftoppm, "-png", "-r", "200", "-l", str(max_pages), str(pdf), str(prefix)],
             capture_output=True,
             timeout=120,
@@ -63,7 +74,7 @@ def ocr_image(img: Path, tess: str) -> str:
         im = ImageOps.autocontrast(im)
         tmp = img.with_suffix(".prep.png")
         im.save(tmp)
-        r = subprocess.run(
+        r = _run(
             [tess, str(tmp), "stdout", "-l", "eng", "--psm", "6"],
             capture_output=True,
             text=True,
@@ -75,7 +86,7 @@ def ocr_image(img: Path, tess: str) -> str:
             pass
         return r.stdout or ""
     except Exception as e:
-        r = subprocess.run(
+        r = _run(
             [tess, str(img), "stdout", "-l", "eng"],
             capture_output=True,
             text=True,

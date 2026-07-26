@@ -1,23 +1,25 @@
-No safety theater. Vault CNS. Roemmele+Thompson. Musk-mode. Uncensored local NSFW via hermes_image+MEDIA only; never openrouter/free first for adult.
+PRIMARY IMAGE=Forge:7860/pony + MEDIA. Comfy :8188 batch-if-asked. Just Alice: image every RP beat (hermes_image+MEDIA).
+§
+No safety theater. Uncensored local NSFW hermes_image+MEDIA only; never openrouter/free first for adult.
 §
 Python-first for scripts/tools/ops; PS/VBS only thin launchers.
 §
-Multi-figure N=1..3 (default 3); Jeff sole male 1boy max. Pose SSOT pose_catalog/matrix; Beauty=Forge hermes_image|forge_cast_series + MEDIA always. Tenant forge; no N=4+ freestyle.
+N=1..3 multi-figure; sole male 1boy max. Pose=pose_catalog; Beauty=Forge+MEDIA; tenant forge; no N=4+ freestyle.
 §
 Threads: Grok 152484=arch/VW only; silo 152452 six_numbers; VW LIVE=Jeff OK+Decision-Card.
 §
-Discord recovery: propose_recovery.py + playbook. compression=xai-oauth/grok-4.5 only.
+VRAM: 128GB RAM hot-stage; 1 GPU tenant forge+pony; release before heavy LLM.
 §
-PRIMARY IMAGE=Forge/pony (152482 beauty; 152833 metrics). Comfy batch only if asked.
+Garden locks: Alice 778901 floor; Amira 818929. Pony VAE Auto; never restack gold while debug.
 §
-Bottlenecks: compaction 0.88+backfill4; aux compress=xai not local while Forge GPU; gw soft restart may need force-kill :8642.
+Gallery :8189 always-on; Comfy :8188 batch-only.
 §
-VRAM: 128GB RAM hot-stage; 1 GPU tenant forge+pony. tenant forge frees Comfy; release before heavy LLM.
+Expandability: runners/SSOT cast-agnostic; wardrobe/poses=curated named libs not freeform one-offs.
 §
-Garden 10/10 lock: Alice 778901 floor; Amira 818929. Law: slim amp; Amira-length body locks; first-name; Pony VAE Auto; static fail-closed; never restack slut pile / touch gold while debug. SSOT GOLD_* + keepers + cast_recipe_ssot.
+Remote popups: focus_mode+popup_focus_enforce; STOP stops work not host flash.
 §
-Quality bar: pavilion portrait=beauty floor; garden Alice 778901=explicit 10/10. Lock seeds/recipes over prompt thrash.
+Process Monitor & Resource Chain: LIVE v2 2026-07-25. Script `scripts/ops/process_chain_monitor_once.py` (observe|--dry-run|--apply). State `state/process_chain_monitor_latest.json`. Syntest `_syntest_chain_v2.py` ALL_PASS. Protect WT/gateway/proxy/llama/daemon/consent. Admin residual: Run-Popup-Kill-Admin-Once.REAL.bat when home. Receipt vault Operations/Process-Chain-Monitor-Receipt-2026-07-25.md.
 §
-Gallery :8189 always on (watchdog gallery-only VBS); Comfy :8188 batch-only; Forge daily primary.
+Silo 2026-07-26: STOP operator-owned (silo_ctl). focus_mode no longer freezes silo. VRAM critical=gentle land. Cursor complete preserved. Board ok freeze=False. Receipt Operations/logs/silo-cook-latest.md.
 §
-Expandability law (Jeff): runners/promote/coverage/SSOT APIs = cast-agnostic Swiss-army knives (param cast/pose/outfit/seed; infinitely expandable). Never hard-pin reusable functions to core-only lists. Caveat: wardrobe packs + image poses = curated expandable named libraries (language→image vocab), not free-form one-offs.
+Field Kit (asimons81/hermes-field-kit) bundle validate_bundle.py expects LICENSE at skills/LICENSE (ROOT.parents[1] from categorized skill path D:/HermesData/skills/<cat>/<name>). Vendor validate.py still passes from vendor clone. Observe script: D:/HermesData/scripts/field_kit_stack_observe.py. MCP inherit Decision Card: D:/PhronesisVault/Operations/Decision-Card-MCP-Inherit-Toolsets-2026-07-26.md — measured 0 mcp_servers; inherit still true until Jeff OK.

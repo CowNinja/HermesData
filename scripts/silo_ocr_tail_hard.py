@@ -55,7 +55,7 @@ def main() -> int:
     parked = 0
     for path, st in list(
         con.execute(
-            "SELECT path,status FROM ocr_queue WHERE status IN ('empty','queued','needs_ocr')"
+            "SELECT path,status FROM ocr_queue WHERE status IN ('empty','queued','needs_ocr','error','thin_image')"
         )
     ):
         name = Path(path).name.lower()
@@ -69,6 +69,31 @@ def main() -> int:
         ) or ("/images/" in low and name.endswith(".png")):
             con.execute(
                 "UPDATE ocr_queue SET status='archive_skip', score=1, updated_at=? WHERE path=?",
+                (now, path),
+            )
+            parked += 1
+            continue
+        # 2026-07-26 SSOT park
+        try:
+            from ocr_park_patterns import is_ocr_park_path
+
+            park = is_ocr_park_path(path)
+        except Exception:
+            park = any(
+                k in low
+                for k in (
+                    "volbrain",
+                    "glass all lesion",
+                    "all lesion_jobs",
+                    "/demo images/",
+                    "depositphotos",
+                    "00-pics",
+                    "stock-photo",
+                )
+            )
+        if park:
+            con.execute(
+                "UPDATE ocr_queue SET status='thin_image', score=1, engine=COALESCE(NULLIF(engine,''),'park_ssot'), updated_at=? WHERE path=?",
                 (now, path),
             )
             parked += 1

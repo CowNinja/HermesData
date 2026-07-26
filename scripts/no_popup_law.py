@@ -29,9 +29,8 @@ CREATE_NO_WINDOW = 0x08000000
 HERMES = Path(r"D:\HermesData")
 SCRIPTS = HERMES / "scripts"
 STATE = HERMES / "state"
+# Silo STOP is operator-owned (silo_ctl). Popup law must not freeze land/depth.
 STOPS = [
-    STATE / "silo_continuous.STOP",
-    STATE / "silo_autonomous.STOP",
     STATE / "focus_mode.STOP",
 ]
 LAW_JSON = STATE / "no_popup_law.json"
@@ -82,7 +81,10 @@ def clear_focus_stops() -> None:
             pass
 
 
-# User-level ticks we can disable/enable without Admin
+# User-level ticks we can disable/enable without Admin.
+# 2026-07-26: do NOT quiet Phronesis-*-Hidden — those are the CREATE_NO_WINDOW
+# pythonw entrypoints. Bare Phronesis-Guardian / Bridge (powershell.exe) hang
+# under Win11 default-terminal and mint 267014 when force-Ended. Prefer Hidden.
 USER_TICKS_QUIET: list[str] = [
     "Hermes_Silent_Green_Pulse",
     "Hermes_Image_Queue_Pulse",
@@ -91,9 +93,16 @@ USER_TICKS_QUIET: list[str] = [
     "Hermes_Silo_Overnight_Watchdog",
     "Hermes_Silo_Travel_Heartbeat",
     "Hermes_Gateway_Watchdog_5m",
+    "ComfyUI-Gallery-Watchdog",
+]
+
+# Keep these ENABLED (user-IL) even under focus/lockdown — silent pythonw path.
+USER_TICKS_KEEP_ENABLED: list[str] = [
     "Phronesis-Guardian-Hidden",
     "Phronesis-Grok-Direct-Bridge-Hidden",
-    "ComfyUI-Gallery-Watchdog",
+    "Hermes_Popup_Storm_Suppress",
+    "Hermes_Popup_Focus_Guard",
+    "Hermes_Popup_End_Flashy_30m",
 ]
 
 # Admin-owned flashy entries (document + trampoline no-op only)
@@ -144,11 +153,23 @@ def schtasks_change(name: str, enable: bool) -> bool:
 
 
 def quiet_user_ticks() -> dict[str, bool]:
-    return {n: schtasks_change(n, enable=False) for n in USER_TICKS_QUIET}
+    out = {n: schtasks_change(n, enable=False) for n in USER_TICKS_QUIET}
+    # Always re-assert silent Hidden twins + protectors stay on
+    for n in USER_TICKS_KEEP_ENABLED:
+        out[f"keep:{n}"] = schtasks_change(n, enable=True)
+    return out
 
 
 def resume_user_ticks() -> dict[str, bool]:
-    return {n: schtasks_change(n, enable=True) for n in USER_TICKS_QUIET}
+    out = {n: schtasks_change(n, enable=True) for n in USER_TICKS_QUIET}
+    for n in USER_TICKS_KEEP_ENABLED:
+        out[f"keep:{n}"] = schtasks_change(n, enable=True)
+    return out
+
+
+def ensure_hidden_twins_enabled() -> dict[str, bool]:
+    """Prefer pythonw Hidden twins over bare powershell.exe parents."""
+    return {n: schtasks_change(n, enable=True) for n in USER_TICKS_KEEP_ENABLED}
 
 
 def schtask_action_line(name: str) -> str:
@@ -203,7 +224,9 @@ def write_law_state(extra: dict[str, Any] | None = None) -> dict[str, Any]:
         ],
         "user_ticks_quiet": USER_TICKS_QUIET,
         "admin_flashy": ADMIN_FLASY,
-        "admin_one_shot": str(SCRIPTS / "ops" / "Run-Popup-Kill-Admin-Once.bat"),
+        # Travel stub bat is no-UAC; permanent kill is REAL.bat (elevated once when home).
+        "admin_one_shot": str(SCRIPTS / "ops" / "Run-Popup-Kill-Admin-Once.REAL.bat"),
+        "admin_one_shot_stub_travel": str(SCRIPTS / "ops" / "Run-Popup-Kill-Admin-Once.bat"),
         "enforce_cli": f'{pythonw_path()} "{SCRIPTS / "popup_focus_enforce.py"}"',
     }
     if extra:

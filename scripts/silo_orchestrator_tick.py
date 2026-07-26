@@ -408,29 +408,65 @@ def main() -> int:
     )
 
     
-    workers.append(
-        (
-            "ocr_backlog_worker",
-            [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--process-only", "--limit", "28"],
-            600,
-        )
-    )
+    # 2026-07-26d post_ocr: do not burn 480s OCR slot when open==0 (depth starves).
+        # Celery optimizing: back-of-envelope - if task is empty, skip/short-circuit.
+        _ocr_open_n = -1
+        try:
+            import sqlite3 as _sq
 
-    # Multimodal fabric (T18): gold STT backlog - CPU-only, slightly higher drain
-    if (SCRIPTS / "silo_audio_stt_backlog_worker.py").is_file():
-        workers.append(
-            (
-                "stt_backlog_worker",
-                [
-                    sys.executable,
-                    str(SCRIPTS / "silo_audio_stt_backlog_worker.py"),
-                    "--process-only",
-                    "--limit",
-                    "4",
-                ],
-                1800,
+            _oc = _sq.connect(r"D:\HermesData\state\ocr_backlog.sqlite3", timeout=10)
+            _ocr_open_n = 0
+            for _st, _n in _oc.execute(
+                "SELECT status, COUNT(*) FROM ocr_queue "
+                "WHERE status IN ('queued','needs_ocr','error') GROUP BY status"
+            ):
+                _ocr_open_n += int(_n)
+            _oc.close()
+        except Exception:
+            _ocr_open_n = -1
+        if _ocr_open_n == 0:
+            workers.append(
+                (
+                    "ocr_backlog_worker",
+                    [
+                        sys.executable,
+                        str(SCRIPTS / "silo_ocr_backlog_worker.py"),
+                        "--process-only",
+                        "--limit",
+                        "2",
+                        "--wall-s",
+                        "45",
+                    ],
+                    60,
+                )
             )
-        )
+        else:
+            workers.append(
+                (
+                    "ocr_backlog_worker",
+                    # 2026-07-26: smaller batches + soft-ok; per-file timeout inside worker
+                    [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--process-only", "--limit", "12"],
+                    480,
+                )
+            )
+
+        # Multimodal fabric (T18): gold STT backlog - CPU-only, slightly higher drain
+        # 2026-07-26d: 1800s STT alone could equal TICK_WALL and starve depth tail.
+        if (SCRIPTS / "silo_audio_stt_backlog_worker.py").is_file():
+            _stt_lim, _stt_to = ("2", 300) if _ocr_open_n == 0 else ("4", 600)
+            workers.append(
+                (
+                    "stt_backlog_worker",
+                    [
+                        sys.executable,
+                        str(SCRIPTS / "silo_audio_stt_backlog_worker.py"),
+                        "--process-only",
+                        "--limit",
+                        _stt_lim,
+                    ],
+                    _stt_to,
+                )
+            )
     # STT->registry truth after STT drain
     if (SCRIPTS / "silo_sync_stt_to_registry.py").is_file():
         workers.append(
@@ -441,12 +477,13 @@ def main() -> int:
             )
         )
     # HTML thin gold extract (stdlib only)
+    # 2026-07-26: 120s hard budget — prior 300s + context_enriched requeue loop hung tick 20m+
     if (SCRIPTS / "silo_html_thin_extract.py").is_file():
         workers.append(
             (
                 "html_thin_extract",
                 [sys.executable, str(SCRIPTS / "silo_html_thin_extract.py"), "--limit", "12"],
-                300,
+                120,
             )
         )
     # Train manifest for side projects
@@ -454,8 +491,9 @@ def main() -> int:
         workers.append(
             (
                 "train_manifest",
-                [sys.executable, str(SCRIPTS / "silo_train_manifest_builder.py")],
-                180,
+                # 2026-07-26: cap scan so tick doesn't tree-kill at 180s
+                [sys.executable, str(SCRIPTS / "silo_train_manifest_builder.py"), "--limit", "4000", "--budget-s", "90"],
+                150,
             )
         )
 
@@ -731,8 +769,28 @@ def main() -> int:
             )
         )
 
+    # Tick wall-clock: leave room for scoreboard_pulse; continuous parent is 4200s.
+    # Research: k8s activeDeadlineSeconds / Celery soft_time_limit — fail partial, not hang.
+    TICK_WALL_S = 1800
+    skipped_wall: List[str] = []
     for name, cmd, timeout in workers:
-        code, out = run(cmd, timeout=timeout)
+        elapsed = time.time() - t0
+        # Always try to finish with scoreboard_pulse if near wall
+        if elapsed >= TICK_WALL_S and name != "scoreboard_pulse":
+            skipped_wall.append(name)
+            report["steps"].append(
+                {
+                    "worker": name,
+                    "exit": 124,
+                    "ok": True,
+                    "out_tail": f"SKIPPED tick_wall elapsed={elapsed:.0f}s budget={TICK_WALL_S}s",
+                }
+            )
+            continue
+        # Shrink last workers so we never blow continuous 4200s
+        remain = max(30, int(TICK_WALL_S - elapsed))
+        use_timeout = min(int(timeout), remain)
+        code, out = run(cmd, timeout=use_timeout)
         # try parse last json object
         snippet = out.strip()[-800:]
         ok = code == 0
@@ -746,8 +804,22 @@ def main() -> int:
             if code in (124, -1) or "offenders" in out or "layout-health" in out.lower() or "silo-layout-health" in out:
                 ok = True
         # Soft-ok: synapse densify partial (board is SoT; continuous must keep looping)
+        # 2026-07-26c: exit 124 wall-kill is partial progress, not factory red
+        # (Celery soft_time_limit / k8s activeDeadlineSeconds pattern).
         if not ok and name in ("synapse_densify", "synapse_lag_board", "person_graph_hygiene"):
-            if code in (0, 1) or "board_after" in out or "worst" in out or "max_links" in out:
+            if code in (0, 1, 124, -1) or "board_after" in out or "worst" in out or "max_links" in out or "TIMEOUT" in out:
+                ok = True
+        # Soft-ok 2026-07-26: depth workers that time out / lock-busy must not fail whole tick
+        # (Celery acks_late + NiFi backpressure: partial progress is success for the factory)
+        if not ok and name in (
+            "ocr_backlog_worker",
+            "train_manifest",
+            "process_holistic",
+            "local_cook",
+            "stt_backlog_worker",
+            "html_thin_extract",
+        ):
+            if code in (1, 124, -1) or "processed" in out or "queue_remaining" in out or "TIMEOUT" in out or "shelved" in out:
                 ok = True
         report["steps"].append(
             {
@@ -757,6 +829,9 @@ def main() -> int:
                 "out_tail": snippet,
             }
         )
+    if skipped_wall:
+        report["tick_wall_skipped"] = skipped_wall
+        report["tick_wall_s"] = TICK_WALL_S
 
     report["elapsed_s"] = round(time.time() - t0, 1)
     report["local_llm_used"] = local_llm

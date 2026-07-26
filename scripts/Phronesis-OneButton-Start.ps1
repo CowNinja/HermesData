@@ -17,13 +17,21 @@ param(
     [switch]$Force = $false
 )
 
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "SilentlyContinue"
+# Detach console first — schtask still starts bare powershell (Access denied rebind).
+try {
+  Add-Type -Name K -Namespace W -MemberDefinition '[DllImport("kernel32.dll")] public static extern bool FreeConsole();' -ErrorAction SilentlyContinue
+  [W.K]::FreeConsole() | Out-Null
+} catch {}
 # Focus mode: refuse auto start-at-logon stack while STOP files present (unless -Force)
 if (-not $Force) {
+    if (Test-Path "D:\HermesData\state\popup_lockdown.ON") { exit 0 }
+    if (Test-Path "D:\HermesData\state\popup_emergency.STOP") { exit 0 }
     if (Test-Path "D:\HermesData\state\silo_continuous.STOP") { exit 0 }
     if (Test-Path "D:\HermesData\state\silo_autonomous.STOP") { exit 0 }
     if (Test-Path "D:\HermesData\state\focus_mode.STOP") { exit 0 }
 }
+$ErrorActionPreference = "Continue"
 $corePath = Join-Path $PSScriptRoot "phronesis-core.json"
 if (-not (Test-Path $corePath)) { Write-Host "FATAL: phronesis-core.json missing" -ForegroundColor Red; exit 1 }
 $core = Get-Content $corePath -Raw | ConvertFrom-Json

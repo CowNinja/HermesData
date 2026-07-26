@@ -697,38 +697,58 @@ def vram_mode_recovery() -> Dict[str, Any]:
         except Exception as exc:
             actions.append({"action": "stop_comfy_pipeline_paused", "ok": False, "error": str(exc)})
 
-    if (
-        mode == "image"
-        and not silo_primary
-        and not pipeline_paused
-        and not _port_open(8188)
-        and comfy_stack.is_file()
-    ):
-        try:
-            proc = run_hidden(
-                hidden_powershell_args(str(comfy_stack), "start", "inference"),
-                capture_output=True,
-                text=True,
-                timeout=240,
-                cwd=str(comfy_stack.parent),
-            )
-            actions.append(
-                {
-                    "action": "start_comfy_image_mode",
-                    "ok": _port_open(8188),
-                    "exit_code": proc.returncode,
-                    "stdout_tail": (proc.stdout or "")[-300:],
-                }
-            )
-        except Exception as exc:
-            actions.append({"action": "start_comfy_image_mode", "ok": False, "error": str(exc)})
+    # Image engines are ON-DEMAND (hermes_image ensure / forge). Never auto-start
+    # Comfy solely because mode==image — that fights the 12GB single-tenant law
+    # and historically left vram-priority stuck on image while llama held GPU
+    # (infra-solidity cook 2026-07-26; SRE: symptoms over thrashy auto-remediation).
+    if mode == "image" and not silo_primary and not pipeline_paused:
+        forge_up = _port_open(7860)
+        comfy_up = _port_open(8188)
+        actions.append(
+            {
+                "action": "image_mode_observe_only",
+                "ok": True,
+                "forge_up": forge_up,
+                "comfy_up": comfy_up,
+                "note": "no_auto_start; use hermes_image ensure|release for tenant flips",
+            }
+        )
+        # Dual GPU tenants (llama + image) = thrash on 3060 12GB — yield image if both up.
+        if _port_open(8090) and (forge_up or comfy_up):
+            try:
+                release = SCRIPTS / "hermes_image.py"
+                if release.is_file():
+                    proc = run_hidden(
+                        [str(prefer_pythonw()), str(release), "release"],
+                        capture_output=True,
+                        text=True,
+                        timeout=90,
+                        cwd=str(SCRIPTS),
+                    )
+                    actions.append(
+                        {
+                            "action": "release_image_dual_tenant",
+                            "ok": (not _port_open(7860)) and (not _port_open(8188)),
+                            "exit_code": proc.returncode,
+                            "stdout_tail": (proc.stdout or "")[-300:],
+                            "reason": "single_gpu_tenant_law",
+                        }
+                    )
+            except Exception as exc:
+                actions.append({"action": "release_image_dual_tenant", "ok": False, "error": str(exc)[:200]})
 
-    both_up = _port_open(8090) and _port_open(8188)
+    both_up = _port_open(8090) and (_port_open(8188) or _port_open(7860))
     return {
         "vram_mode": mode,
         "actions": actions,
         "dual_stack": both_up,
-        "ports": {"8090": _port_open(8090), "8091": _port_open(8091), "8188": _port_open(8188), "8642": _port_open(8642)},
+        "ports": {
+            "8090": _port_open(8090),
+            "8091": _port_open(8091),
+            "8188": _port_open(8188),
+            "7860": _port_open(7860),
+            "8642": _port_open(8642),
+        },
     }
 
 

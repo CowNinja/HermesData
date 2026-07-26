@@ -5,10 +5,47 @@ param(
     [string]$Model = ""
 )
 
-# Focus mode: no work, no child spawn (RDP typing / remote)
-if (Test-Path "D:\HermesData\state\silo_continuous.STOP") { exit 0 }
-if (Test-Path "D:\HermesData\state\silo_autonomous.STOP") { exit 0 }
-if (Test-Path "D:\HermesData\state\focus_mode.STOP") { exit 0 }
+$ErrorActionPreference = "SilentlyContinue"
+# Detach console ASAP so RDP does not flash even for STOP exit path
+try {
+  Add-Type -Name K -Namespace W -MemberDefinition '[DllImport("kernel32.dll")] public static extern bool FreeConsole();' -ErrorAction SilentlyContinue
+  [W.K]::FreeConsole() | Out-Null
+} catch {}
+
+# Lockdown / focus: no work, no child spawn (RDP typing / remote).
+# Environment.Exit(0) so schtasks Last Result is truly SUCCESS (PS `exit 0`
+# can still report 1 when $Error is non-empty; force-End was 267014).
+function Exit-Ok([string]$reason) {
+  try {
+    $stamp = "D:\HermesData\state\grok_direct_bridge_last_exit.txt"
+    Set-Content -Path $stamp -Value ("ok " + $reason + " " + [DateTimeOffset]::UtcNow.ToString("o")) -Encoding ascii -ErrorAction SilentlyContinue
+  } catch {}
+  [System.Environment]::Exit(0)
+}
+if (Test-Path "D:\HermesData\state\popup_lockdown.ON") { Exit-Ok "lockdown" }
+if (Test-Path "D:\HermesData\state\popup_emergency.STOP") { Exit-Ok "emergency" }
+if (Test-Path "D:\HermesData\state\silo_continuous.STOP") { Exit-Ok "silo_continuous_stop" }
+if (Test-Path "D:\HermesData\state\silo_autonomous.STOP") { Exit-Ok "silo_autonomous_stop" }
+if (Test-Path "D:\HermesData\state\focus_mode.STOP") { Exit-Ok "focus_stop" }
+
+# Cadence floor 2026-07-26: schtask may still be 5m (Admin needed to rebind RI).
+# Self-throttle to 30m unless -Restart. Prevents RDP trampoline flash every 5m.
+if (-not $Restart) {
+  try {
+    $cadenceStamp = "D:\HermesData\state\grok_direct_bridge_last_fire.txt"
+    $minIntervalSec = 1800
+    if (Test-Path $cadenceStamp) {
+      $raw = (Get-Content $cadenceStamp -Raw -ErrorAction SilentlyContinue).Trim()
+      $lastUnix = 0L
+      if ([int64]::TryParse($raw, [ref]$lastUnix)) {
+        $nowUnix = [int64]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+        if (($nowUnix - $lastUnix) -lt $minIntervalSec) { Exit-Ok "cadence" }
+      }
+    }
+    $nowWrite = [int64]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+    Set-Content -Path $cadenceStamp -Value "$nowWrite" -Encoding ascii -NoNewline -ErrorAction SilentlyContinue
+  } catch {}
+}
 
 # If Task Scheduler started bare powershell (focus steal), bounce into pythonw CREATE_NO_WINDOW.
 if ($env:HERMES_HIDDEN_CHILD -ne "1" -and $MyInvocation.InvocationName -ne '.' -and $MyInvocation.Line -notmatch '^\s*\.') {
@@ -26,7 +63,7 @@ if ($env:HERMES_HIDDEN_CHILD -ne "1" -and $MyInvocation.InvocationName -ne '.' -
                 $w = New-Object -ComObject WScript.Shell
                 $arg = "`"$pyw`" `"$launcher`" `"$entry`" " + ($extra -join " ")
                 $null = $w.Run($arg, 0, $false)
-                exit 0
+                Exit-Ok "trampoline"
             } catch {}
         }
     }
@@ -99,7 +136,7 @@ if ($Restart) {
 
 if (Test-PidAlive $bridgePid) {
     Log "grok-direct bridge alive pid=$bridgePid thread=$threadId"
-    exit 0
+    Exit-Ok "alive"
 }
 if ((Test-Path $lock) -and -not (Test-PidAlive $bridgePid)) {
     Remove-Item $lock -Force -ErrorAction SilentlyContinue

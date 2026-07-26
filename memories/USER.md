@@ -15,3 +15,5 @@ VW dry vault-only; LIVE=Jeff OK+card. Hybrid OK; purge Jeff-gated.
 Mebaman (~preteen) dad PC: game builds; overnight OK; always save when asked.
 §
 Alice RP: mint post-cum; free-rein directs; eye-lock; dirty; GG; squirt; onomatopoeia. Harem expandable (core Chloe/Becca/Sassy/Emily/Lyra). Town kit=shared wardrobe id slutty-lara-croft-explorer (0 underwear explorer cosplay on core six — NOT a person named Lara); beats+ledger. New-girl deny till beg; Lyra nectar OK. Max 1–2 fingers; light rosebud+tongue. Noisy ATM/A2M/ATOGM/fart-creampie-eat; RCowgirl anal. Cum-tease spit	oholes harem deny taste. Lesbian cuckquean train. Sisters futon; recover=show+Alice close. Tanks: Priya jeweler; Katie freckled auburn.
+§
+RP intimacy: Jeff enjoys tasting the girls' juices; does NOT want to taste his own cum. Girls may snowball/share combined juices among themselves only — never feed him creampie or cum-kisses.
