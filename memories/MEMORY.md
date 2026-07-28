@@ -8,7 +8,7 @@ N=1..3 multi-figure; sole male 1boy max. Pose=pose_catalog; Beauty=Forge+MEDIA; 
 §
 Threads: Grok 152484=arch/VW only; silo 152452 six_numbers; VW LIVE=Jeff OK+Decision-Card.
 §
-HW SSOT: OptiPlex7090 i5-11500 6C/12T; 128GB DDR4-2933 4x32; RTX3060 12GB sm86 PCIe4x16 170W; C:256GB~35GB free CRITICAL; D:MX500 4TB; G:HGST4TB; K:USB5TB. Canon Operations/Machine-Capability-Spec-CANONICAL-2026-07-27.md + state/machine_capability_spec.json + scripts/machine_capability_probe.py. VRAM-poor/RAM-rich; 1 GPU tenant; stage D:/RAM.
+HW: OptiPlex7090 i5-11500/128GB/3060-12GB; C:~45.8GB watch. Canon Machine-Capability-Spec + probe/gate/refresh/cron + p2a/p2b_safe + gpu_thermal. Skill machine-capability-foundation. Cron 664882a9deee. 1 GPU tenant; P2 Jeff=PackageCache/Python/Docker	o D:.
 §
 Garden locks: Alice 778901 floor; Amira 818929. Pony VAE Auto; never restack gold while debug.
 §
