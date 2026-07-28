@@ -10,7 +10,7 @@ Contextual awareness (Jeff mandate):
   - capped Qwythos grunt
 
 Signals order:
-  entity+origin → name_rule → origin_path/siblings → k_path → content → grunt → stay
+  entity+origin ? name_rule ? origin_path/siblings ? k_path ? content ? grunt ? stay
 
 Default dry-run. --apply moves on K only (never touches G:).
 """
@@ -294,7 +294,7 @@ def main() -> int:
         stats[why] += 1
         if "Inbox" in dom:
             continue
-        # Preserve nested origin tree (anti-flat) — never flatten into _rehome-inbox
+        # Preserve nested origin tree (anti-flat) ? never flatten into _rehome-inbox
         try:
             rel = p.relative_to(INBOX / "from-g-drive")
         except Exception:
@@ -372,9 +372,9 @@ def main() -> int:
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Inbox process (origin-aware) — {TS}",
+        f"# Inbox process (origin-aware) ? {TS}",
         "",
-        f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'} · planned **{len(moves)}** · applied **{applied}** · grunt **{grunt_used}**",
+        f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'} ? planned **{len(moves)}** ? applied **{applied}** ? grunt **{grunt_used}**",
         f"**Signals:** {dict(stats)}",
         "",
         "| Why | Domain | Origin parents | File |",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility shim → jsonl_log_rotator (SSOT).
+"""Compatibility shim -> jsonl_log_rotator (SSOT).
 
 Do not duplicate rotation logic here. Callers may `import jsonl_rotate`.
 Research 2026-07-19: existing jsonl_log_rotator.py already covers rename +

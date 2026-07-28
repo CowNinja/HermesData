@@ -101,18 +101,18 @@ def main() -> int:
     ]:
         print(f"\n--- {label} ({url}) ---")
         ok_a, msg_a = test_a_skill_hint(url)
-        print(f"Test A (skill): {'PASS' if ok_a else 'FAIL'} — {msg_a}")
+        print(f"Test A (skill): {'PASS' if ok_a else 'FAIL'} ? {msg_a}")
         if not ok_a and required:
             failures.append(f"{label}:test_a")
         elif not ok_a and "401" in msg_a:
-            print("  (gateway requires session auth — proxy path is authoritative)")
+            print("  (gateway requires session auth ? proxy path is authoritative)")
 
         ok_b, msg_b = test_b_narrative(url)
-        print(f"Test B (narrative): {'PASS' if ok_b else 'FAIL'} — {msg_b}")
+        print(f"Test B (narrative): {'PASS' if ok_b else 'FAIL'} ? {msg_b}")
         if not ok_b and required:
             failures.append(f"{label}:test_b")
         elif not ok_b and "401" in msg_b:
-            print("  (gateway requires session auth — proxy path is authoritative)")
+            print("  (gateway requires session auth ? proxy path is authoritative)")
 
     if failures:
         print("\nFAILURES:", failures)

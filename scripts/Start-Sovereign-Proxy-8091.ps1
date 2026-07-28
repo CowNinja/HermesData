@@ -18,7 +18,7 @@ if (-not (Test-Path $venvPython)) {
 
 . $forkGuard
 
-# Prefer pythonw via Start-HiddenProcess (breakaway/wscript) — no console, stays up on this host (2026-07-17).
+# Prefer pythonw via Start-HiddenProcess (breakaway/wscript) - no console, stays up on this host (2026-07-17).
 # Fall back to python.exe if pythonw missing.
 $launcher = if (Test-Path $venvPythonw) { $venvPythonw } else { $venvPython }
 

@@ -62,7 +62,7 @@ def cloud_destinations() -> list[Path]:
         # Post-move targets (D: off C-space)
         Path(r"D:\CloudSync\Google-My-Drive\Phronesis-Recovery"),
         Path(r"D:\CloudSync\OneDrive\Phronesis-Recovery"),
-        # Google Drive for Desktop — current mirror root on this host
+        # Google Drive for Desktop ? current mirror root on this host
         home / "My Drive" / "Phronesis-Recovery",
         Path(r"G:\My Drive\Phronesis-Recovery"),
         Path(r"G:\MyDrive\Phronesis-Recovery"),
@@ -146,10 +146,10 @@ def main() -> int:
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     receipt_body = "\n".join(
         [
-            f"# Cloud recovery pack sync — {TS}",
+            f"# Cloud recovery pack sync ? {TS}",
             "",
             f"**Staging:** `{STAGING}`",
-            f"**Cloud dest:** `{chosen or 'NONE — pack built locally only'}`",
+            f"**Cloud dest:** `{chosen or 'NONE ? pack built locally only'}`",
             f"**Sync:** {sync_msg}",
             "",
             "## Files",

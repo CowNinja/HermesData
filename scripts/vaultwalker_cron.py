@@ -40,7 +40,7 @@ FEEDBACK_JSON = LOG_DIR / "vaultwalker-last-run.json"
 FEEDBACK_JSONL = LOG_DIR / "vaultwalker-runs.jsonl"
 FEEDBACK_MD = Path(r"D:\PhronesisVault\Operations\logs\vaultwalker-feedback-latest.md")
 VISION_DOC = "Operations/Grand-Vision-Silo-Gardener-and-Hermes-Continuity-2026-07-10.md"
-# Jeff 15C 2026-07-18: cron MAY live under guardrails — default file unarmed
+# Jeff 15C 2026-07-18: cron MAY live under guardrails ? default file unarmed
 AUTO_LIVE = STATE_DIR / "vaultwalker_auto_live.json"
 TRAVEL_STOP = ROOT / "state" / "vaultwalker_travel.STOP"
 
@@ -123,7 +123,7 @@ def decide_live_mode(
             if errors > max_err:
                 return True, f"last_errors_{errors}"
             if require_dry and not last_dry:
-                # last was live — require a dry success before next live (canary cadence)
+                # last was live ? require a dry success before next live (canary cadence)
                 # allow consecutive live only if require_last_dry_ok false
                 pass
             if require_dry and last.get("exit_code", 1) != 0:
@@ -167,7 +167,7 @@ def evaluate_feedback(summary: Dict[str, Any], dry_run: bool, silos: List[str], 
         totals["evaluated"] += int(stats.get("reloc_evaluated") or 0)
 
     if totals["indexes"] == 0 and totals["errors"] == 0:
-        notes.append("No index updates this cycle (incremental skip or light cycle) — ok if state fresh")
+        notes.append("No index updates this cycle (incremental skip or light cycle) ? ok if state fresh")
     else:
         notes.append(f"Index folders touched ~{totals['indexes']}")
 
@@ -201,7 +201,7 @@ def evaluate_feedback(summary: Dict[str, Any], dry_run: bool, silos: List[str], 
         "score": score,
         "notes": notes,
         "risks": risks,
-        "suggested_adjustments": adjustments or ["none — continue dry-run monitoring"],
+        "suggested_adjustments": adjustments or ["none ? continue dry-run monitoring"],
         "vision_checklist": vision,
         "totals": totals,
         "silos": silos,
@@ -264,7 +264,7 @@ def parse_summary_from_stdout(stdout: str) -> Dict[str, Any]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Safe VaultWalker cron runner")
-    # no_agent cron cannot pass argv — defaults must finish under Hermes 240s script cap.
+    # no_agent cron cannot pass argv ? defaults must finish under Hermes 240s script cap.
     # Full multi-silo walks (K: alone ~2.7k indexes) exceed 240s and mark the job error forever.
     default_silos = ["PhronesisVault"]
     env_silos = os.environ.get("VAULTWALKER_SILOS", "").strip()

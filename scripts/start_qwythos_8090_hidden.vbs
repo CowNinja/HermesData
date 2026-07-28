@@ -1,7 +1,7 @@
 ' Start Qwythos llama-server with ZERO visible console (no focus steal).
-' Uses pythonw + CREATE_NO_WINDOW launcher — do not call llama-server.exe from schtasks directly.
+' Uses pythonw + CREATE_NO_WINDOW launcher - do not call llama-server.exe from schtasks directly.
 '
-' Phase 3 (2026-07-25) — RTX 3060 12GB + 128GB system RAM profile:
+' Phase 3 (2026-07-25) - RTX 3060 12GB + 128GB system RAM profile:
 '   - ngl=99 full GPU weights (single resident GGUF)
 '   - ctx 65536 (Hermes agent floor)
 '   - cache-type-k/v q8_0 (safe KV quant; frees VRAM vs f16)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write lightweight silo WORLD index (top-level shelves only — fast).
+"""Write lightweight silo WORLD index (top-level shelves only ? fast).
 
 Pairs with silo_domain_indexes.py (deep per-domain). K-light cron calls both.
 2026-07-18: created so K-Light no longer reports missing_script for world leg.
@@ -12,7 +12,7 @@ from pathlib import Path
 
 SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
 OUT = SILO / "00-WORLD-INDEX.md"
-# Cap per-shelf immediate children count (no deep rglob — domain job owns depth).
+# Cap per-shelf immediate children count (no deep rglob ? domain job owns depth).
 MAX_CHILDREN_LIST = 40
 
 
@@ -69,11 +69,11 @@ def main() -> int:
 
     ok_n = sum(1 for s in shelves if s.get("ok"))
     lines = [
-        "# Personal Digital Silo — World Index",
+        "# Personal Digital Silo ? World Index",
         "",
-        f"_Auto world index — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
+        f"_Auto world index ? {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
         "",
-        "**Access:** catalog-first — `python D:/HermesData/scripts/silo_retrieve.py \"…\"` or ask Hermes.",
+        "**Access:** catalog-first ? `python D:/HermesData/scripts/silo_retrieve.py \"?\"` or ask Hermes.",
         "**Depth:** domain shelves get `00-INDEX.md` from `silo_domain_indexes.py`.",
         "",
         f"- top-level shelves: **{len(shelves)}** (ok={ok_n})",
@@ -85,9 +85,9 @@ def main() -> int:
     ]
     for s in shelves:
         if not s.get("ok"):
-            lines.append(f"| `{s.get('name')}` | — | — | {s.get('reason', 'err')} |")
+            lines.append(f"| `{s.get('name')}` | ? | ? | {s.get('reason', 'err')} |")
             continue
-        sample = ", ".join(f"`{x}`" for x in (s.get("samples") or [])[:4]) or "—"
+        sample = ", ".join(f"`{x}`" for x in (s.get("samples") or [])[:4]) or "?"
         lines.append(
             f"| `{s['name']}` | {s.get('dirs', 0)} | {s.get('files', 0)} | {sample} |"
         )

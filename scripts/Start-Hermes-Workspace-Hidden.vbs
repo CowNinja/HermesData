@@ -1,5 +1,5 @@
 ' Start Hermes Workspace on :3001 (detached, no console flash).
-' Prefer portable Node 22 (tools\node22) — system Node 24 broke vite/SSR dist.
+' Prefer portable Node 22 (tools\node22) - system Node 24 broke vite/SSR dist.
 Option Explicit
 Dim sh, node22, nodeSys, node, wsDir, cmd
 Set sh = CreateObject("WScript.Shell")

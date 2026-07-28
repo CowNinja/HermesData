@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Weekly no_agent Comfy gallery drift gate.
 
-Runs dry-run dedup (--scope both) + light FS↔DB count check.
+Runs dry-run dedup (--scope both) + light FSDB count check.
 Silent (empty stdout, exit 0) when reclaim_mb < THRESHOLD and counts align.
 One-line alert on stdout when drift exceeds threshold (cron delivers).
 

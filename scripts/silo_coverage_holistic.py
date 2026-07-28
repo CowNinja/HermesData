@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Holistic silo coverage — MemoryCard 100% + other G: folders + depth tracking."""
+"""Holistic silo coverage ? MemoryCard 100% + other G: folders + depth tracking."""
 from __future__ import annotations
 
 import json
@@ -157,16 +157,16 @@ def main() -> int:
         )
 
     lines = [
-        f"# Silo coverage holistic — {report['at'][:19]}",
+        f"# Silo coverage holistic ? {report['at'][:19]}",
         "",
         "## Headline",
         "- **MemoryCard land: 100% COMPLETE**",
         f"- **Campaign 2 G: personal: ~{c2_pct}%** ({c2_reg:,} / {c2_src:,} files)",
-        f"- **K registry:** {reg_total:,} · **unique:** {uniq:,}",
-        f"- **Depth touched:** ~{depth_pct}% · **OCR ok_text:** {ocr.get('ok_text', 0)}",
+        f"- **K registry:** {reg_total:,} ? **unique:** {uniq:,}",
+        f"- **Depth touched:** ~{depth_pct}% ? **OCR ok_text:** {ocr.get('ok_text', 0)}",
         "",
         "## MemoryCard",
-        f"- Census {CENSUS_MC:,} · registry rows {mc_reg:,} · **display 100%**",
+        f"- Census {CENSUS_MC:,} ? registry rows {mc_reg:,} ? **display 100%**",
         "",
         "## Other G: personal folders",
         "",
@@ -181,7 +181,7 @@ def main() -> int:
         "",
         "## Never / later",
         "- NEVER: HermesData, PhronesisVault, ComfyUI, Windows",
-        "- LATER: D: Documents/CloudSync · USB · Takeout",
+        "- LATER: D: Documents/CloudSync ? USB ? Takeout",
         "",
         "## Process on K",
     ]

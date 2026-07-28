@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exact-hash content fusion for the Personal Digital Silo.
 
-Same bytes, many paths → one fused knowledge object + full member provenance.
+Same bytes, many paths ? one fused knowledge object + full member provenance.
 Does NOT delete evidence. Idempotent upsert into fused_index.sqlite3.
 
 Phase 1 of Content-Fusion-Layer-CANONICAL-2026-07-12.
@@ -175,17 +175,17 @@ def build_card(
     for m in members[:200]:
         role = m.get("role", "member")
         lines.append(
-            f"- **{role}** · `{m.get('domain')}` · `{m.get('path')}`"
+            f"- **{role}** ? `{m.get('domain')}` ? `{m.get('path')}`"
         )
     if len(members) > 200:
-        lines.append(f"- … +{len(members) - 200} more")
+        lines.append(f"- ? +{len(members) - 200} more")
     lines += ["", "## Content body (from primary sidecars if any)", ""]
     if body:
         lines.append(body)
     else:
         lines.append(
             "_No extract/train sidecar on primary yet. "
-            "Bytes are identical across members — one future extract covers all._"
+            "Bytes are identical across members ? one future extract covers all._"
         )
     lines += [
         "",
@@ -281,7 +281,7 @@ def fuse(
             body = load_sidecar_text(ppath)
 
         summary = (
-            f"Exact-hash cluster ×{len(members)} · train_value={tv} · "
+            f"Exact-hash cluster ?{len(members)} ? train_value={tv} ? "
             f"primary={Path(primary['dest_path']).name if primary['dest_path'] else '?'}"
         )
         deltas = {
@@ -415,7 +415,7 @@ def fuse(
     JSON_OUT.write_text(json.dumps(out, indent=2), encoding="utf-8")
 
     lines = [
-        f"# Content fuse exact — {out['ts']}",
+        f"# Content fuse exact ? {out['ts']}",
         "",
         f"**Clusters processed:** {out['clusters_processed']}",
         f"**Cards written:** {out['cards_written']}",
@@ -427,7 +427,7 @@ def fuse(
     ]
     for s in out["sample"]:
         lines.append(
-            f"- ×{s['member_count']} · {s['train_value']} · `{s['sha16']}` · "
+            f"- ?{s['member_count']} ? {s['train_value']} ? `{s['sha16']}` ? "
             f"`{Path(s['primary']).name if s['primary'] else '?'}`"
         )
     lines += [

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Image pipeline pause gate — sovereign router phase can block Comfy auto-start."""
+"""Image pipeline pause gate ? sovereign router phase can block Comfy auto-start."""
 from __future__ import annotations
 
 import json
@@ -102,7 +102,7 @@ def set_image_pipeline_paused(
     current = load_pause_state()
     reason_s = reason or ("sovereign_router_phase" if paused else "operator_resume")
 
-    # API-level soft-resume noop (matches CLI) — protects operator_resume sticky note.
+    # API-level soft-resume noop (matches CLI) ? protects operator_resume sticky note.
     if (
         not force
         and not paused
@@ -116,7 +116,7 @@ def set_image_pipeline_paused(
         PAUSE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
         return state
 
-    # Preserve non-empty operator note when unpaused→unpaused operator_resume with empty note.
+    # Preserve non-empty operator note when unpaused?unpaused operator_resume with empty note.
     if (
         not force
         and not paused
@@ -175,7 +175,7 @@ def main() -> int:
             state = set_image_pipeline_paused(
                 True,
                 reason="silo_primary",
-                note="resume blocked — run .\\Phronesis.ps1 vram image first",
+                note="resume blocked ? run .\\Phronesis.ps1 vram image first",
             )
         elif is_hard_pause(current) and not args.force and args.reason in _AUTO_RESUME_REASONS:
             # Keep hard emergency pauses; Comfy may start without re-enabling Discord delivery.
@@ -188,7 +188,7 @@ def main() -> int:
             and (args.reason or "") in _AUTO_RESUME_REASONS
             and (args.reason or "") != "operator_resume"
         ):
-            # Already unpaused — soft stack/vram resume must not clobber reason/note.
+            # Already unpaused ? soft stack/vram resume must not clobber reason/note.
             state = dict(current)
             state["soft_resume_noop"] = args.reason or "auto"
             state["soft_resume_noop_at"] = _utc_now()

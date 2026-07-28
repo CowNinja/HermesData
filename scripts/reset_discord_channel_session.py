@@ -109,7 +109,7 @@ def main() -> int:
     if args.post:
         msg = (
             f"**[Session reset]** Hermes sessions for `{cid}` cleared "
-            f"({len(deleted)} id(s)). Re-ask a short prompt — avoids Grok tool-history "
+            f"({len(deleted)} id(s)). Re-ask a short prompt - avoids Grok tool-history "
             "parser errors on local Qwythos."
         )
         mid = post_discord(cid, msg)

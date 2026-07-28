@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post and pin Lane C travel ops guide to Jeff ↔ Grok Direct thread."""
+"""Post and pin Lane C travel ops guide to Jeff ? Grok Direct thread."""
 from __future__ import annotations
 
 import json
@@ -13,32 +13,32 @@ ROOT = Path(r"D:\HermesData")
 CONFIG = ROOT / "state" / "grok-direct-discord.json"
 DISCORD_API = "https://discord.com/api/v10"
 
-GUIDE = """**📌 Jeff ↔ Grok Direct — Travel Ops Guide (pinned)**
+GUIDE = """**? Jeff ? Grok Direct - Travel Ops Guide (pinned)**
 *Your remote command surface while away ~30 days.*
 
 **This thread = Grok Build command channel.** Bridge on your PC executes locally + queues Hermes.
 
-**Fix stack (instant — no Hermes):**
-• `heal stack` — Phronesis-Heal recovery
-• `status check` / `e2e review` — health score + inbox counts
-• `restart bridge` / `restart proxy` — service recovery
+**Fix stack (instant - no Hermes):**
+? `heal stack` - Phronesis-Heal recovery
+? `status check` / `e2e review` - health score + inbox counts
+? `restart bridge` / `restart proxy` - service recovery
 
 **Send work to Hermes (vault/files):**
-• `tell Hermes: [task with D:\\ paths]`
-• `go ahead` (after Grok offers to queue)
-• Grok says `Queued for Hermes:` → auto-drains immediately
+? `tell Hermes: [task with D:\\ paths]`
+? `go ahead` (after Grok offers to queue)
+? Grok says `Queued for Hermes:` -> auto-drains immediately
 
 **Force process queue:**
-• `drain all` — run up to 5 pending inbox items now
+? `drain all` - run up to 5 pending inbox items now
 
 **What you'll see:**
-• `🔧 Bridge local ops` — fixes ran on disk
-• `⚡ Bridge queued` — inbox item + immediate drain
-• `✅/🔴 Hermes inbox` — Hermes result (`tools=N`)
+? `? Bridge local ops` - fixes ran on disk
+? `? Bridge queued` - inbox item + immediate drain
+? `[OK]/? Hermes inbox` - Hermes result (`tools=N`)
 
 **Lanes (don't cross-post):**
-• **C (here)** — Jeff↔Grok planning + results
-• **A/B** — TL;DR checkpoints only (≤6 lines)
+? **C (here)** - Jeff?Grok planning + results
+? **A/B** - TL;DR checkpoints only (?6 lines)
 
 **Canon:** `D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md`
 
@@ -46,7 +46,7 @@ GUIDE = """**📌 Jeff ↔ Grok Direct — Travel Ops Guide (pinned)**
 
 **Kickstart:** `PHRONESIS v3.0 kickstart` (paste universal prompt from vault)
 
-— Grok Build · updated 2026-07-05"""
+- Grok Build ? updated 2026-07-05"""
 
 
 def _load_env() -> None:

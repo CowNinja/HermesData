@@ -97,7 +97,7 @@ def bw_json(args: list[str], session: str) -> dict | list | None:
 
 
 def encode_item(item: dict) -> str:
-    """Same as `bw encode` — base64 of JSON."""
+    """Same as `bw encode` - base64 of JSON."""
     raw = json.dumps(item, separators=(",", ":")).encode("utf-8")
     return base64.b64encode(raw).decode("ascii")
 

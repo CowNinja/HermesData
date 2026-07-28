@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-model_rotation_cron.py — Scheduled model rotation handoff (rotation-lock aware).
+model_rotation_cron.py ? Scheduled model rotation handoff (rotation-lock aware).
 
 When model_rotation_locked is true (current default), logs and exits without swap.
 When unlocked, delegates promotion decision to fleetctl suggest and applies via
-warm_tier_actions / 02-start-llama.ps1 (Windows-safe — no bash netstat).
+warm_tier_actions / 02-start-llama.ps1 (Windows-safe ? no bash netstat).
 
 Called by Hermes cronjob. Reads lru-router-state.json for workload context.
 """
@@ -122,7 +122,7 @@ def main() -> int:
     print("=== Model Rotation Cron ===")
     core = _load_json(CORE_PATH)
     if core.get("model_rotation_locked") or core.get("model_locked"):
-        msg = "Rotation locked in phronesis-core.json — no swap"
+        msg = "Rotation locked in phronesis-core.json ? no swap"
         print(f"  {msg}")
         log_event({"event": "rotation_blocked", "reason": "lock"})
         return 0
@@ -142,7 +142,7 @@ def main() -> int:
         log_event({"event": "no_rotation", "current": current})
         return 0
 
-    print(f"  → Rotating toward: {target}")
+    print(f"  ? Rotating toward: {target}")
     log_event({"event": "rotation_triggered", "from": current, "to": target})
     result = apply_rotation(target)
     if result.get("ok"):

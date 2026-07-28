@@ -2,8 +2,8 @@
 """Progressive file lifecycle index (SQLite) + status machine.
 
 Statuses:
-  untouched → inventoried → queued → copied → verified
-  → purge_eligible (class 2 only) → purged
+  untouched ? inventoried ? queued ? copied ? verified
+  ? purge_eligible (class 2 only) ? purged
   blocked | leave_alone
 
 AI:
@@ -178,7 +178,7 @@ def sha256_file(path: Path, limit: int = 32 * 1024 * 1024) -> str:
 
 
 def local_ai_classify(name: str, timeout: int = 45) -> dict:
-    """Optional local intelligence — fail soft."""
+    """Optional local intelligence ? fail soft."""
     script = Path(r"D:\HermesData\scripts\grunt_local.py")
     if not script.exists():
         return {}
@@ -392,7 +392,7 @@ def write_receipt(con: sqlite3.Connection) -> None:
     ).fetchall()
     total = con.execute("SELECT COUNT(*) c FROM files").fetchone()["c"]
     lines = [
-        f"# Lifecycle index receipt — {utc()}",
+        f"# Lifecycle index receipt ? {utc()}",
         "",
         f"**DB:** `{DB}`",
         f"**Total rows:** {total}",
@@ -404,8 +404,8 @@ def write_receipt(con: sqlite3.Connection) -> None:
         lines.append(f"| {r['class']} | {r['status']} | {r['c']} |")
     lines += [
         "",
-        "Machine: untouched→inventoried→queued→copied→verified→purge_eligible→purged",
-        "Class 1 leave_alone · Class 3 never purge via automation",
+        "Machine: untouched?inventoried?queued?copied?verified?purge_eligible?purged",
+        "Class 1 leave_alone ? Class 3 never purge via automation",
         "",
         "[[Operations/Three-Data-Classes-and-Touch-Policy-CANONICAL-2026-07-10]]",
         "[[Operations/Lifecycle-AI-Hybrid-Assessment-2026-07-10]]",
@@ -440,7 +440,7 @@ def main() -> int:
     p.add_argument(
         "--mark-purge-eligible",
         action="store_true",
-        help="Class 2 verified → purge_eligible (still no delete)",
+        help="Class 2 verified ? purge_eligible (still no delete)",
     )
     p.set_defaults(func=cmd_verify)
 

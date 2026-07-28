@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wave-3 clarity cook 2026-07-18 — items 1,2,4,3,5 with dual-verify hooks.
+"""Wave-3 clarity cook 2026-07-18 ? items 1,2,4,3,5 with dual-verify hooks.
 
 Safe, incremental, vault CNS first. No gateway kills. No VW LIVE.
 """
@@ -48,7 +48,7 @@ def ensure_k_pointer() -> Path:
         return p
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(
-        """# K: Sovereign Master Index — Vault Pointer
+        """# K: Sovereign Master Index ? Vault Pointer
 
 **External path (on K: drive):** `K:\\Phronesis-Sovereign\\00-MASTER-K-SOVEREIGN-INDEX.md`
 
@@ -86,7 +86,7 @@ def ensure_log_intelligence_pointer() -> Path:
         return p
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(
-        """# Log-Intelligence Digest — Pointer
+        """# Log-Intelligence Digest ? Pointer
 
 Historical log-intelligence noise is **archived** under HermesData and excluded from Graph.
 
@@ -219,8 +219,8 @@ def close_daily_a() -> dict:
         t = pointer.read_text(encoding="utf-8", errors="ignore")
         if "PRE-STAGED" in t or "moves on Jeff" in t:
             t2 = t.replace(
-                "**Status:** PRE-STAGED — moves on Jeff `APPROVE Daily-A`.",
-                f"**Status:** **DONE** — executed; archive has {arch_n} md (Wave-3 closeout {TS[:10]}).",
+                "**Status:** PRE-STAGED ? moves on Jeff `APPROVE Daily-A`.",
+                f"**Status:** **DONE** ? executed; archive has {arch_n} md (Wave-3 closeout {TS[:10]}).",
             )
             if t2 == t:
                 t2 = t.replace("PRE-STAGED", "DONE")
@@ -230,7 +230,7 @@ def close_daily_a() -> dict:
     if idx.exists():
         t = idx.read_text(encoding="utf-8", errors="ignore")
         if "PRE-STAGED" in t:
-            t2 = t.replace("**PRE-STAGED** — 104 files; Jeff gate", f"**DONE** — archived {arch_n} files")
+            t2 = t.replace("**PRE-STAGED** ? 104 files; Jeff gate", f"**DONE** ? archived {arch_n} files")
             t2 = t2.replace("PRE-STAGED", "DONE")
             idx.write_text(t2, encoding="utf-8", newline="\n")
             changes.append("digests-index DONE")
@@ -268,7 +268,7 @@ def close_daily_a() -> dict:
     # ACK note
     ack = VAULT / "docs" / "agent-coordination" / f"Hermes-Daily-A-Closeout-Wave3-{TS[:10]}.md"
     ack.write_text(
-        f"""# Hermes Daily-A Closeout — Wave-3 {TS[:10]}
+        f"""# Hermes Daily-A Closeout ? Wave-3 {TS[:10]}
 
 **Status:** DONE (idempotent re-verify)
 
@@ -297,7 +297,7 @@ tags: [daily-a, distillation, wave3, closeout]
     hk = VAULT / "Housekeeping.md"
     if hk.exists():
         t = hk.read_text(encoding="utf-8", errors="ignore")
-        row = f"\n- {TS[:10]} — Daily-A closeout Wave-3: archive={arch_n}, residual_moved={len(residual)}, status=DONE\n"
+        row = f"\n- {TS[:10]} ? Daily-A closeout Wave-3: archive={arch_n}, residual_moved={len(residual)}, status=DONE\n"
         if "Daily-A closeout Wave-3" not in t:
             # append near Daily Distillation if present
             if "## Daily Distillation Log" in t:
@@ -361,7 +361,7 @@ def densify_entities() -> dict:
             else:
                 touched.append(f"skip {slug}")
         else:
-            body = f"# {meta['title']}\n\n**Entity card** — personal digital silo.\n" + footer
+            body = f"# {meta['title']}\n\n**Entity card** ? personal digital silo.\n" + footer
             path.write_text(body, encoding="utf-8", newline="\n")
             touched.append(f"create {slug}")
 
@@ -406,12 +406,12 @@ Living map of `domain/*` tags for vault CSS and Bases.
 
 ## Active domains
 
-- `domain/medical` — Silo-Entities medical core, Digital-Twin medical
-- `domain/navy` — Navy career arc entities
-- `domain/family` — family graph
-- `domain/ops` — Operations living CNS
-- `domain/research` — Research hubs
-- `domain/silo` — K: land/depth
+- `domain/medical` ? Silo-Entities medical core, Digital-Twin medical
+- `domain/navy` ? Navy career arc entities
+- `domain/family` ? family graph
+- `domain/ops` ? Operations living CNS
+- `domain/research` ? Research hubs
+- `domain/silo` ? K: land/depth
 
 ## Wave-3 closeout
 
@@ -538,7 +538,7 @@ def main() -> int:
     else:
         wave3_json.write_text(json.dumps(receipt, indent=2, default=str), encoding="utf-8")
 
-    md = f"""# Wave-3 Clarity Cook Receipt — {TS[:10]}
+    md = f"""# Wave-3 Clarity Cook Receipt ? {TS[:10]}
 
 **Backup:** `{BACKUP}`
 
@@ -548,17 +548,17 @@ def main() -> int:
 |--------|--------|---------|---------|
 | Living unresolved | {base.get('living_unresolved')} | {v_a.get('living_unresolved')} | {v_b.get('living_unresolved')} |
 | Repair unresolved (living scan) | {base.get('repair_unresolved')} | {v_a.get('repair_unresolved')} | {v_b.get('repair_unresolved')} |
-| Residual rewrites | — | {rr.get('replacements')} in {rr.get('rewritten_files')} files | — |
-| Daily-A archive md | — | {da.get('archive_count')} | — |
-| Entity densify | — | {len(ent.get('touched', []))} | — |
+| Residual rewrites | ? | {rr.get('replacements')} in {rr.get('rewritten_files')} files | ? |
+| Daily-A archive md | ? | {da.get('archive_count')} | ? |
+| Entity densify | ? | {len(ent.get('touched', []))} | ? |
 
 ## Items
 
-1. **Repair-scanner truth** — living-only outbound + multi-ext + no backups write; `vault_living_unresolved_scan.py` is hygiene truth surface.
-2. **Residual clearance** — K:/ scripts/ RP / absolute path redirects → living pointers.
-3. **Daily-A** — idempotent closeout (already archived {da.get('archive_count')}); stale PRE-STAGED cleared.
-4. **Domain-tag + entities** — medical core densified; Domain-Tag-Index touched.
-5. **Silo land+depth** — focus_land + health + scoreboard + six_numbers pulsed.
+1. **Repair-scanner truth** ? living-only outbound + multi-ext + no backups write; `vault_living_unresolved_scan.py` is hygiene truth surface.
+2. **Residual clearance** ? K:/ scripts/ RP / absolute path redirects ? living pointers.
+3. **Daily-A** ? idempotent closeout (already archived {da.get('archive_count')}); stale PRE-STAGED cleared.
+4. **Domain-tag + entities** ? medical core densified; Domain-Tag-Index touched.
+5. **Silo land+depth** ? focus_land + health + scoreboard + six_numbers pulsed.
 
 ## Example redirects
 """

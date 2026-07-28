@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""8091 sovereign proxy preflight — venv-owned health before gateway/Discord dispatch."""
+"""8091 sovereign proxy preflight ? venv-owned health before gateway/Discord dispatch."""
 from __future__ import annotations
 
 import subprocess
@@ -97,7 +97,7 @@ def _start_router() -> bool:
 
 
 def ensure_sovereign_router(timeout: float = 3.0) -> bool:
-    """Qwythos brain on 8090 — proxy is useless without it."""
+    """Qwythos brain on 8090 ? proxy is useless without it."""
     if _router_healthy(timeout):
         return True
     free = _vram_free_mb()

@@ -108,9 +108,9 @@ def main() -> int:
     args = ap.parse_args()
     t0 = time.time()
     lines = [
-        f"# MemoryCard ingestion trial — {utc()}",
+        f"# MemoryCard ingestion trial ? {utc()}",
         "",
-        f"**Limit:** {args.limit} · **Mode:** {'DRY-RUN' if args.dry_run else 'APPLY'}",
+        f"**Limit:** {args.limit} ? **Mode:** {'DRY-RUN' if args.dry_run else 'APPLY'}",
         f"**Intelligence:** scripts + rules only (no Grok/cloud LLM in this runner)",
         "",
     ]

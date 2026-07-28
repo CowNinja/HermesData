@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-model_resource_manager.py — MoE tier health, context budgeting, recovery hooks.
+model_resource_manager.py ? MoE tier health, context budgeting, recovery hooks.
 
 Config-driven resource layer for sovereign router. Used by sovereign_openai_proxy
 and Run-Phronesis-LocalVerification.ps1 extensions.
@@ -41,7 +41,7 @@ DEFAULT_PORTS = {
     "11434": {"tier": "ollama", "role": "interim_fallback"},
 }
 
-# Context window hints per tier (tokens) — expand via MoE map later
+# Context window hints per tier (tokens) ? expand via MoE map later
 TIER_CONTEXT_BUDGET = {
     "local_classifier": 12288,
     "local_hot": 12288,
@@ -278,7 +278,7 @@ def _llama_start_script() -> Path:
 
 
 def attempt_moe_recovery(dry_run: bool = False) -> Dict[str, Any]:
-    """Bring llama :8090 up — unified mode uses 02-start-llama.ps1."""
+    """Bring llama :8090 up ? unified mode uses 02-start-llama.ps1."""
     state = load_state()
     if not _recovery_allowed(state, "moe") and not dry_run:
         return {"ok": False, "reason": "max_recovery_attempts", "attempts": state["recovery_attempts"]["moe"]}

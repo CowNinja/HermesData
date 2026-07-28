@@ -8,7 +8,7 @@ FOOTER = """
 
 ## Phronesis alignment (2026-06-21, P3 batch)
 
-**Phase A surface:** Hermes Workspace `http://127.0.0.1:3001` (`npm start` in `hermes-workspace`). CLI `hermes dashboard` (:9119) has no Model Manager strip. **Parked:** Conductor `/conductor`, Hermes Studio. **Archived (historical only):** `D:\\HermesData\\archive\\deprecated-sovereign-host-training/` — do not launch `enhanced_voyager_window.py` or `sovereign_host_*.py` for Phase A.
+**Phase A surface:** Hermes Workspace `http://127.0.0.1:3001` (`npm start` in `hermes-workspace`). CLI `hermes dashboard` (:9119) has no Model Manager strip. **Parked:** Conductor `/conductor`, Hermes Studio. **Archived (historical only):** `D:\\HermesData\\archive\\deprecated-sovereign-host-training/` ? do not launch `enhanced_voyager_window.py` or `sovereign_host_*.py` for Phase A.
 
 **Jeff feedback gate:** `D:\\PhronesisVault\\docs\\agent-coordination\\Jeff-Foundational-Docs-Feedback-2026-06-21.md` | **Inspection spine:** `Foundational-Docs-Research-Plan-2026-06-21.md` | **Matrix:** `Skills-Alignment-Matrix-2026-06-21.md`
 """
@@ -35,15 +35,15 @@ SKILLS = [
 REPLACEMENTS = [
     (
         '"D:\\HermesData\\hermes-agent\\venv\\Scripts\\python.exe" "D:\\HermesData\\enhanced_voyager_window.py"',
-        "# ARCHIVED — do not launch. Phase A UI: cd D:\\HermesData\\hermes-workspace && npm start (PORT=3001)",
+        "# ARCHIVED ? do not launch. Phase A UI: cd D:\\HermesData\\hermes-workspace && npm start (PORT=3001)",
     ),
     (
         "bind to sovereign_host_desktop_layer.py",
-        "bind to archived sovereign_host patterns (historical — see archive/deprecated-sovereign-host-training/)",
+        "bind to archived sovereign_host patterns (historical ? see archive/deprecated-sovereign-host-training/)",
     ),
     (
         "import sovereign_host_desktop_layer as l",
-        "# archived: sovereign_host_desktop_layer — use PhronesisVault scripts + hermes-workspace instead",
+        "# archived: sovereign_host_desktop_layer ? use PhronesisVault scripts + hermes-workspace instead",
     ),
     (
         "adapt in sovereign_host_prototype.py or similar",
@@ -51,19 +51,19 @@ REPLACEMENTS = [
     ),
     (
         "## Human-like Sovereign Host Control Layer",
-        "## Human-like Sovereign Host Control Layer (historical — archived side-quest)",
+        "## Human-like Sovereign Host Control Layer (historical ? archived side-quest)",
     ),
     (
         "## GUI-Hosted Long-Running Autonomous Loops (Sovereign Host Desktop Training UI)",
-        "## GUI-Hosted Long-Running Autonomous Loops (historical — archived voyager trainer)",
+        "## GUI-Hosted Long-Running Autonomous Loops (historical ? archived voyager trainer)",
     ),
     (
         "**The 3 Sub-Observer Types (wired in enhanced_voyager_window.py)**:",
-        "**The 3 Sub-Observer Types (historical — archived enhanced_voyager_window.py)**:",
+        "**The 3 Sub-Observer Types (historical ? archived enhanced_voyager_window.py)**:",
     ),
     (
         "## Async Subagent Orchestration and Delegation Patterns (Hermes 2026 + Phronesis Sovereign Host Applications)",
-        "## Async Subagent Orchestration (Hermes 2026 — delegation patterns; Sovereign Host training refs historical)",
+        "## Async Subagent Orchestration (Hermes 2026 ? delegation patterns; Sovereign Host training refs historical)",
     ),
     (
         "For any Hermes recovery, cleanup, or hardening task on sovereign host:",
@@ -71,7 +71,7 @@ REPLACEMENTS = [
     ),
     (
         "### RTS / Gamified Real-Metric Sovereign Host Dashboards (Class Pattern)",
-        "### RTS / Gamified Dashboards (historical class pattern — archived sovereign host; Phase A use Workspace :3001)",
+        "### RTS / Gamified Dashboards (historical class pattern ? archived sovereign host; Phase A use Workspace :3001)",
     ),
 ]
 

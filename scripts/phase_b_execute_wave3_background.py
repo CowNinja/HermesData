@@ -54,7 +54,7 @@ def main() -> int:
     es = sorted(ing.glob("es_ingest_*.md")) if ing.exists() else []
     if es:
         lines = [
-            f"# ES Ingest Stubs — Index ({TS})",
+            f"# ES Ingest Stubs ? Index ({TS})",
             "",
             f"**Count:** {len(es)} live-export stubs (thin provenance).",
             "Originals archived Wave3 (recoverable).",
@@ -83,7 +83,7 @@ def main() -> int:
     rms = sorted(rm_dir.glob("review-moc-pilot*.md")) if rm_dir.exists() else []
     if rms:
         parts = [
-            f"# Review-MOC Pilots — Digest ({TS})",
+            f"# Review-MOC Pilots ? Digest ({TS})",
             "",
             f"**Count:** {len(rms)}",
             "",
@@ -100,7 +100,7 @@ def main() -> int:
         for p in rms:
             archive_move(p, "review-moc")
 
-    # 3) Discord HERMES-config sprawl — master index; archive Archives/ + exact duplicate hashes of bare HERMES-config.md
+    # 3) Discord HERMES-config sprawl ? master index; archive Archives/ + exact duplicate hashes of bare HERMES-config.md
     discord = VAULT / "Discord" / "configs"
     configs = list(discord.rglob("HERMES-config*.md")) if discord.exists() else []
     by_folder: dict[str, list[Path]] = defaultdict(list)
@@ -147,7 +147,7 @@ def main() -> int:
         except OSError:
             continue
         if h in hashes:
-            # duplicate content — archive this one, leave pointer file
+            # duplicate content ? archive this one, leave pointer file
             keep = hashes[h]
             write(
                 p,
@@ -166,7 +166,7 @@ Duplicate content removed {TS} (Wave3). Recoverable archive if this was unique (
             hashes[h] = p
     receipts.append(f"hermes-config unique hashes {len(hashes)}")
 
-    # 4) Growth-Blueprints dated re-verification sprawl — index only if many
+    # 4) Growth-Blueprints dated re-verification sprawl ? index only if many
     gb = VAULT / "Operations" / "Growth-Blueprints"
     if gb.exists():
         gbs = list(gb.glob("*.md"))
@@ -176,7 +176,7 @@ Duplicate content removed {TS} (Wave3). Recoverable archive if this was unique (
 
 **Count:** {len(gbs)}
 
-These are high-signal research distillations — **not** auto-archived.
+These are high-signal research distillations ? **not** auto-archived.
 Open from this map; prefer updating core Research notes over new dated sprawl.
 
 """
@@ -209,10 +209,10 @@ Recoverable. Working indexes in AI-Zone + Discord/configs.
         note = f"""
 
 ## Background wave3 ({TS})
-- es_ingest stubs → index + archive
-- review-moc pilots → digest + archive
-- Discord HERMES-config → map + archive Archives/
-- Growth Blueprints → index map
+- es_ingest stubs ? index + archive
+- review-moc pilots ? digest + archive
+- Discord HERMES-config ? map + archive Archives/
+- Growth Blueprints ? index map
 - Receipt: [[Operations/logs/phase-b-merge-execution-wave3-{TS}]]
 """
         if "Background wave3" not in t:
@@ -221,7 +221,7 @@ Recoverable. Working indexes in AI-Zone + Discord/configs.
 
     write(
         VAULT / "Operations" / "logs" / f"phase-b-merge-execution-wave3-{TS}.md",
-        f"# Phase B Wave3 Background — {TS}\n\n"
+        f"# Phase B Wave3 Background ? {TS}\n\n"
         + "\n".join(f"- {r}" for r in receipts)
         + "\n\n## Vault links\n- [[Operations/Active-Work-Program-Phase-B-Orchestrator-Insights-2026-07-10]]\n- [[Archive/Distillations-2026-07-10/Wave3/README]]\n",
     )

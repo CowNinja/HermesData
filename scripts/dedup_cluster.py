@@ -174,7 +174,7 @@ def cluster_files(files: list[Path], policy: dict) -> dict:
 
 def write_receipt(result: dict) -> None:
     lines = [
-        f"# Dedup / version clusters — {result['ts']}",
+        f"# Dedup / version clusters ? {result['ts']}",
         "",
         f"**Files scanned:** {result['file_count']}",
         f"**Exact hash clusters:** {len(result['exact_duplicate_clusters'])}",
@@ -188,12 +188,12 @@ def write_receipt(result: dict) -> None:
         "## Exact duplicates (sample)",
     ]
     for c in result["exact_duplicate_clusters"][:15]:
-        lines.append(f"- primary `{Path(c['primary']).name}` · dupes={len(c['duplicates'])}")
+        lines.append(f"- primary `{Path(c['primary']).name}` ? dupes={len(c['duplicates'])}")
     lines.append("")
     lines.append("## Version / cross-format (sample)")
     for c in result["version_or_format_clusters"][:20]:
         lines.append(
-            f"- stem `{c['stem_norm'][:60]}` · primary `{Path(c['primary']).name}` · "
+            f"- stem `{c['stem_norm'][:60]}` ? primary `{Path(c['primary']).name}` ? "
             f"n={len(c['members'])} exts={c['exts']} ({c['reason']})"
         )
     lines += [

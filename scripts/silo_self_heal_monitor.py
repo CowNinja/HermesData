@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ending-loop self-heal: measure → fix → POST-VERIFY → log. $0 Grok.
+"""Ending-loop self-heal: measure ? fix ? POST-VERIFY ? log. $0 Grok.
 
 Canon:
   Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18 (A3/N1)
@@ -7,7 +7,7 @@ Canon:
   Operations/Silo-Self-Heal-Loop-CANONICAL-2026-07-12
 
 Guardrails:
-  - exact process match only (silo_continuous_loop.py) — never gateway
+  - exact process match only (silo_continuous_loop.py) ? never gateway
   - STOP files win (no restart if STOP present)
   - success claim ONLY after post-verify re-measure
   - soft-fail exit 0 when measure ran; receipt always written
@@ -16,7 +16,7 @@ Guardrails:
   - live process required for healthy claim (fresh state alone is NOT enough)
 
 Research (2026-07-19 overnight):
-  SRE critical-path isolation — best-effort side effects (OCR/brief) must not
+  SRE critical-path isolation ? best-effort side effects (OCR/brief) must not
   block or timeout the heal that keeps the land loop single-writer alive.
   Prior overnight: full monitor hung ~120s on OCR/brief while continuous was dead.
 """
@@ -141,7 +141,7 @@ def post_verify(*, attempted_restart: bool) -> dict:
     hb_age = heartbeat_age_s()
     checks: list[dict] = []
 
-    # STOP always wins — do not claim healthy run while STOP armed
+    # STOP always wins ? do not claim healthy run while STOP armed
     checks.append(
         {
             "name": "stop_clear",
@@ -169,7 +169,7 @@ def post_verify(*, attempted_restart: bool) -> dict:
     else:
         # Live process required unless STOP armed.
         # Pitfall (2026-07-19 overnight): (age<=900 and n<=1) treated DEAD workers
-        # with a fresh state stamp as healthy → success_claim while kitchen was down.
+        # with a fresh state stamp as healthy ? success_claim while kitchen was down.
         intentional_stop = n == 0 and len(stops) > 0
         healthy = (n == 1) or intentional_stop
         checks.append(
@@ -303,7 +303,7 @@ def main() -> int:
         if args.continuous_only:
             actions.append("mode=continuous-only (skip ocr/brief)")
         if stops0:
-            actions.append(f"STOP present — no restart ({stops0})")
+            actions.append(f"STOP present ? no restart ({stops0})")
         elif n0 > 1:
             # Dual/multi continuous = single-writer violation. Exact recovery only; never gateway.
             rec = SCRIPTS / "silo_recovery_single_writer.py"
@@ -327,14 +327,14 @@ def main() -> int:
             else:
                 actions.append(f"dual continuous n={n0} but recovery script missing")
         elif n0 == 0:
-            # Dead worker: restart immediately. Do NOT wait for age>900 —
+            # Dead worker: restart immediately. Do NOT wait for age>900 ?
             # fresh state + dead PID previously delayed heal for 15 minutes.
             start_continuous()
             attempted_restart = True
             actions.append(f"restarted continuous (n=0 age={age:.0f}s)")
             time.sleep(max(0.0, float(args.post_verify_sleep)))
         elif age > 900 and n0 > 0:
-            actions.append(f"stale state age={age:.0f}s but {n0} live — leave")
+            actions.append(f"stale state age={age:.0f}s but {n0} live ? leave")
         else:
             actions.append(
                 f"continuous ok age={age:.0f}s cycle={st.get('cycle')} n={n0}"
@@ -380,7 +380,7 @@ def main() -> int:
         else:
             actions.append("skipped ocr/brief (continuous-only)")
 
-    # POST-VERIFY — never claim restart success without re-measure
+    # POST-VERIFY ? never claim restart success without re-measure
     pv = post_verify(attempted_restart=attempted_restart)
     write_post_verify(pv)
     if attempted_restart and pv.get("success_claim"):
@@ -416,7 +416,7 @@ def main() -> int:
         },
     }
     print(json.dumps(out, ensure_ascii=False))
-    # Soft-fail: measure ran → exit 0; hard signal only via success_claim false in receipt
+    # Soft-fail: measure ran ? exit 0; hard signal only via success_claim false in receipt
     return 0
 
 

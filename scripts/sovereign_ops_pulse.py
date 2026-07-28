@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sovereign Ops Pulse — registry-driven receipt + probe aggregator ($0 LLM).
+"""Sovereign Ops Pulse ? registry-driven receipt + probe aggregator ($0 LLM).
 
 Reads D:/HermesData/config/sovereign_ops_pulse_registry.yaml
 Writes JSON + MD cliff notes + optional JSONL history.
@@ -22,12 +22,12 @@ ports signal-only, jan gold receipts.
 v1.4 (2026-07-19 overnight): critical_ok/dual_verify cook schema-on-read,
 stack_ports accepts health/listen_pid, expand wave2/wikifp/cook receipts,
 exclude ghost k-light Hermes path from discovery.
-v1.5 (2026-07-19 overnight): discovery freshness gate (stale ≠ expand candidate),
+v1.5 (2026-07-19 overnight): discovery freshness gate (stale ? expand candidate),
 fix prev_level trend bug, score-drop soft issue, MD archived-stale section.
 v1.6 (2026-07-19 overnight): atomic publish for pulse outputs (jan/VW parity),
 probe HTTP one-retry on transient fail (SRE flapping).
 v1.7 (2026-07-19 overnight): shared scripts/atomic_io.py SSOT for kitchen
-writers; silo_self_heal live-process gate (fresh state alone ≠ healthy);
+writers; silo_self_heal live-process gate (fresh state alone ? healthy);
 single-writer continuous recovery confirmed n=1.
 v1.8 (2026-07-19 overnight): residual receipt writers on atomic_io
 (loop_registry, canon_conflict, propose_recovery, recovery log, jan meta).
@@ -40,15 +40,15 @@ conversation_intent_queue, four_worlds_audit_cron).
 v1.11 (2026-07-19 overnight): pulse-registered residual writers on atomic_io
 (k_light_index_cron, vault_hygiene_6h, living_unresolved, stack_reconcile,
 domain_tag_lint, vault_gardener) + kitchen travel_heartbeat (pid/primary/brief).
-v1.12 (2026-07-19 overnight): next residual pulse writers on atomic_io —
+v1.12 (2026-07-19 overnight): next residual pulse writers on atomic_io ?
 voice_after_recovery, single_gateway (SSOT migrate), rp_bottleneck_scanner,
 jan_golden_eval, vault_wikilink_repair receipts, vault_hub_backlink receipts,
 vault_domain_tag_batch receipts, wave3_clarity_cook latest receipts.
-v1.13 (2026-07-19 overnight): cook receipt writers on atomic_io —
+v1.13 (2026-07-19 overnight): cook receipt writers on atomic_io ?
 five_item_vault_clarity_cook, five_item_wave2_link_clarity_cook (incl. wikifp
 audit + repair mirror), obsidian_five_item_closed_cook, obsidian_five_item
 fixup_verify, obsidian_finish_docs dual-verify latest. Receipt-only atomic.
-v1.14 (2026-07-19 overnight): continuous kitchen state path on atomic_io —
+v1.14 (2026-07-19 overnight): continuous kitchen state path on atomic_io ?
 silo_continuous_loop LOCK/heartbeat/STATE/LOG; recovery PID files via _pid_write.
 Takes effect on next continuous start/recover (no forced dual-start).
 """
@@ -345,7 +345,7 @@ def interpret_receipt(
 
     if expect == "stack_ports":
         ports = doc.get("ports") if isinstance(doc.get("ports"), dict) else {}
-        # core stack ports — 8090/8091/8642 must be up; extras informational
+        # core stack ports ? 8090/8091/8642 must be up; extras informational
         core_ids = ("8090", "8091", "8642")
         core_ok = 0
         core_n = 0
@@ -384,7 +384,7 @@ def interpret_receipt(
             out["ok"] = True
             # Optional/info ports (9119 metrics, 3001 dash, etc.) are signals only.
             # Core green + silent-green GREEN must not amber on chronic optional downs
-            # (Prometheus pattern: separate optional job ≠ fail primary scrape).
+            # (Prometheus pattern: separate optional job ? fail primary scrape).
             if extra_down:
                 out["signals"].append("extra_down=" + ",".join(extra_down[:4]))
             if sg_color == "YELLOW":
@@ -431,7 +431,7 @@ def interpret_receipt(
         return out
 
     if expect == "fresh_presence":
-        # File was readable — presence of a structured receipt is success.
+        # File was readable ? presence of a structured receipt is success.
         # Prefer explicit ok/status when present.
         if ok_field is True:
             out["ok"] = True
@@ -590,7 +590,7 @@ def interpret_receipt(
             out["level"] = "amber" if out["partial"] else "green"
         elif ok_field is False:
             out["ok"] = False
-            # soft_fail receipts or check lists with partial pass → amber
+            # soft_fail receipts or check lists with partial pass ? amber
             checks = doc.get("checks")
             if isinstance(checks, list) and any(
                 isinstance(c, dict) and c.get("ok") for c in checks
@@ -609,7 +609,7 @@ def interpret_receipt(
             # re-enter score_or_checks path
             return interpret_receipt(doc, "score_or_checks", defaults, metrics)
         elif isinstance(doc.get("critical_ok"), dict) and doc.get("critical_ok"):
-            # wave2 / wikilink-FP cook receipts: map of path → bool
+            # wave2 / wikilink-FP cook receipts: map of path ? bool
             crit = doc["critical_ok"]
             vals = [bool(v) for v in crit.values()]
             n_ok = sum(vals)
@@ -659,7 +659,7 @@ def probe_http(url: str, timeout: float = 3.0, retries: int = 1, retry_delay_s: 
     """HTTP probe with one cheap retry on transient failure.
 
     Research (SRE flapping / Prometheus scrape retries): a single blip should not
-    red a critical kitchen SLI. retries=1 → up to 2 attempts. No multi-second
+    red a critical kitchen SLI. retries=1 ? up to 2 attempts. No multi-second
     backoff (pulse must stay fast for 30m cron).
     """
     attempts = max(1, int(retries) + 1)
@@ -775,7 +775,7 @@ def discover_unregistered(
 
     Research (Google SRE monitoring + Prometheus alerting practices):
     alerts/candidates must be actionable and fresh. Stale one-shot receipts
-    (days old pilots, dry-runs) are noise — count them as archived, do not
+    (days old pilots, dry-runs) are noise ? count them as archived, do not
     push Jeff to register them as live kitchen gauges.
     """
     fresh: list[dict[str, Any]] = []
@@ -802,7 +802,7 @@ def discover_unregistered(
                 "hint": "add under receipts: in sovereign_ops_pulse_registry.yaml",
             }
             if max_age_hours is not None and age is not None and age > float(max_age_hours):
-                row["hint"] = "stale_archived — re-run job before registering"
+                row["hint"] = "stale_archived ? re-run job before registering"
                 stale.append(row)
             else:
                 fresh.append(row)
@@ -827,14 +827,14 @@ def rollup_level(
     """Kitchen scoreboard severity.
 
     Research (SRE multi-signal / burn-rate style): page on *critical* SLIs,
-    not on chronic hygiene debt. Core probe down or core/silo receipt red → red.
-    Hygiene/rp red alone → amber (debt visible). ≥3 hygiene reds → still amber
+    not on chronic hygiene debt. Core probe down or core/silo receipt red ? red.
+    Hygiene/rp red alone ? amber (debt visible). ?3 hygiene reds ? still amber
     unless critical_down (avoid paging Jeff overnight for link debt).
     """
     if critical_down or core_red:
         return "red"
     if "red" in levels:
-        # non-core reds (hygiene/rp) — surface as amber kitchen state
+        # non-core reds (hygiene/rp) ? surface as amber kitchen state
         return "amber"
     if "amber" in levels or "missing" in levels or "unknown" in levels:
         return "amber"
@@ -863,7 +863,7 @@ def read_trend(jsonl_path: Path, window: int = 12) -> dict[str, Any]:
         out["levels"] = [r.get("level") for r in rows if r.get("level")]
         out["scores"] = [r.get("score") for r in rows if isinstance(r.get("score"), (int, float))]
         if len(out["scores"]) >= 2:
-            # window delta (oldest→newest in window) + step delta (prev tick)
+            # window delta (oldest?newest in window) + step delta (prev tick)
             out["delta_score"] = round(float(out["scores"][-1]) - float(out["scores"][-2]), 1)
             out["delta_score_window"] = round(float(out["scores"][-1]) - float(out["scores"][0]), 1)
         # prev_level = prior tick, not current tail (v1.4 bugfix)
@@ -901,16 +901,16 @@ def trim_jsonl(path: Path, keep: int) -> None:
 
 def render_md(report: dict[str, Any]) -> str:
     lines = [
-        f"# Sovereign Ops Pulse — {report.get('at', '')}",
+        f"# Sovereign Ops Pulse ? {report.get('at', '')}",
         "",
-        f"**Rollup:** `{report.get('level')}` · score **{report.get('score')}** · seal `{report.get('seal')}`",
+        f"**Rollup:** `{report.get('level')}` ? score **{report.get('score')}** ? seal `{report.get('seal')}`",
         "",
     ]
     trend = report.get("trend") or {}
     if trend.get("n"):
         lines.append(
             f"_trend:_ n={trend.get('n')} prev=`{trend.get('prev_level')}` "
-            f"Δscore={trend.get('delta_score')} streak={trend.get('level_streak')}"
+            f"?score={trend.get('delta_score')} streak={trend.get('level_streak')}"
         )
         lines.append("")
     lines += [
@@ -943,7 +943,7 @@ def render_md(report: dict[str, Any]) -> str:
     if dsk:
         lines += ["", "## Disk", ""]
         for d in dsk:
-            lines.append(f"- **{d.get('id')}**: {d.get('free_gb')} GB free · level `{d.get('level')}`")
+            lines.append(f"- **{d.get('id')}**: {d.get('free_gb')} GB free ? level `{d.get('level')}`")
     gpu = report.get("gpu") or {}
     if gpu:
         lines += ["", "## GPU", "", f"```\n{gpu.get('raw') or gpu}\n```"]
@@ -951,7 +951,7 @@ def render_md(report: dict[str, Any]) -> str:
     unreg = disc.get("unregistered") or []
     stale_arch = disc.get("stale_archived") or []
     if unreg:
-        lines += ["", "## Unregistered receipts (fresh — expand here)", ""]
+        lines += ["", "## Unregistered receipts (fresh ? expand here)", ""]
         for u in unreg[:15]:
             lines.append(f"- `{u.get('path')}` age_h={u.get('age_h')}")
     elif disc.get("stale_archived_count"):
@@ -977,7 +977,7 @@ def render_md(report: dict[str, Any]) -> str:
         lines += ["", "## Issues", ""]
         for i in issues:
             lines.append(f"- {i}")
-    lines += ["", "---", "_$0 LLM · registry-driven · soft-fail_", "", "## Vault links", ""]
+    lines += ["", "---", "_$0 LLM ? registry-driven ? soft-fail_", "", "## Vault links", ""]
     for link in VAULT_MD_LINKS:
         lines.append(f"- {link}")
     lines.append("")
@@ -1154,16 +1154,16 @@ def run_pulse(registry_path: Path) -> dict[str, Any]:
     drop_thr = float(defaults.get("score_drop_issue_points") or 8)
     if isinstance(trend_pre.get("delta_score"), (int, float)) and trend_pre["delta_score"] <= -drop_thr:
         issues.append(
-            f"score_drop Δ={trend_pre['delta_score']} (thr=-{drop_thr}) "
+            f"score_drop ?={trend_pre['delta_score']} (thr=-{drop_thr}) "
             f"prev_level={trend_pre.get('prev_level')}"
         )
-    # Window crash (e.g. 95→88 overnight) — advisory only
+    # Window crash (e.g. 95?88 overnight) ? advisory only
     if (
         isinstance(trend_pre.get("delta_score_window"), (int, float))
         and trend_pre["delta_score_window"] <= -(drop_thr * 1.5)
     ):
         issues.append(
-            f"score_window_drop Δ={trend_pre['delta_score_window']} over n={trend_pre.get('n')}"
+            f"score_window_drop ?={trend_pre['delta_score_window']} over n={trend_pre.get('n')}"
         )
 
     report: dict[str, Any] = {

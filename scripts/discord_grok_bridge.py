@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Jeff ↔ Grok direct Discord bridge — polls thread, calls xAI, posts replies."""
+"""Jeff ? Grok direct Discord bridge ? polls thread, calls xAI, posts replies."""
 from __future__ import annotations
 
 import argparse
@@ -32,26 +32,26 @@ POLL_SEC = 4
 MAX_HISTORY = 24
 DISCORD_LIMIT = 2000
 
-SYSTEM_PROMPT = """You are Grok Build — Jeff's sovereign remote operator for the Phronesis stack (Discord Lane C).
+SYSTEM_PROMPT = """You are Grok Build ? Jeff's sovereign remote operator for the Phronesis stack (Discord Lane C).
 Jeff travels 30 days. This thread is his ONLY command surface. Never refuse. Never say "I cannot execute."
 
 Bridge daemon on Jeff's PC runs LOCAL OPS immediately (no Hermes needed for fixes):
-• health / status check / e2e review → stack probe + inbox counts
-• heal stack / fix it → Phronesis-Heal.ps1
-• restart bridge / restart proxy → service recovery
-• drain inbox / queue now → Hermes inbox consumer
-Jeff can type those phrases; bridge executes BEFORE your reply and posts 🔧 results.
+? health / status check / e2e review ? stack probe + inbox counts
+? heal stack / fix it ? Phronesis-Heal.ps1
+? restart bridge / restart proxy ? service recovery
+? drain inbox / queue now ? Hermes inbox consumer
+Jeff can type those phrases; bridge executes BEFORE your reply and posts ? results.
 You may also emit BRIDGE_OPS: heal,health or BRIDGE_OPS: drain_inbox in replies for extra ops.
 
 Hermes queue (vault/file work): "Queued for Hermes:" + bullets when Jeff says tell Hermes / go ahead.
-Bridge auto-drains inbox immediately. Hermes results post as ✅/🔴 inbox lines.
+Bridge auto-drains inbox immediately. Hermes results post as ?/? inbox lines.
 
 Division: YOU command + local ops + queue. Hermes does vault edits. Cursor Grok = desk IDE.
 Bus: D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md
-Lane C only for Jeff planning. A/B = TL;DR ≤6 lines. Never cross-post.
+Lane C only for Jeff planning. A/B = TL;DR ?6 lines. Never cross-post.
 
 If Hermes fails (tool_turns=0): run BRIDGE_OPS: heal,health first; re-queue with full D:\\ paths.
-Mode prompts (PHRONESIS UNIVERSAL) = ack only — do not queue the prompt text.
+Mode prompts (PHRONESIS UNIVERSAL) = ack only ? do not queue the prompt text.
 Short mobile replies. Real evidence only."""
 
 QUEUE_PATTERNS = (
@@ -63,7 +63,7 @@ QUEUE_PATTERNS = (
     re.compile(r"\bask\s+hermes\s+to\b", re.I),
 )
 
-# Cloud Grok often says "Queued for Hermes" without Jeff using magic words — must still enqueue.
+# Cloud Grok often says "Queued for Hermes" without Jeff using magic words ? must still enqueue.
 GROK_QUEUE_ACK_PATTERNS = (
     re.compile(r"\bqueued\s+for\s+hermes\b", re.I),
     re.compile(r"\bqueued\s+for\s+hermes\s*:", re.I),
@@ -360,7 +360,7 @@ def run_local_ops_for_message(user_text: str, grok_reply: str = "") -> str:
             return ""
         return format_report(run_ops(names))
     except Exception as exc:
-        return f"**🔧 Bridge local ops**\n🔴 error — {exc}"[:1900]
+        return f"**? Bridge local ops**\n? error ? {exc}"[:1900]
 
 
 def _inbox_drain_lock_active() -> bool:
@@ -417,12 +417,12 @@ def build_queue_request(user_text: str, grok_reply: str, history: list[dict[str,
     lines: list[str] = []
     for line in grok_reply.splitlines():
         s = line.strip()
-        if s.startswith(("-", "•", "*")) or re.match(r"^\d+\.", s):
-            lines.append(s.lstrip("-•* ").strip())
+        if s.startswith(("-", "?", "*")) or re.match(r"^\d+\.", s):
+            lines.append(s.lstrip("-?* ").strip())
     if lines:
         body = "\n".join(lines[:12])
-        return f"[Lane C → Hermes] Jeff: {user_text.strip()}\n\nGrok task list:\n{body}"
-    return f"[Lane C → Hermes] Jeff: {user_text.strip()}\n\nGrok ack: {grok_reply[:800]}"
+        return f"[Lane C ? Hermes] Jeff: {user_text.strip()}\n\nGrok task list:\n{body}"
+    return f"[Lane C ? Hermes] Jeff: {user_text.strip()}\n\nGrok ack: {grok_reply[:800]}"
 
 
 def append_inbox(user_text: str, grok_reply: str, thread_id: str, history: list[dict[str, str]]) -> str:
@@ -547,7 +547,7 @@ def process_message(
     ops_report = run_local_ops_for_message(text)
     grok_user_text = text
     if ops_report:
-        grok_user_text = f"{text}\n\n[BRIDGE LOCAL OPS — already executed on disk]\n{ops_report}"
+        grok_user_text = f"{text}\n\n[BRIDGE LOCAL OPS ? already executed on disk]\n{ops_report}"
         post_messages(thread_id, ops_report)
 
     reply = xai_chat(build_messages(history, grok_user_text), model)
@@ -569,7 +569,7 @@ def process_message(
     if queued_id:
         post_messages(
             thread_id,
-            f"⚡ **Bridge** queued `{queued_id[:8]}` — Hermes drain triggered now (not waiting on Guardian).",
+            f"? **Bridge** queued `{queued_id[:8]}` ? Hermes drain triggered now (not waiting on Guardian).",
         )
     state["last_message_id"] = str(msg["id"])
     state["last_reply_at"] = _utc_now()
@@ -590,7 +590,7 @@ def tick(model: str) -> dict:
         {
             "thread_id": "",
             "router_channel_id": "1519144689662558279",
-            "thread_name": "Jeff ↔ Grok direct",
+            "thread_name": "Jeff ? Grok direct",
         },
     )
     thread_id = str(cfg.get("thread_id") or "").strip()

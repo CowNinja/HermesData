@@ -104,13 +104,13 @@ def _register(path: Path) -> None:
         for key in list(tiers.keys()):
             tiers[key] = LOGICAL
         moe["description"] = (
-            "Unified sovereign generalist — single abliterated model for all task types."
+            "Unified sovereign generalist ? single abliterated model for all task types."
         )
         MOE_MAP.write_text(json.dumps(moe, indent=2), encoding="utf-8")
 
     pin = {
         "version": "v0.2",
-        "approved_by": "Jeff — unified sovereign generalist pivot 2026-06-28",
+        "approved_by": "Jeff ? unified sovereign generalist pivot 2026-06-28",
         "vram_gb": 12,
         "pinned_logical_models": [LOGICAL],
         "generalist_logical": LOGICAL,

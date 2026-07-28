@@ -55,7 +55,7 @@ def chunk_text(text: str, size: int = 850, overlap: int = 140) -> list[str]:
 def build_index() -> int:
     """Chunk text/ and text_wpd/ shelves into jan_chunks.jsonl.
 
-    Atomic publish (tmp → fsync → replace) — same class of fix as
+    Atomic publish (tmp ? fsync ? replace) ? same class of fix as
     jan_unified_index.py after the 2026-07-19 0-byte wipe incident.
     """
     import os
@@ -183,7 +183,7 @@ def retrieve(query: str, k: int = 8) -> list[dict]:
                 ("faint of heart", 4),
                 ("living books", 3),
                 ("author list", 4),
-                ("author→edition", 5),
+                ("author?edition", 5),
                 ("author edition", 4),
                 ("revised and expanded", 4),
                 ("152 authors", 5),

@@ -23,7 +23,7 @@ def utc() -> str:
 
 
 def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
-    """subprocess.run with CREATE_NO_WINDOW — parent was flashing tesseract/pdftoppm tabs."""
+    """subprocess.run with CREATE_NO_WINDOW ? parent was flashing tesseract/pdftoppm tabs."""
     kwargs.setdefault("stdin", subprocess.DEVNULL)
     if _CREATE_NO_WINDOW:
         kwargs["creationflags"] = int(kwargs.get("creationflags") or 0) | _CREATE_NO_WINDOW
@@ -110,7 +110,7 @@ def process_flag(flag: Path, tess: str) -> dict:
         pages = pdf_to_pngs(original, work)
         if not pages:
             notes.append("no_pdftoppm_or_pages")
-            # try pytesseract on nothing — mark pending_poppler
+            # try pytesseract on nothing ? mark pending_poppler
             rec = {
                 "status": "blocked_need_pdftoppm",
                 "path": str(original),

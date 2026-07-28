@@ -300,7 +300,7 @@ def main() -> int:
     if promoted and not args.no_promote:
         entity_doc["updated"] = utc()[:10]
         save_json(ENTITY, entity_doc)
-        # Tier A6 / N2 — domain_for smoke after any promote write
+        # Tier A6 / N2 ? domain_for smoke after any promote write
         smoke_result = run_post_promote_smoke()
         if not smoke_result.get("ok"):
             # Do not silent-green a broken lexicon; leave write (audit trail) but flag hard.
@@ -310,7 +310,7 @@ def main() -> int:
 
     # write queue MD
     q_lines = [
-        f"# Entity review queue — {utc()}",
+        f"# Entity review queue ? {utc()}",
         "",
         "Jeff: only thin queue. Reply like: `entity: richardson = doctor medical` or `entity: skip key`",
         "",
@@ -331,10 +331,10 @@ def main() -> int:
         q_lines.append("_None_")
     else:
         for r in promoted:
-            q_lines.append(f"- **{r['key']}** → {r['role']} → `{r['domain']}` (n={r['count']})")
+            q_lines.append(f"- **{r['key']}** ? {r['role']} ? `{r['domain']}` (n={r['count']})")
     q_lines += [
         "",
-        "Config: `entity_context.json` · policy `entity_mining_policy.json`",
+        "Config: `entity_context.json` ? policy `entity_mining_policy.json`",
         "[[Operations/Entity-Mining-and-Human-Thin-Queue-CANONICAL-2026-07-10]]",
         "",
     ]
@@ -361,13 +361,13 @@ def main() -> int:
             f"Smoke: [[Operations/logs/detective-codify-smoke-latest]]\n"
         )
     RECEIPT.write_text(
-        f"# Entity mine — {utc()}\n\n"
+        f"# Entity mine ? {utc()}\n\n"
         f"scanned_files={len(names)} clusters={len(results)} "
         f"promoted={len(promoted)} queue={len(queue)}\n\n"
         f"{smoke_line}"
         f"Queue: [[Operations/logs/entity-review-queue-latest]]\n"
         f"Canon: [[Operations/Detective-Entity-Codify-Loop-CANONICAL-2026-07-11]] "
-        f"· [[Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18]]\n",
+        f"? [[Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18]]\n",
         encoding="utf-8",
     )
     payload_out = {

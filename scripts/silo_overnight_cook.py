@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Overnight full-tilt silo cook — OCR + train/index + Booksbloom pilot.
+"""Overnight full-tilt silo cook ? OCR + train/index + Booksbloom pilot.
 
 Designed for multi-hour unattended runs (Jeff sleep window).
 Local-only; no cloud tokens.
@@ -88,7 +88,7 @@ def cycle(ocr_limit: int, train_limit: int, index_limit: int, bb_limit: int) -> 
         ],
         timeout=480,
     )
-    # promote fat ocr.md (chars + status — hang-fix for stuck gold tail)
+    # promote fat ocr.md (chars + status ? hang-fix for stuck gold tail)
     try:
         con = sqlite3.connect(r"D:/HermesData/state/ocr_backlog.sqlite3", timeout=60)
         now = utc()
@@ -124,7 +124,7 @@ def cycle(ocr_limit: int, train_limit: int, index_limit: int, bb_limit: int) -> 
         ],
         timeout=120,
     )
-    # Post-OCR twin meta stamp (bounded — never hang rglob)
+    # Post-OCR twin meta stamp (bounded ? never hang rglob)
     code_st, _ = run(
         [
             PY,
@@ -203,9 +203,9 @@ def main() -> int:
             )
             RECEIPT.parent.mkdir(parents=True, exist_ok=True)
             RECEIPT.write_text(
-                f"""# Overnight cook — {utc()}
+                f"""# Overnight cook ? {utc()}
 
-**Cycles:** {n} · target hours {args.hours}
+**Cycles:** {n} ? target hours {args.hours}
 
 | Metric | Value |
 |--------|------:|
@@ -222,7 +222,7 @@ Log: `{LOG}`
             log(f"cycle_error {type(e).__name__}: {e}")
         # stop early if queue empty and bb planned 0 repeatedly
         if cycles and cycles[-1].get("queued", 1) == 0 and n > 3:
-            log("queue empty — continue bb/train until deadline")
+            log("queue empty ? continue bb/train until deadline")
         time.sleep(args.sleep)
     log(f"OVERNIGHT END cycles={n}")
     print(json.dumps({"cycles": n, "last": cycles[-1] if cycles else None}, indent=2))

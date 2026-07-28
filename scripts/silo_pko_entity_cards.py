@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PKO entity cards — rich vault pages (retroactive backfill OK).
+"""PKO entity cards ? rich vault pages (retroactive backfill OK).
 
 Pulls full entity_context fields + person_file_graph samples + org/place cross-links.
 Re-running overwrites cards with fuller detail as graph/OCR grow.
@@ -79,7 +79,7 @@ def main() -> int:
 
     written = 0
     index_lines = [
-        f"# Silo entity cards — {ts}",
+        f"# Silo entity cards ? {ts}",
         "",
         "Rich PKO pages from `entity_context` + graph + registry. **Re-run anytime to retrofill.**",
         "",
@@ -108,14 +108,14 @@ def main() -> int:
         body = [
             f"# {can}",
             "",
-            f"_Updated {ts} · auto PKO card · re-run backfills as graph grows_",
+            f"_Updated {ts} ? auto PKO card ? re-run backfills as graph grows_",
             "",
             "## Identity",
             f"- **Canonical:** {can}",
             f"- **Also known as:** {', '.join(str(n) for n in names[:12])}",
             f"- **Confidence:** {conf or 'n/a'}",
-            f"- **Role:** {pe.get('role') or '—'}",
-            f"- **Domain shelf:** `{pe.get('domain') or '—'}`",
+            f"- **Role:** {pe.get('role') or '?'}",
+            f"- **Domain shelf:** `{pe.get('domain') or '?'}`",
         ]
         if pe.get("email"):
             body.append(f"- **Email:** `{pe.get('email')}`")
@@ -129,7 +129,7 @@ def main() -> int:
             body.append(f"- **Birthday:** {pe.get('birthday') or pe.get('dob')}")
 
         body += ["", "## Notes (codified)"]
-        notes = pe.get("notes") or pe.get("note") or "_(thin — will thicken as OCR/links grow)_"
+        notes = pe.get("notes") or pe.get("note") or "_(thin ? will thicken as OCR/links grow)_"
         body.append(str(notes))
 
         if pe.get("relationships"):
@@ -148,7 +148,7 @@ def main() -> int:
             for s in samp:
                 body.append(f"- `{s}`")
         else:
-            body.append("- _(no graph links yet — entity locked from interview/path rules)_")
+            body.append("- _(no graph links yet ? entity locked from interview/path rules)_")
 
         # soft related orgs by keyword in notes
         blob = json.dumps(pe).lower()
@@ -179,7 +179,7 @@ def main() -> int:
         path.write_text("\n".join(body), encoding="utf-8")
         written += 1
         index_lines.append(
-            f"| [[{slug(str(can))}\\|{can}]] | {pe.get('role') or '—'} | {pe.get('domain') or '—'} | {lc} |"
+            f"| [[{slug(str(can))}\\|{can}]] | {pe.get('role') or '?'} | {pe.get('domain') or '?'} | {lc} |"
         )
 
     # org cards (lighter)
@@ -195,12 +195,12 @@ def main() -> int:
                 [
                     f"# {can}",
                     "",
-                    f"_Org/command · {ts}_",
+                    f"_Org/command ? {ts}_",
                     "",
                     f"- **Names:** {', '.join(str(x) for x in (o.get('names') or [can])[:10])}",
-                    f"- **Domain:** {o.get('domain') or '—'}",
-                    f"- **Type:** {o.get('type') or '—'}",
-                    f"- **Notes:** {o.get('notes') or '—'}",
+                    f"- **Domain:** {o.get('domain') or '?'}",
+                    f"- **Type:** {o.get('type') or '?'}",
+                    f"- **Notes:** {o.get('notes') or '?'}",
                     "",
                     "[[00-LIFE-GRAPH]]",
                 ]
@@ -210,10 +210,10 @@ def main() -> int:
 
     index_lines += [
         "",
-        f"_People cards written: **{written}** · Orgs: **{len(orgs)}** · Places in entity_context: **{len(places)}**_",
+        f"_People cards written: **{written}** ? Orgs: **{len(orgs)}** ? Places in entity_context: **{len(places)}**_",
         "",
         "## Retrofill policy",
-        "Re-run `python D:/HermesData/scripts/silo_pko_entity_cards.py` anytime — cards get richer as notes, graph links, and registry hits grow.",
+        "Re-run `python D:/HermesData/scripts/silo_pko_entity_cards.py` anytime ? cards get richer as notes, graph links, and registry hits grow.",
     ]
     INDEX.write_text("\n".join(index_lines), encoding="utf-8")
     print(json.dumps({"written": written, "orgs": len(orgs), "out": str(OUT)}))

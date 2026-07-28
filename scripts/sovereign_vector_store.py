@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-sovereign_vector_store.py — SQLite-vec semantic index (multi-million chunk target).
+sovereign_vector_store.py ? SQLite-vec semantic index (multi-million chunk target).
 
 Optimized for ANN retrieval with hierarchical parent-child metadata.
 Embeds on ingestion via local Ollama nomic-embed-text (768d).
@@ -128,7 +128,7 @@ class SovereignVectorStore:
         cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_level ON chunks(level)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_source ON chunks(source_path)")
 
-        # vec0 virtual table — auxiliary columns without + in DML
+        # vec0 virtual table ? auxiliary columns without + in DML
         cur.execute(
             f"""
             CREATE VIRTUAL TABLE IF NOT EXISTS chunk_vectors USING vec0(
@@ -298,7 +298,7 @@ class SovereignVectorStore:
         if not qvec:
             return []
         cur = self._conn.cursor()
-        # vec0 forbids auxiliary-column filters inside KNN MATCH — filter in Python.
+        # vec0 forbids auxiliary-column filters inside KNN MATCH ? filter in Python.
         fetch_k = k * 5 if levels else k * 3
         rows = cur.execute(
             """

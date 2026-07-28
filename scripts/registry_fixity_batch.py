@@ -2,7 +2,7 @@
 """Batch fixity: re-hash dest files and compare to registry sha256.
 
 Raises confidence via digital-preservation style fixity checks (NDSA/LOC).
-Default: sample recent N rows. --all is slow — use carefully.
+Default: sample recent N rows. --all is slow ? use carefully.
 """
 from __future__ import annotations
 
@@ -107,7 +107,7 @@ def main() -> int:
     con.close()
 
     lines = [
-        f"# Registry fixity batch — {utc()}",
+        f"# Registry fixity batch ? {utc()}",
         "",
         f"checked={len(rows)} **ok={ok}** bad={bad} missing={missing}",
         "",
@@ -118,7 +118,7 @@ def main() -> int:
         lines.append("_None_")
     else:
         for path, err in bad_rows[:40]:
-            lines.append(f"- `{Path(path).name[:60]}` — {err}")
+            lines.append(f"- `{Path(path).name[:60]}` ? {err}")
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text("\n".join(lines), encoding="utf-8")
     print(

@@ -183,10 +183,10 @@ def main() -> int:
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Silo repair re-pull — {utc()}",
+        f"# Silo repair re-pull ? {utc()}",
         "",
-        f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'} · domain `{args.domain or 'all'}`",
-        f"**Planned:** {stats['planned']} · **re_pulled:** {stats['re_pulled']} · **hash_ok:** {stats['hash_ok_after']} · **src_missing:** {stats['src_missing']} · **errors:** {stats['errors']}",
+        f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'} ? domain `{args.domain or 'all'}`",
+        f"**Planned:** {stats['planned']} ? **re_pulled:** {stats['re_pulled']} ? **hash_ok:** {stats['hash_ok_after']} ? **src_missing:** {stats['src_missing']} ? **errors:** {stats['errors']}",
         f"**Stub zeros marked:** {stats['marked_stub_zero']}",
         "",
         "| Status | Domain | Reasons | File |",

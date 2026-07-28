@@ -54,7 +54,7 @@ if ($dupKilled -gt 0) {
     Write-Heal "Killed $dupKilled duplicate Phronesis llama-server" "Yellow"
 }
 
-# Inference 8090/8091 (skip 8090 heal when VRAM priority is image — Comfy owns GPU)
+# Inference 8090/8091 (skip 8090 heal when VRAM priority is image - Comfy owns GPU)
 $vramMode = "text"
 $vramStatePath = Join-Path (Split-Path $scriptRoot -Parent) "state\vram-priority.json"
 if (Test-Path $vramStatePath) {
@@ -215,7 +215,7 @@ if ($core.start_dashboard) {
         Write-Heal "Healing dashboard ($dashPort) via 05-heal-dashboard.ps1..." "Cyan"
         $healDashPs1 = Join-Path $scriptRoot "ops\05-heal-dashboard.ps1"
         if (Test-Path $healDashPs1) {
-            # In-process — nested powershell was flashing cmd popups every Guardian tick
+            # In-process - nested powershell was flashing cmd popups every Guardian tick
             & $healDashPs1 | Out-Null
             if ($LASTEXITCODE -eq 0 -and (Wait-PortUp -Port $dashPort -MaxSeconds 10)) {
                 $actions += "dashboard_restart:OK"

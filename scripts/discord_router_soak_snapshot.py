@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """P2: Start / sample Discord router soak + popup audit snapshot.
 
-Not a full 24h wait — writes baseline + checklist so overnight soak is measurable.
+Not a full 24h wait ? writes baseline + checklist so overnight soak is measurable.
 Receipt: D:\\PhronesisVault\\Operations\\logs\\discord-router-soak-latest.{json,md}
 """
 from __future__ import annotations
@@ -132,7 +132,7 @@ def main() -> int:
     RECEIPT_JSON.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT_JSON.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     md = [
-        f"# Discord Router Soak — {receipt['status']}",
+        f"# Discord Router Soak ? {receipt['status']}",
         "",
         f"- **Start:** {receipt['soak_start_utc']}",
         f"- **Target end:** {receipt['soak_end_utc_target']}",

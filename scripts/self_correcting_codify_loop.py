@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Self-correcting codify loop template — safe defaults.
+"""Self-correcting codify loop template - safe defaults.
 
 Pattern (CANONICAL):
-  PROPOSE → VERIFY (non-LLM) → CRITIQUE (must cite verify) → GATE → COMMIT/ABORT
+  PROPOSE -> VERIFY (non-LLM) -> CRITIQUE (must cite verify) -> GATE -> COMMIT/ABORT
 
 Guardrails:
   - dry-run default (no commit unless --commit)
   - max 3 iterations
-  - critique without verify evidence → ABORT
+  - critique without verify evidence -> ABORT
   - irreversible actions never auto (purge / VW LIVE / gateway)
   - trajectory JSONL always written
   - $0 Grok in loop body; print escalate hint only
@@ -88,12 +88,12 @@ class Receipt:
     message: str
 
 
-# ─── Demo hooks (replace per surface) ───────────────────────────────────────
+# --- Demo hooks (replace per surface) ---------------------------------------
 
 
 def demo_propose(ctx: dict[str, Any]) -> Candidate:
     n = int(ctx.get("iteration", 0))
-    # Intentionally weak on iter 0, stronger later — shows retry path
+    # Intentionally weak on iter 0, stronger later - shows retry path
     text = "entity: Abigail (ambiguous)" if n == 0 else "entity: Abigail Tulis (case party; VA medical context)"
     return Candidate(
         id=f"demo-{n}",
@@ -104,7 +104,7 @@ def demo_propose(ctx: dict[str, Any]) -> Candidate:
 
 
 def demo_verify(candidate: Candidate) -> VerifyResult:
-    """Deterministic ground truth — NEVER an LLM."""
+    """Deterministic ground truth - NEVER an LLM."""
     text = str(candidate.payload.get("text", ""))
     checks = []
     has_full_name = "Tulis" in text
@@ -116,7 +116,7 @@ def demo_verify(candidate: Candidate) -> VerifyResult:
         }
     )
     domain = candidate.payload.get("domain_guess")
-    # Friends≠Family≠Medical disambiguation stub
+    # Friends?Family?Medical disambiguation stub
     domain_ok = domain in {"Medical", "Projects", "Family"} and not (
         domain == "Family" and "case" in text.lower()
     )
@@ -134,7 +134,7 @@ def demo_verify(candidate: Candidate) -> VerifyResult:
 
 def demo_critique(candidate: Candidate, verify: VerifyResult) -> Critique:
     """
-    Critic may be local LLM later — but MUST cite verify.evidence.
+    Critic may be local LLM later - but MUST cite verify.evidence.
     This default is rule-based (safe offline).
     """
     ev = verify.all_evidence()
@@ -158,7 +158,7 @@ def demo_commit(candidate: Candidate, dry_run: bool) -> Receipt:
     return Receipt(committed=True, path=str(out), message="appended demo commit")
 
 
-# ─── Core engine ────────────────────────────────────────────────────────────
+# --- Core engine ------------------------------------------------------------
 
 
 def gate(verify: VerifyResult, critique: Critique) -> GateOutcome:
@@ -168,7 +168,7 @@ def gate(verify: VerifyResult, critique: Critique) -> GateOutcome:
         return GateOutcome("PASS", "verify+critique ok")
     if not verify.ok and critique.cites_verify:
         return GateOutcome("RETRY", "verify failed; retry propose")
-    return GateOutcome("ESCALATE", "gray — prepare_grok_escalation_brief")
+    return GateOutcome("ESCALATE", "gray - prepare_grok_escalation_brief")
 
 
 def run_loop(
@@ -246,7 +246,7 @@ def run_loop(
     latest.write_text(
         "\n".join(
             [
-                f"# Self-correcting loop — {name}",
+                f"# Self-correcting loop - {name}",
                 f"",
                 f"- **at:** {final['at']}",
                 f"- **decision:** {final['decision']}",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Autonomous G→K wave runner for no_agent cron.
+"""Autonomous G?K wave runner for no_agent cron.
 
 - Sources: MemoryCard historical Google Drive only (not live D: My Drive)
 - Copy-only with provenance via g_to_k_safe_drain.py
@@ -26,7 +26,7 @@ def run(cmd: list[str], timeout: int = 600) -> tuple[int, str]:
 
 def main() -> int:
     ts = datetime.now(timezone.utc).isoformat()
-    lines = [f"# G→K autonomous wave — {ts}", ""]
+    lines = [f"# G?K autonomous wave ? {ts}", ""]
 
     code_h, out_h = run([sys.executable, str(SCRIPTS / "pipeline_health_check.py")], 120)
     lines.append(f"## Health exit={code_h}")

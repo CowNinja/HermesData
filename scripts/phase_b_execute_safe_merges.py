@@ -57,14 +57,14 @@ def main() -> int:
     if ops_orch.exists() and docs_orch.exists():
         write(
             ops_orch,
-            """# Orchestrator Pilot Run Log — Operations Pointer
+            """# Orchestrator Pilot Run Log ? Operations Pointer
 
 **Canonical (append here):** [[docs/agent-coordination/Orchestrator-Pilot-Run-Log]]
 
 This Operations path is a **pointer only** (distilled 2026-07-10 Phase B).
-Do not append new pilot runs here — use the docs canonical file.
+Do not append new pilot runs here ? use the docs canonical file.
 
-**Parent:** [[Operations/Sovereign-Stack-Operations-Index]] · [[Operations/Active-Work-Program-Phase-B-Orchestrator-Insights-2026-07-10]]
+**Parent:** [[Operations/Sovereign-Stack-Operations-Index]] ? [[Operations/Active-Work-Program-Phase-B-Orchestrator-Insights-2026-07-10]]
 
 ## Vault links
 - [[docs/agent-coordination/Orchestrator-Pilot-Run-Log]]
@@ -77,7 +77,7 @@ Do not append new pilot runs here — use the docs canonical file.
     mds = sorted(OPS.glob("Memory-Delta-*.md"))
     if mds:
         lines = [
-            f"# Memory Delta Sessions — Distilled Rollup ({TS})",
+            f"# Memory Delta Sessions ? Distilled Rollup ({TS})",
             "",
             f"**Source count:** {len(mds)} session delta files from ~2026-06-18",
             "**Method:** singular rollup + recoverable archive (not one concatenated landfill)",
@@ -118,7 +118,7 @@ Do not append new pilot runs here — use the docs canonical file.
     dds = sorted((OPS / "logs").glob("daily-distillation-*.md"))
     if dds:
         lines = [
-            f"# Daily Distillation Log — Index ({TS})",
+            f"# Daily Distillation Log ? Index ({TS})",
             "",
             f"**Count:** {len(dds)} dated logs",
             "Originals archived under Archive/Distillations-2026-07-10/Daily-Distillation/",
@@ -153,7 +153,7 @@ Do not append new pilot runs here — use the docs canonical file.
     batches = sorted(OPS.glob("Automated-Routing-Batch-*.md"))
     if batches:
         parts = [
-            f"# Automated Routing Batches — Digest ({TS})",
+            f"# Automated Routing Batches ? Digest ({TS})",
             "",
             "**Batches:** " + ", ".join(p.stem for p in batches),
             "",
@@ -180,7 +180,7 @@ Do not append new pilot runs here — use the docs canonical file.
     # 5) Secrets batches
     secs = sorted(OPS.glob("Secrets-Proposals-Batch-*.md"))
     if secs:
-        parts = [f"# Secrets Proposals Batches — Digest ({TS})", ""]
+        parts = [f"# Secrets Proposals Batches ? Digest ({TS})", ""]
         for p in secs:
             parts.append(f"## {p.stem}")
             parts.append(p.read_text(encoding="utf-8", errors="ignore").strip()[:2000])
@@ -197,7 +197,7 @@ Do not append new pilot runs here — use the docs canonical file.
     # 6) Session handoffs
     hands = sorted(OPS.glob("Session-Handoff-*.md"))
     if hands:
-        parts = [f"# Session Handoffs — Digest ({TS})", ""]
+        parts = [f"# Session Handoffs ? Digest ({TS})", ""]
         for p in hands:
             parts.append(f"## {p.stem}")
             parts.append(p.read_text(encoding="utf-8", errors="ignore").strip()[:3000])
@@ -238,7 +238,7 @@ Restore any file by moving it back from this folder.
 
     write(
         OPS / "logs" / f"phase-b-merge-execution-{TS}.md",
-        f"""# Phase B Merge Execution Receipt — {TS}
+        f"""# Phase B Merge Execution Receipt ? {TS}
 
 ## Why not raw-merge everything?
 - Unique logs glued = landfill, lost provenance, broken links

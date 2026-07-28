@@ -57,7 +57,7 @@ TARGETS = [
 ]
 
 # Never descend into package/runtime trees. 2026-07-18: VW 00-INDEX stamps in
-# site-packages broke mcp→computer_use (15s timeout). Indexes = vault/silo MD only.
+# site-packages broke mcp?computer_use (15s timeout). Indexes = vault/silo MD only.
 SKIP_NAMES = {
     ".git",
     ".obsidian",
@@ -80,12 +80,12 @@ HOT_PATHS: dict[str, list[str]] = {
         "|------|------|",
         "| Digital twin pipeline | [[Digital-Twin/INDEX]] |",
         "| Entity PKO wiki | [[Research/Silo-Entities/00-INDEX]] |",
-        "| Second-brain × silo contract | [[Operations/Silo-Second-Brain-Loop-Utilization-CANONICAL-2026-07-13]] |",
+        "| Second-brain ? silo contract | [[Operations/Silo-Second-Brain-Loop-Utilization-CANONICAL-2026-07-13]] |",
         "| Ops digests / canons | [[Operations/00-INDEX]] (hot-path table at top) |",
-        "| Second-brain tools (colors/tags) | [[Setup/Obsidian-Category-Colors-and-Tags]] · [[Dashboard/Domain-Tag-Dashboard]] · [[Operations/Second-Brain-Tools-Infra-Thread-2026-07-18]] |",
+        "| Second-brain tools (colors/tags) | [[Setup/Obsidian-Category-Colors-and-Tags]] ? [[Dashboard/Domain-Tag-Dashboard]] ? [[Operations/Second-Brain-Tools-Infra-Thread-2026-07-18]] |",
         "| Domain tag lint | `Operations/logs/domain-tag-lint-latest.md` |",
         "| Live silo brief | `Operations/logs/silo-status-brief-latest.md` |",
-        "| D↔K harmony | [[D-K-Harmony]] |",
+        "| D?K harmony | [[D-K-Harmony]] |",
         "| Medical care web | [[Research/Silo-Entities/Medical-Care-Web-2017-2018]] |",
         "| Navy NCDOC net | [[Research/Silo-Entities/Navy-NCDOC-Command-Net]] |",
     ],
@@ -94,22 +94,22 @@ HOT_PATHS: dict[str, list[str]] = {
         "|------|------|",
         "| **Grok thread scope** (arch / VW / hybrid / escalate) | [[Operations/Grok-Thread-Architecture-Judgment-CANONICAL-2026-07-18]] |",
         "| **Semantic wiki ops** (Ingest/Query/Lint) | [[Operations/Silo-Second-Brain-Loop-Utilization-CANONICAL-2026-07-13]] |",
-        "| **Which skills load** | [[Operations/Skills-Safe-Incorporate-Silo-CANONICAL-2026-07-12]] · [[Operations/Skills-Stack-Silo-Incorporation-CANONICAL-2026-07-12]] |",
-        "| **One silo → many views** | [[Operations/Multi-View-Wiki-Silo-Architecture-CANONICAL-2026-07-11]] |",
+        "| **Which skills load** | [[Operations/Skills-Safe-Incorporate-Silo-CANONICAL-2026-07-12]] ? [[Operations/Skills-Stack-Silo-Incorporation-CANONICAL-2026-07-12]] |",
+        "| **One silo ? many views** | [[Operations/Multi-View-Wiki-Silo-Architecture-CANONICAL-2026-07-11]] |",
         "| **PKO entity surface** | [[Research/Silo-Entities/00-INDEX]] |",
         "| **Context fabric layers** | [[Operations/Data-Silo-Context-Fabric-CANONICAL-2026-07-12]] |",
-        "| **Physical priority queue** | [[Operations/Silo-Next-Enhancements-2026-07-12]] · brief: `logs/silo-status-brief-latest.md` |",
+        "| **Physical priority queue** | [[Operations/Silo-Next-Enhancements-2026-07-12]] ? brief: `logs/silo-status-brief-latest.md` |",
         "| **Detective -> codify** | [[Operations/Detective-Entity-Codify-Loop-CANONICAL-2026-07-11]] |",
         "| **Failure modes research** | [[Operations/Research-LLM-Wiki-Second-Brain-Failure-Modes-2026-07-13]] |",
         "| **VaultWalker judgment** | [[Operations/VaultWalker-PhronesisVault-Focus-0.8.0-2026-07-17]] |",
         "| **Hybrid Grok/local tokens** | [[Operations/Hybrid-Local-Grok-Token-Policy-CANONICAL-2026-07-17]] |",
         "| **Gateway restore** | [[Operations/SINGLE-GATEWAY-RESTORE]] |",
         "| **Silo kitchen thread handoff** | [[Operations/logs/silo-thread-merge-handoff-2026-07-18]] |",
-        "| **Second-brain tools thread** (colors/tags/X) | [[Operations/Second-Brain-Tools-Infra-Thread-2026-07-18]] · [[Setup/Obsidian-Category-Colors-and-Tags]] |",
+        "| **Second-brain tools thread** (colors/tags/X) | [[Operations/Second-Brain-Tools-Infra-Thread-2026-07-18]] ? [[Setup/Obsidian-Category-Colors-and-Tags]] |",
         "| **Five-actions receipt 2026-07-18** | [[Operations/logs/Second-Brain-Tools-Five-Actions-2026-07-18]] |",
         "",
-        "Rule: **K: = raw** · **vault entity wiki = compiled**. Continuous drain stays scripts; second-brain is capped semantic densify.",
-        "**Thread rule:** silo land/cook/six_numbers → Data silo agent; Grok lane → architecture/judgment only.",
+        "Rule: **K: = raw** ? **vault entity wiki = compiled**. Continuous drain stays scripts; second-brain is capped semantic densify.",
+        "**Thread rule:** silo land/cook/six_numbers ? Data silo agent; Grok lane ? architecture/judgment only.",
     ],
     "Research": [
         "| Need | Open |",
@@ -133,10 +133,10 @@ HOT_PATHS: dict[str, list[str]] = {
         "| Op | Action |",
         "|----|--------|",
         "| **Ingest** | Densify person/org cards + concept hubs from OCR/dossier evidence |",
-        "| **Query** | `silo_retrieve` + cards → file under `queries/` |",
+        "| **Query** | `silo_retrieve` + cards ? file under `queries/` |",
         "| **Lint** | Placeholders / 0-link rows; weekly |",
         "",
-        "Hubs: [[00-LIFE-GRAPH]] · [[Medical-Care-Web-2017-2018]] · [[Navy-NCDOC-Command-Net]] · [[Navy-Career-Arc]]",
+        "Hubs: [[00-LIFE-GRAPH]] ? [[Medical-Care-Web-2017-2018]] ? [[Navy-NCDOC-Command-Net]] ? [[Navy-Career-Arc]]",
         "Contract: [[Operations/Silo-Second-Brain-Loop-Utilization-CANONICAL-2026-07-13]]",
     ],
 }
@@ -181,7 +181,7 @@ def purpose_for(folder: Path) -> str:
         return "Central Obsidian CNS. Agent: read folder 00-INDEX.md before deep scans."
     rel = str(folder.relative_to(VAULT)).replace("\\", "/")
     hints = {
-        "Operations": "Living ops brain — plans, digests, STATUS, active work. Prefer digests over dated sprawl.",
+        "Operations": "Living ops brain ? plans, digests, STATUS, active work. Prefer digests over dated sprawl.",
         "Operations/logs": "Execution receipts, Phase B reports, insights. Thin rows preferred.",
         "Operations/Growth-Blueprints": "High-signal research distillations. Use 00-GROWTH-BLUEPRINTS-INDEX if present.",
         "Operations/Audits": "Ops audit artifacts and health snapshots.",
@@ -197,7 +197,7 @@ def purpose_for(folder: Path) -> str:
         "AI-Computer-Management": "Desktop/sovereign computer-management track.",
         "SkillForge": "Skill trees and domain audits.",
         "MOCs": "Map-of-content hubs for graph navigation.",
-        "Archive": "Recoverable history — not the working set.",
+        "Archive": "Recoverable history ? not the working set.",
         "AI-Zone": "Ingestion / review pilots. Prefer digests over raw exports.",
     }
     return hints.get(rel, f"Folder map for agent navigation (`{rel}`). Read this before scanning all files.")
@@ -220,7 +220,7 @@ def render_index(folder: Path) -> str:
 
     dirs, files, n_dirs, n_files = list_entries(folder)
     rel = rel_key(folder)
-    title = "PhronesisVault — Root INDEX" if folder == VAULT else f"{folder.name} — INDEX"
+    title = "PhronesisVault ? Root INDEX" if folder == VAULT else f"{folder.name} ? INDEX"
     # Domain tags so category colors / Bases survive index refresh
     domain_map = {
         ".": ["domain/setup", "type/index"],
@@ -276,7 +276,7 @@ def render_index(folder: Path) -> str:
         "",
         f"**Path:** `{rel}`  ",
         f"**Updated:** {TS}  ",
-        f"**Counts:** {n_dirs} dirs · {n_files} files (listed up to cap)",
+        f"**Counts:** {n_dirs} dirs ? {n_files} files (listed up to cap)",
         "",
         "## Purpose",
         purpose_for(folder),
@@ -310,7 +310,7 @@ def render_index(folder: Path) -> str:
                 else:
                     lines.append(f"- `{d.name}/`")
         if n_dirs > len(dirs):
-            lines.append(f"- … +{n_dirs - len(dirs)} more")
+            lines.append(f"- ? +{n_dirs - len(dirs)} more")
     else:
         lines.append("- (none)")
 
@@ -336,7 +336,7 @@ def render_index(folder: Path) -> str:
                 sz = 0
             lines.append(f"- `{p.name}` ({sz}b)")
         if n_files > len(files):
-            lines.append(f"- … +{n_files - len(files)} more")
+            lines.append(f"- ? +{n_files - len(files)} more")
     else:
         lines.append("- (none or only indexes)")
 
@@ -381,11 +381,11 @@ def render_silo_entities_preserving_table(old: str) -> str:
         "  - type/index",
         "---",
         "",
-        f"# Silo entity cards — {TS}",
+        f"# Silo entity cards ? {TS}",
         "",
         "Rich PKO pages from `entity_context` + graph + registry. **Re-run** `silo_pko_entity_cards.py` to retrofill.",
         "",
-        f"**Counts:** {n_dirs} dirs · {n_files} files (folder scan)",
+        f"**Counts:** {n_dirs} dirs ? {n_files} files (folder scan)",
         "",
         "## Hot paths",
     ]
@@ -414,7 +414,7 @@ def render_silo_entities_preserving_table(old: str) -> str:
     if table:
         lines.append(table)
     else:
-        lines.append("_No person table found — run silo_pko_entity_cards.py_")
+        lines.append("_No person table found ? run silo_pko_entity_cards.py_")
     lines += [
         "",
         "## Related hubs",

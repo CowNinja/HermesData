@@ -2,9 +2,9 @@
 """Multi-format archive eval + encrypted asset staging.
 
 Formats: zip, tar, tar.gz, tgz, tar.bz2, tar.xz, gz (single), 7z/rar if tools present.
-Encrypted zips/PDFs: detect → stage → never crack; try Jeff password list only.
+Encrypted zips/PDFs: detect ? stage ? never crack; try Jeff password list only.
 
-Secrets: path quarantine list only — no secret values to stdout/chat.
+Secrets: path quarantine list only ? no secret values to stdout/chat.
 """
 from __future__ import annotations
 
@@ -151,7 +151,7 @@ def classify(path: Path) -> dict:
         names, enc = list_zip(path)
     elif fmt == ".gz" and not name.endswith((".tar.gz", ".tgz")):
         fmt = "gzip_single"
-        # single-file gzip — treat as land if small/gold
+        # single-file gzip ? treat as land if small/gold
         if size < 50_000_000 or score >= 45:
             return {
                 "path": str(path),
@@ -168,7 +168,7 @@ def classify(path: Path) -> dict:
             "score": score,
         }
     elif fmt in {".7z", ".rar"}:
-        # no library — stage for external tool / Jeff
+        # no library ? stage for external tool / Jeff
         if size > 150_000_000 and score < 50:
             return {
                 "path": str(path),
@@ -232,7 +232,7 @@ def classify(path: Path) -> dict:
 
 
 def try_decrypt_zip(path: Path, passwords: list[str]) -> dict:
-    """Try known passwords only — never brute force."""
+    """Try known passwords only ? never brute force."""
     if not passwords:
         return {"ok": False, "reason": "no_password_file"}
     for pw in passwords:

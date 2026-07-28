@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-fleet_procurement_engine.py — Autonomous Opportunistic Fleet Procurement Engine.
+fleet_procurement_engine.py ? Autonomous Opportunistic Fleet Procurement Engine.
 
-Discover → sandbox inject → benchmark (TTFT/quality/rate) → auto-promote or disable.
+Discover ? sandbox inject ? benchmark (TTFT/quality/rate) ? auto-promote or disable.
 Provider-agnostic: routing uses capability tags only.
 
 Usage:
@@ -29,7 +29,7 @@ HERMES_SCRIPTS = Path(__file__).resolve().parent
 PROCUREMENT_LOG = Path(r"D:\PhronesisVault\Operations\logs\fleet-procurement.jsonl")
 PROCUREMENT_STATE = Path(r"D:\PhronesisVault\Operations\logs\fleet-procurement-state.json")
 PROCUREMENT_REPORT = Path(r"D:\PhronesisVault\Operations\logs\fleet-procurement-report.json")
-# P4/P5 role-matrix SSOT — procurement must never promote forbidden lanes
+# P4/P5 role-matrix SSOT ? procurement must never promote forbidden lanes
 ROLE_MATRIX_REGISTRY = Path(r"D:\PhronesisVault\Operations\Free-Model-Registry-v0.2.json")
 ROLE_MATRIX_MD = Path(
     r"D:\PhronesisVault\Operations\Free-Model-Creative-Role-Matrix-CANONICAL-2026-07-21.md"
@@ -89,7 +89,7 @@ GITHUB_SEARCH_QUERIES = [
 
 URL_PATTERN = re.compile(r"https?://[a-zA-Z0-9._~:/?#\[\]@!$&'()*+,;=%-]+")
 
-# Open-ended capability inference patterns (first principles — tags are data, not code)
+# Open-ended capability inference patterns (first principles ? tags are data, not code)
 CAPABILITY_PATTERNS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"1m[- ]?context|million[- ]?token|1,?000,?000", re.I), "1m-context"),
     (re.compile(r"128k|131k|100k[- ]?context", re.I), "128k-context"),
@@ -139,9 +139,9 @@ def load_role_matrix_forbid() -> Dict[str, Any]:
     """Load forbid lists from Free-Model-Registry-v0.2.json (+ hard defaults).
 
     Aligns procurement promote/inject with P4 creative role matrix:
-      adult_image → local Forge only (no openrouter/free, fal, moderated cloud)
-      rp_ic → never opportunistic free fleet body
-      disabled_compute_* → stay disabled (mixtral decommission, dead OR slugs)
+      adult_image ? local Forge only (no openrouter/free, fal, moderated cloud)
+      rp_ic ? never opportunistic free fleet body
+      disabled_compute_* ? stay disabled (mixtral decommission, dead OR slugs)
     """
     forbid_ids: Set[str] = set(DEFAULT_FORBID_IDS)
     forbid_model_substr: List[str] = list(DEFAULT_FORBID_MODEL_SUBSTR)
@@ -168,7 +168,7 @@ def load_role_matrix_forbid() -> Dict[str, Any]:
                             forbid_url_substr.extend(["fal.ai", "fal.run"])
                         elif fs == "openrouter/free":
                             # free text router is OK for non-image roles; only block
-                            # image-tagged promotion — handled via caps + kind checks
+                            # image-tagged promotion ? handled via caps + kind checks
                             forbid_caps.add("adult-image-cloud")
                         elif fs == "any_moderated_cloud":
                             forbid_caps.add("nsfw-image-cloud")
@@ -326,7 +326,7 @@ class ResourceGovernor:
 
 
 class FleetProcurementEngine:
-    """Autonomous discover → sandbox → test → promote/disable pipeline."""
+    """Autonomous discover ? sandbox ? test ? promote/disable pipeline."""
 
     def __init__(self):
         import sys
@@ -559,7 +559,7 @@ class FleetProcurementEngine:
         return True
 
     def promote_provider(self, provider_id: str, bench: Dict[str, Any]) -> Dict[str, Any]:
-        """Move sandbox → production with enabled lifecycle."""
+        """Move sandbox ? production with enabled lifecycle."""
         sandbox = self.fm._registry.get("sandbox_providers") or []
         entry = None
         new_sandbox = []
@@ -640,7 +640,7 @@ class FleetProcurementEngine:
                     "api_mode": "metadata_only",
                     "capabilities": infer_capabilities_from_text(r.get("description", ""), topic),
                     "discovery_source": f"github_topic:{topic}",
-                    "notes": "Repo discovery — needs README parse pass",
+                    "notes": "Repo discovery ? needs README parse pass",
                 })
 
         # GitHub search
@@ -658,7 +658,7 @@ class FleetProcurementEngine:
                     "notes": desc[:120],
                 })
 
-        # Awesome-list seeds → parse endpoints
+        # Awesome-list seeds ? parse endpoints
         for seed in seeds:
             if len(candidates) >= self.governor.max_discoveries_per_tick:
                 break
@@ -879,7 +879,7 @@ class FleetProcurementEngine:
         return report
 
     def simulate_loop(self) -> Dict[str, Any]:
-        """Simulated discovery→sandbox→benchmark→promote without external hammering."""
+        """Simulated discovery?sandbox?benchmark?promote without external hammering."""
         self.governor.reset_tick_counters()
         # Use unique id to avoid collision
         sim_id = f"sim-{int(time.time())}"

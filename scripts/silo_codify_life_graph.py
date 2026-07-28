@@ -36,12 +36,12 @@ def upsert(lst, canonical, **kw):
 
 org_defs = [
     ("NCDOC", ["NCDOC", "Navy Cyber Defense Operations Command", "ncdoc.navy.mil"],
-     "Navy command — Jeff photos/email; ITC Melvin Johnson boss", "Navy-Service"),
+     "Navy command ? Jeff photos/email; ITC Melvin Johnson boss", "Navy-Service"),
     ("N332", ["N332", "N32"], "Navy billet/code related to service", "Navy-Service"),
     ("NMCP", ["NMCP", "Naval Medical Center Portsmouth"],
      "Primary Navy medical center", "Medical-Records"),
     ("Hampton VAMC", ["Hampton VAMC", "VAMC Hampton", "Vet Center Hampton", "VAMC"],
-     "VA medical — Kapoor PCM, meds, MRI, urology", "Medical-Records"),
+     "VA medical ? Kapoor PCM, meds, MRI, urology", "Medical-Records"),
     ("CNSVA", ["CNSVA", "Center for Neurorehabilitation Services"],
      "Dr OShanick neurorehab clinic", "Medical-Records"),
     ("USS Elrod FFG-55", ["USS Elrod", "Elrod", "FFG-55", "FFG55"],
@@ -90,10 +90,10 @@ for can, names, domain, role, notes in [
 
 d["life_graph_notes"] = {
     "updated": ts,
-    "navy_spine": "RTC/training → USS Elrod FFG-55 → NCDOC (ITC Melvin Johnson boss) → care at NMCP/VAMC/CNSVA",
-    "medical_spine": "NMCP (Cann, Foster) → CNSVA O'Shanick → Hampton VAMC (Kapoor, DeFilippo) → OT/PT Barefield/Stevenson",
-    "church_spine": "KPC → GBEFC → Crosswater PCA (friend graph) → NRBC current; Rescue Church touchpoints",
-    "family_spine": "Jeff · Jodi/Jenni · Jeremy Kamies BIL · Blaizen/Spencer · Sara Ballas · Gary/Jan",
+    "navy_spine": "RTC/training ? USS Elrod FFG-55 ? NCDOC (ITC Melvin Johnson boss) ? care at NMCP/VAMC/CNSVA",
+    "medical_spine": "NMCP (Cann, Foster) ? CNSVA O'Shanick ? Hampton VAMC (Kapoor, DeFilippo) ? OT/PT Barefield/Stevenson",
+    "church_spine": "KPC ? GBEFC ? Crosswater PCA (friend graph) ? NRBC current; Rescue Church touchpoints",
+    "family_spine": "Jeff ? Jodi/Jenni ? Jeremy Kamies BIL ? Blaizen/Spencer ? Sara Ballas ? Gary/Jan",
 }
 d["updated"] = ts
 p.write_text(json.dumps(d, indent=2), encoding="utf-8")
@@ -101,13 +101,13 @@ p.write_text(json.dumps(d, indent=2), encoding="utf-8")
 vault = Path(r"D:/PhronesisVault/Research/Silo-Entities/00-LIFE-GRAPH.md")
 vault.parent.mkdir(parents=True, exist_ok=True)
 vault.write_text(
-    f"""# Life graph — people · places · commands
+    f"""# Life graph ? people ? places ? commands
 
 _Updated {ts}_
 
 ## Navy spine
 ```
-RTC / training → USS Elrod (FFG-55) → NCDOC (cyber)
+RTC / training ? USS Elrod (FFG-55) ? NCDOC (cyber)
   boss: ITC Melvin Johnson
   medical: NMCP Portsmouth
 ```
@@ -115,23 +115,23 @@ RTC / training → USS Elrod (FFG-55) → NCDOC (cyber)
 ## Medical spine
 ```
 NMCP (Dr Cann, Dr Foster, CTN1 Means)
-  → CNSVA (Dr Gregory O'Shanick + staff)
-  → Hampton VAMC (Dr Kapoor, DeFilippo, urology)
-  → community OT/PT (Barefield, Stevenson)
-  → endo (Roberts, Richardson)
+  ? CNSVA (Dr Gregory O'Shanick + staff)
+  ? Hampton VAMC (Dr Kapoor, DeFilippo, urology)
+  ? community OT/PT (Barefield, Stevenson)
+  ? endo (Roberts, Richardson)
 ```
 
 ## Church spine (VA)
 ```
-KPC → GBEFC → Crosswater (friend photos) → NRBC (current)
+KPC ? GBEFC ? Crosswater (friend photos) ? NRBC (current)
 (+ Rescue Church)
 ```
 
 ## Places
-Norfolk · Portsmouth · Hampton · Chesapeake · Virginia Beach · Suffolk · Williamsburg
+Norfolk ? Portsmouth ? Hampton ? Chesapeake ? Virginia Beach ? Suffolk ? Williamsburg
 
 ## Storage
-entity_context (people/orgs/places) · person_file_graph · dossiers · timelines · PKO cards
+entity_context (people/orgs/places) ? person_file_graph ? dossiers ? timelines ? PKO cards
 """,
     encoding="utf-8",
 )

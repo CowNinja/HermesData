@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Multi-provenance context: same hash/file in different folders → merge neighborhood.
+"""Multi-provenance context: same hash/file in different folders ? merge neighborhood.
 
-Jeff 2026-07-12: when scan finds existing content, don't waste the hit —
+Jeff 2026-07-12: when scan finds existing content, don't waste the hit ?
 ingest additional path/sibling context so classification & twin get richer
 evidence from every home the file lived in.
 
 Writes/updates:
-  - dest .meta.json  → provenances[] list
-  - dest .context.json → merged parents/siblings samples
+  - dest .meta.json  ? provenances[] list
+  - dest .context.json ? merged parents/siblings samples
   - registry notes optional
 """
 from __future__ import annotations

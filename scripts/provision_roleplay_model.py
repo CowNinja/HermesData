@@ -85,7 +85,7 @@ def main() -> int:
     filename = m.get("filename")
     result = _download(repo, filename)
     if not result.get("ok"):
-        print("Primary download failed — trying fallback...")
+        print("Primary download failed - trying fallback...")
         result = _download(m.get("fallback_repo_id"), m.get("fallback_filename"))
         if result.get("ok"):
             cfg["logical_model"] = "llama-3.1-8b-abliterated"

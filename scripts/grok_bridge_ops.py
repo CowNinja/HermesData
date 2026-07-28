@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Whitelisted local ops for Grok Discord bridge — fixes stack without Hermes narration."""
+"""Whitelisted local ops for Grok Discord bridge ? fixes stack without Hermes narration."""
 from __future__ import annotations
 
 import json
@@ -65,7 +65,7 @@ OPS: dict[str, dict] = {
     },
 }
 
-# Jeff mobile verbs → ops (first match wins)
+# Jeff mobile verbs ? ops (first match wins)
 USER_OP_PATTERNS: list[tuple[re.Pattern[str], list[str]]] = [
     (re.compile(r"\b(?:full\s+)?(?:stack\s+)?health\b|\bhealth\s+check\b|\bstatus\s+check\b", re.I), ["health", "queue_status", "inbox_status"]),
     (re.compile(r"\bqueue\s+status\b|\bfifo\s+status\b|\bmodel\s+queue\b|\bwaiting\s+for\s+model\b", re.I), ["queue_status"]),
@@ -238,19 +238,19 @@ def run_ops(ops: list[str]) -> list[dict]:
 def format_ops_report(results: list[dict]) -> str:
     if not results:
         return ""
-    lines = ["**🔧 Bridge local ops**"]
+    lines = ["**? Bridge local ops**"]
     for r in results:
-        mark = "✅" if r.get("ok") else "🔴"
+        mark = "?" if r.get("ok") else "?"
         op = r.get("op", "?")
         err = r.get("error")
         out = r.get("output")
         if err:
-            lines.append(f"{mark} `{op}` — {err}")
+            lines.append(f"{mark} `{op}` ? {err}")
         elif out:
             snippet = out.replace("\n", " ")[:220]
-            lines.append(f"{mark} `{op}` — {snippet}")
+            lines.append(f"{mark} `{op}` ? {snippet}")
         else:
-            lines.append(f"{mark} `{op}` — done")
+            lines.append(f"{mark} `{op}` ? done")
     return "\n".join(lines)[:1900]
 
 

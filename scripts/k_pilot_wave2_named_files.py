@@ -46,7 +46,7 @@ def main() -> int:
             continue
         out = dest / src.name
         if out.exists():
-            rows.append(f"SKIP exists `{src.name}` → `{dest.relative_to(ROOT)}`")
+            rows.append(f"SKIP exists `{src.name}` ? `{dest.relative_to(ROOT)}`")
             continue
         shutil.copy2(src, out)
         digest = sha256_file(out)
@@ -59,14 +59,14 @@ def main() -> int:
             "mode": "copy_only_broad_domain",
         }
         out.with_suffix(out.suffix + ".meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-        rows.append(f"COPY `{src.name}` → `{dest.relative_to(ROOT)}`")
+        rows.append(f"COPY `{src.name}` ? `{dest.relative_to(ROOT)}`")
 
     RECEIPT.write_text(
         "\n".join(
             [
-                f"# K Pilot Wave 2 — {TS}",
+                f"# K Pilot Wave 2 ? {TS}",
                 "",
-                "Named high-signal files → **broad domains** (open taxonomy).",
+                "Named high-signal files ? **broad domains** (open taxonomy).",
                 "",
                 *([f"- {r}" for r in rows]),
                 "",

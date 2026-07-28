@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interest media catalog-only — DVD/mp4 rips, music libs (not twin training content).
+"""Interest media catalog-only ? DVD/mp4 rips, music libs (not twin training content).
 
 Jeff 2026-07-14: STAR_OF_BETHLEHEM-class media denotes interests; full binary
 is NOT training data. Same policy family as music/ISO catalog-only.
@@ -107,22 +107,22 @@ def catalog_root(root: Path, limit: int = 200_000) -> dict:
 
 def write_vault_note(summaries: list[dict]) -> None:
     lines = [
-        "# Interest media — catalog only (not bulk twin ingest)",
+        "# Interest media ? catalog only (not bulk twin ingest)",
         "",
-        f"**Canonical:** 2026-07-14 · Jeff clarity",
+        f"**Canonical:** 2026-07-14 ? Jeff clarity",
         "",
         "## Policy",
         "- Entertainment media (DVD/mp4 rips, commercial video, music libraries) = **catalog title/path/size only**.",
         "- Denotes **interests**, not training content. Do **not** full-copy into silo for RAG/twin.",
         "- Same family as music + ISO catalog-only.",
         "- **Exceptions (still land):** personal/family recordings, medical/Navy audio, Booksbloom conference mixdowns, journals.",
-        "- STAR_OF_BETHLEHEM (2× mp4) = interest catalog example.",
+        "- STAR_OF_BETHLEHEM (2? mp4) = interest catalog example.",
         "",
         "## Roots",
     ]
     for s in summaries:
         lines.append(
-            f"- `{s.get('root')}` · exists={s.get('exists')} · media={s.get('media_items')} · scanned={s.get('files_scanned')}"
+            f"- `{s.get('root')}` ? exists={s.get('exists')} ? media={s.get('media_items')} ? scanned={s.get('files_scanned')}"
         )
     lines += [
         "",

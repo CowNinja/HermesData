@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harem 7 — partial outfit (crop top + jeans at thighs) with exposed genitals."""
+"""Harem 7 ? partial outfit (crop top + jeans at thighs) with exposed genitals."""
 from __future__ import annotations
 
 import json
@@ -16,7 +16,7 @@ PROMPT = (
     "OOC: series of 7, one of each harem member, camera from behind, on hands and knees, "
     "both hands spreading ass cheeks wide open, exposed pussy and visible asshole, no panties, no underwear. "
     "Wearing ONLY the following: skimpy 1-inch crop tops barely covering nipples; "
-    "tight jeans pulled down and bunched around upper thighs only — "
+    "tight jeans pulled down and bunched around upper thighs only ? "
     "bare ass, bare pussy, and bare asshole fully exposed between crop top and jeans, "
     "jeans must NOT cover crotch or pussy."
 )

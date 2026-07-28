@@ -263,10 +263,10 @@ def main() -> int:
     }
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text(
-        f"# Twin meta stamp — {payload['at']}\n\n"
-        f"Stamped **{stamped}** · skipped already **{skipped}** · scanned {scanned} · "
-        f"offset_skipped {offset_skipped} · already_fast {already_fast} · walked {walked} · "
-        f"k_light unique **{light_n}** · `{LIGHT}`\n\n"
+        f"# Twin meta stamp ? {payload['at']}\n\n"
+        f"Stamped **{stamped}** ? skipped already **{skipped}** ? scanned {scanned} ? "
+        f"offset_skipped {offset_skipped} ? already_fast {already_fast} ? walked {walked} ? "
+        f"k_light unique **{light_n}** ? `{LIGHT}`\n\n"
         f"```json\n{json.dumps(payload, indent=2)}\n```\n",
         encoding="utf-8",
     )

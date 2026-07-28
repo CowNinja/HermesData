@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Silo relevance heuristics — gold vs junk for land + process.
+"""Silo relevance heuristics ? gold vs junk for land + process.
 
 Codifies Jeff 2026-07-13/14 lessons:
   - Booksbloom = parents' business + family PC (TRAINING GOLD), not pure junk
@@ -9,7 +9,7 @@ Codifies Jeff 2026-07-13/14 lessons:
   - Medical / Navy / me / family / business = high score (Med/Navy first process)
   - Entertainment media (DVD/mp4 rips, music libs) = INTEREST catalog only
     (titles denote interests; binary content is NOT twin training data)
-  - Never boost bare "water" — phone autocorrect of WSWTR (Jeff 2026-07-14)
+  - Never boost bare "water" ? phone autocorrect of WSWTR (Jeff 2026-07-14)
 
 Used by: g_to_k_safe_drain, focus_land, OCR scoring, scoreboard.
 """
@@ -58,7 +58,7 @@ JUNK_PATH_SUBSTR = (
     "/local storage/",
     "/session storage/",
     "/shader cache/",
-    # hardware/driver dumps — not twin training
+    # hardware/driver dumps ? not twin training
     "/drivers/",
     "drivermax",
     "windows10_install",
@@ -80,9 +80,9 @@ JUNK_SUFFIXES = {
     ".final",  # firefox session junk
     ".dmp",
     ".etl",
-    ".log",  # bulk logs — catalog later if needed
+    ".log",  # bulk logs ? catalog later if needed
     ".dll",
-    ".exe",  # binaries — catalog-only unless in gold business installer exception
+    ".exe",  # binaries ? catalog-only unless in gold business installer exception
     ".sys",
     ".msi",
 }
@@ -90,7 +90,7 @@ JUNK_SUFFIXES = {
 # Allow .exe/.dll only under explicit business tools? default skip binaries for land
 BINARY_SKIP = {".dll", ".exe", ".sys", ".msi", ".so", ".dylib"}
 
-# Entertainment / interest media — catalog title/path/size only (Jeff 2026-07-14).
+# Entertainment / interest media ? catalog title/path/size only (Jeff 2026-07-14).
 # Like music libraries: denotes interests, content itself is not training data.
 # Exceptions: personal/family recordings, medical audio, Navy/business conference audio.
 ENTERTAINMENT_MEDIA_SUFFIXES = {
@@ -182,7 +182,7 @@ GOLD_KEYS = (
     "keepers of the books",
     "who should we then",
     "who should we then read",
-    # Mom books brand: WSWTR only (Jeff 2026-07-14 — "water" was phone autocorrect of wswtr)
+    # Mom books brand: WSWTR only (Jeff 2026-07-14 ? "water" was phone autocorrect of wswtr)
     "wswtr",
     "wholesale",
     "retail",
@@ -282,7 +282,7 @@ def is_entertainment_media(path: str | Path) -> bool:
     """True when binary media is interest-catalog only (not twin training content).
 
     Jeff 2026-07-14: STAR_OF_BETHLEHEM mp4/DVD-class, music libraries, commercial rips.
-    Titles still denote interests → catalog path/size/name only.
+    Titles still denote interests ? catalog path/size/name only.
     Personal/family/medical/Navy/business recordings still land.
     """
     low = norm(path)
@@ -296,7 +296,7 @@ def is_entertainment_media(path: str | Path) -> bool:
     # Explicit interest-media roots always catalog
     if any(m in low for m in INTEREST_MEDIA_ROOT_MARKERS):
         return True
-    # Commercial-ish video containers without personal markers → catalog
+    # Commercial-ish video containers without personal markers ? catalog
     if suf in {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v", ".mpg", ".mpeg", ".vob"}:
         return True
     # Audio libs / disk images default catalog unless gold marker above
@@ -339,7 +339,7 @@ def gold_score(path: str | Path) -> int:
     for k in GOLD_KEYS:
         if k in low or k in name:
             s += 15
-    # Booksbloom family business + mom books (WSWTR / Keepers) — NOT bare "water"
+    # Booksbloom family business + mom books (WSWTR / Keepers) ? NOT bare "water"
     if "booksbloom" in low or "keepers" in low or "who should we then" in low or "wswtr" in low:
         if any(g in low for g in WEB_GOLD_SUBSTR) or "/documents/" in low or "/desktop/" in low:
             s += 30
@@ -443,7 +443,7 @@ def gold_tier(path: str | Path) -> str:
 
 
 def ocr_priority_boost(path: str | Path) -> int:
-    """Extra OCR score points — text gold up, pure imaging down."""
+    """Extra OCR score points ? text gold up, pure imaging down."""
     tier = gold_tier(path)
     g = gold_score(path)
     if tier == "noise":
@@ -509,11 +509,11 @@ def twin_scopes(path: str | Path) -> list[str]:
     """Which twin/project corpora this file may feed (Jeff 2026-07-18).
 
     Broad land stays on; filtering is at *use* time via metadata, not at land.
-    Scopes are additive — family context can be both jeff_context and mom_twin.
+    Scopes are additive ? family context can be both jeff_context and mom_twin.
     """
     low = norm(path)
     scopes: list[str] = []
-    # Jeff primary twin — medical/navy/me trees
+    # Jeff primary twin ? medical/navy/me trees
     if any(
         k in low
         for k in (
@@ -582,7 +582,7 @@ def twin_scopes(path: str | Path) -> list[str]:
 def train_meta_flags(path: str | Path) -> dict:
     """Flags for .train.md / index: historical graph OK, not live truth.
 
-    Jeff 2026-07-18: multi-twin silo — scopes let later projects select
+    Jeff 2026-07-18: multi-twin silo ? scopes let later projects select
     jeff_twin vs mom_twin vs family_context without re-landing.
     """
     t = temporal_relevance(path)

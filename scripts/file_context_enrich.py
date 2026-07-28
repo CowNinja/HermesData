@@ -97,11 +97,11 @@ def keyword_tags(blob: str) -> list[str]:
     tags = []
     checks = [
         ("genealogy", r"gedmatch|descendant|family tree|line of descent"),
-        ("medical", r"lab|labs|prescription|diagnosis|va rating|pharmacy|adrenal|tbi|healthevet|healthvault|clinvar|mirtazapine|medical"),
-        ("navy", r"navy|navpers|dd-?214|fitrep|navadmin"),
+        ("medical", r"lab|labs|prescription|diagnosis|va rating|pharmacy|adrenal|tbi|healthevet|healthvault|clinvar|mirtazapine|medical"),
+        ("navy", r"navy|navpers|dd-?214|fitrep|navadmin"),
         ("gaming", r"albion|guild|miststanding|warz|lewz|clickmate|nomads of the mist"),
-        ("education", r"transcript|homeschool|lego league|fll|ecpi|course"),
-        ("finance", r"paypal|transaction_download|mortgage|receipt|bank statement"),
+        ("education", r"transcript|homeschool|lego league|fll|ecpi|course"),
+        ("finance", r"paypal|transaction_download|mortgage|receipt|bank statement"),
         ("home_automation", r"hubitat|landroid|iotawatt|skynet"),
     ]
     for tag, patt in checks:

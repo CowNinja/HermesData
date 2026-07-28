@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Monthly Hermes insights → lessons learned note (thin orchestrator feedback).
+"""Monthly Hermes insights ? lessons learned note (thin orchestrator feedback).
 
 Runs `hermes insights` (or uses last cache), extracts top tools/models/platforms,
 writes Operations/logs/insights-lessons-YYYY-MM.md + latest pointer.
@@ -59,7 +59,7 @@ def extract_lessons(text: str) -> dict:
     if "discord" in text.lower():
         lessons.append({
             "signal": "Discord traffic is high-token",
-            "lesson": "Ultra-brief replies + tool budget ≤3 rounds; deep work in vault MD.",
+            "lesson": "Ultra-brief replies + tool budget ?3 rounds; deep work in vault MD.",
             "action": "grok-efficiency-mode skill on Discord sessions.",
         })
     if "grok-build" in text.lower() or "phronesis-sovereign" in text.lower():
@@ -85,12 +85,12 @@ def extract_lessons(text: str) -> dict:
 def render(payload: dict, text_head: str) -> str:
     ym = datetime.now().strftime("%Y-%m")
     lines = [
-        f"# Hermes Insights Lessons — {ym}",
+        f"# Hermes Insights Lessons ? {ym}",
         "",
         f"**Generated:** {payload['ts']}",
         f"**Raw:** `{payload['raw_path']}` ({payload['raw_bytes']} bytes)",
         "",
-        "Purpose: train the Machine (thin orchestrator) from real usage — not silo content.",
+        "Purpose: train the Machine (thin orchestrator) from real usage ? not silo content.",
         "Vision: [[Operations/Autonomy-Pathway-Dreamer-Worker-2026-07-10]]",
         "",
         "## Lessons",

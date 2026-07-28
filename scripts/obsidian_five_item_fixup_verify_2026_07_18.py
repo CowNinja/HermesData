@@ -195,7 +195,7 @@ tags:
 ts: {TS}
 ---
 
-# Obsidian five-item closed-cook — {TS}
+# Obsidian five-item closed-cook ? {TS}
 
 **VAULT_CONFIRMED:** `D:\\\\PhronesisVault`  
 **Obsidian process:** CLOSED (required for workspace stick)  
@@ -207,7 +207,7 @@ ts: {TS}
 | Source | Lesson |
 |--------|--------|
 | Obsidian forum: forced uninstall / disable via JSON | Edit `community-plugins.json` with app **closed** |
-| Forum/Reddit: workspace residual | Disabled plugins leave ghost leaves **and** ribbon `hiddenItems` keys — strip both |
+| Forum/Reddit: workspace residual | Disabled plugins leave ghost leaves **and** ribbon `hiddenItems` keys ? strip both |
 | Smart Connections + large vault | Exclusion-first + archive heavy multi ajson; neighborhoods > galaxy |
 | kepano / tags+Bases | Namespace tags + Bases = agent query surface |
 | Style Settings 1.0.9 | `@settings` needs `variable-color` (already shipped) |
@@ -276,7 +276,7 @@ tags:
   - status/live
 ---
 
-# Obsidian dual-verify — latest (closed-cook {"PASS" if dual_pass else "FAIL"})
+# Obsidian dual-verify ? latest (closed-cook {"PASS" if dual_pass else "FAIL"})
 
 **UTC:** {datetime.now(timezone.utc).isoformat()}  
 **TS:** {TS}
@@ -294,7 +294,7 @@ tags:
 | lint missing | {v2.get("lint_missing")} |
 | Dual PASS | {dual_pass} |
 
-Full: [[Operations/logs/obsidian-five-item-closed-cook-latest]] · [[Setup/Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18]]
+Full: [[Operations/logs/obsidian-five-item-closed-cook-latest]] ? [[Setup/Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18]]
 """
     atomic_write_text(LOGS / "obsidian-dual-verify-latest.md", dual_md)
     payload = {"v1": v1, "v2": v2, "ts": TS, "pass": dual_pass}
@@ -333,7 +333,7 @@ Full: [[Operations/logs/obsidian-five-item-closed-cook-latest]] · [[Setup/Obsid
         ct = charter.read_text(encoding="utf-8")
         if "Five-item closed-cook" not in ct:
             inject = (
-                "\n### Five-item closed-cook 2026-07-18 — DONE\n\n"
+                "\n### Five-item closed-cook 2026-07-18 ? DONE\n\n"
                 "See [[Operations/logs/obsidian-five-item-closed-cook-latest]] "
                 f"(workspace strip, plugin lock, lint missing=0, dual-verify "
                 f"{'PASS' if dual_pass else 'FAIL'}).\n\n"

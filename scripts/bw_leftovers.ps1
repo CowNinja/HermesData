@@ -1,4 +1,4 @@
-# BW leftovers — re-unlock + re-analyze + apply remaining dupes only
+# BW leftovers - re-unlock + re-analyze + apply remaining dupes only
 # Run in the open PowerShell window (non-elevated):
 #   $env:BW_EMAIL='mr.jeffrey.j.bloom@gmail.com'
 #   $env:BW_PASSWORD='***'   # type it; do not save

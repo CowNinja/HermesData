@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Loop v2 lint gate — active coordination files only. Exit 0 + empty stdout = silent cron."""
+"""Loop v2 lint gate - active coordination files only. Exit 0 + empty stdout = silent cron."""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""HermesData entrypoint — delegates to ~/.hermes/scripts/universal_ingest_monitor.py."""
+"""HermesData entrypoint - delegates to ~/.hermes/scripts/universal_ingest_monitor.py."""
 from __future__ import annotations
 
 import runpy

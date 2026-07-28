@@ -130,23 +130,23 @@ def ensure_canon() -> None:
 Research: DLQ, fail-soft, observability, incremental/idempotent loads.
 
 ## Layers
-1. **Land** — drain + hash skip (idempotent)
-2. **Depth** — OCR, harvest, zip/tar eval
-3. **Connect** — graph, PKO, dossiers
-4. **Control** — metrics, DLQ, self-heal, heartbeats
+1. **Land** ? drain + hash skip (idempotent)
+2. **Depth** ? OCR, harvest, zip/tar eval
+3. **Connect** ? graph, PKO, dossiers
+4. **Control** ? metrics, DLQ, self-heal, heartbeats
 
 ## Dead letter queue
-`state/silo_dead_letter_queue.jsonl` — failures that must not block the wave.
-Pattern: retry N → DLQ → continue (never silent drop of important classes).
+`state/silo_dead_letter_queue.jsonl` ? failures that must not block the wave.
+Pattern: retry N ? DLQ ? continue (never silent drop of important classes).
 
 ## Metrics
 `state/silo_autonomy_metrics.json` + `.jsonl` history
 
 ## Heal rules
-- continuous age > 900s → restart aggressive loop
-- OCR queue starved → rediscover (self_heal_monitor)
-- encrypted assets → stage queue (no crack)
-- secrets → path quarantine → BW → purge gate
+- continuous age > 900s ? restart aggressive loop
+- OCR queue starved ? rediscover (self_heal_monitor)
+- encrypted assets ? stage queue (no crack)
+- secrets ? path quarantine ? BW ? purge gate
 
 ## Autonomy checklist (programmatic)
 - [x] three data classes + never roots

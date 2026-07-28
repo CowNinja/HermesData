@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 # Production: Comfy inference :8188, gallery SPA :8189.
-# Gallery returns 200 HTML for /system_stats — must JSON-validate, prefer 8188.
+# Gallery returns 200 HTML for /system_stats ? must JSON-validate, prefer 8188.
 # COMFY_URL env still wins; otherwise probe 8188 then 8189 once at import.
 def _detect_comfy_url() -> str:
     env = (os.environ.get("COMFY_URL") or "").strip()

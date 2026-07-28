@@ -139,7 +139,7 @@ def main() -> int:
     lines = [
         f"# Dossier: {doc['canonical_name']} (`{cid}`)",
         "",
-        f"Roles: {', '.join(doc['roles'] or [])} · Domain: {doc['domain_primary']} · {doc['confidence']}",
+        f"Roles: {', '.join(doc['roles'] or [])} ? Domain: {doc['domain_primary']} ? {doc['confidence']}",
         "",
         "## Active contact",
         "",
@@ -149,13 +149,13 @@ def main() -> int:
     lines.append(f"- phones: {act.get('phone') or []}")
     lines += ["", "## All emails (validity)", ""]
     for h in doc["handles"]["email"]:
-        lines.append(f"- **{h.get('status')}** `{h.get('value')}` · {h.get('confidence')} · {h.get('signals')}")
+        lines.append(f"- **{h.get('status')}** `{h.get('value')}` ? {h.get('confidence')} ? {h.get('signals')}")
     lines += ["", "## All phones (validity)", ""]
     for h in doc["handles"]["phone"]:
-        lines.append(f"- **{h.get('status')}** `{h.get('value')}` · {h.get('confidence')}")
+        lines.append(f"- **{h.get('status')}** `{h.get('value')}` ? {h.get('confidence')}")
     lines += ["", f"## Ledger (last {len(doc['ledger_tail'])} of {doc['ledger_count']})", ""]
     for e in doc["ledger_tail"]:
-        lines.append(f"- {e.get('action')} {e.get('kind')}: `{str(e.get('value'))[:80]}` ← {str(e.get('source'))[:60]}")
+        lines.append(f"- {e.get('action')} {e.get('kind')}: `{str(e.get('value'))[:80]}` ? {str(e.get('source'))[:60]}")
     lines += ["", "## Silo connections", ""]
     for path in (doc.get("silo_links") or {}).get("sample_paths") or []:
         lines.append(f"- `{path}`")
@@ -163,7 +163,7 @@ def main() -> int:
         lines.append(f"- [{h.get('domain')}] `{h.get('path')}`")
     lines += ["", "## Relations", ""]
     for r in doc["relations"]:
-        lines.append(f"- {r.get('type')} → `{r.get('to_id')}`")
+        lines.append(f"- {r.get('type')} ? `{r.get('to_id')}`")
     print("\n".join(lines))
     return 0
 

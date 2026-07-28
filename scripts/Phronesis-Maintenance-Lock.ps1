@@ -108,12 +108,12 @@ function Test-DiscordTurnInFlight {
         }
     }
     if (-not $pendingChat) { return $false }
-    # Hung API call: inbound received but no agent progress for StuckMinutes — allow heal/restart.
+    # Hung API call: inbound received but no agent progress for StuckMinutes - allow heal/restart.
     if ($lastActivityAt -and $lastActivityAt -lt $stuckCutoff) { return $false }
 
     # Ghost turn: inbound from a prior gateway process that died mid-turn never gets
     # "response ready". If gateway process started AFTER the pending inbound, the old
-    # turn is dead — do not block restarts/config reloads (2026-07-17 booksBloom hang).
+    # turn is dead - do not block restarts/config reloads (2026-07-17 booksBloom hang).
     try {
         $gwPort = 8642
         $listener = Get-NetTCPConnection -LocalPort $gwPort -State Listen -ErrorAction SilentlyContinue |
@@ -140,7 +140,7 @@ function Test-PhronesisMaintenanceBlocked {
     $gwListening = [bool](Get-NetTCPConnection -LocalPort $gwPort -State Listen -ErrorAction SilentlyContinue)
 
     # Defer disruptive gateway actions only while a Discord turn is in-flight AND gateway
-    # is still listening. If :8642 is down, never block heal — stale "in flight" after a
+    # is still listening. If :8642 is down, never block heal - stale "in flight" after a
     # silent crash was leaving Discord dead for hours (2026-07-17).
     if ($Action -in @('gateway_restart', 'gateway_stop', 'gateway_heal')) {
         if (-not $gwListening) {
@@ -158,7 +158,7 @@ function Test-PhronesisMaintenanceBlocked {
         return @{ blocked = $false; reason = "" }
     }
 
-    # Hermes venv update window — block all stack respawns (Guardian/Heal/watchdog preflight).
+    # Hermes venv update window - block all stack respawns (Guardian/Heal/watchdog preflight).
     if ($lock.block_stack_heal -or $lock.reason -eq 'hermes_update') {
         if ($Action -in @('stack_heal', 'forkguard', 'gateway_heal', 'gateway_restart', 'gateway_stop')) {
             return @{ blocked = $true; reason = $lock.reason }

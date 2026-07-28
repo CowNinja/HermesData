@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Catalog game ISOs / disk images — do not bulk-ingest into silo."""
+"""Catalog game ISOs / disk images ? do not bulk-ingest into silo."""
 from __future__ import annotations
 
 import json
@@ -57,7 +57,7 @@ def main() -> int:
     (OUT / "catalog_isos_and_disk_images.json").write_text(
         json.dumps(doc, indent=2), encoding="utf-8"
     )
-    lines = [f"# ISO/disk image catalog — {doc['at']}", f"count {len(found)}", ""]
+    lines = [f"# ISO/disk image catalog ? {doc['at']}", f"count {len(found)}", ""]
     for it in found:
         lines.append(f"{it['size_mb']} MB\t{it['path']}")
     (OUT / "catalog_isos_and_disk_images.txt").write_text(

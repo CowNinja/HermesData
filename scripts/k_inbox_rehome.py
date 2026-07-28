@@ -90,7 +90,7 @@ def main() -> int:
             except Exception as e:
                 status = f"ERR {e}"
         else:
-            status = f"would→{dom}"
+            status = f"would?{dom}"
             moved += 1  # count would-move
         rows.append((p.name[:50], dom, status))
         if (moved if args.apply else len(rows)) >= args.limit and args.apply:
@@ -99,7 +99,7 @@ def main() -> int:
             break
 
     lines = [
-        f"# K Inbox re-home — {utc()}",
+        f"# K Inbox re-home ? {utc()}",
         f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'}",
         f"moved/would={moved} skipped={skipped}",
         "",

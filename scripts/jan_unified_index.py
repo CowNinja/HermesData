@@ -6,7 +6,7 @@ Does NOT dump all 76k pilot files into RAG (noise). Merges:
   2) BooksBloom gold text on K (WSWTR/Keepers/author paths, .train.md/.txt with gold keys)
   3) Public context stub
 
-One query → one index → talk_to_jan.py
+One query ? one index ? talk_to_jan.py
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ JAN_CHUNKS = Path(
 UNIFIED = Path(
     r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\Family\Jan-Bloom-Author\chunks\jan_unified_chunks.jsonl"
 )
-# Gold text only — antiword/docx extracts live here (avoid huge Documents rglob).
+# Gold text only ? antiword/docx extracts live here (avoid huge Documents rglob).
 BB_ROOTS = [
     Path(
         r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal\Projects\from-g-drive\Booksbloom\_gold_extracts"
@@ -198,7 +198,7 @@ def vault_pack_rows() -> list[dict]:
     also lets retrieve() surface Hi-Ho Silver / workshop titles / public
     schedule facts when the query is about living/road life.
 
-    author_list packs are multi-chunked on purpose so the gold author→edition
+    author_list packs are multi-chunked on purpose so the gold author?edition
     table is fully retrievable (not truncated to a single stub chunk).
     """
     # path, lane, title, max_read, force_chunk
@@ -241,7 +241,7 @@ def vault_pack_rows() -> list[dict]:
         (
             Path(r"D:\PhronesisVault\Operations\WSWTR-Author-Edition-Table-2026-07-21.md"),
             "author_list",
-            "WSWTR author→edition table (gold only, partial)",
+            "WSWTR author?edition table (gold only, partial)",
             400_000,
             True,
         ),
@@ -279,16 +279,16 @@ def vault_pack_rows() -> list[dict]:
 
 
 def public_stub() -> list[dict]:
-    """Backward-compatible alias — prefer vault_pack_rows(). """
+    """Backward-compatible alias ? prefer vault_pack_rows(). """
     return [r for r in vault_pack_rows() if r.get("lane") == "public"]
 
 
 def _atomic_write_jsonl(path: Path, rows: list[dict]) -> str:
     """Write JSONL without leaving a 0-byte target on crash or Win lock.
 
-    Pattern: write complete .tmp → fsync → replace. On Windows PermissionError
+    Pattern: write complete .tmp ? fsync ? replace. On Windows PermissionError
     (destination briefly locked), fall back to copy2 over the target only after
-    tmp is fully written — never open(target, 'w') first.
+    tmp is fully written ? never open(target, 'w') first.
     """
     import os
     import shutil

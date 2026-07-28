@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Propose recovery plays for Discord/Hermes issues (menu, not monologue).
 
-Research (2026-07-18): SRE option menus / action-control; Draft→Approve→Execute;
+Research (2026-07-18): SRE option menus / action-control; Draft?Approve?Execute;
 silent-green + soft-fail; kill switch outside body. Never auto-executes.
 
 Usage:
@@ -102,7 +102,7 @@ PLAYBOOK: dict[str, dict] = {
                 "label": "Stack snapshot board",
                 "risk": "low",
                 "cmd": r"python D:\HermesData\scripts\stack_snapshot.py",
-                "why": "One board: ports, writers, green — no kill",
+                "why": "One board: ports, writers, green ? no kill",
             },
         ],
         "do_not": [
@@ -403,7 +403,7 @@ PLAYBOOK: dict[str, dict] = {
                 "label": "Escalate judgment",
                 "risk": "low",
                 "cmd": r'python D:\HermesData\scripts\prepare_grok_escalation_brief.py --topic "..."',
-                "why": "Hard architecture → Grok thread with facts",
+                "why": "Hard architecture ? Grok thread with facts",
             },
         ],
         "do_not": ["invent root cause", "gateway kill by default"],
@@ -444,10 +444,10 @@ def build_menu(symptom: str) -> dict:
         "do_not": meta["do_not"],
         "need_from_jeff": "only if HIGH risk or Admin schtask / purge / VW LIVE",
         "discord_format": (
-            "Symptom (measured): …\n"
-            "Options:\nA) …\nB) …\nC) …\n"
-            f"Recommend: {rec} because …\n"
-            "Need from Jeff: …"
+            "Symptom (measured): ?\n"
+            "Options:\nA) ?\nB) ?\nC) ?\n"
+            f"Recommend: {rec} because ?\n"
+            "Need from Jeff: ?"
         ),
         "seal": "propose-recovery-v1",
     }
@@ -462,11 +462,11 @@ def format_human(menu: dict) -> str:
     ]
     for p in menu["options"]:
         lines.append(
-            f"**{p['id']})** {p['label']}  · risk={p['risk']}\n"
+            f"**{p['id']})** {p['label']}  ? risk={p['risk']}\n"
             f"   cmd: `{p['cmd']}`\n"
             f"   why: {p['why']}"
         )
-    lines.append(f"\n**Recommend:** {menu['recommend']} — {menu['recommend_reason']}")
+    lines.append(f"\n**Recommend:** {menu['recommend']} ? {menu['recommend_reason']}")
     lines.append("**Do not:** " + "; ".join(menu["do_not"]))
     lines.append(f"**Need from Jeff:** {menu['need_from_jeff']}")
     return "\n".join(lines)

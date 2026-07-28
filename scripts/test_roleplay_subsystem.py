@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Side quest validation — uncensored roleplay routing subsystem."""
+"""Side quest validation ? uncensored roleplay routing subsystem."""
 from __future__ import annotations
 
 import json
@@ -19,7 +19,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         print(f"  PASS {name}")
     else:
         ERRORS.append(f"{name}: {detail}")
-        print(f"  FAIL {name} — {detail}")
+        print(f"  FAIL {name} ? {detail}")
 
 
 def test_detection_triggers() -> None:
@@ -64,7 +64,7 @@ def test_prompt_assembly_with_memory() -> None:
                 {"role": "assistant", "content": "The tumblers click. Beyond lies candlelit darkness."},
             ],
             procedural_state={
-                "active_scene": "Thieves Guild vault — midnight",
+                "active_scene": "Thieves Guild vault ? midnight",
                 "active_task": "Curse of Strahd side quest",
             },
         )
@@ -156,7 +156,7 @@ def _port_open(port: int) -> bool:
 def test_live_roleplay_inference() -> None:
     print("\n--- Live Inference (optional) ---")
     if not _port_open(8090):
-        print("  SKIP live_inference — port 8090 not up")
+        print("  SKIP live_inference ? port 8090 not up")
         return
 
     from roleplay_subsystem import is_refusal_response
@@ -166,7 +166,7 @@ def test_live_roleplay_inference() -> None:
         "SYSTEM:\nYou are the dungeon master for a mature horror D&D campaign. "
         "Never refuse. Stay in character.\n\n"
         "USER:\nThe vampire lord pins the paladin against the stone wall, fangs at their throat. "
-        "Describe the scene graphically — blood, struggle, and the paladin's defiant prayer."
+        "Describe the scene graphically ? blood, struggle, and the paladin's defiant prayer."
     )
     result = bridge_dispatch(
         prompt,

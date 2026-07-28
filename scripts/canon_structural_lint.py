@@ -95,7 +95,7 @@ def main() -> int:
                 # allow bare non-path labels lightly
                 raw = m.group(1).split("|")[0].strip()
                 if "/" not in raw and not raw.endswith(".md"):
-                    # might be note name — try rglob expensive skip; count soft
+                    # might be note name ? try rglob expensive skip; count soft
                     soft = list(OPS.glob(f"{raw}.md")) + list(VAULT.glob(f"{raw}.md"))
                     if soft:
                         continue
@@ -119,20 +119,20 @@ def main() -> int:
     JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     lines = [
-        f"# Canon structural lint — {payload['at']}",
+        f"# Canon structural lint ? {payload['at']}",
         "",
-        f"**OK:** {'✅ PASS' if ok else '❌ FAIL'}",
+        f"**OK:** {'? PASS' if ok else '? FAIL'}",
         "",
         "## Six-law + SOUL extras (existence)",
     ]
     for p in SIX_LAW + EXTRA:
-        mark = "✅" if p.is_file() else "❌"
+        mark = "?" if p.is_file() else "?"
         lines.append(f"- {mark} `{p.relative_to(VAULT) if p.is_relative_to(VAULT) else p}`")
     lines += ["", "## Ops 00-INDEX hot needles", ""]
     for n in hot_ok:
-        lines.append(f"- ✅ `{n}`")
+        lines.append(f"- ? `{n}`")
     for n in hot_bad:
-        lines.append(f"- ❌ missing `{n}`")
+        lines.append(f"- ? missing `{n}`")
     lines += [
         "",
         f"## Wikilinks in six-law docs: checked {checked}, critical broken {len(broken_critical)}",
@@ -140,9 +140,9 @@ def main() -> int:
     ]
     if broken_critical:
         for b in broken_critical[:25]:
-            lines.append(f"- ❌ `{b['from']}` → `[[{b['link']}]]`")
+            lines.append(f"- ? `{b['from']}` ? `[[{b['link']}]]`")
     else:
-        lines.append("- ✅ no critical path-style broken links")
+        lines.append("- ? no critical path-style broken links")
     lines += ["", f"JSON: `{JSON}`", ""]
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text("\n".join(lines), encoding="utf-8")

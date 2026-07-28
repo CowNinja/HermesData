@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P1 processor: plain text + digital PDF → .train.md sidecar (idempotent).
+"""P1 processor: plain text + digital PDF -> .train.md sidecar (idempotent).
 
 No deletes. Fail soft. Class-agnostic (caller enforces touch policy).
 """

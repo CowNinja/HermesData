@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-local_content_distill.py — Holistic local content distillation pipeline.
+local_content_distill.py ? Holistic local content distillation pipeline.
 
 Universal adapter for any information: wisdom, research, silo ingest, narratives.
-Routes via MoE task_type map (metadata → 8083, synthesis → 8082).
+Routes via MoE task_type map (metadata ? 8083, synthesis ? 8082).
 
 Usage:
   python local_content_distill.py --input path/to/source.md --mode wisdom
@@ -169,7 +169,7 @@ def run_pipeline(
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     out_path = TEMP_DIR / f"content-distill-{sample_name}-{mode}-{ts}.md"
     lines = [
-        f"# Local Content Distill — {sample_name}",
+        f"# Local Content Distill ? {sample_name}",
         f"**Mode:** {mode} | **Time:** {results['timestamp']}",
         "",
     ]

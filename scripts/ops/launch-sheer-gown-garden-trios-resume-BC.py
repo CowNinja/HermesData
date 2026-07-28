@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Resume sheer-gown garden trios — B + C only (A already landed as standard__00763_.png).
+"""Resume sheer-gown garden trios ? B + C only (A already landed as standard__00763_.png).
 
-Same design locks + seeds as launch-sheer-gown-garden-trios.py jobs 2–3.
+Same design locks + seeds as launch-sheer-gown-garden-trios.py jobs 2?3.
 """
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ NEG_EXTRA = (
 TRIOS_BC: list[tuple[list[str], str, str, int]] = [
     (
         ["becca-moreau", "lyra-voss", "chloe-ramirez"],
-        "Trio B Cool light — Becca & Lyra & Chloe — 2/3",
+        "Trio B Cool light ? Becca & Lyra & Chloe ? 2/3",
         (
             "LEFT Becca Moreau: northern Italian Venetian Celtic pale creamy alabaster skin freckles "
             "deep chestnut brown hair, floor-length pearl-white sheer chiffon strapless column gown "
@@ -74,7 +74,7 @@ TRIOS_BC: list[tuple[list[str], str, str, int]] = [
     ),
     (
         ["zara-mehra", "sassy-romano", "amira-khoury"],
-        "Trio C Spice garden — Zara & Sassy & Amira — 3/3",
+        "Trio C Spice garden ? Zara & Sassy & Amira ? 3/3",
         (
             "LEFT Zara Mehra: South Indian Tamil Persian Gulf woman warm honey-brown sun-kissed skin "
             "darkest brown almost black wavy hair deep violet eyes, floor-length saffron-to-amethyst "
@@ -189,7 +189,7 @@ def main() -> int:
         )
         print(f"  job {i+1}/{total}: {label} seed={seed} prompt_len={len(prompt)}")
 
-    print("Queueing variation_loop…")
+    print("Queueing variation_loop?")
     report = run_jobs(jobs, draft=False)
     results = list(report.get("results") or [])
     ok = sum(1 for r in results if (r.get("ok") or r.get("success") or r.get("path") or r.get("png") or r.get("filename")) and not r.get("error"))
@@ -230,7 +230,7 @@ def main() -> int:
         "error": report.get("error"),
     }
     BATCH_SESSION.write_text(json.dumps(session_done, indent=2, default=str), encoding="utf-8")
-    print(f"Done: {ok} ok, {fail} failed — summary {SUMMARY}")
+    print(f"Done: {ok} ok, {fail} failed ? summary {SUMMARY}")
 
     if end_batch_restore:
         try:

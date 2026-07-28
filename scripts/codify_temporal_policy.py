@@ -128,7 +128,7 @@ def main() -> int:
 
     CANON.parent.mkdir(parents=True, exist_ok=True)
     CANON.write_text(
-        f"""# Temporal / Historical Graph Policy (CANONICAL) — 2026-07-14
+        f"""# Temporal / Historical Graph Policy (CANONICAL) ? 2026-07-14
 
 **Jeff:** Outdated docs (old insurance / medical cards for kids & me) are **still excellent
 training and historical graph material**. They may **not** be currently relevant for live answers.
@@ -142,7 +142,7 @@ training and historical graph material**. They may **not** be currently relevant
 
 ## Code
 - `silo_relevance_heuristics.temporal_relevance(path)`
-- `silo_relevance_heuristics.train_meta_flags(path)` → `use_as_current_fact`, `use_as_historical_graph`
+- `silo_relevance_heuristics.train_meta_flags(path)` ? `use_as_current_fact`, `use_as_historical_graph`
 
 ## Config
 `D:/HermesData/config/temporal_document_policy.json`

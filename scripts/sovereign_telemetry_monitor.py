@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-sovereign_telemetry_monitor.py — Self-aware telemetry, auto-triage, zombie protection.
+sovereign_telemetry_monitor.py ? Self-aware telemetry, auto-triage, zombie protection.
 
 Tracks TTFT drift, failure clusters, and thread stalls across procurement + routing loops.
 Autonomously throttles or blacklists degraded providers; force-releases semaphore pool on zombies.
@@ -775,7 +775,7 @@ class SovereignTelemetryMonitor:
                 proc.pop("telemetry_stress_level", None)
                 evt = {
                     "action": "governor_recovery",
-                    "message": "Governor stress cleared — limits restored to baseline",
+                    "message": "Governor stress cleared ? limits restored to baseline",
                     "max_http_per_tick": base_http,
                     "max_concurrent_http": base_conc,
                 }
@@ -965,7 +965,7 @@ def simulate_stalled_provider_test() -> Dict[str, Any]:
         release_cb=_force_release,
     )
 
-    # Simulate stall — sleep past 1.5x window (0.6s)
+    # Simulate stall ? sleep past 1.5x window (0.6s)
     time.sleep(0.75)
     zombie_events = monitor.zombie_guard.scan_zombies()
 

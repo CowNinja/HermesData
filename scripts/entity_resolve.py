@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Entity resolution: exact aliases + fuzzy match for OCR/misspellings/nicknames.
 
-Research patterns: entity resolution / record linkage (Fellegi–Sunter spirit),
+Research patterns: entity resolution / record linkage (Fellegi-Sunter spirit),
 alias tables, Levenshtein/ratio fuzzy match, canonical ID.
 
 Does not auto-merge placeholders into confirmed without high confidence.

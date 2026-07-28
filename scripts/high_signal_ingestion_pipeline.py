@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-high_signal_ingestion_pipeline.py — Feed → sqlite-vec automation (Milestone 2).
+high_signal_ingestion_pipeline.py ? Feed ? sqlite-vec automation (Milestone 2).
 
 Bridges universal_ingest_monitor probes/distills into the sovereign semantic index.
 Dedupes by content_hash; logs to ingestion-vector.jsonl.
@@ -53,7 +53,7 @@ def html_to_text(html: str, *, max_chars: int = 50000) -> str:
 
 
 class HighSignalIngestionPipeline:
-    """Automated high-signal content → hierarchical vector index."""
+    """Automated high-signal content ? hierarchical vector index."""
 
     def __init__(self, engine: Optional[SovereignSemanticEngine] = None):
         self.engine = engine or SovereignSemanticEngine(enable_rerank=False)
@@ -215,7 +215,7 @@ def load_vector_defaults(registry_path: Path = DEFAULT_REGISTRY) -> Dict[str, An
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="High-signal ingestion → vector index")
+    parser = argparse.ArgumentParser(description="High-signal ingestion ? vector index")
     parser.add_argument("--target", required=True)
     parser.add_argument("--source", type=Path, help="Vault source file to index")
     parser.add_argument("--feed-html", type=Path, help="Saved probe HTML")

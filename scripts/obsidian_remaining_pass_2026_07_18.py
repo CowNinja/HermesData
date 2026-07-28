@@ -4,7 +4,7 @@
 - Re-strip Juggl leaves from workspace.json
 - Disable Juggl + Agent Client (keep Copilot quiet but available)
 - Tag 2 missing domain notes
-- Archive .smart-env/multi → backups (force lighter SC rebuild on next open)
+- Archive .smart-env/multi ? backups (force lighter SC rebuild on next open)
 - Dual-verify + print report
 """
 from __future__ import annotations
@@ -108,7 +108,7 @@ def ensure_yaml_tags(path: Path, tags: list[str]) -> bool:
         if re.search(r"(?m)^tags:\s*$", front) or re.search(r"(?m)^tags:\s*\[", front):
             # list form tags:
             if re.search(r"(?m)^tags:\s*\[", front):
-                # inline array — convert gently by appending YAML list after
+                # inline array ? convert gently by appending YAML list after
                 front = re.sub(r"(?m)^tags:\s*\[.*?\]\s*$", "tags:", front)
             # ensure list items
             existing = set(re.findall(r"(?m)^\s*-\s*([^\n#]+)", front))
@@ -142,7 +142,7 @@ def ensure_yaml_tags(path: Path, tags: list[str]) -> bool:
                             count=1,
                         )
                     else:
-                        # find last tag list item under tags — simple append before next top key
+                        # find last tag list item under tags ? simple append before next top key
                         lines = front.splitlines()
                         out = []
                         in_tags = False
@@ -282,7 +282,7 @@ def main() -> int:
         ok = simple_ensure_tags(path, tags)
         log(f"tag_{'updated' if ok else 'unchanged'}={path.relative_to(VAULT)} tags={tags}")
 
-    # 4) archive smart-env multi (large ajson thrash) — move, don't delete
+    # 4) archive smart-env multi (large ajson thrash) ? move, don't delete
     multi = VAULT / ".smart-env" / "multi"
     arch_root = VAULT / "Operations" / "backups" / f"smart-env-multi-{TS}"
     if multi.exists():
@@ -363,7 +363,7 @@ def main() -> int:
     body = "\n".join(f"- {line}" for line in REPORT)
     rep.write_text(
         f"---\ntags:\n  - domain/ops\n  - domain/setup\n  - type/receipt\n  - status/live\ndate: 2026-07-18\n---\n\n"
-        f"# Obsidian remaining pass — {TS}\n\n{body}\n",
+        f"# Obsidian remaining pass ? {TS}\n\n{body}\n",
         encoding="utf-8",
     )
     latest = VAULT / "Operations" / "logs" / "obsidian-remaining-pass-latest.md"

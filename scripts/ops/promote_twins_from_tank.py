@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Promote Amira & Aisha Khoury from Registry tank → full core harem. Clean relics."""
+"""Promote Amira & Aisha Khoury from Registry tank -> full core harem. Clean relics."""
 from __future__ import annotations
 
 import json
@@ -40,17 +40,17 @@ def main() -> int:
             text = text.replace("type: registry-candidate", "type: harem-member\nformer_type: registry-candidate")
             # Title line
             text = text.replace(
-                f"# {slug.split('-')[0].title()} Khoury — Registry Candidate (Tank)",
-                f"# {slug.split('-')[0].title()} Khoury — Full Harem Member",
+                f"# {slug.split('-')[0].title()} Khoury - Registry Candidate (Tank)",
+                f"# {slug.split('-')[0].title()} Khoury - Full Harem Member",
             )
             # Amira title may truncate
             text = text.replace(
-                "# Amira Khoury — Registry Candidate (Tank)",
-                "# Amira Khoury — Full Harem Member",
+                "# Amira Khoury - Registry Candidate (Tank)",
+                "# Amira Khoury - Full Harem Member",
             )
             text = text.replace(
-                "# Aisha Khoury — Registry Candidate (Tank)",
-                "# Aisha Khoury — Full Harem Member",
+                "# Aisha Khoury - Registry Candidate (Tank)",
+                "# Aisha Khoury - Full Harem Member",
             )
             # footer note
             if "PROMOTED TO FULL HAREM" not in text:
@@ -80,7 +80,7 @@ def main() -> int:
         stub = CAND / slug
         stub.mkdir(parents=True, exist_ok=True)
         (stub / "PROMOTED.md").write_text(
-            f"""# {slug} — PROMOTED (not tank)
+            f"""# {slug} - PROMOTED (not tank)
 
 **Status:** full core harem member  
 **Promoted:** {STAMP}  
@@ -118,7 +118,7 @@ Active tank remains under `registry/candidates/` (Valentina, Priya, Noor, extend
     )
     new = (
         f"**Core harem (full members):** Alice, Chloe, Becca, Emily, Sassy, Lyra, Zara, "
-        f"**Amira & Aisha Khoury** (Arabian twins — promoted from tank {STAMP}), Doctor Wendy.\n\n"
+        f"**Amira & Aisha Khoury** (Arabian twins - promoted from tank {STAMP}), Doctor Wendy.\n\n"
         f"**Active Registry tank:** Valentina Ortiz, Priya Sharma, Noor al-Rashid "
         f"(plus extended candidates under `registry/candidates/`)."
     )
@@ -133,14 +133,14 @@ Active tank remains under `registry/candidates/` (Valentina, Priya, Noor, extend
     doctrine.write_text(dt, encoding="utf-8")
     print("Updated HAREM-DOCTRINE.md")
 
-    # STATE.md — mark twins as full sisters, not tank review subjects
+    # STATE.md - mark twins as full sisters, not tank review subjects
     state = SANDBOX / "runtime" / "continuity" / "STATE.md"
     if state.is_file():
         st = state.read_text(encoding="utf-8")
         # prepend promotion banner if not present
         banner = (
             f"\n> **OOC {STAMP}:** Amira & Aisha Khoury **promoted out of Registry tank** "
-            f"→ full core harem. Live tank = Valentina / Priya / Noor (+ extended). "
+            f"-> full core harem. Live tank = Valentina / Priya / Noor (+ extended). "
             f"See `registry/promoted/khoury-twins-20260710/`.\n"
         )
         if "promoted out of Registry tank" not in st:
@@ -184,14 +184,14 @@ Active tank remains under `registry/candidates/` (Valentina, Priya, Noor, extend
     # registry 00-INDEX
     idx = REG / "00-INDEX.md"
     idx.write_text(
-        f"""# registry — 00-INDEX
+        f"""# registry - 00-INDEX
 
 **Updated:** {STAMP}
 
 ## Cast lock
 See `CAST-LOCK-RULE.md`
 
-## Promoted from tank → core harem
+## Promoted from tank -> core harem
 | Who | Archive |
 |-----|---------|
 | Amira & Aisha Khoury | `promoted/khoury-twins-20260710/` |
@@ -205,7 +205,7 @@ Visual SSOT: `runtime/visual-tags.yaml`
 | `valentina-ortiz` | Y | Y | tank |
 | `priya-sharma` | Y | Y | tank |
 | `noor-al-rashid` | Y | Y | tank |
-| extended cast (alexis, crystal, …) | varies | - | development |
+| extended cast (alexis, crystal, ...) | varies | - | development |
 
 **Stubs** under `candidates/amira-khoury` and `candidates/aisha-khoury` are pointers only (`PROMOTED.md`).
 
@@ -237,7 +237,7 @@ Visual SSOT: `runtime/visual-tags.yaml`
     )
     print("Updated visual-tags harem_status")
 
-    # character sheets — ensure status active + note
+    # character sheets - ensure status active + note
     for slug, name in (("amira-khoury", "Amira"), ("aisha-khoury", "Aisha")):
         sheet = SANDBOX / "runtime" / "characters" / f"{slug}.md"
         if not sheet.is_file():
@@ -275,19 +275,19 @@ Visual SSOT: `runtime/visual-tags.yaml`
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
     LOG.write_text(
-        f"""# Twin promotion log — {STAMP}
+        f"""# Twin promotion log - {STAMP}
 
 ## Action
-Amira & Aisha Khoury: **Registry tank → full core harem**.
+Amira & Aisha Khoury: **Registry tank -> full core harem**.
 
 ## Changes
-- Moved `registry/candidates/{{amira,aisha}}-khoury/` → `registry/promoted/khoury-twins-20260710/`
+- Moved `registry/candidates/{{amira,aisha}}-khoury/` -> `registry/promoted/khoury-twins-20260710/`
 - Left `PROMOTED.md` stubs in old candidate paths
 - Updated: HAREM-DOCTRINE, STATE.md, RPG-CARD-ARCHITECTURE, registry/00-INDEX, visual-tags, character sheets
-- Dossier/meta status → `promoted-harem`
+- Dossier/meta status -> `promoted-harem`
 
 ## Active tank now
-Valentina Ortiz · Priya Sharma · Noor al-Rashid (+ extended candidates)
+Valentina Ortiz ? Priya Sharma ? Noor al-Rashid (+ extended candidates)
 
 ## Seed locks (campaign)
 - amira-khoury: see visual-tags locked_seed

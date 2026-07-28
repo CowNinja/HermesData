@@ -1,7 +1,7 @@
 """
-per_step_tier_router.py — Per-step Phronesis MoE model selection for agent tool loops.
+per_step_tier_router.py ? Per-step Phronesis MoE model selection for agent tool loops.
 
-Maps in-flight tool activity to sovereign model aliases (8091 proxy → 8081/8082/8083).
+Maps in-flight tool activity to sovereign model aliases (8091 proxy ? 8081/8082/8083).
 """
 from __future__ import annotations
 
@@ -186,7 +186,7 @@ def model_for_task_kind(task_kind: str, *, default_model: Optional[str] = None) 
 
 
 def resolve_per_step_model(agent: Any, api_messages: List[Dict[str, Any]]) -> Optional[str]:
-    """Unified generalist pivot — no per-step model switching."""
+    """Unified generalist pivot ? no per-step model switching."""
     return None
 
 
@@ -197,7 +197,7 @@ def resolve_subagent_model(
     *,
     default_model: str = MODEL_AUTO,
 ) -> str:
-    """Unified generalist — all subagents use phronesis-sovereign-auto."""
+    """Unified generalist ? all subagents use phronesis-sovereign-auto."""
     explicit = str(explicit_model or "").strip()
     if explicit and explicit.startswith(SOVEREIGN_PREFIX):
         return explicit

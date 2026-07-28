@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Propose domain placement for high-signal test-ingest paths (no moves).
 
-Open taxonomy matching — adaptable. Writes proposal MD only.
+Open taxonomy matching ? adaptable. Writes proposal MD only.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ TI = ROOT / "test-ingest-2026-06-25"
 OUT = Path(r"D:\PhronesisVault\Operations\logs\k-test-ingest-domain-propose-latest.md")
 OUT_JSON = Path(r"D:\HermesData\logs\k-test-ingest-domain-propose-latest.json")
 
-# keyword → broad domain (open list)
+# keyword ? broad domain (open list)
 RULES: list[tuple[str, list[str]]] = [
     ("Medical-Records", [r"medical", r"dental", r"diagnosis", r"prescription", r"bumed", r"med\.navy", r"lab", r"health"]),
     ("Core-Personal/Finance", [r"finance", r"navy.?cash", r"tax", r"1095", r"w-2", r"w2", r"mint", r"bank", r"mastercard", r"navyfederal"]),
@@ -79,12 +79,12 @@ def main() -> int:
     OUT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     lines = [
-        f"# K test-ingest → domain propose — {ts[:10]}",
+        f"# K test-ingest ? domain propose ? {ts[:10]}",
         "",
-        "**Mode:** proposal only — no moves",
+        "**Mode:** proposal only ? no moves",
         f"**Sampled files:** {len(samples)}",
         "",
-        "Open taxonomy matching. Unmatched → `Core-Personal/_Inbox`.",
+        "Open taxonomy matching. Unmatched ? `Core-Personal/_Inbox`.",
         "",
         "## Counts (sample)",
         "| Domain | ~files |",
@@ -103,8 +103,8 @@ def main() -> int:
         "1. Medical-Records (already piloted Diagnosis-History)",
         "2. Core-Personal/Finance (Navy-Cash piloted)",
         "3. Navy-Service highsignal",
-        "4. Digital-Footprint / Gmail exports (large — tranche carefully)",
-        "5. Rest → _Inbox then promote domains if patterns repeat",
+        "4. Digital-Footprint / Gmail exports (large ? tranche carefully)",
+        "5. Rest ? _Inbox then promote domains if patterns repeat",
         "",
         "## Links",
         "- [[Operations/K-Life-Domain-Taxonomy-CANONICAL-2026-07-10]]",

@@ -6,7 +6,7 @@ Obsidian Graph only draws edges from resolvable [[wikilinks]]. This pass:
   2) Appends a ## Vault links footer pointing at parent 00-INDEX + domain hub
   3) Ensures the parent index lists the note as a wikilink (if index exists)
 
-Noise folders (Alice, Roleplay-Sandbox, Archive bulk, etc.) are skipped —
+Noise folders (Alice, Roleplay-Sandbox, Archive bulk, etc.) are skipped ?
 hide those from Graph via .obsidian/app.json userIgnoreFilters instead.
 
 Usage:
@@ -313,10 +313,10 @@ def main() -> int:
     VAULT_LOG.parent.mkdir(parents=True, exist_ok=True)
     mode = "APPLY" if args.apply else "DRY-RUN"
     lines = [
-        f"# Vault Hub Backlink Pass — {payload['ts'][:10]}",
+        f"# Vault Hub Backlink Pass ? {payload['ts'][:10]}",
         "",
-        f"**Mode:** {mode} · **Living orphans (eligible):** {len(orphans)} · **Processed:** {len(targets)}",
-        f"**Notes changed:** {len(changed_notes)} · **Indexes updated:** {len(set(changed_indexes))}",
+        f"**Mode:** {mode} ? **Living orphans (eligible):** {len(orphans)} ? **Processed:** {len(targets)}",
+        f"**Notes changed:** {len(changed_notes)} ? **Indexes updated:** {len(set(changed_indexes))}",
         "",
         "## Sample notes",
         "",
@@ -324,7 +324,7 @@ def main() -> int:
     for s in changed_notes[:40]:
         lines.append(f"- `{s}`")
     if len(changed_notes) > 40:
-        lines.append(f"- … +{len(changed_notes) - 40} more")
+        lines.append(f"- ? +{len(changed_notes) - 40} more")
     lines += [
         "",
         "## Vault links",

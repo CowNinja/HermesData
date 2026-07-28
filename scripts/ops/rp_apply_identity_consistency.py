@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Apply Tier-A character consistency to Roleplay-Sandbox visual-tags.yaml.
 
-- Derive/write identity_lock (face/hair/skin/eyes) per cast — NO fixed expression
+- Derive/write identity_lock (face/hair/skin/eyes) per cast ? NO fixed expression
 - body_lock from body_tags + bust (optional cache field)
 - locked_seed from canonical portrait.meta.json when missing
 - expression stays dynamic via scene text (prompt_compose.expression_layer)
 
-Does NOT freeze faces into one emotion — expression is a separate runtime layer.
+Does NOT freeze faces into one emotion ? expression is a separate runtime layer.
 """
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ def _tokens(text: str) -> list[str]:
 
 
 def derive_identity_lock(entry: dict) -> str:
-    """Stable face/hair/skin/eyes only — never bakes a fixed emotion."""
+    """Stable face/hair/skin/eyes only ? never bakes a fixed emotion."""
     if str(entry.get("identity_lock") or "").strip():
         # Normalize existing if user already set one
         return str(entry["identity_lock"]).strip()
@@ -113,7 +113,7 @@ def derive_identity_lock(entry: dict) -> str:
                 seen.add(key)
                 kept.append(tok)
 
-    # Cap length — identity should be tight
+    # Cap length ? identity should be tight
     kept = kept[:14]
     blob = ", ".join(parts + kept)
     # Weight wrapper applied at compose time; store raw tags here
@@ -123,7 +123,7 @@ def derive_identity_lock(entry: dict) -> str:
 def derive_body_lock(entry: dict) -> str:
     body = str(entry.get("body_tags") or entry.get("tags") or "").strip()
     bust = str(entry.get("bust_emphasis") or "").strip()
-    # Remove pure face-color duplicates lightly — body_lock may still include ethnicity for shape context
+    # Remove pure face-color duplicates lightly ? body_lock may still include ethnicity for shape context
     parts = [body, bust]
     return ", ".join(p for p in parts if p)
 
@@ -164,7 +164,7 @@ def main() -> int:
         "body_weight": 1.12,
         "expression_weight": 1.05,
         "ipadapter_status": (
-            "deferred — Comfy only exposes ImpactIPAdapterApplySEGS; "
+            "deferred ? Comfy only exposes ImpactIPAdapterApplySEGS; "
             "install IPAdapter-Plus or InstantID for true face-ref lock (Tier B)"
         ),
     }

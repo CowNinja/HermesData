@@ -3,7 +3,7 @@
 
 Why this exists (2026-07-17):
   Grok / CI tool shells wrap commands in a Windows Job Object. When the shell
-  exits, *every* descendant is killed — even pythonw with DETACHED_PROCESS —
+  exits, *every* descendant is killed ? even pythonw with DETACHED_PROCESS ?
   unless CREATE_BREAKAWAY_FROM_JOB succeeds (often denied) or the process is
   created via WMI Win32_Process.Create (outside the job).
 

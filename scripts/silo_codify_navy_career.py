@@ -47,12 +47,12 @@ career = {
     "spellings": {
         "STA-21": "Seaman to Admiral-21 (enlisted-to-commissioning)",
         "BOOST": "BOOST program / class (photo 08-05-01 BOOST class photo.jpg in silo)",
-        "NSI": "Naval Science Institute — Officer Training Command Newport (OTCN), RI",
+        "NSI": "Naval Science Institute ? Officer Training Command Newport (OTCN), RI",
         "HRNROTC": "Hampton Roads Naval Reserve Officers Training Corps (at ODU)",
-        "ODU": "Old Dominion University — Electrical Engineering Technology degree path",
+        "ODU": "Old Dominion University ? Electrical Engineering Technology degree path",
         "CVN-65": "USS Enterprise CVN-65",
         "FFG-55": "USS Elrod FFG-55",
-        "NCDOC": "Navy Cyber Defense Operations Command — last command, Suffolk VA area",
+        "NCDOC": "Navy Cyber Defense Operations Command ? last command, Suffolk VA area",
         "RTC": "Recruit Training Command Great Lakes",
     },
     "sequence": [
@@ -68,23 +68,23 @@ career = {
             "id": "USS_Enterprise_CVN65",
             "name": "USS Enterprise (CVN-65)",
             "type": "sea_duty",
-            "silo_hits_note": "Enterprise ~67 · CVN ~23 path hits",
+            "silo_hits_note": "Enterprise ~67 ? CVN ~23 path hits",
         },
         {
             "order": 3,
             "id": "OTC_Newport_STA21",
-            "name": "Officer Training Command Newport — STA-21 (BOOST + NSI)",
+            "name": "Officer Training Command Newport ? STA-21 (BOOST + NSI)",
             "type": "commissioning_pipeline",
             "detail": "Selected Seaman to Admiral (STA-21); attended BOOST and Naval Science Institute at Newport, RI",
-            "silo_hits_note": "STA-21 ~79 · Newport ~595 · NSI many · BOOST class photo 2008-05-01",
+            "silo_hits_note": "STA-21 ~79 ? Newport ~595 ? NSI many ? BOOST class photo 2008-05-01",
         },
         {
             "order": 4,
             "id": "HRNROTC_ODU",
             "name": "HRNROTC at Old Dominion University",
             "type": "nrotc_degree",
-            "detail": "Electrical Engineering Technology degree path; interrupted by car accident → TBI",
-            "silo_hits_note": "HRNROTC ~390 · NROTC ~540 · ODU ~787",
+            "detail": "Electrical Engineering Technology degree path; interrupted by car accident ? TBI",
+            "silo_hits_note": "HRNROTC ~390 ? NROTC ~540 ? ODU ~787",
         },
         {
             "order": 5,
@@ -99,18 +99,18 @@ career = {
             "id": "NCDOC",
             "name": "NCDOC (Navy Cyber Defense Operations Command)",
             "type": "shore_last_command",
-            "detail": "Last command — Suffolk VA area",
+            "detail": "Last command ? Suffolk VA area",
             "silo_hits_note": "NCDOC ~611",
         },
     ],
-    "open_for_dates": "Exact report dates / rates / NEC — fill from LES/orders/eval waves as OCR improves",
+    "open_for_dates": "Exact report dates / rates / NEC ? fill from LES/orders/eval waves as OCR improves",
 }
 
 d["navy_career_arc"] = career
 
 # Orgs
 for can, names, notes, domain in [
-    ("RTC Great Lakes", ["RTC", "RTC Great Lakes", "Great Lakes", "Recruit Training Command"], "Boot camp — Jeff sequence #1", "Navy-Service"),
+    ("RTC Great Lakes", ["RTC", "RTC Great Lakes", "Great Lakes", "Recruit Training Command"], "Boot camp ? Jeff sequence #1", "Navy-Service"),
     ("USS Enterprise CVN-65", ["USS Enterprise", "Enterprise", "CVN-65", "CVN 65", "CVN65"], "Jeff sequence #2 sea duty", "Navy-Service"),
     ("Officer Training Command Newport", ["OTC Newport", "OTCN", "Newport Rhode Island", "Officer Training Command"], "STA-21 BOOST + NSI location", "Navy-Service"),
     ("STA-21", ["STA-21", "STA21", "Seaman to Admiral", "Seaman to Admiral-21"], "Enlisted-to-commissioning program Jeff selected for", "Navy-Service"),
@@ -139,7 +139,7 @@ d["addresses"] = {
             "area": "Norfolk VA condo",
             "approx_purchase": "2008 (Jeff belief)",
             "notes": "Before Suffolk; lived various places before condo",
-            "silo": "condo ~193 · Norfolk ~431",
+            "silo": "condo ~193 ? Norfolk ~431",
         },
         {
             "area": "various pre-condo",
@@ -170,18 +170,18 @@ upsert(people, "LCDR Cann",
 upsert(people, "Christina Barefield",
        names=["Christina Barefield", "Christy Barefield", "Barefield, Christy", "Christina Barefield, OT"],
        domain="Medical-Records", role="occupational_therapist",
-       notes="OT Dec2019–Jan2020 calendar — post-TBI civilian OT (not NMCP PCM era). Photo Barefield, Christy.")
+       notes="OT Dec2019?Jan2020 calendar ? post-TBI civilian OT (not NMCP PCM era). Photo Barefield, Christy.")
 upsert(people, "Marjorie Stevenson",
        names=["Marjorie Stevenson", "Marjorie Stevenson, PT"],
        domain="Medical-Records", role="physical_therapist",
-       notes="PT late 2019–2020 calendar — post-TBI community PT (dates after active NMCP-heavy period).")
+       notes="PT late 2019?2020 calendar ? post-TBI community PT (dates after active NMCP-heavy period).")
 
 # TBI timeline note
 d["tbi_medical_notes"] = {
     "updated": ts,
-    "event": "Car accident during HRNROTC/ODU EET studies → traumatic brain injury",
-    "diagnosis_clinician": "Dr Gregory J. O'Shanick (CNSVA) — also low cortisol identification",
-    "referral_path": "BIAV → O'Shanick",
+    "event": "Car accident during HRNROTC/ODU EET studies ? traumatic brain injury",
+    "diagnosis_clinician": "Dr Gregory J. O'Shanick (CNSVA) ? also low cortisol identification",
+    "referral_path": "BIAV ? O'Shanick",
     "cortisol_silo": "NMCP ER low cortisol Jan 2018; ACTH stim tests; Decadron treatment docs present",
 }
 
@@ -191,17 +191,17 @@ p.write_text(json.dumps(d, indent=2), encoding="utf-8")
 
 # Vault career card
 Path(r"D:\PhronesisVault\Research\Silo-Entities\Navy-Career-Arc.md").write_text(
-    f"""# Navy career arc — Jeffrey Jay Bloom
+    f"""# Navy career arc ? Jeffrey Jay Bloom
 
-_Updated {ts} · Jeff-confirmed sequence + silo corroboration_
+_Updated {ts} ? Jeff-confirmed sequence + silo corroboration_
 
 ## Sequence
-1. **RTC Great Lakes** — boot camp  
+1. **RTC Great Lakes** ? boot camp  
 2. **USS Enterprise (CVN-65)**  
-3. **OTC Newport / STA-21** — **BOOST** + **NSI** (Seaman to Admiral-21 enlisted-to-commissioning)  
-4. **HRNROTC @ ODU** — Electrical Engineering Technology; **car accident → TBI**  
-5. **USS Elrod (FFG-55)** — detailed after ODU interruption  
-6. **NCDOC** — **last command** (Suffolk VA)
+3. **OTC Newport / STA-21** ? **BOOST** + **NSI** (Seaman to Admiral-21 enlisted-to-commissioning)  
+4. **HRNROTC @ ODU** ? Electrical Engineering Technology; **car accident ? TBI**  
+5. **USS Elrod (FFG-55)** ? detailed after ODU interruption  
+6. **NCDOC** ? **last command** (Suffolk VA)
 
 ## Spellings (locked)
 | Term | Meaning |
@@ -229,7 +229,7 @@ _Updated {ts} · Jeff-confirmed sequence + silo corroboration_
 - Current: **103 Whimbrel Drive, Suffolk VA 23435**
 
 ## Open (OCR / records)
-Exact report dates, rates, NECs — harvest from LES/orders/evals as robust re-OCR runs.
+Exact report dates, rates, NECs ? harvest from LES/orders/evals as robust re-OCR runs.
 """,
     encoding="utf-8",
 )

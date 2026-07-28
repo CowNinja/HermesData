@@ -23,19 +23,19 @@ OBS = VAULT / ".obsidian"
 def main() -> None:
     triage = VAULT / "Operations" / "Architecture-Idea-Triage.md"
     text = triage.read_text(encoding="utf-8")
-    marker = "## X harvest — second-brain tooling (2026-07-18)"
+    marker = "## X harvest ? second-brain tooling (2026-07-18)"
     entry = """
 
-## X harvest — second-brain tooling (2026-07-18)
+## X harvest ? second-brain tooling (2026-07-18)
 
-Source filter: Obsidian Style Settings / graph colors / Smart Connections performance (X + plugin ecosystem, 2026). Parking only — no new heavy frameworks.
+Source filter: Obsidian Style Settings / graph colors / Smart Connections performance (X + plugin ecosystem, 2026). Parking only ? no new heavy frameworks.
 
 **Smart Graph neighborhoods over full-vault galaxy**
 Source: Smart Connections / SmartObsidian threads (2026) + large-vault graph reports
 One-sentence: Prefer Smart Graph / local neighborhoods + folder/tag filters over keeping a full-vault force graph open; pipe selected clusters into Smart Context / agent reads.
 Why it fits: Cuts GPU/CPU thrash and attention noise; aligns with our app.json ignores + smart_env exclusions + archived multi reindex.
 Triage: Impact H | Effort L | Time-to-Value Near
-Status: **Integrated (ops pattern)** — Juggl disabled; SC multi archived 2026-07-18; exclusions reinforced. See [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]].
+Status: **Integrated (ops pattern)** ? Juggl disabled; SC multi archived 2026-07-18; exclusions reinforced. See [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]].
 Revisit trigger: If SC rebuild after exclusions is still slow or Jeff re-enables Juggl for a focused use-case.
 Links: [[Setup/Obsidian-Plugin-Streamline-Receipt-2026-07-18]] [[Setup/Obsidian-Category-Colors-and-Tags]]
 
@@ -44,7 +44,7 @@ Source: Style Settings community pattern + core graph.json colorGroups; Iconize 
 One-sentence: Drive explorer/tag/graph color via CSS @settings + graph.json path/tag groups; skip deprecated Iconize.
 Why it fits: Already shipped Phronesis snippet + 50 graph groups; Minimal theme optional only.
 Triage: Impact M | Effort L | Time-to-Value Near
-Status: **Integrated** — Style Settings 1.0.9 on disk; snippet ON.
+Status: **Integrated** ? Style Settings 1.0.9 on disk; snippet ON.
 Revisit trigger: Jeff wants Minimal theme polish pass (aesthetics only).
 Links: [[Setup/Obsidian-Category-Colors-and-Tags]]
 
@@ -72,23 +72,23 @@ Links: [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]]
     stream = VAULT / "Setup" / "Obsidian-Plugin-Streamline-Receipt-2026-07-18.md"
     st = stream.read_text(encoding="utf-8")
     st2 = st.replace(
-        "- [ ] **Live:** REST ports listening — **requires Obsidian reload** (process still holds old plugin memory)",
-        "- [x] **Live:** REST ports listening — verified HTTP+HTTPS 200 after Jeff reload (4.1.7)",
+        "- [ ] **Live:** REST ports listening ? **requires Obsidian reload** (process still holds old plugin memory)",
+        "- [x] **Live:** REST ports listening ? verified HTTP+HTTPS 200 after Jeff reload (4.1.7)",
     )
     old_gate = (
         "## Intentionally not done (Jeff-gated)\n\n"
         "- Disabling Juggl / Copilot / Agent Client entirely\n"
         "- Purging `.smart-env/multi` reindex (large; do only if SC still thrashing after reload)\n"
         "- Rotating Local REST API key (still the existing key on disk)\n"
-        "- Iconize (skipped earlier — deprecated upstream)\n"
+        "- Iconize (skipped earlier ? deprecated upstream)\n"
         "- Mass community plugin updates beyond LRA\n"
     )
     new_gate = (
         "## Intentionally not done (original gate list)\n\n"
-        "- Disabling Juggl / Agent Client — **DONE in post-reload pass** (Copilot kept, quieted)\n"
-        "- Purging `.smart-env/multi` — **DONE** (archived under Operations/backups/smart-env-multi-*)\n"
+        "- Disabling Juggl / Agent Client ? **DONE in post-reload pass** (Copilot kept, quieted)\n"
+        "- Purging `.smart-env/multi` ? **DONE** (archived under Operations/backups/smart-env-multi-*)\n"
         "- Rotating Local REST API key (still the existing key on disk)\n"
-        "- Iconize (skipped earlier — deprecated upstream)\n"
+        "- Iconize (skipped earlier ? deprecated upstream)\n"
         "- Mass community plugin updates beyond LRA\n\n"
         "Follow-on receipt: [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]]\n"
     )
@@ -103,8 +103,8 @@ Links: [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]]
     cat = VAULT / "Setup" / "Obsidian-Category-Colors-and-Tags.md"
     ct = cat.read_text(encoding="utf-8")
     ct2 = ct.replace(
-        "- [ ] Gated batch-tag wave for hot-path missing tags (lint missing≈656 — not auto-applied)",
-        "- [x] Gated batch-tag wave for hot-path — **done** (lint 660/660 missing=0; manifests under Operations/logs/domain-tag-batch-*)",
+        "- [ ] Gated batch-tag wave for hot-path missing tags (lint missing?656 ? not auto-applied)",
+        "- [x] Gated batch-tag wave for hot-path ? **done** (lint 660/660 missing=0; manifests under Operations/logs/domain-tag-batch-*)",
     ).replace(
         "- [ ] Periodic X harvest into [[Operations/Architecture-Idea-Triage]] for second-brain tooling only",
         "- [x] Periodic X harvest into [[Operations/Architecture-Idea-Triage]] (2026-07-18 second-brain tooling block)",
@@ -151,7 +151,7 @@ tags:
   - status/live
 ---
 
-# Obsidian dual-verify — latest
+# Obsidian dual-verify ? latest
 
 **UTC:** {summary['ts']}
 
@@ -186,7 +186,7 @@ Full narrative: [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]]
         if link not in it and link2 not in it:
             it = it.rstrip() + (
                 "\n\n- [[Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]] "
-                "— post-reload remaining pass (Juggl off, SC multi archived, tags 660/660)\n"
+                "? post-reload remaining pass (Juggl off, SC multi archived, tags 660/660)\n"
             )
             idx.write_text(it, encoding="utf-8")
             print("setup_index_appended", idx)
@@ -200,7 +200,7 @@ Full narrative: [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]]
         needle = "Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18"
         if needle not in ht:
             line = (
-                f"\n- 2026-07-18: Obsidian post-reload pass — Juggl/Agent Client off, "
+                f"\n- 2026-07-18: Obsidian post-reload pass ? Juggl/Agent Client off, "
                 f"SC multi archived (~205MB), domain tags 660/660, REST 4.1.7 live. "
                 f"[[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]]\n"
             )

@@ -1,6 +1,6 @@
 # Hybrid warm mode: Qwythos + ComfyUI both resident on 12GB GPU + 128GB RAM.
 # Text stays usable (reduced n_gpu_layers); Comfy uses ram_prefer (novram) staging.
-# RAM hot-load: both stacks mmap/stage weights in system RAM — GPU swaps are faster than cold disk.
+# RAM hot-load: both stacks mmap/stage weights in system RAM - GPU swaps are faster than cold disk.
 #
 # Usage:
 #   powershell -File Phronesis-Hybrid-Warm-Mode.ps1 -Mode On

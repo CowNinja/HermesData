@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Autonomous OCR backlog worker — $0 Grok.
+"""Autonomous OCR backlog worker ? $0 Grok.
 
-Industry pattern: land raw → parse → quality gate → reprocess queue → catalog.
-Never blocks G→K drain. Prioritizes Navy/Medical PDFs; skips portraits.
+Industry pattern: land raw ? parse ? quality gate ? reprocess queue ? catalog.
+Never blocks G?K drain. Prioritizes Navy/Medical PDFs; skips portraits.
 """
 from __future__ import annotations
 
@@ -27,13 +27,13 @@ PRIORITY_KEYS = (
     "separation", "oshanick", "nmcp", "vamc", "tricare", "dd214", "page 13",
 )
 MAX_OCR_ATTEMPTS = 4
-# Gold medical/Navy (score>=500) gets extra retries — short-temp poppler + fat-promote
+# Gold medical/Navy (score>=500) gets extra retries ? short-temp poppler + fat-promote
 # were hanging the final tail when attempts hit 4 with chars still 0.
 MAX_OCR_ATTEMPTS_GOLD = 12
 # 2026-07-26: per-file hard cap so one fat PDF cannot hang the whole tick
 # (Celery soft_time_limit pattern; OCRmyPDF batch isolation).
 PER_FILE_TIMEOUT_S = 90
-# Worker wall under orch 480s slot — exit clean with partial progress (Celery soft limit).
+# Worker wall under orch 480s slot ? exit clean with partial progress (Celery soft limit).
 WORKER_WALL_S = 420
 SKIP_RE = re.compile(r"(logo|icon|wallpaper|screenshot|_00\.jpg|cnsva\.jpg)", re.I)
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".webp"}
@@ -49,7 +49,7 @@ def _process_one_timed(mod: Any, p: Path, tess: str, max_p: int, timeout_s: int 
     def _target() -> None:
         try:
             box["rec"] = mod.process_one(p, tess, True, max_p)
-        except Exception as e:  # noqa: BLE001 — surface to caller path
+        except Exception as e:  # noqa: BLE001 ? surface to caller path
             box["err"] = e
 
     t = threading.Thread(target=_target, name=f"ocr-one-{p.name[:24]}", daemon=True)
@@ -135,7 +135,7 @@ def score(p: Path) -> int:
         s += 60
     if any(k in low for k in ("dna", "genome", "23andme", "ancestry", "labcorp", "quest")):
         s += 55
-    # 2026-07-26 SSOT park: neuroimaging / chrome / stock — not twin-OCR yield
+    # 2026-07-26 SSOT park: neuroimaging / chrome / stock ? not twin-OCR yield
     try:
         from ocr_park_patterns import is_ocr_park_path
 
@@ -161,7 +161,7 @@ def score(p: Path) -> int:
     if any(k in name for k in ("mri", "segmentation", "dicom")) and "note" not in name:
         s -= 15
     if p.suffix.lower() in {".dcm", ".nii", ".nrrd"}:
-        s -= 50  # archive imaging — not OCR queue priority (2026-07-13)
+        s -= 50  # archive imaging ? not OCR queue priority (2026-07-13)
     if "navy" in low or "medical" in low:
         s += 25
     for k in PRIORITY_KEYS:
@@ -236,7 +236,7 @@ def update_registry_process(path: str, status: str, chars: int) -> None:
         if not row:
             con.close()
             return
-        # ok_text → extracted; terminal non-yield → catalog_only so gold_requeue
+        # ok_text ? extracted; terminal non-yield ? catalog_only so gold_requeue
         # stops selecting ocr_queued/ocr_failed forever (2026-07-26 glass-lesion loop).
         new = None
         if status == "ok_text" and (chars or 0) > 80:
@@ -414,7 +414,7 @@ def main() -> int:
             )
             continue
         # Pre-OCR park/portrait gate (no tesseract burn).
-        # IMPORTANT: do not force attempts=1 into should_terminal_thin_image —
+        # IMPORTANT: do not force attempts=1 into should_terminal_thin_image ?
         # that would retire never-tried document scans.
         try:
             from ocr_park_patterns import should_terminal_thin_image, is_ocr_park_path
@@ -450,7 +450,7 @@ def main() -> int:
         try:
             # Medical/Navy scans: more pages; cheap first for others
             max_p = 12 if any(k in str(p).lower() for k in ('medical', 'navy', 'nmcp', 'vamc')) else 6
-            # Wall-clock isolation — hang on one PDF must not kill the tick
+            # Wall-clock isolation ? hang on one PDF must not kill the tick
             rec = _process_one_timed(mod, p, tess, max_p, PER_FILE_TIMEOUT_S)
             if rec.get("error") == f"per_file_timeout_{PER_FILE_TIMEOUT_S}s":
                 con.execute(
@@ -554,9 +554,9 @@ def main() -> int:
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# OCR backlog worker — {utc()}",
+        f"# OCR backlog worker ? {utc()}",
         "",
-        f"processed **{len(results)}** · queue remaining **{queued2}** · ok_text **{done2}** · terminalized_pre **{terminalized}**",
+        f"processed **{len(results)}** ? queue remaining **{queued2}** ? ok_text **{done2}** ? terminalized_pre **{terminalized}**",
         f"wall_hit={wall_hit} wall_s={args.wall_s}",
         "",
     ]

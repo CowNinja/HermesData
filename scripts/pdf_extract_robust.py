@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Robust PDF text extraction for training — fail-soft with quality flags.
+"""Robust PDF text extraction for training ? fail-soft with quality flags.
 
 Strategies (in order):
 1) pypdf extract
@@ -96,7 +96,7 @@ def process(path: Path, write_train: bool = True) -> dict:
         train.write_text(body, encoding="utf-8")
         rec["train_md"] = str(train)
     if q["status"] in {"needs_ocr", "low_quality_text"}:
-        # marker only — OCR engine later
+        # marker only ? OCR engine later
         flag = Path(str(path) + ".needs_ocr")
         flag.write_text(
             f"needs_ocr\nreason={q['reason']}\nsize={size}\nat={utc()}\n",

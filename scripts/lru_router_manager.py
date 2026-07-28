@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-lru_router_manager.py — Fuzzy context-aware LRU coordination for port 8090.
+lru_router_manager.py ? Fuzzy context-aware LRU coordination for port 8090.
 
 Phronesis MoE unified router: preload hints, activity pinning, idle-aware eviction.
-Designed for 128GB RAM — tend toward keeping models warm during active work,
+Designed for 128GB RAM ? tend toward keeping models warm during active work,
 soft unload only when idle and memory pressure warrants it.
 """
 from __future__ import annotations
@@ -30,17 +30,17 @@ _DEFAULT_PINNED = ("qwen2-5-7b",)
 _KEEPALIVE_THREAD: Optional[threading.Thread] = None
 _KEEPALIVE_STOP = threading.Event()
 
-# Legacy dotted aliases from early pivot configs → models.ini section ids (hyphens)
+# Legacy dotted aliases from early pivot configs ? models.ini section ids (hyphens)
 _LOGICAL_MODEL_ALIASES: Dict[str, str] = {
     "llama-3.1-8b-abliterated": "DEFAULT",
     "llama-3.1-8b": "llama-3-1-8b",
     "qwen2.5-coder-14b-abliterated": "DEFAULT",
-    "qwen2-5-7b": "DEFAULT",      # legacy dotted id → router DEFAULT profile
+    "qwen2-5-7b": "DEFAULT",      # legacy dotted id ? router DEFAULT profile
     "qwen2-5-14b": "qwen25-14b-q5",
     "qwen2-5-3b": "qwen25-3b",
 }
 
-# Tier → preset logical model id (models.ini sections)
+# Tier ? preset logical model id (models.ini sections)
 # "DEFAULT" = whatever the [DEFAULT] section in models-8090.ini points to (currently qwen25-7b-q4)
 _UNIFIED_LOGICAL = "DEFAULT"
 MODELS_INI_PATH = Path(r"D:\PhronesisVault\Operations\models-8090.ini")
@@ -64,7 +64,7 @@ TIER_LOGICAL_MODELS: Dict[str, str] = {
     "code": "qwen25-coder-14b-q4",
 }
 
-# Single-model pivot — no neighbor preloads
+# Single-model pivot ? no neighbor preloads
 TIER_PRELOAD_NEIGHBORS: Dict[str, List[str]] = {}
 
 # Fuzzy thresholds (seconds)
@@ -251,9 +251,9 @@ def gateway_or_workspace_active() -> bool:
 def activity_profile() -> str:
     """
     Fuzzy activity bucket:
-      active_project — recent dispatches or gateway up
-      idle_soft      — no dispatch 15–60 min
-      deep_idle      — no dispatch > 1 hr and no gateway
+      active_project ? recent dispatches or gateway up
+      idle_soft      ? no dispatch 15?60 min
+      deep_idle      ? no dispatch > 1 hr and no gateway
     """
     since = seconds_since_last_dispatch()
     if since < ACTIVE_SESSION_SEC or gateway_or_workspace_active():
@@ -264,7 +264,7 @@ def activity_profile() -> str:
 
 
 def recommended_models_max() -> int:
-    """LRU slot count — pinned models are never evicted below models_max_floor.
+    """LRU slot count ? pinned models are never evicted below models_max_floor.
     Also factors in GPU memory pressure (KV-cache-aware eviction)."""
     cfg = load_pin_config()
     pinned = get_pinned_logical_models()
@@ -326,7 +326,7 @@ def _gpu_memory_pressure() -> str:
 
 
 def recommended_sleep_idle_seconds() -> int:
-    """llama-server --sleep-idle-seconds — long during projects, shorter when away."""
+    """llama-server --sleep-idle-seconds ? long during projects, shorter when away."""
     profile = activity_profile()
     if profile == "active_project":
         return 0  # disable aggressive idle unload mid-project
@@ -446,7 +446,7 @@ def send_preload_hints(
     async_mode: bool = True,
     port: int = UNIFIED_PORT,
 ) -> Dict[str, Any]:
-    """Warm LRU slots before main dispatch — reduces swap TTFT."""
+    """Warm LRU slots before main dispatch ? reduces swap TTFT."""
     if not unified_router_up():
         return {"ok": False, "reason": "8090_down", "hints": []}
 
@@ -553,7 +553,7 @@ def vram_pin_telemetry(port: int = UNIFIED_PORT) -> Dict[str, Any]:
 
 
 def pin_startup_warm(*, port: int = UNIFIED_PORT, async_mode: bool = False) -> Dict[str, Any]:
-    """Load all pinned models at router boot — Rocinante always-on."""
+    """Load all pinned models at router boot ? Rocinante always-on."""
     pinned = get_pinned_logical_models()
     if not pinned:
         return {"ok": False, "reason": "no_pinned_models"}
@@ -567,7 +567,7 @@ def pin_startup_warm(*, port: int = UNIFIED_PORT, async_mode: bool = False) -> D
 
 
 def ensure_pinned_resident(*, port: int = UNIFIED_PORT) -> Dict[str, Any]:
-    """Re-warm any pinned model that fell out of LRU — idempotent keepalive tick."""
+    """Re-warm any pinned model that fell out of LRU ? idempotent keepalive tick."""
     tel = vram_pin_telemetry(port)
     missing = tel.get("pinned_missing") or []
     if not missing:
@@ -580,7 +580,7 @@ def ensure_pinned_resident(*, port: int = UNIFIED_PORT) -> Dict[str, Any]:
 def swap_kv_cache(from_model: str, to_model: str, *, port: int = UNIFIED_PORT) -> Dict[str, Any]:
     """Hot-swap KV cache between models to preserve context continuity.
     
-    When rotating models (e.g. 7B → 14B), this attempts to transfer
+    When rotating models (e.g. 7B ? 14B), this attempts to transfer
     the KV cache so the new model inherits the conversation context
     without a cold-start penalty. Requires llama-server with --cache-save enabled.
     """
@@ -650,7 +650,7 @@ def swap_kv_cache(from_model: str, to_model: str, *, port: int = UNIFIED_PORT) -
 
 
 def start_pin_keepalive(*, interval_sec: Optional[int] = None, port: int = UNIFIED_PORT) -> Dict[str, Any]:
-    """Background daemon — periodic pinned-model residency checks."""
+    """Background daemon ? periodic pinned-model residency checks."""
     global _KEEPALIVE_THREAD
     cfg = load_pin_config()
     interval = int(interval_sec or cfg.get("keepalive_interval_sec") or 300)

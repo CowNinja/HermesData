@@ -20,7 +20,7 @@ def main() -> int:
             ]
             rows.append((c.name, flags))
     lines = [
-        "# registry — 00-INDEX",
+        "# registry - 00-INDEX",
         "",
         f"**Updated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d')}",
         "",

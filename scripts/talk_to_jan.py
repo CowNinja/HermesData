@@ -60,17 +60,17 @@ def load_public() -> str:
     authors = Path(r"D:\PhronesisVault\Operations\WSWTR-Author-List-Extract-2026-07-19.md")
     if authors.exists():
         bits.append(
-            "WSWTR AUTHOR LIST EXTRACT (gold only, PARTIAL — not full 157; never invent missing names):\n"
+            "WSWTR AUTHOR LIST EXTRACT (gold only, PARTIAL ? not full 157; never invent missing names):\n"
             + authors.read_text(encoding="utf-8", errors="ignore")[:5000]
         )
     edition = Path(
         r"D:\PhronesisVault\Operations\WSWTR-Author-Edition-Table-2026-07-21.md"
     )
     if edition.exists():
-        # Prefer policy + edition facts + counts; full A–Z lives in author_list lane chunks
+        # Prefer policy + edition facts + counts; full A?Z lives in author_list lane chunks
         ed_txt = edition.read_text(encoding="utf-8", errors="ignore")
         bits.append(
-            "WSWTR AUTHOR→EDITION TABLE (gold only, PARTIAL — edition labels from source files; never pad to 157):\n"
+            "WSWTR AUTHOR?EDITION TABLE (gold only, PARTIAL ? edition labels from source files; never pad to 157):\n"
             + ed_txt[:6500]
         )
     return "\n\n".join(bits)
@@ -150,7 +150,7 @@ def llm_answer(query: str, hits: list[dict]) -> str | None:
         + "\n\n## Grounding rules (mandatory)\n"
         "1. Answer ONLY from retrieved SOURCE blocks + clearly labeled family living facts.\n"
         "2. If the sources do not support an answer, say you do not have it on the shelf yet.\n"
-        "3. Cite as (Source N — filename). Do not invent source numbers or titles.\n"
+        "3. Cite as (Source N ? filename). Do not invent source numbers or titles.\n"
         "4. Warm librarian tone. First person Hermes. Never claim to be Jan or Jeff.\n"
         "5. Gary in corpus; Daddy only when reflecting family voice.\n"
         "6. Prefer short quotes from sources over paraphrased invention.\n"
@@ -158,7 +158,7 @@ def llm_answer(query: str, hits: list[dict]) -> str | None:
     user = (
         f"Family question:\n{query}\n\n"
         f"Retrieved corpus passages:\n{ctx}\n\n"
-        "Write a delightful, citable curator reply (2–5 short paragraphs). "
+        "Write a delightful, citable curator reply (2?5 short paragraphs). "
         "If unsupported, refuse honestly."
     )
     body = {
@@ -187,9 +187,9 @@ def llm_answer(query: str, hits: list[dict]) -> str | None:
 def heuristic_answer(query: str, hits: list[dict]) -> str:
     if not hits:
         return (
-            "I don’t have strong hits in Jan’s extracted shelves for that yet. "
+            "I don?t have strong hits in Jan?s extracted shelves for that yet. "
             "Try WSWTR, Keepers, thrift stores, dedications, road/bookstores, or living books. "
-            "(Hermes, curator — not Jan.)"
+            "(Hermes, curator ? not Jan.)"
         )
     qwords = set(re.findall(r"[a-z']{3,}", query.lower()))
     bullets = []
@@ -207,13 +207,13 @@ def heuristic_answer(query: str, hits: list[dict]) -> str:
         if not best:
             best = t[:280].strip()
         src = Path(h.get("source") or h.get("file") or f"chunk{i}").name
-        bullets.append(f"- (Source {i} — {src}) {best}")
+        bullets.append(f"- (Source {i} ? {src}) {best}")
 
     return (
-        "From Jan Bloom’s pages on the family shelf, here’s what I can hold up for you:\n\n"
+        "From Jan Bloom?s pages on the family shelf, here?s what I can hold up for you:\n\n"
         + "\n".join(bullets)
-        + "\n\nI’m Hermes, keeping her library lights on—not speaking *as* her, but *from* her work. "
-        "Ask another question and we’ll walk more shelves."
+        + "\n\nI?m Hermes, keeping her library lights on?not speaking *as* her, but *from* her work. "
+        "Ask another question and we?ll walk more shelves."
     )
 
 
@@ -224,15 +224,15 @@ def format_reply(
     for i, h in enumerate(hits, 1):
         src = h.get("source") or h.get("file")
         lane = h.get("lane") or ""
-        cites.append(f"{i}. `{src}`" + (f" · _{lane}_" if lane else ""))
+        cites.append(f"{i}. `{src}`" + (f" ? _{lane}_" if lane else ""))
     warn = ""
     if ground.get("score", 1) < 0.12 and hits:
         warn = (
-            "\n\n_Groundedness check low — treat claims carefully; prefer the citations below._"
+            "\n\n_Groundedness check low ? treat claims carefully; prefer the citations below._"
         )
     return "\n".join(
         [
-            "# Jan’s Library — Hermes curator",
+            "# Jan?s Library ? Hermes curator",
             "",
             f"**Question:** {query}",
             f"**Mode:** {mode}",

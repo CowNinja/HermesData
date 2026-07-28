@@ -91,11 +91,11 @@ def main() -> int:
         dirs = [p for p in kids if p.is_dir() and p.name not in SKIP]
         rel = str(d.relative_to(VAULT)).replace("\\", "/")
         lines = [
-            f"# {d.name} — INDEX",
+            f"# {d.name} ? INDEX",
             "",
             f"**Path:** `{rel}`  ",
             f"**Updated:** {TS}  ",
-            f"**Counts:** {len(dirs)} dirs · {len(files)} files",
+            f"**Counts:** {len(dirs)} dirs ? {len(files)} files",
             "",
             "## Purpose",
             "Folder map for agent navigation. Read this before scanning all files.",

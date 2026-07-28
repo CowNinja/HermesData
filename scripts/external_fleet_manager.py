@@ -262,7 +262,7 @@ class FleetManager:
         """Persist health map + reconcile enabled_ids from live registry.
 
         Disabled providers may remain in providers{} history for forensics, but
-        enabled_ids must never list them — stale disabled last_check poisoned
+        enabled_ids must never list them - stale disabled last_check poisoned
         operator reads (YELLOW "stale") even when stack_snapshot filters ages.
         """
         HEALTH_STATE.parent.mkdir(parents=True, exist_ok=True)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Music catalog-only — do NOT bulk-ingest MP3 libraries.
+"""Music catalog-only ? do NOT bulk-ingest MP3 libraries.
 
 Jeff 2026-07-13: one manifest of songs, not full silo of music.
 Suno AI library = future side quest (pin).
@@ -83,7 +83,7 @@ def main() -> int:
         out.write_text(json.dumps(cat, indent=2), encoding="utf-8")
         # lightweight text index for twin
         txt = OUT_DIR / f"catalog_{name}.txt"
-        lines = [f"# Music catalog — {root}", f"at {utc()}", f"audio_tracks {cat.get('audio_tracks')}", ""]
+        lines = [f"# Music catalog ? {root}", f"at {utc()}", f"audio_tracks {cat.get('audio_tracks')}", ""]
         for t in cat.get("tracks_sample_or_all") or []:
             lines.append(t.get("rel") or t.get("name"))
             all_titles.append(t.get("name") or "")
@@ -111,7 +111,7 @@ Suno AI library = interesting later; pin side quest (account + songwriting).
 |---------|------------------------|
 | Single catalog JSON/TXT on K | Bulk `.mp3/.flac` libraries |
 | Suno exports when found (future) | `G:\\Old_music`, `Music RIP`, kids music as full copy |
-| Medical imaging / DNA / docs | — |
+| Medical imaging / DNA / docs | ? |
 
 ## Catalog location
 `K:/Phronesis-Sovereign/Personal-Digital-Silo/Core-Personal/Life-Archive/from-g-drive/_music_catalogs/`

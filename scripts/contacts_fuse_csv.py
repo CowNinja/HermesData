@@ -158,7 +158,7 @@ def merge_into_person(p: dict, data: dict, source: str) -> List[str]:
     changes = []
     handles = p.get("handles")
     if not isinstance(handles, dict):
-        # normalize list-of-handle-dicts → dict shape
+        # normalize list-of-handle-dicts ? dict shape
         emails = iter_emails(handles)
         phones: List[str] = []
         if isinstance(handles, list):
@@ -325,11 +325,11 @@ def main() -> int:
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Contacts CSV fuse — {utc()}",
+        f"# Contacts CSV fuse ? {utc()}",
         "",
         f"**CSV:** `{path.name}`",
         f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'}",
-        f"**Matched/enriched:** {matched} · **Created:** {created} · **Skipped:** {skipped}",
+        f"**Matched/enriched:** {matched} ? **Created:** {created} ? **Skipped:** {skipped}",
         f"**People total:** {len(people)}",
         "",
         "## Examples",

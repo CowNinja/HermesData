@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Dead-letter queue for G→K drain failures (ETL best practice).
+"""Dead-letter queue for G?K drain failures (ETL best practice).
 
-Failed items land in SQLite + optional quarantine note — pipeline keeps moving.
+Failed items land in SQLite + optional quarantine note ? pipeline keeps moving.
 Retry later without blocking the main wave.
 """
 from __future__ import annotations
@@ -86,7 +86,7 @@ def write_receipt() -> None:
     st = stats()
     rows = list_open(30)
     lines = [
-        f"# Drain DLQ — {utc()}",
+        f"# Drain DLQ ? {utc()}",
         "",
         f"**Open:** {st['open']} / {st['total']}",
         "",

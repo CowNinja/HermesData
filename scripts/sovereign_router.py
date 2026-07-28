@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-DEPRECATED — Legacy Ollama router (phi3:mini / qwen2.5:14b @ :11434).
+DEPRECATED ? Legacy Ollama router (phi3:mini / qwen2.5:14b @ :11434).
 
 Canonical sovereign path (2026-07+):
   Hermes Gateway :8642 -> Sovereign Proxy :8091 -> llama-server :8090 (Qwythos)
 
 Use sovereign_openai_proxy.py + router_bridge.py for agent chat.
-Ollama :11434 is embeddings/vision aux only — not the sovereign brain.
+Ollama :11434 is embeddings/vision aux only ? not the sovereign brain.
 
 This module remains for router_bridge fallback and historical tests only.
 New code must not import dispatch() for agent paths.

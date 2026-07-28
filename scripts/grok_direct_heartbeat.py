@@ -112,13 +112,13 @@ def due(interval_h: float, state: dict, force: bool) -> bool:
 
 
 def build_tldr(bridge: dict, xai: bool, pending: int) -> str:
-    emoji = "🟢" if bridge.get("alive") and xai else "🟡"
+    emoji = "?" if bridge.get("alive") and xai else "?"
     lines = [
         f"{emoji} Grok-direct travel heartbeat",
         f"bridge={'alive' if bridge.get('alive') else 'DOWN'} pid={bridge.get('pid')} | xAI={'OK' if xai else 'FAIL'}",
         f"last_reply={bridge.get('last_reply_age')} | inbox_pending={pending}",
         "vault: docs/agent-coordination/GROK-HERMES-MASTER-PLAN.md",
-        "⏭️ next: post in Jeff ↔ Grok direct thread for planning",
+        "?? next: post in Jeff ? Grok direct thread for planning",
     ]
     return "\n".join(lines[:6])
 

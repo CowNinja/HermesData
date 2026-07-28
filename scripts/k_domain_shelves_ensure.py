@@ -13,7 +13,7 @@ ROOT = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
 VAULT_RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\k-domain-shelves-ensure-latest.md")
 TAXONOMY = Path(r"D:\PhronesisVault\Operations\K-Life-Domain-Taxonomy-CANONICAL-2026-07-10.md")
 
-# Open starter list — adaptable; new broad domains may be added later
+# Open starter list ? adaptable; new broad domains may be added later
 SHELVES = [
     ROOT / "Medical-Records",
     ROOT / "Core-Personal" / "Finance",
@@ -34,7 +34,7 @@ def write_index(d: Path, ts: str) -> None:
     rel = d.relative_to(ROOT) if d.is_relative_to(ROOT) else d
     kids = sorted(p.name for p in d.iterdir() if p.name != "00-INDEX.md") if d.is_dir() else []
     lines = [
-        f"# {d.name} — INDEX",
+        f"# {d.name} ? INDEX",
         "",
         f"**Path:** `{rel}`",
         f"**Updated:** {ts}",
@@ -44,8 +44,8 @@ def write_index(d: Path, ts: str) -> None:
         "",
         "## Contents",
     ]
-    lines += [f"- `{k}`" for k in kids] if kids else ["- (empty — ready for ingest)"]
-    lines += ["", "## Rules", "- Prefer this shelf over new micro-folders", "- Unsure → `Core-Personal/_Inbox` or test-ingest", ""]
+    lines += [f"- `{k}`" for k in kids] if kids else ["- (empty ? ready for ingest)"]
+    lines += ["", "## Rules", "- Prefer this shelf over new micro-folders", "- Unsure ? `Core-Personal/_Inbox` or test-ingest", ""]
     (d / "00-INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -63,13 +63,13 @@ def main() -> int:
     (ROOT / "00-INDEX.md").write_text(
         "\n".join(
             [
-                "# Personal-Digital-Silo — INDEX",
+                "# Personal-Digital-Silo ? INDEX",
                 "",
-                "**World 3** · centralized life / digital footprint SSOT",
+                "**World 3** ? centralized life / digital footprint SSOT",
                 f"**Updated:** {ts}",
                 "",
                 "## Open taxonomy",
-                "Medical-Records · Core-Personal/{Finance,Career,Education,Spiritual,Family,Projects,_Inbox} · Navy-Service · Life-Archive · Digital-Footprint · Archive",
+                "Medical-Records ? Core-Personal/{Finance,Career,Education,Spiritual,Family,Projects,_Inbox} ? Navy-Service ? Life-Archive ? Digital-Footprint ? Archive",
                 "Staging: test-ingest-*",
                 "",
                 f"Vault SSOT: `{TAXONOMY}`",
@@ -94,9 +94,9 @@ def main() -> int:
     VAULT_RECEIPT.write_text(
         "\n".join(
             [
-                f"# K domain shelves ensure — {ts}",
+                f"# K domain shelves ensure ? {ts}",
                 "",
-                f"**Created:** {len(created)} · **Refreshed indexes:** {len(refreshed) + len(created)}",
+                f"**Created:** {len(created)} ? **Refreshed indexes:** {len(refreshed) + len(created)}",
                 "",
                 "## Shelves",
                 *[f"- `{s}`" for s in SHELVES],

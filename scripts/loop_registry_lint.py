@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""N5 — Loop registry lint (meta, always dry-run / report-only).
+"""N5 ? Loop registry lint (meta, always dry-run / report-only).
 
 Inventory cron/jobs.json + known STOP/lock paths + known loop scripts.
 Diff against Codifying-Loops-Guardrails-Map expected surfaces.
@@ -32,7 +32,7 @@ OPS_LOG = Path(r"D:\PhronesisVault\Operations\logs")
 OUT_JSON = OPS_LOG / "loop-registry-lint-latest.json"
 OUT_MD = OPS_LOG / "loop-registry-lint-latest.md"
 
-# Expected loop surfaces from Codifying-Loops-Guardrails-Map §2 + live cron inventory
+# Expected loop surfaces from Codifying-Loops-Guardrails-Map ?2 + live cron inventory
 # (2026-07-20 cook: expand so unknown_enabled_script is signal, not noise)
 EXPECTED_SCRIPTS = {
     "silo_continuous_loop.py": {"plane": "kitchen", "stop": "silo_continuous.STOP", "single_writer": True},
@@ -84,6 +84,12 @@ EXPECTED_SCRIPTS = {
         "comfy_gallery_refresh_script.py": {"plane": "image", "stop": None, "single_writer": False},
         "rp-bottleneck-fix-cron.py": {"plane": "meta", "stop": None, "single_writer": False},
         "script_newline_integrity_gate.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "script_ascii_integrity_gate.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "script_hygiene_autonomy_once.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "discord_503_heal_once.py": {"plane": "gateway", "stop": None, "single_writer": False},
+        "ops/script_integrity_audit_once.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "repair_ascii_scripts.py": {"plane": "meta", "stop": None, "single_writer": False},
+        "hygiene_zero_newline_scripts.py": {"plane": "meta", "stop": None, "single_writer": False},
         "insights_lessons_monthly.py": {"plane": "meta", "stop": None, "single_writer": False},
         "vault_gardener_autonomy_daily.py": {"plane": "vw", "stop": None, "single_writer": False},
         "vault_gardener_autonomy_weekly.py": {"plane": "vw", "stop": None, "single_writer": False},
@@ -97,13 +103,13 @@ EXPECTED_SCRIPTS = {
         "driver_judgment_pulse.py": {"plane": "judgment", "stop": None, "single_writer": False},
                 "silo_handoff_packet.py": {"plane": "judgment", "stop": None, "single_writer": False},
                 "discord_intent_propose.py": {"plane": "judgment", "stop": "intent_queue.STOP", "single_writer": False},
-                # 2026-07-21 full-method residual — live enabled crons
+                # 2026-07-21 full-method residual ? live enabled crons
                 "router_tenant_tick_once.py": {"plane": "gateway", "stop": None, "single_writer": False},
                 "rp_sandbox_overnight_review_cron.py": {"plane": "rp", "stop": None, "single_writer": False},
                 "gallery_ingest_catchup_cron.py": {"plane": "image", "stop": None, "single_writer": False},
                                 "rp_sandbox_residual_lint_cron.py": {"plane": "rp", "stop": None, "single_writer": False},
                                 "ensure_qwythos_8090.py": {"plane": "grunt", "stop": None, "single_writer": False},
-                                        # 2026-07-22 Driver cook P1 — Wave-2/4 enabled crons
+                                        # 2026-07-22 Driver cook P1 ? Wave-2/4 enabled crons
                                         "fleet_health_tick.py": {"plane": "model", "stop": None, "single_writer": False},
                                         "pick_backend_matrix_lab.py": {"plane": "model", "stop": None, "single_writer": False},
                                         "stack_single_instance_audit.py": {"plane": "gateway", "stop": None, "single_writer": False},
@@ -262,7 +268,7 @@ def main() -> int:
     else:
         OUT_JSON.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     lines = [
-        f"# Loop registry lint — {report['at']}",
+        f"# Loop registry lint ? {report['at']}",
         "",
         f"- jobs: **{len(jobs)}** (enabled **{len(enabled)}**, paused/disabled **{len(paused)}**)",
         f"- expected scripts present: **{len(present_scripts)}/{len(EXPECTED_SCRIPTS)}**",
@@ -282,7 +288,7 @@ def main() -> int:
         lines.append("_None_")
     else:
         for i in issues:
-            lines.append(f"- `{i['class']}` — {i['detail']}" + (f" (job={i['job']})" if i.get("job") else ""))
+            lines.append(f"- `{i['class']}` ? {i['detail']}" + (f" (job={i['job']})" if i.get("job") else ""))
     lines += [
         "",
         "## STOP / lock presence",

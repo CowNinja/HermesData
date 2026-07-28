@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert WordPerfect .wpd → UTF-8 text via local libwpd wpd2text (no LibreOffice, no cloud).
+"""Convert WordPerfect .wpd -> UTF-8 text via local libwpd wpd2text (no LibreOffice, no cloud).
 
 Tooling lives under D:/HermesData/tools/libwpd/mingw64/bin (msys2 packages).
 Deps: libwpd + librevenge DLLs; mingw runtime often from Git mingw64 PATH.

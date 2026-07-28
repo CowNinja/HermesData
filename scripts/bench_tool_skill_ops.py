@@ -118,7 +118,7 @@ TOOLS = [
 
 SYSTEM = (
     "You are Hermes local ops agent on Windows. "
-    "Use REAL tool_calls only — never narrate tools in prose. "
+    "Use REAL tool_calls only ? never narrate tools in prose. "
     "Prefer absolute D:\\ paths. tool_choice may force a tool. "
     "Do not invent tool results."
 )
@@ -188,7 +188,7 @@ CASES = [
         "expect_name": "read_file",
         "user": (
             "Jeff asked: what is the default model in Hermes config? "
-            "You must read D:\\HermesData\\config.yaml — do not guess."
+            "You must read D:\\HermesData\\config.yaml ? do not guess."
         ),
         "check": "path_contains",
         "path_substr": "config.yaml",

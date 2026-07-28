@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Quick benchmark — writes to temp file for monitoring."""
+"""Quick benchmark - writes to temp file for monitoring."""
 import subprocess, time, urllib.request, json, sys
 from pathlib import Path
 

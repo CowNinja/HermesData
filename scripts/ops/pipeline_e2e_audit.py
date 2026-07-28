@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E2E image pipeline audit — structural health."""
+"""E2E image pipeline audit ? structural health."""
 from __future__ import annotations
 
 import ast

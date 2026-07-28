@@ -24,7 +24,11 @@ from pathlib import Path
 SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
 LOG = Path(r"D:\PhronesisVault\Operations\logs\silo-audio-stt-latest.md")
 TOOL_PATHS = Path(r"D:\HermesData\config\tool_paths.json")
+# Prefer console python + CREATE_NO_WINDOW (nested pythonw+Piped STT can exit 1).
 STT_PYTHON = Path("D:/HermesData/venvs/stt/Scripts/python.exe")
+# 2026-07-27 popup parent-trace: bare ffmpeg/python STT children titled WT tabs
+# when launched without CREATE_NO_WINDOW from silo continuous loop.
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
 AUDIO_EXT = {
     ".wav",
     ".mp3",
@@ -86,6 +90,8 @@ def to_wav16k(path: Path, work: Path) -> tuple[Path | None, str]:
             capture_output=True,
             text=True,
             timeout=300,
+            stdin=subprocess.DEVNULL,
+            creationflags=CREATE_NO_WINDOW,
         )
         if out.is_file() and out.stat().st_size > 1000:
             return out, "ffmpeg_16k"
@@ -95,7 +101,7 @@ def to_wav16k(path: Path, work: Path) -> tuple[Path | None, str]:
 
 
 def stt_whisper(path: Path) -> tuple[str, str]:
-    """Prefer isolated STT venv (numpy pin) — research: Numba/whisper vs numpy 2.5 clash."""
+    """Prefer isolated STT venv (numpy pin) ? research: Numba/whisper vs numpy 2.5 clash."""
     py = STT_PYTHON if STT_PYTHON.is_file() else Path(sys.executable)
     helper = r"""
 import sys
@@ -119,6 +125,8 @@ except Exception as e:
             capture_output=True,
             text=True,
             timeout=900,
+            stdin=subprocess.DEVNULL,
+            creationflags=CREATE_NO_WINDOW,
         )
         text = (r.stdout or "").strip()
         eng = "faster-whisper-venv"
@@ -190,7 +198,7 @@ def process(path: Path) -> dict:
         }
         out = Path(str(path) + ".stt.md")
         out.write_text(
-            f"# STT — {path.name}\n\n- engine: {engine}\n- chars: {rec['chars']}\n- at: {rec['at']}\n\n"
+            f"# STT ? {path.name}\n\n- engine: {engine}\n- chars: {rec['chars']}\n- at: {rec['at']}\n\n"
             f"```\n{text[:12000]}\n```\n",
             encoding="utf-8",
         )
@@ -198,7 +206,7 @@ def process(path: Path) -> dict:
             train = Path(str(path) + ".train.md")
             if not train.is_file() or train.stat().st_size < 50:
                 train.write_text(
-                    f"# Train audio — {path.name}\n\n{text[:8000]}\n", encoding="utf-8"
+                    f"# Train audio ? {path.name}\n\n{text[:8000]}\n", encoding="utf-8"
                 )
             needs = Path(str(path) + ".needs_stt")
             if needs.is_file():
@@ -257,9 +265,9 @@ def main() -> int:
     useful = sum(1 for r in results if r.get("twin_useful"))
     LOG.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Audio STT — {utc()}",
+        f"# Audio STT ? {utc()}",
         "",
-        f"processed **{len(results)}** · twin_useful **{useful}**",
+        f"processed **{len(results)}** ? twin_useful **{useful}**",
         "",
     ]
     for r in results:

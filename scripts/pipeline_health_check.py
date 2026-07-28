@@ -95,7 +95,7 @@ def main() -> int:
 
     failed = sum(1 for c in checks if not c["ok"])
     lines = [
-        f"# Pipeline health — {utc()}",
+        f"# Pipeline health - {utc()}",
         "",
         f"**Overall:** {'PASS' if failed == 0 else 'FAIL'} ({failed} failed / {len(checks)})",
         "",

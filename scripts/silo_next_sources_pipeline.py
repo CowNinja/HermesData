@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Next-sources dry pipeline — probe + plan only (never land without --apply + Jeff intent).
+"""Next-sources dry pipeline ? probe + plan only (never land without --apply + Jeff intent).
 
 Reads config/next_sources_rules.json. Writes receipt + machine plan JSON.
 """
@@ -43,7 +43,7 @@ def main() -> int:
     ap.add_argument(
         "--apply",
         action="store_true",
-        help="RESERVED — refuses unless SILIO_NEXT_SOURCE_APPLY=1 and Jeff phrase file present",
+        help="RESERVED ? refuses unless SILIO_NEXT_SOURCE_APPLY=1 and Jeff phrase file present",
     )
     args = ap.parse_args()
     rules = json.loads(RULES.read_text(encoding="utf-8"))
@@ -69,14 +69,14 @@ def main() -> int:
         "sources": sources,
         "apply_requested": bool(args.apply),
         "apply_executed": False,
-        "reason": "dry-run only — land requires Jeff green light",
+        "reason": "dry-run only ? land requires Jeff green light",
     }
     if args.apply:
         plan["reason"] = "REFUSED: next-source land not armed in this codification wave"
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(plan, indent=2), encoding="utf-8")
     lines = [
-        f"# Next-sources probe — {plan['at']}",
+        f"# Next-sources probe ? {plan['at']}",
         "",
         "| Source | Present | Notes |",
         "|--------|:-------:|-------|",

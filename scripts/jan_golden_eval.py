@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BooksBloom / Jan Library golden eval — regression pack (no Grok).
+"""BooksBloom / Jan Library golden eval ? regression pack (no Grok).
 
 Research basis (2026-07-19 overnight):
 - RAG evals should separate retrieval hit-rate from answer faithfulness
@@ -108,7 +108,7 @@ CASES: list[dict] = [
         "expect_any": ["business by the books", "business", "bookselling", "ministry"],
         "prefer_lanes": ["workshop_catalog", "booksbloom_gold"],
     },
-    # Extended 2026-07-21 cook — still corpus-only expectations
+    # Extended 2026-07-21 cook ? still corpus-only expectations
     {
         "id": "yee_haw_boys",
         "q": "What is the Yee Haw Books for Boys workshop about?",
@@ -220,7 +220,7 @@ def write_reports(report: dict) -> None:
     else:
         OUT_JSON.write_text(json.dumps(report, indent=2), encoding="utf-8")
     lines = [
-        f"# Jan golden eval — {report['at']}",
+        f"# Jan golden eval ? {report['at']}",
         "",
         f"**Mode:** {report['mode']}  ",
         f"**Pass rate (retrieve):** {report['retrieve_pass']}/{report['retrieve_total']}  ",
@@ -231,22 +231,22 @@ def write_reports(report: dict) -> None:
     ]
     for r in report["retrieve"]:
         lines.append(
-            f"| {r['id']} | {'✅' if r['ok'] else '❌'} | {'✅' if r['lane_ok'] else '⚠'} | "
-            f"{', '.join(r['matched_keywords']) or '—'} | {', '.join(r['top_sources'])} |"
+            f"| {r['id']} | {'?' if r['ok'] else '?'} | {'?' if r['lane_ok'] else '?'} | "
+            f"{', '.join(r['matched_keywords']) or '?'} | {', '.join(r['top_sources'])} |"
         )
     if report.get("llm"):
         lines += ["", "## LLM subset", "", "| id | ok | groundedness | matched |", "|----|----|--------------|---------|"]
         for r in report["llm"]:
             lines.append(
-                f"| {r['id']} | {'✅' if r['ok'] else '❌'} | {r.get('groundedness')} | "
-                f"{', '.join(r.get('matched_keywords') or []) or '—'} |"
+                f"| {r['id']} | {'?' if r['ok'] else '?'} | {r.get('groundedness')} | "
+                f"{', '.join(r.get('matched_keywords') or []) or '?'} |"
             )
     lines += [
         "",
         "## Notes",
         "- Retrieve-only is the fast nightly gate.",
         "- LLM subset optional (local Qwythos :8091).",
-        "- Expected keywords are public/corpus anchors — not full author lists.",
+        "- Expected keywords are public/corpus anchors ? not full author lists.",
         "",
     ]
     md_body = "\n".join(lines)

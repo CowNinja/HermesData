@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Holistic processing streamline tick — repair / re-OCR / enrich / status sync.
+"""Holistic processing streamline tick ? repair / re-OCR / enrich / status sync.
 
 Coordinates (does not fight land chef):
   1) OCR cook (process-only when queue deep)
-  2) Retire hopeless corrupt after max attempts → DLQ
+  2) Retire hopeless corrupt after max attempts ? DLQ
   3) Backfill registry process_status from sidecars
-  4) Clean OCR → .train.md for RAG/twin
+  4) Clean OCR ? .train.md for RAG/twin
   5) Re-queue thin/garbled OCR for re-OCR
   6) Medical/Navy text index
   7) Multimodal fabric: gold OCR requeue, STT, office, email (T17)
@@ -149,7 +149,7 @@ def requeue_thin_ocr(limit: int = 40) -> int:
         con.close()
         return n
     except sqlite3.OperationalError as e:
-        # database is locked / busy — skip this tick; OCR worker owns the queue
+        # database is locked / busy ? skip this tick; OCR worker owns the queue
         return 0 if "locked" in str(e).lower() or "busy" in str(e).lower() else 0
 
 
@@ -186,7 +186,7 @@ def main() -> int:
         )
 
     # 2c gold STT discover+process (CPU) - multimodal fabric; limit 3
-    # 2026-07-26: cap STT wall time — 1800s was stalling holistic inside orch tick
+    # 2026-07-26: cap STT wall time ? 1800s was stalling holistic inside orch tick
     stt_w = SCRIPTS / "silo_audio_stt_backlog_worker.py"
     if stt_w.is_file():
         report["steps"]["stt_discover"] = run(
@@ -242,7 +242,7 @@ def main() -> int:
             timeout=120,
         )
     # train manifest refresh (side-project consumption)
-    # 2026-07-26: ALWAYS pass --limit — unbounded rglob ran 5h+ and burned CPU
+    # 2026-07-26: ALWAYS pass --limit ? unbounded rglob ran 5h+ and burned CPU
     man = SCRIPTS / "silo_train_manifest_builder.py"
     if man.is_file():
         report["steps"]["train_manifest"] = run(
@@ -250,7 +250,7 @@ def main() -> int:
             timeout=120,
         )
 
-    # 5 text clean → train.md
+    # 5 text clean ? train.md
     clean = SCRIPTS / "silo_ocr_text_clean.py"
     if clean.is_file():
         report["steps"]["text_clean"] = run(
@@ -292,7 +292,7 @@ def main() -> int:
         json.dumps(report, indent=2), encoding="utf-8"
     )
     lines = [
-        f"# Process holistic — {report['at']}",
+        f"# Process holistic ? {report['at']}",
         "",
         f"- retire_corrupt: {report['steps'].get('retire_corrupt')}",
         f"- requeue_thin: {report['steps'].get('requeue_thin')}",

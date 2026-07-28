@@ -14,7 +14,8 @@ logErr = logDir & "\llama-" & port & "-router.err.log"
 preSets = "D:\PhronesisVault\Operations\models-8090.ini"
 
 ' models-max MUST be on CLI (community: ini models-max is ignored / broken)
-' Do NOT pass global --ctx-size here — it overrides per-model ctx in the preset
+' Do NOT pass global --ctx-size here - it overrides per-model ctx in the preset
+' Phase3 2026-07-25/27: q8_0 K+V (not q4_0), kv-offload, batch 512/256
 args = """" & prebuiltDir & "\llama-server.exe"" " & _
        "--port " & port & " " & _
        "--host 127.0.0.1 " & _
@@ -23,7 +24,11 @@ args = """" & prebuiltDir & "\llama-server.exe"" " & _
        "--models-autoload " & _
        "--flash-attn on " & _
        "--cache-type-k q8_0 " & _
-       "--cache-type-v q4_0"
+       "--cache-type-v q8_0 " & _
+       "--kv-offload " & _
+       "--mmap " & _
+       "--batch-size 512 " & _
+       "--ubatch-size 256"
 
 Dim fso, logFolder
 Set fso = CreateObject("Scripting.FileSystemObject")

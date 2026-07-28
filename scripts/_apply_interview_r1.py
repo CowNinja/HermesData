@@ -66,13 +66,13 @@ print("gary", upsert_person(
     ["gary bloom", "gary"],
     "father",
     "Core-Personal/Family",
-    "Jeff dad — interview R1",
+    "Jeff dad ? interview R1",
 ))
 print("qadeeb", upsert_org(
     ["ahmed al-qadeeb", "ahmad al-qadeeb", "al-qadeeb", "qadeeb", "ahmed", "ahmad"],
     "Core-Personal/Projects",
     "osint_target",
-    "Work/investigation target — not personal relationship. R1",
+    "Work/investigation target ? not personal relationship. R1",
 ))
 print("lowes", upsert_org(
     ["lowe's", "lowes", "lowe"],
@@ -101,7 +101,7 @@ print("saved")
 
 log = Path(r"D:\PhronesisVault\Operations\logs\entity-interview-round1-2026-07-10.md")
 log.write_text(
-    f"""# Entity interview Round 1 — {ts}
+    f"""# Entity interview Round 1 ? {ts}
 
 | # | Entity | Jeff | Domain / role |
 |---|--------|------|----------------|
@@ -111,7 +111,7 @@ log.write_text(
 | 4 | Crosswater | **Former church** (member) | Spiritual |
 | 5 | N332 / NCDOC | Navy until Mar 2018 | Navy-Service |
 | 6 | Corinthians | Scripture | Spiritual rules only |
-| 7 | Cont. | Ask as found | — |
+| 7 | Cont. | Ask as found | ? |
 
 Lexicon: `D:/HermesData/config/entity_context.json`
 """,

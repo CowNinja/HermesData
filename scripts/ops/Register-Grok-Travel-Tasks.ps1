@@ -20,14 +20,14 @@ $bridgeAction = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle 
 schtasks /Create /TN "\$bridgeTask" /TR $bridgeAction /SC MINUTE /MO 5 /RL LIMITED /F | Out-Null
 Write-Host "Registered: $bridgeTask (every 5 min)" -ForegroundColor Green
 
-# Guardian already runs every 5 min — ensure it includes travel stack hooks
+# Guardian already runs every 5 min - ensure it includes travel stack hooks
 if (Test-Path $guardian) {
     Write-Host "Guardian travel hooks: Ensure-Grok-Direct-Bridge + inbox + heartbeat + fullstack health" -ForegroundColor Cyan
 } else {
     Write-Host "WARN: Phronesis-Guardian.ps1 not found" -ForegroundColor Yellow
 }
 
-# Unattended Grok↔Hermes collab (no Cursor/PowerShell required) — every 6h
+# Unattended Grok?Hermes collab (no Cursor/PowerShell required) - every 6h
 $loopTask = "Phronesis-Grok-Hermes-Loop"
 if ((Test-Path $py) -and (Test-Path $hermesLoop)) {
     schtasks /Delete /TN "\$loopTask" /F 2>$null | Out-Null

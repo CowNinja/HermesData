@@ -67,17 +67,17 @@ REJECT_FIRST_SUBSTR = (
 )
 
 LAST_FIRST = re.compile(
-    r"^(?P<last>[A-Z][A-Za-z'’\-\.]*(?:[\s][A-Z][A-Za-z'’\-\.]*){0,2}),\s*"
+    r"^(?P<last>[A-Z][A-Za-z'?\-\.]*(?:[\s][A-Z][A-Za-z'?\-\.]*){0,2}),\s*"
     r"(?P<first>.+?)\s*$"
 )
-# First Last (2–4 tokens) for the "New authors added" block
+# First Last (2?4 tokens) for the "New authors added" block
 FIRST_LAST = re.compile(
-    r"^(?P<first>[A-Z][A-Za-z'’\-\.]+(?:\s[A-Z][A-Za-z'’\-\.]+){0,2})\s+"
-    r"(?P<last>[A-Z][A-Za-z'’\-\.]+)$"
+    r"^(?P<first>[A-Z][A-Za-z'?\-\.]+(?:\s[A-Z][A-Za-z'?\-\.]+){0,2})\s+"
+    r"(?P<last>[A-Z][A-Za-z'?\-\.]+)$"
 )
 
 SKIP_LINE = re.compile(
-    r"^(SOURCE:|#|---|\*|❀|BLANK|WHO SHOULD|VOLUME|AUTHORS OF|Jan Bloom|"
+    r"^(SOURCE:|#|---|\*|?|BLANK|WHO SHOULD|VOLUME|AUTHORS OF|Jan Bloom|"
     r"www\.|COPYRIGHT|Published|Printed|All rights|To order|New authors|"
     r"New series|Improved|Space for|Reading |Favorite |Updated |Additional |"
     r"method:|chars:|lane:|source:|extracted)",
@@ -143,7 +143,7 @@ def parse_new_authors_block(path: Path) -> list[dict]:
     authors: list[dict] = []
     seen: set[str] = set()
     for line in block.splitlines():
-        line = line.strip().lstrip("❀•-* ").strip()
+        line = line.strip().lstrip("??-* ").strip()
         if not line or SKIP_LINE.search(line):
             continue
         # allow multi names on one line separated by 2+ spaces
@@ -201,12 +201,12 @@ def _clean_body_first(first: str) -> str | None:
         return None
     # must look like a personal name token sequence
     if not re.match(
-        r"^[A-Z][A-Za-z'’\-\.]+(?:\s+[A-Z][A-Za-z'’\-\.]+){0,3}$",
+        r"^[A-Z][A-Za-z'?\-\.]+(?:\s+[A-Z][A-Za-z'?\-\.]+){0,3}$",
         first,
     ):
         # allow nicknames in quotes: Isabella "Pansy"
         if not re.match(
-            r"^[A-Z][A-Za-z'’\-\.]+(?:\s+[A-Z][A-Za-z'’\-\.]+)*(?:\s+[“\"][^”\"]+[”\"])?$",
+            r"^[A-Z][A-Za-z'?\-\.]+(?:\s+[A-Z][A-Za-z'?\-\.]+)*(?:\s+[?\"][^?\"]+[?\"])?$",
             first,
         ):
             return None
@@ -332,7 +332,7 @@ def build(min_count: int = 50) -> dict:
     authors = sorted(merged.values(), key=lambda a: (a["last"].lower(), a["first"].lower()))
     report = {
         "at": utc(),
-        "policy": "gold extracts only — never invent authors/ISBNs",
+        "policy": "gold extracts only ? never invent authors/ISBNs",
         "primary_count": len(primary_rows),
         "secondary_new_count": len(secondary_rows),
         "body_heading_count": len(body_rows),
@@ -343,7 +343,7 @@ def build(min_count: int = 50) -> dict:
         "warnings": warnings,
         "authors": authors,
         "public_blurb_note": (
-            "Public site says 157 authors per WSWTR volume — this extract is a "
+            "Public site says 157 authors per WSWTR volume ? this extract is a "
             "partial gold index (jan-authors + revised new-authors block + "
             "body-heading Last, First lines), not a claim of completeness. "
             "Never pad to 157."
@@ -378,13 +378,13 @@ def write_outputs(report: dict) -> None:
         f"**Primary (jan-authors Last, First):** {report['primary_count']}  ",
         f"**Secondary (part1 'New authors added'):** {report['secondary_new_count']}  ",
         f"**Body heading (Last, First entries):** {report.get('body_heading_count', 0)}  ",
-        f"**OK (≥{report['min_count']}):** {'yes' if report['ok'] else 'NO'}  ",
+        f"**OK (?{report['min_count']}):** {'yes' if report['ok'] else 'NO'}  ",
         "",
         "## Policy",
         "",
         "- Extracted **only** from K gold files listed below.",
         "- **Do not** treat as complete 157-author public blurb fulfillment.",
-        "- Curator may say “on the gold author index…” and cite this pack + source file.",
+        "- Curator may say ?on the gold author index?? and cite this pack + source file.",
         "- Never invent missing surnames to reach 157.",
         "- Body-heading pass merges extra Last, First entry lines; primary wins on conflicts.",
         "",
@@ -418,7 +418,7 @@ def write_outputs(report: dict) -> None:
         "- Script: `D:\\\\HermesData\\\\scripts\\\\jan_wswtr_author_list_extract.py`",
         "",
     ]
-    # vault note pack — atomic to avoid mid-write truncate of large author table
+    # vault note pack ? atomic to avoid mid-write truncate of large author table
     md_body = "\n".join(lines)
     if atomic_write_text is not None:
         atomic_write_text(OUT_MD, md_body, min_bytes=20)

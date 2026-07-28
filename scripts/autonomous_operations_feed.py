@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-autonomous_operations_feed.py — Dashboard feed for System Health / Autonomous Operations.
+autonomous_operations_feed.py - Dashboard feed for System Health / Autonomous Operations.
 
 Tails system_optimizations.jsonl + telemetry state into a JSON panel for :3001 dashboard.
 

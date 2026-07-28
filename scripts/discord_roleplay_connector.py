@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Discord → Phronesis roleplay routing connector.
+Discord ? Phronesis roleplay routing connector.
 
 Rewrites slash triggers that Hermes gateway would swallow as unknown commands,
 detects alice-roleplay channels, and logs ingest traces for E2E debugging.
@@ -46,7 +46,7 @@ def is_alice_roleplay_discord_location(
 ) -> bool:
     """True only for #alice-roleplay (1519509288286949466) and threads under it.
 
-    Location-bound sandbox — never true for other Discord channels even if the
+    Location-bound sandbox ? never true for other Discord channels even if the
     user pastes ROLEPLAY_MODE: or [platform: alice-roleplay] elsewhere.
     """
     ids = {str(x) for x in (chat_id, parent_channel_id, thread_id) if x}
@@ -58,7 +58,7 @@ def is_alice_roleplay_discord_location(
 
 
 def has_explicit_roleplay_user_trigger(text: str) -> bool:
-    """User-initiated roleplay only — slash rewrite or colon trigger."""
+    """User-initiated roleplay only ? slash rewrite or colon trigger."""
     raw = (text or "").strip()
     if not raw:
         return False
@@ -266,7 +266,7 @@ def scan_messages_for_roleplay(
 
     if not in_alice and chat_name and "alice-roleplay" in chat_name.lower():
         in_alice = True
-    # Do not scan raw system_blob for #alice-roleplay — Hermes default stance
+    # Do not scan raw system_blob for #alice-roleplay ? Hermes default stance
     # mentions it as policy text and would false-positive api_server/cron turns.
 
     if not chat_id:
@@ -308,7 +308,7 @@ def scan_messages_for_roleplay(
                 break
         model = str(ph.get("model") or ROLEPLAY_MODEL)
     elif platform_tag == "alice-roleplay":
-        # Tag pasted outside sandbox — do not route to roleplay tier.
+        # Tag pasted outside sandbox ? do not route to roleplay tier.
         platform = "discord"
         reasons.append("platform_tag_ignored_outside_sandbox")
 

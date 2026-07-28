@@ -16,9 +16,9 @@ MODE_NOTES = {
     "lowvram": "Comfy launches with lowvram (default balance, faster staging)",
     "ram_prefer": "Comfy launches with novram + disable-smart-memory (heavier RAM staging, slower renders)",
     # Jeff / RP shorthand aliases (persist as real modes after normalize)
-    "image": "alias→ram_prefer (solo quality / stick image mode)",
-    "quality": "alias→ram_prefer",
-    "fast": "alias→lowvram",
+    "image": "alias?ram_prefer (solo quality / stick image mode)",
+    "quality": "alias?ram_prefer",
+    "fast": "alias?lowvram",
 }
 
 # Canonical modes written to disk (aliases normalize here).

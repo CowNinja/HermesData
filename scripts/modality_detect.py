@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-# router key → process_status hint
+# router key ? process_status hint
 EXT = {
     ".txt": "text",
     ".md": "text",
@@ -15,7 +15,7 @@ EXT = {
     ".yaml": "text",
     ".yml": "text",
     ".log": "text",
-    ".html": "text",  # takeout Keep/Voice — Jeff 2026-07-18 land wave
+    ".html": "text",  # takeout Keep/Voice ? Jeff 2026-07-18 land wave
     ".htm": "text",
     ".rtf": "text",
     ".py": "code",

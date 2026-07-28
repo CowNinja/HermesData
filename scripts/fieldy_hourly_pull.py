@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""fieldy_hourly_pull.py — No-agent Fieldy pull.
+"""fieldy_hourly_pull.py ? No-agent Fieldy pull.
 
 Reads the Fieldy RecentPull script from the standard path and runs it via
-powershell.  Emits the output directly — no LLM step, no agent overhead.
+powershell.  Emits the output directly ? no LLM step, no agent overhead.
 
 Called by cron with `no_agent: True`.  Silent on code 0, emits errors on fail.
 """
@@ -26,7 +26,7 @@ def main():
         stdout = result.stdout.strip()
         if stdout:
             print(stdout)
-        # silent on empty success — watchdog pattern
+        # silent on empty success ? watchdog pattern
     else:
         print(f"FIELDY PULL FAILED (exit {result.returncode})")
         if result.stdout.strip():

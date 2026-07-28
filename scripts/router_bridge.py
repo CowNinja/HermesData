@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Phronesis Router Bridge — unified local-first dispatch.
+Phronesis Router Bridge ? unified local-first dispatch.
 
 Priority order (local-first, opportunistic second, paid Grok last):
-  1. PhronesisVault sovereign_router → Local MoE (8090 LRU)
+  1. PhronesisVault sovereign_router ? Local MoE (8090 LRU)
   2. HermesData Ollama router (fallback)
   3. Tier 1.5 Opportunistic Fleet (free APIs via fleet_registry.yaml)
-  4. Paid Grok escalation signal — high-stakes / explicit only
+  4. Paid Grok escalation signal ? high-stakes / explicit only
 
 Usage:
     from router_bridge import bridge_dispatch
@@ -17,8 +17,8 @@ from __future__ import annotations
 
 # === Tier routing policies (2026-06-27) ===
 # Tier 1:   Local MoE (8090 LRU)
-# Tier 1.5: Opportunistic Fleet (free APIs) — external_fleet_manager
-# Tier 2:   Paid Grok — high-stakes explicit escalation only
+# Tier 1.5: Opportunistic Fleet (free APIs) ? external_fleet_manager
+# Tier 2:   Paid Grok ? high-stakes explicit escalation only
 
 FLEET_TRIGGERS = frozenset({
     "latest_external_knowledge",
@@ -45,7 +45,7 @@ def detect_opportunistic_fleet_triggers(
     tool_depth: int = None,
     local_failed: bool = False,
 ) -> dict:
-    """Tier 1.5 — free compute/context when local is insufficient but not high-stakes."""
+    """Tier 1.5 ? free compute/context when local is insufficient but not high-stakes."""
     prompt_lower = (prompt or "").lower()
     matched = []
     reasons = []
@@ -86,7 +86,7 @@ def detect_opportunistic_fleet_triggers(
     }
 
 
-# === Grok-Escalation-Policy v0.2 — Paid tier only ===
+# === Grok-Escalation-Policy v0.2 ? Paid tier only ===
 def detect_grok_escalation_triggers(
     prompt: str,
     task_type: str = None,
@@ -112,12 +112,12 @@ def detect_grok_escalation_triggers(
     matched = []
     reasons = []
 
-    # Private RP sandboxes stay on local Qwythos — never Grok-escalate on tool noise.
+    # Private RP sandboxes stay on local Qwythos ? never Grok-escalate on tool noise.
     if is_roleplay:
         return {
             'should_escalate': False,
             'matched_triggers': [],
-            'reason': 'roleplay sandbox — local sovereign only',
+            'reason': 'roleplay sandbox ? local sovereign only',
             'recommended_tier': None,
             'policy_version': 'v0.4_t2_t3',
             'tool_fail_count': int(tool_fail_count or 0),
@@ -141,23 +141,23 @@ def detect_grok_escalation_triggers(
         matched.append('massive_context_window')
         reasons.append(f'estimated context {ctx} tokens exceeds local comfortable limit')
 
-    # 4. Real-time / external → Tier 1.5 Opportunistic Fleet (NOT paid Grok)
+    # 4. Real-time / external ? Tier 1.5 Opportunistic Fleet (NOT paid Grok)
     # (handled by detect_opportunistic_fleet_triggers)
 
-    # 5. High-stakes verification / safety — PAID GROK ONLY
+    # 5. High-stakes verification / safety ? PAID GROK ONLY
     high_stakes = ['legal', 'financial', 'medical', 'safety-critical', 'high-stakes', 'compliance']
     if explicit_flag or any(k in prompt_lower for k in high_stakes) or 'verify' in task_lower and 'critical' in prompt_lower:
         matched.append('high_stakes_verification')
         reasons.append('high-stakes or safety-critical task')
 
-    # 6. Heavy tool chaining → Tier 1.5 unless explicit grok flag
+    # 6. Heavy tool chaining ? Tier 1.5 unless explicit grok flag
     # (moderate depth routed to fleet first)
 
     if explicit_flag:
         matched.append('explicit_grok_request')
         reasons.append('explicit paid Grok escalation requested')
 
-    # T2 — Grok 4.20 Heavy: repeated local tool failures or explicit heavy reasoning
+    # T2 ? Grok 4.20 Heavy: repeated local tool failures or explicit heavy reasoning
     heavy_reasoning = any(
         k in prompt_lower
         for k in ('heavy reasoning', 'grok heavy', 'tier 2', 't2 escalate', 'deep reasoning')
@@ -320,7 +320,7 @@ def preview_route(task_type: Optional[str] = None, prompt: str = "") -> Dict[str
         "complexity": _complexity_from_task_type(task_type, prompt),
         "map_entry": None,
         "inferred": True,
-        "notes": "no MoE map match — conservative hot-tier trim budget",
+        "notes": "no MoE map match ? conservative hot-tier trim budget",
     }
 
 
@@ -584,7 +584,7 @@ def bridge_dispatch(
     }
     provenance["unified_generalist"] = True
 
-    # Paid Grok (Tier 2) — never block force_local sovereign dispatch (log only).
+    # Paid Grok (Tier 2) ? never block force_local sovereign dispatch (log only).
     if escalation_info.get("should_escalate") and not force_local:
         provenance["escalation_recommended"] = True
         provenance["escalation_triggers"] = escalation_info["matched_triggers"]
@@ -738,7 +738,7 @@ def bridge_dispatch(
             )
             return hit
 
-    # Tier 1.5 — opportunistic fleet after local miss (never for uncensored roleplay)
+    # Tier 1.5 ? opportunistic fleet after local miss (never for uncensored roleplay)
     fleet_hit = _try_fleet(local_failed=True)
     if fleet_hit:
         _checkpoint_bridge_dispatch(
@@ -746,7 +746,7 @@ def bridge_dispatch(
         )
         return fleet_hit
 
-    # Tier 1.5 — proactive fleet if triggers matched (local may have been skipped)
+    # Tier 1.5 ? proactive fleet if triggers matched (local may have been skipped)
     if fleet_info.get("should_route"):
         fleet_hit = _try_fleet(local_failed=False)
         if fleet_hit:
@@ -957,7 +957,7 @@ def assess_local_stack(
     run_classifier_probe: bool = True,
 ) -> Dict[str, Any]:
     """
-    Pre-flight diagnostic for relay / cron — no hermes.exe, no Grok.
+    Pre-flight diagnostic for relay / cron ? no hermes.exe, no Grok.
     Port matrix + optional 8083 classifier mock + task_type map resolution.
     """
     ports = _port_matrix()
@@ -1029,7 +1029,7 @@ def print_assess_local_report(report: Dict[str, Any]) -> None:
     if resolved:
         print(f"Task map: {resolved.get('task_type')} -> tier={resolved.get('tier')} port={resolved.get('port')}")
     else:
-        print("Task map: (no match — will use keyword heuristics)")
+        print("Task map: (no match ? will use keyword heuristics)")
     print("")
     probe = report.get("classifier_probe") or {}
     if probe.get("skipped"):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-model_benchmark_harness.py — Lightweight GGUF candidate vs incumbent benchmark.
+model_benchmark_harness.py - Lightweight GGUF candidate vs incumbent benchmark.
 
 Metrics per tier slot:
   - TTFT (time to first token, streaming)

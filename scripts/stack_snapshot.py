@@ -167,10 +167,10 @@ def orch_color() -> dict:
             "thrash_group": d.get("thrash_group"),
             "thrash_harem": d.get("thrash_harem"),
         }
-    # No pulse: writers==0 continuous is intentional idle → GREEN not UNKNOWN/YELLOW
+    # No pulse: writers==0 continuous is intentional idle ? GREEN not UNKNOWN/YELLOW
     return {
         "color": "GREEN",
-        "summary": "no orch pulse receipt — intentional idle treated GREEN for router plane",
+        "summary": "no orch pulse receipt ? intentional idle treated GREEN for router plane",
         "source": None,
         "dual_bad": 0,
         "intentional_idle": True,
@@ -302,6 +302,19 @@ def fleet_color() -> dict:
 
     max_age_h = (max(ages) / 3600.0) if ages else None
     stale = max_age_h is not None and max_age_h > 6.0
+    # 2026-07-27: when fleet-health-tick is fresh GREEN, trust tick over a single
+    # provider last_check that lagged (e.g. brave-search not refreshed that cycle).
+    # Prevents false YELLOW stale while tick age << 6h and down==0.
+    tick_trust = bool(
+        tick
+        and not tick_stale
+        and str(tick.get("color") or "").upper() == "GREEN"
+        and guard_ok
+        and down == 0
+        and up > 0
+    )
+    if tick_trust and stale:
+        stale = False
 
     if enabled_ids and set(ids_up) >= enabled_ids and not stale:
         color = "GREEN"
@@ -318,6 +331,8 @@ def fleet_color() -> dict:
     else:
         color = "YELLOW"
         summary = f"fleet degraded up={up} down={down}" + (" stale" if stale else "")
+    if tick_trust and color == "GREEN":
+        summary = summary + " (tick-trust)"
 
     return {
         "color": color,
@@ -464,10 +479,15 @@ def thrift_plane() -> dict:
     2026-07-26: prefer sovereign_token_thrift_latest gate receipt when fresh so
     Discord pulse matches thrift ROCK SSOT. free_p95 alone with tiny free share
     must not paint thrift YELLOW (same law as thrift gate T3).
+
+    2026-07-27: if gate is fresh but RED/YELLOW (e.g. transient image-lock T1),
+    live-reprobe thrift gate once before painting stale RED on stack pulse.
     """
-    gate = last_json(ROOT / "state" / "sovereign_token_thrift_latest.json") or {}
+    gate_path = ROOT / "state" / "sovereign_token_thrift_latest.json"
+    gate = last_json(gate_path) or {}
     gate_ts = gate.get("ts")
     gate_fresh = False
+    age_h = None
     if gate_ts:
         try:
             # accept Z
@@ -478,13 +498,56 @@ def thrift_plane() -> dict:
             gate_fresh = age_h <= 6.0
         except Exception:
             gate_fresh = False
+
+    g_pre = str(gate.get("overall") or "").upper()
+    # Stale-bad refresh: RED/YELLOW gate under 6h may still be transient (8090 yield).
+    # Re-run gate when bad and not brand-new (<2 min) to avoid thrash loops.
+    need_live = bool(
+        gate_fresh
+        and g_pre in {"RED", "YELLOW", ""}
+        and (age_h is None or age_h >= (2.0 / 60.0))
+    )
+    if need_live or not gate_fresh or not gate:
+        try:
+            import subprocess
+
+            r = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPTS / "sovereign_token_thrift_gate.py"),
+                    "--write-rollup",
+                    "--json",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=120,
+                cwd=str(SCRIPTS),
+            )
+            if r.stdout and r.stdout.strip().startswith("{"):
+                try:
+                    gate = json.loads(r.stdout)
+                except Exception:
+                    gate = last_json(gate_path) or gate
+            else:
+                gate = last_json(gate_path) or gate
+            gate_fresh = True
+        except Exception:
+            gate = last_json(gate_path) or gate
+
     if gate_fresh and str(gate.get("overall") or "").upper() in {"ROCK", "GREEN", "YELLOW", "RED"}:
         t3 = (gate.get("pillars") or {}).get("T3_rollup_share") or {}
         share = t3.get("share") or {}
         thrift = t3.get("thrift") or {}
         g = str(gate.get("overall") or "YELLOW").upper()
-        # Map ROCK → GREEN for snapshot color vocabulary
+        # Map ROCK -> GREEN for snapshot color vocabulary
         color = "GREEN" if g == "ROCK" else g
+        notes = list(t3.get("notes") or []) + ["prefer_thrift_gate_receipt"]
+        if need_live:
+            notes.append("live_reprobe_on_stale_bad_gate")
+        if t3.get("free_bulk_lawful"):
+            notes.append("free_bulk_lawful")
         return {
             "color": color,
             "summary": (
@@ -495,9 +558,11 @@ def thrift_plane() -> dict:
             "thrift": thrift,
             "share": share,
             "gate_overall": g,
-            "notes": list(t3.get("notes") or []) + ["prefer_thrift_gate_receipt"],
+            "notes": notes,
             "window_hours": t3.get("window"),
             "free_p95_info_only": t3.get("free_p95_info_only"),
+            "free_bulk_lawful": t3.get("free_bulk_lawful"),
+            "live_reprobe": bool(need_live),
         }
 
     try:
@@ -512,13 +577,14 @@ def thrift_plane() -> dict:
         free_s = float(share.get("free") or 0.0)
         grok_s = float(share.get("grok") or 0.0)
         local_s = float(share.get("local") or 0.0)
+        # Policy B: local~85-98% thrift band; free_p95 latency alone = info residual.
         free_p95_only = (
             color == "YELLOW"
             and notes
             and all("free_p95" in str(n) or "p95_latency" in str(n) for n in notes)
             and free_s < 0.15
             and grok_s < 0.05
-            and local_s >= 0.90
+            and local_s >= 0.85
         )
         if free_p95_only:
             color = "GREEN"

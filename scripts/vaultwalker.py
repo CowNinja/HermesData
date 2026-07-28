@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-VaultWalker v0.8.0 — PhronesisVault (second-brain / Obsidian CNS) primary.
+VaultWalker v0.8.0 ? PhronesisVault (second-brain / Obsidian CNS) primary.
 
 Focus (2026-07-17 streamlining):
 - Default silo = PhronesisVault only (world 2 second brain). Other silos opt-in via --silos.
-- Living hub indexes owned by refresh_folder_indexes.py — NEVER clobber rich 00-INDEX.
+- Living hub indexes owned by refresh_folder_indexes.py ? NEVER clobber rich 00-INDEX.
 - Lean missing-folder maps only; skip Roleplay-Sandbox / Alice / package trees for index plant.
 - True dry-run: no file writes (indexes, notes, moves).
 - Explicit-only relocate still deep-only; block-by-default.
@@ -35,7 +35,7 @@ from typing import Dict, Tuple, Any, List, Set
 # Module-level flag for clean dry-run passing
 DRY_RUN = False
 VAULTWALKER_VERSION = "0.8.0"
-# five-item cook 2026-07-18 — never plant indexes in junk trees
+# five-item cook 2026-07-18 ? never plant indexes in junk trees
 SKIP_INDEX_PARTS = {
     "site-packages", "alice_venv", "node_modules", ".git", ".smart-env",
     "__pycache__", "venv", ".venv", "Lib", "Scripts", "dist-info",
@@ -194,7 +194,7 @@ CNS_INDEX_SKIP_PARTS: Set[str] = {
     "ComfyUI",
 }
 
-# Markers that mean refresh_folder_indexes (or human) owns this map — do not clobber
+# Markers that mean refresh_folder_indexes (or human) owns this map ? do not clobber
 RICH_INDEX_MARKERS = (
     "**Path:**",
     "Hot path",
@@ -287,7 +287,7 @@ def is_light_cycle() -> bool:
     """LIGHT = indexes only; DEEP = model review+relocate; RESURFACE = indexes+stale surface.
 
     --cycle light|deep|resurface|auto overrides hour-based stagger.
-    auto: hour%12 < 6 → light else resurface (never auto-deep — model path is weekly/manual).
+    auto: hour%12 < 6 ? light else resurface (never auto-deep ? model path is weekly/manual).
     """
     if FORCE_CYCLE == "light":
         return True
@@ -306,7 +306,7 @@ def is_resurface_only() -> bool:
         return False
     if FORCE_CYCLE == "light":
         return False
-    # auto deep window → resurface-only (safe); full model deep is explicit --cycle deep
+    # auto deep window ? resurface-only (safe); full model deep is explicit --cycle deep
     return not is_light_cycle()
 
 def file_hash(path: Path) -> str:
@@ -432,7 +432,7 @@ def _should_skip_index_dir(dirpath: Path, root: Path | None = None) -> bool:
 
 
 def _is_rich_index(text: str) -> bool:
-    """True if owned by refresh_folder_indexes / human hub — never overwrite."""
+    """True if owned by refresh_folder_indexes / human hub ? never overwrite."""
     if not GLOBAL_POLICIES.get("preserve_rich_indexes", True):
         return False
     head = text[:1200]
@@ -513,7 +513,7 @@ def update_per_folder_indexes(root: Path, silo_name: str, state: Dict[str, Any],
                 continue
             # Only rewrite our own generic stamps (or empty stubs)
             if "VaultWalker" not in existing[:200] and len(existing.strip()) > 80:
-                # Unknown hand-written index — preserve
+                # Unknown hand-written index ? preserve
                 skipped_rich += 1
                 continue
 
@@ -528,7 +528,7 @@ def update_per_folder_indexes(root: Path, silo_name: str, state: Dict[str, Any],
                 file_lines.append(f"- `{f.name}`")
         if not file_lines:
             if not md_files and len(files) == 0:
-                # empty dir — skip planting noise
+                # empty dir ? skip planting noise
                 continue
             file_lines = [f"- (no markdown; {len(files)} other files)"]
 
@@ -538,16 +538,16 @@ def update_per_folder_indexes(root: Path, silo_name: str, state: Dict[str, Any],
             rel_dir = dirpath.name
 
         content = (
-            f"# {dirpath.name} — INDEX\n\n"
+            f"# {dirpath.name} ? INDEX\n\n"
             f"**Path:** `{rel_dir}`  \n"
             f"**Updated:** {datetime.now().strftime('%Y-%m-%d')}  \n"
             f"**Silo:** {silo_name} (VaultWalker {VAULTWALKER_VERSION})  \n"
-            f"**Role:** second-brain map — agent reads this before deep scan.\n\n"
+            f"**Role:** second-brain map ? agent reads this before deep scan.\n\n"
             f"## Files\n"
             f"{chr(10).join(file_lines)}\n\n"
-            f"Files total: {len(files)} · md: {len(md_files)}\n"
+            f"Files total: {len(files)} ? md: {len(md_files)}\n"
             f"\n> Living hubs with Hot paths are owned by `refresh_folder_indexes.py` "
-            f"— do not clobber.\n"
+            f"? do not clobber.\n"
         )
 
         if _atomic_write_text(idx_file, content):
@@ -689,8 +689,8 @@ def resurface_forgotten_ideas(root: Path, silo_name: str, state: Dict[str, Any])
             continue
     if entries:
         header = (
-            f"# VaultWalker Resurface — {now.strftime('%Y-%m-%d %H:%M')}\n\n"
-            f"**Silo:** {silo_name} · **Version:** {VAULTWALKER_VERSION} · "
+            f"# VaultWalker Resurface ? {now.strftime('%Y-%m-%d %H:%M')}\n\n"
+            f"**Silo:** {silo_name} ? **Version:** {VAULTWALKER_VERSION} ? "
             f"**Mode:** {'DRY-RUN' if DRY_RUN else 'LIVE'}\n\n"
             f"Stale/low-link candidates (cap {max_surface}). "
             f"Living CNS focus: D:\\PhronesisVault only by default.\n\n"
@@ -803,7 +803,7 @@ def housekeeping_silo(name: str, root: Path) -> Dict:
     if res:
         stats.update({"res_" + k: v for k, v in res.items()})
 
-    # State always may update mtime cache (local HermesData only — not vault content)
+    # State always may update mtime cache (local HermesData only ? not vault content)
     save_persistent_state(name, state)
     return stats
 
@@ -820,7 +820,7 @@ def run_silo(name: str, root: Path) -> Tuple[str, Dict]:
 def main():
     global args, DRY_RUN, FORCE_CYCLE
     parser = argparse.ArgumentParser(
-        description=f"VaultWalker v{VAULTWALKER_VERSION} — PhronesisVault second-brain housekeeper"
+        description=f"VaultWalker v{VAULTWALKER_VERSION} ? PhronesisVault second-brain housekeeper"
     )
     # v0.8 default: PhronesisVault only (other silos opt-in)
     parser.add_argument(

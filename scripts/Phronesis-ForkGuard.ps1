@@ -260,7 +260,7 @@ function Set-HermesGatewayEnv {
     $env:HERMES_CONFIG_PATH = Join-Path $HermesRoot "config.yaml"
     $env:HERMES_GATEWAY_RESPONSE_TRUNCATION_GUARD = "1"
     $env:HERMES_GATEWAY_FORCE_FINISH_REASON = "1"
-    # Never let boot integrity BLOCK Discord (timeout under concurrent restarts → mute).
+    # Never let boot integrity BLOCK Discord (timeout under concurrent restarts -> mute).
     $env:PHRONESIS_BOOT_INTEGRITY_MODE = "fast"
     $env:PHRONESIS_BOOT_INTEGRITY_FAIL = "warn"
 }
@@ -399,7 +399,7 @@ function Start-VenvGateway {
     $gwPort = Get-GatewayPort
     # Drop dead pid/lock/state so restarts are not confused by ghosts.
     $null = Clear-StaleGatewayMarkers
-    # Healthy listener already up — never spawn a second gateway (causes restart storms).
+    # Healthy listener already up - never spawn a second gateway (causes restart storms).
     if ((Get-PortListenerPid -Port $gwPort) -and (Test-GatewayHealth)) {
         return
     }
@@ -408,7 +408,7 @@ function Start-VenvGateway {
     }
     # SSOT 2026-07-21: sole durable owner is schtask Hermes_Gateway
     # (argv: -m hermes_cli.main gateway run). Never dual-boot via -m gateway.run
-    # while that task exists — dual argv was the recurring multi-gateway root.
+    # while that task exists - dual argv was the recurring multi-gateway root.
     $task = Get-ScheduledTask -TaskName "Hermes_Gateway" -ErrorAction SilentlyContinue
     if ($task) {
         try {

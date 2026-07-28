@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""K-light index cron — shelf indexes + world indexes with soft-fail receipts.
+"""K-light index cron ? shelf indexes + world indexes with soft-fail receipts.
 
 2026-07-18 residual seal:
-- Longer child timeout (600s) — full silo walk can exceed 180s under load.
+- Longer child timeout (600s) ? full silo walk can exceed 180s under load.
 - Measure/receipt always written; cron exit 0 unless catastrophic (K: gone AND world gone).
 - Soft-fail model: ok=false stays in JSON for humans; gateway sees green run + receipt.
 Research: cron soft-fail + heartbeat/receipt (dead-man complementary); exit 0 + structured
@@ -28,7 +28,7 @@ SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
 RECEIPT = VAULT / "Operations" / "logs" / "k-light-index-latest.json"
 # 2026-07-18: 180s was flapping K-Light to score=40; silo capped walk still needs headroom.
 CHILD_TIMEOUT_SEC = 600
-SOFT_FAIL_EXIT = 0  # advisory index job — never red-fail the day on timeout/partial
+SOFT_FAIL_EXIT = 0  # advisory index job ? never red-fail the day on timeout/partial
 
 
 def _write_receipt(payload: dict) -> None:
@@ -98,7 +98,7 @@ def main() -> int:
         payload["skip_reason"] = "K_drive_not_mounted"
         _write_receipt(payload)
         print(f"KLightIndex score=0 ok=False skipped=True reason=K_missing elapsed={time.time()-t0:.1f}s")
-        # Catastrophic only if world script also cannot run meaningfully — still soft for cron noise.
+        # Catastrophic only if world script also cannot run meaningfully ? still soft for cron noise.
         return SOFT_FAIL_EXIT
 
     payload["domain_indexes"] = run_py(domain_script)
@@ -122,7 +122,7 @@ def main() -> int:
         f"KLightIndex score={score} ok={payload['ok']} partial={payload['partial']} "
         f"skipped=False soft_fail=1 elapsed={payload['elapsed_sec']}s receipt={RECEIPT}"
     )
-    # Hard-fail only if both children missing scripts (misinstall) — not timeout/partial.
+    # Hard-fail only if both children missing scripts (misinstall) ? not timeout/partial.
     both_missing = (
         payload["domain_indexes"].get("reason") == "missing_script"
         and payload["world_indexes"].get("reason") == "missing_script"

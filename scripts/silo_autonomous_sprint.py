@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fully autonomous silo sprint — 100% local, zero Grok tokens.
+"""Fully autonomous silo sprint ? 100% local, zero Grok tokens.
 
 One entrypoint for unattended post-OCR twin depth + health + gates.
 
@@ -126,7 +126,7 @@ def self_heal() -> dict:
 
 
 def depth_cycle(stamp_limit: int, index_limit: int, train_limit: int) -> dict:
-    """Lightweight post-OCR depth — no nested cook (avoids multi-hour hangs)."""
+    """Lightweight post-OCR depth ? no nested cook (avoids multi-hour hangs)."""
     open_n = ocr_open()
     codes = {}
     # OCR only if open work remains
@@ -144,7 +144,7 @@ def depth_cycle(stamp_limit: int, index_limit: int, train_limit: int) -> dict:
         run([PY, str(SCRIPTS / "silo_ocr_tail_hard.py")], 90)
     else:
         codes["ocr"] = 0
-    # train (OCR-queue + registry-recent HTML; rotate shelves — 2026-07-18)
+    # train (OCR-queue + registry-recent HTML; rotate shelves ? 2026-07-18)
     train_roots = [
         r"K:/Phronesis-Sovereign/Personal-Digital-Silo/Core-Personal/Family",
         r"K:/Phronesis-Sovereign/Personal-Digital-Silo/Medical-Records",
@@ -237,7 +237,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if STOP.is_file():
-        log("STOP present — exit")
+        log("STOP present ? exit")
         print(json.dumps({"stopped": True, "path": str(STOP)}))
         return 0
 
@@ -288,9 +288,9 @@ def main() -> int:
     # receipt
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Autonomous silo sprint — {utc()}",
+        f"# Autonomous silo sprint ? {utc()}",
         "",
-        f"Cycles: **{len(cycles)}** · STOP={STOP.exists()}",
+        f"Cycles: **{len(cycles)}** ? STOP={STOP.exists()}",
         "",
         "| Cycle | ocr_open | cook | bb |",
         "|------:|---------:|-----:|---:|",
@@ -302,7 +302,7 @@ def main() -> int:
         )
     lines += [
         "",
-        "100% local · zero Grok · purge NOT armed · next-sources not auto-landed",
+        "100% local ? zero Grok ? purge NOT armed ? next-sources not auto-landed",
         "[[Operations/Autonomous-Silo-Runbook-CANONICAL-2026-07-14]]",
     ]
     body = "\n".join(lines)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Four Worlds placement audit — REPORT ONLY (no moves).
+"""Four Worlds placement audit ? REPORT ONLY (no moves).
 
 Worlds:
   1 D:\\HermesData          runtime_ops
@@ -47,7 +47,7 @@ EXPLICIT_PATH_RE = re.compile(
     r"\\bporn\\b|adult-content|heat-doctrine)",
     re.I,
 )
-# Avoid false positives on clinical/medical if only "sexual" in medical context — still flag path
+# Avoid false positives on clinical/medical if only "sexual" in medical context ? still flag path
 EXPLICIT_CONTENT_RE = re.compile(
     r"\b(nsfw|onlyfans|pornHub|hentai|creampie|gangbang|"
     r"explicit\s+roleplay|nude\s+spread|barely.?covered\s+nipples)\b",
@@ -169,7 +169,7 @@ def main() -> int:
                 if "rp_garden_wall" in low or "garden wall" in low:
                     continue
                 if "vaultwalker" in low and "roleplay" in low and p.suffix == ".md":
-                    # policy docs mentioning RP — still note lightly
+                    # policy docs mentioning RP ? still note lightly
                     findings["explicit_mentions_in_policy_docs"].append(
                         {"path": path_s, "world": w, "via": "path" if hit_path else "content"}
                     )
@@ -229,7 +229,7 @@ def main() -> int:
         if low in {"gallery", "nsfw", "explicit", "harem", "comfy_output", "outputs"}:
             findings["suspicious_media_dirs_outside_rp"].append(str(p))
 
-    # 6) Sample: Roleplay-Sandbox path string leaks into K index files only — already covered
+    # 6) Sample: Roleplay-Sandbox path string leaks into K index files only ? already covered
 
     # Cap lists for readability
     for k, v in list(findings.items()):
@@ -257,14 +257,14 @@ def main() -> int:
             "Review explicit_outside_rp list; relocate confirmed RP media/notes into Roleplay-Sandbox (dry-run first)."
         )
     if summary["explicit_on_k"]:
-        recs.append("HIGH: explicit material on K: — move to Roleplay-Sandbox; scrub K copies after verify.")
+        recs.append("HIGH: explicit material on K: ? move to Roleplay-Sandbox; scrub K copies after verify.")
     if summary["life_signals_off_k"]:
         recs.append(
-            "Life/PII-like paths under D: — consider copy-to-K with provenance (not blind delete)."
+            "Life/PII-like paths under D: ? consider copy-to-K with provenance (not blind delete)."
         )
     if summary["runtime_trees_on_k"]:
         recs.append(
-            "Hermes/runtime-like trees on K: — confirm backup vs active; prefer D:\\HermesData as SSOT for code."
+            "Hermes/runtime-like trees on K: ? confirm backup vs active; prefer D:\\HermesData as SSOT for code."
         )
     if summary["suspicious_media_dirs_outside_rp"]:
         recs.append("Inspect media dirs outside RP; archive or move if heat/gallery content.")
@@ -287,9 +287,9 @@ def main() -> int:
 
     # Markdown report
     lines = [
-        f"# Four Worlds Placement Audit — {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        f"# Four Worlds Placement Audit ? {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "",
-        "**Mode:** audit only — **no files moved**",
+        "**Mode:** audit only ? **no files moved**",
         f"**Files scanned (capped walks):** {stats['scanned_files']}",
         f"**Canonical:** [[Operations/Four-Worlds-Silo-Architecture-CANONICAL-2026-07-10]]",
         "",
@@ -313,11 +313,11 @@ def main() -> int:
             return
         for it in items[:limit]:
             if isinstance(it, dict):
-                lines.append(f"- `{it.get('path')}` · world={it.get('world')} · {it.get('via', '')}")
+                lines.append(f"- `{it.get('path')}` ? world={it.get('world')} ? {it.get('via', '')}")
             else:
                 lines.append(f"- `{it}`")
         if len(items) > limit:
-            lines.append(f"- … +{len(items) - limit} more (see JSON)")
+            lines.append(f"- ? +{len(items) - limit} more (see JSON)")
 
     section("Explicit / RP-like OUTSIDE Roleplay-Sandbox", "explicit_outside_rp")
     section("Explicit ON K: (should not happen)", "explicit_on_k")

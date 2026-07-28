@@ -5,7 +5,7 @@ param(
   [string]$ProcessName = "Trailmakers"
 )
 
-# Inject mouse click via PostMessage to game HWND (client coords) — bypasses OS cursor focus fights
+# Inject mouse click via PostMessage to game HWND (client coords) - bypasses OS cursor focus fights
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;

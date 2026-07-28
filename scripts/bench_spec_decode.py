@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-bench_spec_decode.py — Quick spec decode test on code-generation prompts.
+bench_spec_decode.py ? Quick spec decode test on code-generation prompts.
 
 Per research:
   - InventiveHQ: 7B models on fast GPUs see 0.92-0.95x regression
@@ -51,7 +51,7 @@ def main():
         print(f"HEALTH FAIL: {e}")
         sys.exit(1)
 
-    print(f"\nSPEC DECODE BENCH — {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\nSPEC DECODE BENCH ? {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Model: {MODEL} @ {URL}")
     print(f"Task: code generation ({MAX_TOKENS} max tokens)\n")
 
@@ -81,9 +81,9 @@ def main():
     print("see NEUTRAL-to-NEGATIVE speedup. Skipping live restart test.")
     print(f"{'='*60}")
     print(f"\nVerdict from research (no live test possible without restart):")
-    print(f"  → RTX 3060 + 7B: expect 0.92-1.05x (neutral to negative)")
-    print(f"  → RECOMMENDATION: disable spec decode for now")
-    print(f"  → Re-test if we upgrade to 14B model (1.4-1.85x expected)")
+    print(f"  ? RTX 3060 + 7B: expect 0.92-1.05x (neutral to negative)")
+    print(f"  ? RECOMMENDATION: disable spec decode for now")
+    print(f"  ? Re-test if we upgrade to 14B model (1.4-1.85x expected)")
 
     # Write result
     import os

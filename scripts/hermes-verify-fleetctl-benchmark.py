@@ -5,18 +5,18 @@ running server or model files."""
 import sys, os, importlib.util, json, tempfile
 from pathlib import Path
 
-# ── helpers ──────────────────────────────────────────────────────────
+# -- helpers ----------------------------------------------------------
 VERDICT = {"pass": 0, "fail": 0, "skip": 0, "detail": []}
 
 def ok(msg):
     VERDICT["pass"] += 1
-    VERDICT["detail"].append(f"  ✅ {msg}")
+    VERDICT["detail"].append(f"  [OK] {msg}")
 def fail(msg):
     VERDICT["fail"] += 1
-    VERDICT["detail"].append(f"  ❌ {msg}")
+    VERDICT["detail"].append(f"  [FAIL] {msg}")
 def skip(msg):
     VERDICT["skip"] += 1
-    VERDICT["detail"].append(f"  ⏭️  {msg}")
+    VERDICT["detail"].append(f"  ??  {msg}")
 
 def module_path(name):
     p = Path(f"D:/PhronesisVault/scripts/{name}.py")
@@ -42,34 +42,34 @@ def subproc_ok(cmd, label, timeout=15):
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, shell=True)
         if r.returncode != 0:
-            fail(f"{label} → exit {r.returncode}: {r.stderr[:200]}")
+            fail(f"{label} -> exit {r.returncode}: {r.stderr[:200]}")
             return None
-        ok(f"{label} → exit 0")
+        ok(f"{label} -> exit 0")
         return r.stdout
     except subprocess.TimeoutExpired:
-        fail(f"{label} → TIMEOUT ({timeout}s)")
+        fail(f"{label} -> TIMEOUT ({timeout}s)")
         return None
     except Exception as e:
-        fail(f"{label} → exception: {e}")
+        fail(f"{label} -> exception: {e}")
         return None
 
-# ══════════════════════════════════════════════════════════════════════
+# ======================================================================
 print("=" * 62)
-print("  AD-HOC VERIFICATION — fleetctl promote/swap + benchmark")
+print("  AD-HOC VERIFICATION - fleetctl promote/swap + benchmark")
 print("=" * 62)
 
-# 1. Import parse — fleetctl.promote_helpers   (static parse check)
+# 1. Import parse - fleetctl.promote_helpers   (static parse check)
 # 2. Run fleetctl --help   (argparse entries exist)
 # 3. Import benchmark harness module
 # 4. Verify benchmark JSON output exists & valid
-# 5. Run fleetctl suggest (dry — uses existing data)
-# 6. Run fleetctl list (no model, no port — uses static data)
+# 5. Run fleetctl suggest (dry - uses existing data)
+# 6. Run fleetctl list (no model, no port - uses static data)
 
-# ── 1. fleetctl parse + promote helpers ──────────────────────────────
+# -- 1. fleetctl parse + promote helpers ------------------------------
 m = load_module("fleetctl")
 ok("fleetctl module loaded") if m else None
 
-# ── 2. fleetctl --help shows ALL 9 commands ──────────────────────────
+# -- 2. fleetctl --help shows ALL 9 commands --------------------------
 out = subproc_ok(
     "cd /d/PhronesisVault/scripts && python fleetctl.py --help",
     "fleetctl --help"
@@ -84,11 +84,11 @@ if out:
     else:
         ok("All 9 commands present in --help")
 
-# ── 3. benchmark harness module ──────────────────────────────────────
+# -- 3. benchmark harness module --------------------------------------
 bm = load_module("model_benchmark_harness")
 ok("benchmark harness module loaded") if bm else None
 
-# ── 4. benchmark harness --list → enumerates candidates ──────────────
+# -- 4. benchmark harness --list -> enumerates candidates --------------
 out2 = subproc_ok(
     "cd /d/PhronesisVault/scripts && python model_benchmark_harness.py --list",
     "benchmark harness --list"
@@ -103,7 +103,7 @@ if out2:
     if nums and int(nums[0]) > 0:
         ok(f"Found {nums[0]} unbenchmarked models")
 
-# ── 5. fleetctl suggest ──────────────────────────────────────────────
+# -- 5. fleetctl suggest ----------------------------------------------
 out3 = subproc_ok(
     "cd /d/PhronesisVault/scripts && python fleetctl.py suggest",
     "fleetctl suggest"
@@ -115,7 +115,7 @@ if out3:
     else:
         ok("suggest runs without benchmark error")
 
-# ── 6. fleetctl list ─────────────────────────────────────────────────
+# -- 6. fleetctl list -------------------------------------------------
 out4 = subproc_ok(
     "cd /d/PhronesisVault/scripts && python fleetctl.py list",
     "fleetctl list"
@@ -124,9 +124,9 @@ if out4:
     if "qwen" in out4.lower() or "qwythos" in out4.lower() or "llama" in out4.lower():
         ok("list returns model names")
     else:
-        fail(f"list output suspicious — no model names: {out4[:200]}")
+        fail(f"list output suspicious - no model names: {out4[:200]}")
 
-# ── 7. fleetctl info (on a known model) ──────────────────────────────
+# -- 7. fleetctl info (on a known model) ------------------------------
 out5 = subproc_ok(
     "cd /d/PhronesisVault/scripts && python fleetctl.py info qwythos-9b-abliterated-q6_k.gguf",
     "fleetctl info qwythos"
@@ -137,7 +137,7 @@ if out5:
     else:
         fail(f"info output missing expected fields: {out5[:200]}")
 
-# ── 8. Verify benchmark JSON files exist and parse valid ─────────────
+# -- 8. Verify benchmark JSON files exist and parse valid -------------
 bench_dir = Path("D:/PhronesisVault/Operations/benchmark-results")
 if bench_dir.exists():
     ok("benchmark-results/ directory exists")
@@ -148,21 +148,21 @@ if bench_dir.exists():
             try:
                 data = json.loads(jf.read_text())
                 if "model" in data and "tests" in data and "composite_score" in data:
-                    ok(f"  {jf.name}: {data['model']} — {data.get('pass_rate','?'):%} pass, composite {data.get('composite_score','?')}")
+                    ok(f"  {jf.name}: {data['model']} - {data.get('pass_rate','?'):%} pass, composite {data.get('composite_score','?')}")
                 else:
                     skip(f"  {jf.name}: missing expected fields (old format?)")
             except json.JSONDecodeError:
                 fail(f"  {jf.name}: invalid JSON")
     else:
-        fail("benchmark-results/ empty — no JSON files")
+        fail("benchmark-results/ empty - no JSON files")
 else:
     fail("benchmark-results/ directory missing")
 
-# ── 9. Tiered-context-benchmark exists ───────────────────────────────
+# -- 9. Tiered-context-benchmark exists -------------------------------
 tc = Path("D:/PhronesisVault/Operations/tiered-context-benchmark.jsonl")
 ok("tiered-context-benchmark.jsonl exists") if tc.exists() else fail("tiered-context-benchmark.jsonl missing")
 
-# ══════════════════════════════════════════════════════════════════════
+# ======================================================================
 print("\n" + "=" * 62)
 print(f"  RESULT: {VERDICT['pass']} passed, {VERDICT['fail']} failed, {VERDICT['skip']} skipped")
 print("=" * 62)

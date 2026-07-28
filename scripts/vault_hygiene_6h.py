@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Vault hygiene every 6h — light, travel-safe, no_agent cron entrypoint.
+"""Vault hygiene every 6h ? light, travel-safe, no_agent cron entrypoint.
 
-Research-aligned (BASB CODE + digital-garden automation 2025–26):
+Research-aligned (BASB CODE + digital-garden automation 2025?26):
   - Automate capture maps / organize / surface; proposal-only for distill merges.
   - Frequent light passes beat rare heavy thrash (SystemSculpt, Obsidian AI gardeners).
   - Keep interpretation + merge/split under Phase B weekly (human-gated waves).
 
 This script (LIGHT only):
-  A. refresh_folder_indexes.py  — living CNS 00-INDEX maps (wikilinks)
-  B. vaultwalker light dry-run   — PhronesisVault indexes + wall-safe (no deep relocate)
-  C. thin scorecard             — Operations/logs/vault-hygiene-6h-latest.md
+  A. refresh_folder_indexes.py  ? living CNS 00-INDEX maps (wikilinks)
+  B. vaultwalker light dry-run   ? PhronesisVault indexes + wall-safe (no deep relocate)
+  C. thin scorecard             ? Operations/logs/vault-hygiene-6h-latest.md
 
 NOT in this tick (heavier / separate):
   - Phase B merge/split proposals (weekly)
@@ -91,7 +91,7 @@ def main() -> int:
     ts = datetime.now(timezone.utc).isoformat()
     steps: list[dict] = []
 
-    # A) Index maps (living CNS only — script already skips Roleplay-Sandbox)
+    # A) Index maps (living CNS only ? script already skips Roleplay-Sandbox)
     steps.append(
         run_step(
             "refresh_folder_indexes",
@@ -109,7 +109,7 @@ def main() -> int:
         )
     )
 
-    # B) Light VaultWalker dry-run — second brain only
+    # B) Light VaultWalker dry-run ? second brain only
     steps.append(
         run_step(
             "vaultwalker_light",
@@ -183,13 +183,13 @@ def main() -> int:
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     md_body = (
-        f"""# Vault Hygiene 6h — {ts}
+        f"""# Vault Hygiene 6h ? {ts}
 
-**Score:** {score}/100 · pipeline_ok={pipeline_ok} · mode=light
+**Score:** {score}/100 ? pipeline_ok={pipeline_ok} ? mode=light
 
 ## Steps
 """
-        + "\n".join(f"- `{s['step']}` → exit {s['exit']}" for s in steps)
+        + "\n".join(f"- `{s['step']}` ? exit {s['exit']}" for s in steps)
         + f"""
 
 ## Notes

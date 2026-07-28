@@ -76,11 +76,11 @@ def main() -> int:
             labels = list(sess.get("labels") or [])
             if labels:
                 label = labels[-1]
-                caption = f"{label} — {png.name}"
+                caption = f"{label} ? {png.name}"
     except Exception:
         pass
     if not caption:
-        caption = f"Series — {png.name}"
+        caption = f"Series ? {png.name}"
     proc = run_hidden(
         [prefer_pythonw(sys.executable), str(POST_SCRIPT), channel, str(png), caption],
         capture_output=True,

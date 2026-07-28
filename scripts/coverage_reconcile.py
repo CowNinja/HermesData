@@ -72,10 +72,10 @@ def main() -> int:
 
     pct = (100.0 * tracked / scanned) if scanned else 0.0
     lines = [
-        f"# Coverage reconcile — {utc()}",
+        f"# Coverage reconcile ? {utc()}",
         "",
         f"scanned={scanned} tracked_path={tracked} untracked={untracked} **path_coverage={pct:.1f}%**",
-        f"registry_rows={rows_n} unique_hashes≈{hash_n}",
+        f"registry_rows={rows_n} unique_hashes?{hash_n}",
         "",
         "## Sample untracked",
         "",

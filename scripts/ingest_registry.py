@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ingestion registry — SSOT for what is already on K from external sources.
+"""Ingestion registry ? SSOT for what is already on K from external sources.
 
 Tracks: source path, dest path, sha256, status, process flags, purge eligibility.
 Prevents re-copy / re-process. Does NOT delete sources.
@@ -159,7 +159,7 @@ def backfill_from_meta(con: sqlite3.Connection, root: Path = K_SILO) -> int:
         source = data.get("source") or data.get("source_path")
         dest = data.get("dest") or data.get("dest_path")
         if not source or not dest:
-            # train meta has source=dest often — skip non-drain
+            # train meta has source=dest often ? skip non-drain
             if "from-g-drive" not in str(meta) and "pilot" not in str(meta).lower():
                 continue
             dest = str(meta).replace(".meta.json", "")
@@ -192,7 +192,7 @@ def mark_process(con: sqlite3.Connection, dest: str, process_status: str) -> Non
 
 
 def set_purge_eligible(con: sqlite3.Connection, source: str, eligible: bool) -> None:
-    """Only marks flag — never deletes."""
+    """Only marks flag ? never deletes."""
     con.execute(
         "UPDATE ingest SET purge_eligible=?, last_seen=? WHERE source_path=?",
         (1 if eligible else 0, utc(), source),
@@ -235,7 +235,7 @@ def stats(con: sqlite3.Connection) -> dict:
 def write_receipt(con: sqlite3.Connection) -> None:
     s = stats(con)
     lines = [
-        f"# Ingest registry — {utc()}",
+        f"# Ingest registry ? {utc()}",
         "",
         f"**DB:** `{DB}`",
         f"**Rows:** {s['total_ingest_rows']}",

@@ -39,7 +39,7 @@ except ImportError:
 
 _bootstrap_env()
 
-# Failure taxonomy (transient/permanent/capacity/...) — see Operations/resilience_primitives.md
+# Failure taxonomy (transient/permanent/capacity/...) ? see Operations/resilience_primitives.md
 try:
     from sovereign_failure_taxonomy import annotate_issues as _annotate_issues
 except ImportError:  # pragma: no cover
@@ -94,7 +94,7 @@ TOOLBOX = {
     "fleet_curator": SCRIPTS / "opportunistic_fleet_agent.py",
     "resource_mgr": SCRIPTS / "model_resource_manager.py",
     "priority_curator": SCRIPTS / "model_priority_curator.py",
-    # Tier harness (808x / ephemeral) — NOT for unified resident stack
+    # Tier harness (808x / ephemeral) ? NOT for unified resident stack
     "benchmark_harness": SCRIPTS / "model_benchmark_harness.py",
     # Resident OpenAI-compat suite against live :8090/:8091 (L06 clear path)
     "benchmark_resident": SCRIPTS / "benchmark_model.py",
@@ -167,7 +167,7 @@ def _parse_session_health_patterns() -> List[str]:
         return []
     try:
         raw = SESSION_HEALTH_LOG.read_bytes()
-        # Tail window — ignore ancient incident prose.
+        # Tail window ? ignore ancient incident prose.
         text = raw[-16384:].decode("utf-8", errors="replace").lower()
     except Exception:
         return []
@@ -363,7 +363,7 @@ def _run_active_resident_benchmark(*, timeout: int = 900) -> Dict[str, Any]:
         return {
             "ok": False,
             "error": "no_resident_endpoint",
-            "message": "Neither :8090 nor :8091 answering — start-llama/heal first",
+            "message": "Neither :8090 nor :8091 answering ? start-llama/heal first",
             "action": "benchmark-active",
         }
 
@@ -430,7 +430,7 @@ def _run_active_resident_benchmark(*, timeout: int = 900) -> Dict[str, Any]:
     # Suite prints human text (not JSON-only); exit 0 + file with tests = success
     ok = out_path.is_file() and total > 0 and proc.returncode == 0
     if not ok and out_path.is_file() and total > 0:
-        # Some shells may non-zero on warnings — accept file with tests
+        # Some shells may non-zero on warnings ? accept file with tests
         ok = True
 
     result = {
@@ -548,7 +548,7 @@ def _local_smoke_probe(
     Research: llama.cpp #20408 reasoning_effort; local-model-management reasoning_content
     gotcha (2026-07-18 L07 root cause).
 
-    2026-07-19: default timeout 20s / retries 2 (was 45/3 ≈ 140s wall) so light ticks
+    2026-07-19: default timeout 20s / retries 2 (was 45/3 ? 140s wall) so light ticks
     stay inside agent/tool budgets. Callers can raise for full-tick deep smoke.
     Queue-aware path (assess_local_models) may call again with SMOKE_BUSY_* budgets.
     """
@@ -617,13 +617,13 @@ def _local_smoke_probe(
 
 
 def _queue_aware_local_smoke(port: int = 8090) -> Dict[str, Any]:
-    """Short smoke first; busy-GPU timeout → L07T without thrashing the single slot.
+    """Short smoke first; busy-GPU timeout ? L07T without thrashing the single slot.
 
     Design (2026-07-19 measure): long Discord gen holds slot ~minutes at ~5 t/s.
-    A 45s×2 retry burns the light-tick budget and still loses. Prefer:
+    A 45s?2 retry burns the light-tick budget and still loses. Prefer:
       1) 15s single probe
-      2) if timeout + (gpu busy OR nvidia-smi unknown) → one 30s retry only
-      3) residual timeout → transient_timeout=True (caller emits L07T low)
+      2) if timeout + (gpu busy OR nvidia-smi unknown) ? one 30s retry only
+      3) residual timeout ? transient_timeout=True (caller emits L07T low)
     """
     gpu = _gpu_busy_hint()
     smoke = _local_smoke_probe(port=port, timeout=15.0, retries=1)
@@ -632,7 +632,7 @@ def _queue_aware_local_smoke(port: int = 8090) -> Dict[str, Any]:
     timed_out = ("timed out" in err) or ("timeout" in err)
     if smoke.get("ok") or not timed_out:
         return smoke
-    # Busy or unknown GPU: one medium retry, then transient — never start-llama.
+    # Busy or unknown GPU: one medium retry, then transient ? never start-llama.
     if gpu.get("busy") or gpu.get("ok") is False:
         retry = _local_smoke_probe(port=port, timeout=30.0, retries=1)
         retry["gpu_busy"] = gpu
@@ -644,7 +644,7 @@ def _queue_aware_local_smoke(port: int = 8090) -> Dict[str, Any]:
             if "timed out" in rerr or "timeout" in rerr:
                 retry["transient_timeout"] = True
         return retry
-    # Timeout but GPU reports idle — still likely slot contention; mark transient.
+    # Timeout but GPU reports idle ? still likely slot contention; mark transient.
     smoke["transient_timeout"] = True
     return smoke
 
@@ -794,9 +794,9 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
     )
     if node.get("up") and not smoke.get("ok"):
         # Health up + smoke fail is NOT "start-llama" (would thrash a live PID for 150s+).
-        # L07 → manual/retry path; start-llama only when port is actually down (L03).
-        # Timeout on cold/busy 3060 is medium (not high) — health already proves process live.
-        # 2026-07-19: residual timeout after queue-aware retry → L07T low/transient (GPU busy).
+        # L07 ? manual/retry path; start-llama only when port is actually down (L03).
+        # Timeout on cold/busy 3060 is medium (not high) ? health already proves process live.
+        # 2026-07-19: residual timeout after queue-aware retry ? L07T low/transient (GPU busy).
         err = str(smoke.get("error") or smoke.get("preview") or "bad response")
         is_timeout = "timed out" in err.lower() or "timeout" in err.lower()
         if is_timeout and (
@@ -811,7 +811,7 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
                     "message": (
                         f"Local smoke transient timeout under load: {err} "
                         f"(gpu_busy={bool((smoke.get('gpu_busy') or {}).get('busy'))}; "
-                        "health up — do not restart llama)"
+                        "health up ? do not restart llama)"
                     ),
                     "fix": "none",
                     "hint": "queue-aware: Discord/long-gen owns the single slot; recheck after idle",
@@ -825,11 +825,11 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
                     "severity": sev,
                     "message": f"Local smoke inference failed: {err}",
                     "fix": "manual",
-                    "hint": "health up but chat failed — check busy GPU / enable_thinking / template; do not dual-start",
+                    "hint": "health up but chat failed ? check busy GPU / enable_thinking / template; do not dual-start",
                 }
             )
     elif node.get("up") and smoke.get("ok"):
-        # SLO: success but slow — warn/info only (does not flip stack RED).
+        # SLO: success but slow ? warn/info only (does not flip stack RED).
         try:
             lat = int(smoke.get("latency_ms") or 0)
         except (TypeError, ValueError):
@@ -844,7 +844,7 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
                     "severity": "low",
                     "message": (
                         f"Local smoke slow ({lat}ms >= {SMOKE_LATENCY_WARN_MS}ms SLO) "
-                        f"— GPU busy/thermal/ctx pressure; inference still OK"
+                        f"? GPU busy/thermal/ctx pressure; inference still OK"
                     ),
                     "fix": "none",
                 }
@@ -857,7 +857,7 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
                     "severity": "info",
                     "message": (
                         f"Local smoke elevated ({lat}ms >= {SMOKE_LATENCY_INFO_MS}ms info) "
-                        f"— under warn budget {SMOKE_LATENCY_WARN_MS}ms"
+                        f"? under warn budget {SMOKE_LATENCY_WARN_MS}ms"
                     ),
                     "fix": "none",
                 }
@@ -879,14 +879,109 @@ def assess_local_models(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str
 
 
 def assess_stack(stack: Dict[str, Any]) -> Dict[str, Any]:
+    """Port liveness first. Do not S03-heal when ports are up but GGUF match probe flaked.
+
+    stack_ready in verify_unified_stack requires match; under load /v1/models can return
+    empty loaded ? false-negative stack_ready ? heal hang. Ports-up is enough for
+    serve path; identity drift is a separate low/medium L-code (2026-07-27 hang fix).
+    """
     issues: List[Dict[str, Any]] = []
-    if not (stack.get("8091") or {}).get("up"):
+    n8090 = stack.get("8090") or {}
+    n8091 = stack.get("8091") or {}
+    n8642 = stack.get("8642") or {}
+    up8090 = bool(n8090.get("up"))
+    up8091 = bool(n8091.get("up"))
+    up8642 = bool(n8642.get("up"))
+    if not up8091:
         issues.append({"code": "S01", "severity": "high", "message": "Proxy :8091 down", "fix": "start-proxy"})
-    if not (stack.get("8642") or {}).get("up"):
+    if not up8642:
         issues.append({"code": "S02", "severity": "medium", "message": "Gateway :8642 down", "fix": "restart-gateway"})
+    if not up8090:
+        issues.append({"code": "S04", "severity": "high", "message": "Llama :8090 down", "fix": "start-llama"})
+    ports_ok = up8090 and up8091 and up8642
     if not stack.get("stack_ready"):
-        issues.append({"code": "S03", "severity": "high", "message": "Stack incomplete", "fix": "heal"})
-    return {"stack_ready": stack.get("stack_ready"), "issues": issues}
+        if ports_ok:
+            # Identity/match probe flake ? do NOT heal (was hanging light ticks)
+            loaded = n8090.get("loaded")
+            match = n8090.get("match")
+            issues.append(
+                {
+                    "code": "S03b",
+                    "severity": "low",
+                    "message": f"stack_ready false but ports up (loaded={loaded!r} match={match})",
+                    "fix": "none",
+                    "hint": "identity probe only; serve path viable ? skip heal",
+                }
+            )
+        else:
+            issues.append({"code": "S03", "severity": "high", "message": "Stack incomplete", "fix": "heal"})
+    return {
+        "stack_ready": stack.get("stack_ready"),
+        "ports_ok": ports_ok,
+        "serve_path_ok": ports_ok,
+        "issues": issues,
+    }
+
+
+def assess_router_efficiency() -> Dict[str, Any]:
+    """Router efficiency residuals via muscle SSOT (dual/lock/queue/circuit).
+
+    Safe auto-fix is delegated to router_efficiency_muscle.py (never kill live image).
+    """
+    issues: List[Dict[str, Any]] = []
+    muscle = _run_python(SCRIPTS / "router_efficiency_muscle.py", ["--json", "--no-write"], timeout=45)
+    grade = str(muscle.get("grade") or "").upper()
+    six = muscle.get("six_numbers") if isinstance(muscle.get("six_numbers"), dict) else {}
+    findings = muscle.get("findings") if isinstance(muscle.get("findings"), list) else []
+    safe = muscle.get("safe_actions") if isinstance(muscle.get("safe_actions"), list) else []
+
+    if grade == "RED":
+        issues.append(
+            {
+                "code": "R01",
+                "severity": "high",
+                "message": f"Router efficiency RED: {', '.join(str(f) for f in findings[:4]) or 'see muscle'}",
+                "fix": "router-efficiency",
+                "hint": "python D:/HermesData/scripts/router_efficiency_muscle.py --apply",
+            }
+        )
+    elif grade == "YELLOW":
+        # Dual with live image is expected YELLOW ? medium only if safe_actions pending
+        sev = "medium" if safe else "low"
+        issues.append(
+            {
+                "code": "R02",
+                "severity": sev,
+                "message": f"Router efficiency YELLOW: {', '.join(str(f) for f in findings[:4]) or 'residual'}",
+                "fix": "router-efficiency" if safe else "none",
+                "hint": "python D:/HermesData/scripts/router_efficiency_muscle.py --apply",
+            }
+        )
+    try:
+        q = int(six.get("queue_waiting") or 0)
+    except (TypeError, ValueError):
+        q = 0
+    if q >= 3 and grade != "RED":
+        # Ensure queue pressure is visible even if grade already yellow
+        if not any(i.get("code") in ("R01", "R02") for i in issues):
+            issues.append(
+                {
+                    "code": "R03",
+                    "severity": "medium",
+                    "message": f"Inference queue waiting={q} pressure={six.get('pressure_tier')}",
+                    "fix": "router-efficiency",
+                    "hint": "python D:/HermesData/scripts/router_efficiency_muscle.py --apply",
+                }
+            )
+    return {
+        "grade": grade or None,
+        "six_numbers": six,
+        "findings": findings,
+        "safe_actions_n": len(safe),
+        "prefer_fleet_offload": muscle.get("prefer_fleet_offload"),
+        "issues": issues,
+        "muscle_rc": muscle.get("returncode") if "returncode" in muscle else muscle.get("rc"),
+    }
 
 
 def assess_cloud_fleet(*, probe: bool) -> Dict[str, Any]:
@@ -1085,7 +1180,7 @@ def assess_constellation(
 def assess_inventory(core: Dict[str, Any], stack: Dict[str, Any]) -> Dict[str, Any]:
     """Inventory <-> disk <-> models.ini drift via fleetctl (read-only)."""
     loaded = str((stack.get("8090") or {}).get("loaded") or "")
-    # Bounded 30s (was 60) — hang guard 2026-07-19; drift is advisory not critical path
+    # Bounded 30s (was 60) ? hang guard 2026-07-19; drift is advisory not critical path
     drift = _run_python(TOOLBOX["fleetctl"], ["drift", "--json", "--loaded", loaded], timeout=30)
     issues: List[Dict[str, Any]] = []
     for problem in (drift.get("problems") or []):
@@ -1140,7 +1235,7 @@ def assess_fleet_recommendations(*, locked: bool) -> Dict[str, Any]:
         )
     unbench = int(suggest.get("unbenchmarked_count") or 0)
     # F03: when rotation is LOCKED (Qwythos pin law), unbenchmarked inventory is
-    # informational only — do not emit an actionable issue that nags full-tick.
+    # informational only ? do not emit an actionable issue that nags full-tick.
     # Operator can still read suggest.unbenchmarked_count / f03_suppressed.
     if unbench > 3 and not locked:
         issues.append(
@@ -1157,7 +1252,7 @@ def assess_fleet_recommendations(*, locked: bool) -> Dict[str, Any]:
         suggest["f03_suppressed"] = {
             "reason": "model_rotation_locked",
             "unbenchmarked_count": unbench,
-            "law": "Qwythos-9B pin — fleet suggest is observe-only until unlock",
+            "law": "Qwythos-9B pin ? fleet suggest is observe-only until unlock",
         }
     return {"suggest": suggest, "issues": issues}
 
@@ -1192,7 +1287,7 @@ def remediate(
     allow_benchmark: bool = False,
 ) -> List[Dict[str, Any]]:
     """Apply bounded fixes using existing scripts. Priority: stack -> model -> cloud."""
-    fix_order = ["heal", "start-llama", "start-proxy", "restart-gateway", "auto-disable-cloud", "benchmark-active"]
+    fix_order = ["heal", "start-llama", "start-proxy", "router-efficiency", "restart-gateway", "auto-disable-cloud", "benchmark-active"]
     actions_taken: List[Dict[str, Any]] = []
     seen_fixes: set = set()
 
@@ -1208,6 +1303,9 @@ def remediate(
                 continue
         elif fix_id == "start-proxy":
             if not any(i.get("fix") == "start-proxy" for i in all_issues):
+                continue
+        elif fix_id == "router-efficiency":
+            if not any(i.get("fix") == "router-efficiency" for i in all_issues):
                 continue
         elif fix_id == "restart-gateway":
             if not any(i.get("fix") == "restart-gateway" for i in all_issues):
@@ -1243,18 +1341,26 @@ def remediate(
                     "ok": True,
                     "skipped": True,
                     "reason": "8090_already_healthy",
-                    "hint": "skip start-llama — live health ok (2026-07-19 hang guard)",
+                    "hint": "skip start-llama ? live health ok (2026-07-19 hang guard)",
                 }
             else:
                 result = _run_warm_action("start-llama")
         elif fix_id == "start-proxy":
             result = _run_warm_action("start-proxy")
+        elif fix_id == "router-efficiency":
+            # Bound muscle apply so light ticks cannot hang (wall budget 2026-07-27)
+            result = _run_python(SCRIPTS / "router_efficiency_muscle.py", ["--apply", "--json"], timeout=90)
+            # Normalize ok from after_grade when script returns non-zero only on RED
+            if "after_grade" in result or "grade" in result:
+                g = str(result.get("after_grade") or result.get("grade") or "")
+                result = dict(result)
+                result.setdefault("ok", g in ("ROCK", "YELLOW") or bool(result.get("ok")))
         elif fix_id == "restart-gateway":
             result = _run_warm_action("restart-gateway")
         elif fix_id == "auto-disable-cloud":
             result = _run_python(TOOLBOX["fleet_curator"], ["--auto-fix"], timeout=90)
         elif fix_id == "benchmark-active":
-            # Unified stack: bench resident :8090/:8091 — never legacy tier :8081
+            # Unified stack: bench resident :8090/:8091 ? never legacy tier :8081
             result = _run_active_resident_benchmark(timeout=900)
         else:
             continue
@@ -1263,7 +1369,7 @@ def remediate(
         if result.get("ok"):
             time.sleep(2)
 
-    # Unified resource manager preflight as final pass — only when we actually healed ports
+    # Unified resource manager preflight as final pass ? only when we actually healed ports
     if not dry_run and any(
         a.get("action") in ("heal", "start-llama", "start-proxy") and a.get("ok") and not a.get("skipped")
         for a in actions_taken
@@ -1279,7 +1385,23 @@ def run_tick(
     mode: str = "tick",
     dry_run: bool = False,
     remediate_flag: bool = True,
+    wall_budget_s: float | None = None,
 ) -> Dict[str, Any]:
+    """Light/full assess + rank + safe remediate.
+
+    wall_budget_s: hard ceiling for light ticks (default 90s light / 300s full).
+    Prevents board A5 hang when heal/smoke thrash under GPU contention (2026-07-27).
+    """
+    t_wall0 = time.time()
+    if wall_budget_s is None:
+        wall_budget_s = 90.0 if mode != "full" else 300.0
+
+    def _budget_left() -> float:
+        return max(0.0, float(wall_budget_s) - (time.time() - t_wall0))
+
+    def _over_budget() -> bool:
+        return _budget_left() < 5.0
+
     verify_stack, get_gpu, load_core = _import_stack()
     build_priority, write_priority = _import_curator()
 
@@ -1289,17 +1411,25 @@ def run_tick(
 
     local = assess_local_models(core, stack)
     stack_assess = assess_stack(stack)
-    cloud = assess_cloud_fleet(probe=(mode == "full"))
-    paid = assess_paid_fallbacks()
-    inventory = assess_inventory(core, stack)
-    constellation = assess_constellation(core, gpu, stack)
-    fleet = assess_fleet_recommendations(locked=bool(core.get("model_rotation_locked", True))) if mode == "full" else {
-        "suggest": None,
-        "issues": [],
-    }
+    router_eff = assess_router_efficiency()
+    if _over_budget():
+        cloud = {"issues": [], "skipped": True, "reason": "wall_budget"}
+        paid = {"entries": [], "issues": []}
+        inventory = {"issues": []}
+        constellation = {"issues": []}
+        fleet = {"suggest": None, "issues": []}
+    else:
+        cloud = assess_cloud_fleet(probe=(mode == "full"))
+        paid = assess_paid_fallbacks()
+        inventory = assess_inventory(core, stack)
+        constellation = assess_constellation(core, gpu, stack)
+        fleet = assess_fleet_recommendations(locked=bool(core.get("model_rotation_locked", True))) if mode == "full" else {
+            "suggest": None,
+            "issues": [],
+        }
 
     all_issues: List[Dict[str, Any]] = []
-    for block in (stack_assess, local, inventory, constellation, cloud, paid, fleet):
+    for block in (stack_assess, router_eff, local, inventory, constellation, cloud, paid, fleet):
         all_issues.extend(block.get("issues") or [])
 
     # Annotate failure_class (transient/permanent/capacity/degraded/policy)
@@ -1310,7 +1440,8 @@ def run_tick(
         all_issues = [i for i in all_issues if i.get("fix") != "heal"]
 
     remediations: List[Dict[str, Any]] = []
-    if remediate_flag and not dry_run:
+    budget_hit = False
+    if remediate_flag and not dry_run and not _over_budget():
         remediations = remediate(
             all_issues,
             dry_run=False,
@@ -1330,8 +1461,11 @@ def run_tick(
                 ]
             if any(r.get("ok") for r in remediations):
                 local = assess_local_models(core, stack)
+    elif remediate_flag and not dry_run and _over_budget():
+        budget_hit = True
+        remediations = [{"action": "skipped_wall_budget", "ok": False, "wall_s": round(time.time() - t_wall0, 2)}]
 
-    priority = build_priority(refresh_cloud=(mode == "full"))
+    priority = build_priority(refresh_cloud=(mode == "full" and not _over_budget()))
     priority["agent"] = {
         "name": "model_management_agent",
         "mode": mode,
@@ -1339,24 +1473,50 @@ def run_tick(
         "remediation_count": len(remediations),
         "capabilities": CAPABILITIES,
         "limitations": LIMITATIONS,
+        "wall_budget_s": wall_budget_s,
+        "wall_used_s": round(time.time() - t_wall0, 2),
     }
     write_priority(priority)
+
+    # 2026-07-27: V01/R02 under live image lock are lawful single-GPU residuals.
+    # Demote to low so agent stays green; board A5 must not YELLOW on image gen alone.
+    try:
+        if str(SCRIPTS) not in sys.path:
+            sys.path.insert(0, str(SCRIPTS))
+        from image_job_lock import status as _ij_status  # noqa: WPS433
+
+        _lock = _ij_status() or {}
+        _lock_held = bool(_lock.get("held") and not _lock.get("stale"))
+    except Exception:
+        _lock_held = False
+    if _lock_held:
+        for _i in all_issues:
+            if str(_i.get("code") or "") in ("V01", "R02"):
+                _i["severity"] = "low"
+                _i["soft"] = "lawful_image_lock"
+                _i["fix"] = _i.get("fix") or "none"
 
     status = "green"
     if any(i.get("severity") == "critical" for i in all_issues):
         status = "red"
     elif any(i.get("severity") in ("high", "medium") for i in all_issues):
         status = "amber"
-    elif not stack.get("stack_ready"):
+    elif not stack.get("stack_ready") and not (stack_assess.get("ports_ok") or stack_assess.get("serve_path_ok")):
         status = "amber"
+    # ports_ok with only S03b low ? green/amber soft
+    elif not stack.get("stack_ready") and (stack_assess.get("ports_ok") or stack_assess.get("serve_path_ok")):
+        if status == "green" and any(i.get("severity") == "low" for i in all_issues):
+            status = "green"  # serve path OK; identity probe flake is non-blocking
 
     diagnostics: Dict[str, Any] = {"skipped": True}
-    # Only run heavy diagnostics when stack is not ready (avoids 60–120s hang on healthy amber).
+    # Only run heavy diagnostics when stack ports are actually down (hang guard).
+    ports_ok = bool(stack_assess.get("ports_ok") or stack_assess.get("serve_path_ok"))
     if (
         status in ("amber", "red")
         and remediate_flag
         and not dry_run
-        and not stack.get("stack_ready")
+        and not ports_ok
+        and not _over_budget()
     ):
         diagnostics = _run_diagnostics_preflight(repair=(status == "red"))
         if diagnostics.get("ok") and status == "red":
@@ -1364,12 +1524,14 @@ def run_tick(
             local = assess_local_models(core, stack)
             if stack.get("stack_ready"):
                 status = "amber" if all_issues else "green"
-    elif status in ("amber", "red") and stack.get("stack_ready"):
+    elif status in ("amber", "red") and ports_ok:
         diagnostics = {
             "skipped": True,
-            "reason": "stack_ready_skip_preflight",
-            "note": "2026-07-19 hang guard: amber with live stack does not run resource preflight",
+            "reason": "ports_ok_skip_preflight",
+            "note": "2026-07-27 hang guard: ports up does not run resource preflight",
         }
+    elif budget_hit:
+        diagnostics = {"skipped": True, "reason": "wall_budget"}
 
     reflection = _self_reflection(
         status=status,
@@ -1381,15 +1543,18 @@ def run_tick(
 
     state = {
         "panel_type": "model_management_agent",
-        "version": "1.3",
+        "version": "1.4",
         "updated_at": _utc_now(),
         "status": status,
         "mode": mode,
         "dry_run": dry_run,
+        "wall_budget_s": wall_budget_s,
+        "wall_used_s": round(time.time() - t_wall0, 2),
         "stack": stack,
         "gpu": gpu,
         "assessments": {
             "stack": stack_assess,
+            "router_efficiency": router_eff,
             "local": local,
             "inventory": inventory,
             "constellation": constellation,
@@ -1443,6 +1608,7 @@ CAPABILITIES = [
     "Cloud provider health probes when fleet enabled (--full-tick)",
     "Auto-disable repeatedly failing cloud providers (opportunistic_fleet_agent)",
     "Bounded self-heal: heal / start-llama / start-proxy / restart-gateway (warm_tier_actions)",
+    "Router efficiency muscle: dual-tenant / image-lock / queue-pressure / circuit (router_efficiency_muscle)",
     "Resource manager preflight with auto-recover (model_resource_manager)",
     "Optional harness benchmark on --full-tick or --benchmark-active",
     "Writes agent + priority state for dashboard panel and cron consumers",
@@ -1459,7 +1625,8 @@ LIMITATIONS = [
     "Paid API probes require env API keys -- missing keys flagged, not auto-fixed",
     "Max 4 remediation actions per tick to avoid restart storms",
     "Split/multi-part GGUF files flagged manual -- no auto-merge",
-    "Does not manage :9119 CLI dashboard or ComfyUI VRAM contention",
+    "Does not manage :9119 CLI dashboard or kill live Comfy/Forge image jobs",
+    "Router efficiency auto-heal never force-starts :8090 under live image lock",
     "Light --tick skips cloud probes, fleet suggest, and harness auto-run",
 ]
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-hierarchical_chunker.py — Token-aware parent-child document chunking.
+hierarchical_chunker.py ? Token-aware parent-child document chunking.
 
 Splits massive unstructured sources into hierarchical context blocks:
-  document → section → paragraph (parent-child graph)
+  document ? section ? paragraph (parent-child graph)
 
 Usage:
   python hierarchical_chunker.py --file path/to/doc.txt

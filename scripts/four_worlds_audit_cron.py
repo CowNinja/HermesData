@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Four Worlds placement audit cron — REPORT ONLY (never moves).
+"""Four Worlds placement audit cron ? REPORT ONLY (never moves).
 
 Flags misplacement: RP outside sandbox, life data in runtime, etc.
 Safe while traveling. Full audit script: four_worlds_placement_audit.py
@@ -52,7 +52,7 @@ def main() -> int:
             "mode": "report_only",
         }
     except subprocess.TimeoutExpired:
-        # Partial/timeout: still "ok" for cron green — audit is best-effort report
+        # Partial/timeout: still "ok" for cron green ? audit is best-effort report
         payload = {
             "ts": ts,
             "ok": True,

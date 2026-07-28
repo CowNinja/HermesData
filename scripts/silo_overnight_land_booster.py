@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Overnight land booster — single-writer gold waves for Jeff sleep cook.
+"""Overnight land booster ? single-writer gold waves for Jeff sleep cook.
 
 Runs up to --hours. Only starts a drain if no land writers are active
 (continuous/orch/focus/drain). Prefer continuous as primary; this is a
@@ -127,18 +127,18 @@ def main() -> int:
 
     while datetime.now(timezone.utc) < deadline:
         if STOP.is_file():
-            log("STOP present — exit")
+            log("STOP present ? exit")
             break
         busy = land_busy()
         # Only fire if no focus/drain active. Prefer continuous primary:
-        # if continuous alive AND focus/drain busy → sleep.
+        # if continuous alive AND focus/drain busy ? sleep.
         if busy.get("busy", 0) > 0:
-            log(f"land busy {busy} — sleep {args.sleep}s")
+            log(f"land busy {busy} ? sleep {args.sleep}s")
             time.sleep(args.sleep)
             continue
         # If continuous is mid-tick with orch only, wait (orch may spawn focus)
         if busy.get("silo_orchestrator_tick.py", 0) > 0:
-            log(f"orch active {busy} — sleep {args.sleep}s")
+            log(f"orch active {busy} ? sleep {args.sleep}s")
             time.sleep(args.sleep)
             continue
         # Continuous idle (or missing): run one gold wave

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Overnight silo watchdog — restart continuous if state stale; never touch gateway.
+"""Overnight silo watchdog ? restart continuous if state stale; never touch gateway.
 
-Safe for Task Scheduler every 15–30 min. $0 LLM.
+Safe for Task Scheduler every 15?30 min. $0 LLM.
 Always launches continuous with pythonw + CREATE_NO_WINDOW (no focus steal).
 
 Critical: long ticks update heartbeat_at but not cycle `at` until complete.
@@ -38,9 +38,9 @@ PY = str(next((p for p in _PY_CANDIDATES if p.is_file()), Path(sys.executable)))
 SCRIPT = r"D:\HermesData\scripts\silo_continuous_loop.py"
 # Long drains legitimately exceed 15m; only restart if NO fresh heartbeat either.
 STALE_S = 1800  # 30 min without cycle completion
-HEARTBEAT_FRESH_S = 900  # 15 min — tick still progressing
+HEARTBEAT_FRESH_S = 900  # 15 min ? tick still progressing
 
-# Full land tree — kill together to prevent multi-writer orphans
+# Full land tree ? kill together to prevent multi-writer orphans
 LAND_MARKERS = (
     "silo_continuous_loop.py",
     "silo_orchestrator_tick.py",
@@ -125,7 +125,7 @@ def start_continuous() -> int:
     # Do not start a second owner
     if continuous_running():
         return -1
-    # Respect STOP — never clear it here (Jeff / operator owns STOP)
+    # Respect STOP ? never clear it here (Jeff / operator owns STOP)
     if STOP.is_file():
         return -2
     # Prefer wscript (true detach from Job Objects) so schtasks/Grok shells
@@ -236,7 +236,7 @@ def _list_marker_pids(marker: str) -> list[int]:
 def prune_excess_drains() -> list[int]:
     """If multiple drains, keep oldest PID and kill the rest (soft dual fix).
 
-    Prefer this over full land-tree restart when continuous heartbeat is fresh —
+    Prefer this over full land-tree restart when continuous heartbeat is fresh ?
     full restart interrupts a healthy multi-hour Google_Backups wave.
     """
     pids = _list_marker_pids("g_to_k_safe_drain.py")
@@ -266,12 +266,12 @@ def prune_excess_drains() -> list[int]:
 
 def main() -> int:
     if STOP.is_file():
-        log("STOP file present — no restart")
+        log("STOP file present ? no restart")
         return 0
     # Dual-writer gate first (research: SQLite = one writer; orphans from parent-only kill)
     dual = dual_land_writers()
     if dual.get("bad"):
-        # Soft path: only excess drains, continuous heartbeat fresh → prune not thrash
+        # Soft path: only excess drains, continuous heartbeat fresh ? prune not thrash
         age, src = freshness_seconds()
         only_drain = (
             dual.get("drain", 0) > 1
@@ -289,9 +289,9 @@ def main() -> int:
             dual2 = dual_land_writers()
             if not dual2.get("bad"):
                 return 0
-            log(f"soft_prune insufficient dual2={dual2} — escalate full tree restart")
+            log(f"soft_prune insufficient dual2={dual2} ? escalate full tree restart")
         log(
-            f"dual_land_writers counts={dual} — kill full land tree then single restart"
+            f"dual_land_writers counts={dual} ? kill full land tree then single restart"
         )
         kill_land_tree()
         pid = start_continuous()
@@ -308,13 +308,13 @@ def main() -> int:
         log(f"ok running soft-age={int(age)}s src={src} (under hard stale)")
         return 0
     if running and age is not None and age >= STALE_S:
-        log(f"stale age={int(age)}s src={src} — kill land tree then single restart")
+        log(f"stale age={int(age)}s src={src} ? kill land tree then single restart")
         kill_land_tree()
     elif not running:
         # Overnight 2026-07-18 lesson: continuous can die while a healthy single
         # focus/drain wave is still copying. Full land-tree cleanup then aborts
         # multi-hour Google_Backups progress. If writers are single and drain/focus
-        # is live, only restart continuous — do not kill the active wave.
+        # is live, only restart continuous ? do not kill the active wave.
         healthy_orphan_wave = (
             dual.get("drain", 0) <= 1
             and dual.get("focus_land", 0) <= 1
@@ -323,14 +323,14 @@ def main() -> int:
         )
         if healthy_orphan_wave:
             log(
-                f"not running — start WITHOUT land-tree kill "
+                f"not running ? start WITHOUT land-tree kill "
                 f"(preserve live single drain/focus) dual={dual}"
             )
         else:
-            log("not running — start (after orphan land tree cleanup)")
+            log("not running ? start (after orphan land tree cleanup)")
             kill_land_tree()
     else:
-        log("running age unknown — leave alone")
+        log("running age unknown ? leave alone")
         return 0
     pid = start_continuous()
     log(f"started pid={pid}")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Repoint ghost Inbox registry rows whose dest is gone but same sha256 lives on a shelf.
 
-Does not move files — catalog hygiene only.
+Does not move files ? catalog hygiene only.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def utc() -> str:
 def main() -> int:
     """Soft-fail catalog hygiene. Never crash orch on lock busy.
 
-    2026-07-21: land writer races caused uncaught sqlite lock → exit 1.
+    2026-07-21: land writer races caused uncaught sqlite lock ? exit 1.
     Lessons: busy_timeout + BEGIN IMMEDIATE retry; always write receipt;
     exit 0 on partial progress / lock skip (soft-ok factory).
     """
@@ -99,8 +99,8 @@ def main() -> int:
         err = str(e)[:240]
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text(
-        f"# Inbox ghost repoint — {now}\n\n"
-        f"**Repointed:** {total} · **Inbox now:** {inbox}\n"
+        f"# Inbox ghost repoint ? {now}\n\n"
+        f"**Repointed:** {total} ? **Inbox now:** {inbox}\n"
         + (f"\n_soft_err:_ `{err}`\n" if err else ""),
         encoding="utf-8",
     )
@@ -114,7 +114,7 @@ def main() -> int:
             }
         )
     )
-    # Always 0 — orch soft-ok; lock races are expected under land writer
+    # Always 0 ? orch soft-ok; lock races are expected under land writer
     return 0
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wave5: Operations dated micro-reports + near-dup launch notes → digests + archive."""
+"""Wave5: Operations dated micro-reports + near-dup launch notes ? digests + archive."""
 from __future__ import annotations
 
 import re
@@ -62,7 +62,7 @@ def main() -> int:
     # also MicroStep / reports that are clearly same day swarm without date in name? skip
     if june19:
         lines = [
-            f"# Session / Micro-Reports — 2026-06-19 MASTER ({TS})",
+            f"# Session / Micro-Reports ? 2026-06-19 MASTER ({TS})",
             "",
             f"**Count archived:** {len(june19)}",
             "These were same-day micro-step execution reports. One master map replaces the swarm.",
@@ -92,7 +92,7 @@ def main() -> int:
         # refresh old index as pointer
         write(
             OPS / "Session-Reports-2026-06-19-Index.md",
-            f"""# Session Reports 2026-06-19 — Index (pointer)
+            f"""# Session Reports 2026-06-19 ? Index (pointer)
 
 **Canonical master:** [[Operations/Session-Reports-2026-06-19-MASTER]]
 
@@ -125,7 +125,7 @@ Updated {TS} Wave5. Individual reports archived (recoverable).
         # may already be archived in june19
         existing = [p for p in (pa, pb) if p.exists()]
         if len(existing) >= 1:
-            parts = [f"# {label} — Combined Digest ({TS})", ""]
+            parts = [f"# {label} ? Combined Digest ({TS})", ""]
             for p in existing:
                 parts.append(f"## {p.stem}")
                 parts.append(p.read_text(encoding="utf-8", errors="ignore").strip()[:3000])
@@ -148,7 +148,7 @@ Updated {TS} Wave5. Individual reports archived (recoverable).
     ]
     if vw:
         lines = [
-            f"# VaultWalker Status Snapshots — Index ({TS})",
+            f"# VaultWalker Status Snapshots ? Index ({TS})",
             "",
             "Living docs kept separately (Safe Gardener, Log Review, EndToEnd).",
             f"**Archived snapshots:** {len(vw)}",
@@ -179,7 +179,7 @@ Updated {TS} Wave5. Individual reports archived (recoverable).
         files = [p for p in files if p.exists()]
         if len(files) < 2:
             continue
-        parts = [f"# {label} — Digest ({TS})", ""]
+        parts = [f"# {label} ? Digest ({TS})", ""]
         for p in sorted(files, key=lambda x: x.name):
             parts.append(f"## {p.stem}")
             parts.append(p.read_text(encoding="utf-8", errors="ignore").strip()[:2500])
@@ -190,11 +190,11 @@ Updated {TS} Wave5. Individual reports archived (recoverable).
 
     write(
         ARCHIVE / "README.md",
-        f"# Wave5 {TS}\n\njune19-reports · near-dup-pairs · vaultwalker-snapshots · ollama/microstep/tiny clusters\n",
+        f"# Wave5 {TS}\n\njune19-reports ? near-dup-pairs ? vaultwalker-snapshots ? ollama/microstep/tiny clusters\n",
     )
     write(
         OPS / "logs" / f"phase-b-merge-execution-wave5-{TS}.md",
-        f"# Phase B Wave5 — {TS}\n\n" + "\n".join(f"- {r}" for r in receipts) + "\n",
+        f"# Phase B Wave5 ? {TS}\n\n" + "\n".join(f"- {r}" for r in receipts) + "\n",
     )
     prog = OPS / "Active-Work-Program-Phase-B-Orchestrator-Insights-2026-07-10.md"
     if prog.exists():
@@ -204,8 +204,8 @@ Updated {TS} Wave5. Individual reports archived (recoverable).
                 prog,
                 t.rstrip()
                 + f"\n\n## Background wave5 ({TS})\n"
-                "- June-19 micro-report swarm → MASTER + archive\n"
-                "- Near-dup launch/FIFO · VaultWalker snapshots · Ollama/MicroStep/Tiny digests\n"
+                "- June-19 micro-report swarm ? MASTER + archive\n"
+                "- Near-dup launch/FIFO ? VaultWalker snapshots ? Ollama/MicroStep/Tiny digests\n"
                 f"- Receipt: [[Operations/logs/phase-b-merge-execution-wave5-{TS}]]\n",
             )
     hk = VAULT / "Housekeeping.md"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lightweight inventory of G: MemoryCard Google Drive sources → vault receipt.
+"""Lightweight inventory of G: MemoryCard Google Drive sources ? vault receipt.
 
 No copies. No deletes. Sample children + counts only (du is too slow on G:).
 """
@@ -64,24 +64,24 @@ def main() -> int:
             continue
         ext = ", ".join(f"{e}:{n}" for e, n in info["ext_top"][:6])
         rows.append(
-            f"| `{s}` | {info['top_children']} top | ~{info['files_depth_le']} files (depth≤2) | {ext} |"
+            f"| `{s}` | {info['top_children']} top | ~{info['files_depth_le']} files (depth?2) | {ext} |"
         )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(
         "\n".join(
             [
-                f"# G: MemoryCard / Drive sources inventory — {ts}",
+                f"# G: MemoryCard / Drive sources inventory ? {ts}",
                 "",
                 "**Purpose:** Primary training data locations for K digital silo drain.",
-                "**Rule:** Inventory only — no copy, no purge.",
+                "**Rule:** Inventory only ? no copy, no purge.",
                 "",
                 "| Source | Top children | Sample depth | Top extensions |",
                 "|--------|--------------|--------------|----------------|",
                 *rows,
                 "",
                 "## Notes",
-                "- `.gdoc`/`.gsheet` on disk are often **shortcuts**, not full body text — twin needs export/PDF/text where possible.",
+                "- `.gdoc`/`.gsheet` on disk are often **shortcuts**, not full body text ? twin needs export/PDF/text where possible.",
                 "- Live Drive: `D:\\CloudSync\\Google-My-Drive` (active mirror).",
                 "- Historical: `G:\\MemoryCard_Backups\\Google Drive` + `Google Drive(archive)`.",
                 "- Jeff zips/takeout: `Bloom_Jeffrey\\Google_Backups`.",

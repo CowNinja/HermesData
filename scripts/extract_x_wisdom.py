@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""extract_x_wisdom.py — SINGLE inspiration pipeline for Hermes (list-only).
+"""extract_x_wisdom.py ? SINGLE inspiration pipeline for Hermes (list-only).
 
 Sole cron for new external inspiration (Jeff 2026-07-12):
   X list 2068802754282504617 only. No parallel Universal-Ingestion inspiration pulls.
@@ -214,7 +214,7 @@ def append_triage_pointers(entries: list[dict[str, Any]], limit: int = 2) -> int
         if e["url"] in text:
             continue
         block.append(
-            f"\n### X-List seed {e['timestamp']} — @{e['poster']}\n"
+            f"\n### X-List seed {e['timestamp']} ? @{e['poster']}\n"
             f"- URL: {e['url']}\n"
             f"- Idea: {e['extracted'][:280]}\n"
             f"- Hermes action: {e.get('actionable')}\n"
@@ -254,7 +254,7 @@ SEED_POSTS = [
         "url": "https://x.com/tonysimons_/status/2076450353105519010",
         "timestamp": "2026-07-12",
         "text": (
-            "Hermes (Nous) multi-model / auxiliary models for task specialization — fine-tuned engine feel "
+            "Hermes (Nous) multi-model / auxiliary models for task specialization ? fine-tuned engine feel "
             "for modular agents and skills."
         ),
         "actionable": "Keep Grok parent + phronesis-sovereign grunt split; document MoA in skills not chat.",
@@ -270,7 +270,7 @@ SEED_POSTS = [
         "timestamp": "2026-07-12",
         "text": (
             "Gemma 4 fully offline on phone (React Native, 4-bit, ~1GB text, function calling, local calendar "
-            "from flyer) — pure local/sovereign AI."
+            "from flyer) ? pure local/sovereign AI."
         ),
         "actionable": "Track on-device patterns for future mobile twin; not a vault rewrite.",
         "evaluation": {
@@ -319,7 +319,7 @@ def main() -> int:
     elif args.write_seed:
         posts = SEED_POSTS[: args.limit]
     else:
-        # no_agent bare run: do NOT write stubs — instruct agent path
+        # no_agent bare run: do NOT write stubs ? instruct agent path
         print(
             "extract-wisdom: no --from-json/--write-seed. "
             "Agent cron should x_search then call with --from-json. "

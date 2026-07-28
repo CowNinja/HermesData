@@ -65,7 +65,7 @@ def main() -> int:
     OUT.write_text(
         "\n".join(
             [
-                f"# Backup layers status — {ts}",
+                f"# Backup layers status - {ts}",
                 "",
                 "| Layer | Detail | Note |",
                 "|-------|--------|------|",

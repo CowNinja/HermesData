@@ -130,7 +130,7 @@ def write_report(report: dict) -> None:
     OUT_CLUSTERS.parent.mkdir(parents=True, exist_ok=True)
     OUT_CLUSTERS.write_text(json.dumps(report, indent=2), encoding="utf-8")
     lines = [
-        f"# Bitwarden de-conflict report — {report.get('at')}",
+        f"# Bitwarden de-conflict report ? {report.get('at')}",
         "",
         "**No secrets in this report** (hosts/usernames/names/counts only).",
         "",
@@ -156,7 +156,7 @@ def write_report(report: dict) -> None:
         "",
         "## Merge plan (human + optional bw CLI later)",
         "",
-        "1. For each cluster count≥2: keep newest `revisionDate` as canonical",
+        "1. For each cluster count?2: keep newest `revisionDate` as canonical",
         "2. Confirm password still works (Jeff-gated test)",
         "3. Archive/delete older dupes in Bitwarden UI or `bw delete`",
         "4. Re-export and re-run this script until duplicate_clusters near 0",
@@ -186,7 +186,7 @@ def main() -> int:
         readme.write_text(
             """# secrets-work (LOCAL ONLY)
 
-1. In Bitwarden: File → Export vault → **.json** (unencrypted) — use carefully
+1. In Bitwarden: File ? Export vault ? **.json** (unencrypted) ? use carefully
 2. Save as `bw-export.json` in this folder
 3. Run: `python D:/HermesData/scripts/bitwarden_deconflict.py`
 4. Read report in PhronesisVault Operations/logs/bitwarden-deconflict-report-latest.md

@@ -35,8 +35,8 @@ def hygiene_line() -> str:
         data = json.loads(HYGIENE_JSON.read_text(encoding="utf-8"))
         total = data.get("total_md", "?")
         top = data.get("top_priority", "none")
-        return f"- Vault hygiene: **{total}** .md · top proposal **{top}** · [[Operations/logs/daily-distillation-{data.get('date', 'latest')}]]\n"
-    return "- Vault hygiene: audit not run · see [[Operations/Vault-Daily-Distillation-Plan]]\n"
+        return f"- Vault hygiene: **{total}** .md ? top proposal **{top}** ? [[Operations/logs/daily-distillation-{data.get('date', 'latest')}]]\n"
+    return "- Vault hygiene: audit not run ? see [[Operations/Vault-Daily-Distillation-Plan]]\n"
 
 
 def main() -> int:

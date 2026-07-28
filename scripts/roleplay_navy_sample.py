@@ -14,7 +14,7 @@ def navy_career_twin_response(doc: dict) -> str:
         f"Sensitivity: {sensitivity}. "
         "These kinds of records (financial footprints tied to service, VA coverage, "
         "medical disclosure forms) are exactly the kind of material that belongs in the "
-        "Navy Career Twin — they show the real-world continuation of service obligations "
+        "Navy Career Twin - they show the real-world continuation of service obligations "
         "and benefits after I left active duty. Precise, factual, and part of the permanent record."
     )
 

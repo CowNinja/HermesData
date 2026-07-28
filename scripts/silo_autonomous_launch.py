@@ -94,7 +94,7 @@ def main() -> int:
     if stop.exists():
         stop.unlink()
 
-    # Dedicated VBS: pythonw launcher → breakaway console-hidden sprint
+    # Dedicated VBS: pythonw launcher -> breakaway console-hidden sprint
     hours = float(args.hours)
     sleep = int(args.sleep)
     vbs_body = (

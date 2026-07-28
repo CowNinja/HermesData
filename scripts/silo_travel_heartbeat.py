@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Travel autonomy heartbeat — progress snapshot + gray queue + continuous kick if needed.
+"""Travel autonomy heartbeat ? progress snapshot + gray queue + continuous kick if needed.
 
-Safe for Task Scheduler every 30–60 min. No Grok. No gateway restarts.
+Safe for Task Scheduler every 30?60 min. No Grok. No gateway restarts.
 Always kicks continuous with pythonw + CREATE_NO_WINDOW (no focus steal).
 """
 from __future__ import annotations
@@ -122,7 +122,7 @@ def main() -> int:
     actions = []
     running = continuous_running()
     if STOP.is_file():
-        actions.append("STOP file — not restarting")
+        actions.append("STOP file ? not restarting")
     elif not running or (age is not None and age > STALE_S):
         actions.append(kick_continuous())
     else:
@@ -171,8 +171,8 @@ def main() -> int:
 
     BRIEF_LOG.parent.mkdir(parents=True, exist_ok=True)
     brief = (
-        f"# Travel heartbeat — {entry['at']}\n\n"
-        f"- registry: **{reg}** · unique: **{uniq}**\n"
+        f"# Travel heartbeat ? {entry['at']}\n\n"
+        f"- registry: **{reg}** ? unique: **{uniq}**\n"
         f"- continuous age: {age}\n"
         f"- actions: {actions}\n"
     )

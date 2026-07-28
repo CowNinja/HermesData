@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RP bottleneck scan + optional fix — no_agent cron entrypoint.
+"""RP bottleneck scan + optional fix ? no_agent cron entrypoint.
 
 2026-07-18 residual seal:
 - Always print one status line (cron MD was empty on some failures).
@@ -46,7 +46,7 @@ def main() -> int:
     # Honor scanner contract: 1 only when batch_active and score<70
     if p.returncode == 0:
         return 0
-    # Nonzero without stdout often means import/env flake under twin-stack — soft if no batch signal
+    # Nonzero without stdout often means import/env flake under twin-stack ? soft if no batch signal
     if "batch_active" not in out and p.returncode != 0:
         # Re-read report file if present
         report = ROOT / "logs" / "rp-bottleneck-report.json"
@@ -61,7 +61,7 @@ def main() -> int:
                 return 1
             return 0
         except Exception:
-            # No report — do not red-fail idle cron
+            # No report ? do not red-fail idle cron
             print("RPBottleneck WARN no_report soft_fail=1")
             return 0
     return int(p.returncode) if isinstance(p.returncode, int) else 0

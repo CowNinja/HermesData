@@ -162,7 +162,7 @@ def item2_graph() -> dict:
     gpath = OBS / "graph.json"
     shutil.copy2(gpath, BAK / "graph.json")
     g = json.loads(gpath.read_text(encoding="utf-8"))
-    # Karpathy: graph shows shape — hide noise paths via search filter (Obsidian path:- syntax)
+    # Karpathy: graph shows shape ? hide noise paths via search filter (Obsidian path:- syntax)
     filt = (
         "path:-Alice path:-Roleplay-Sandbox path:-Archive path:-references "
         "path:-copilot path:-tests path:-.smart-env path:-site-packages "
@@ -339,15 +339,15 @@ tags:
   - type/digest
 ---
 
-# Re-Verification Cron Noise — Distilled Index
+# Re-Verification Cron Noise ? Distilled Index
 
 **Updated:** {TS}  
-**Policy:** [[Operations/Vault-Distillation-Policy]] L1 digest → L2 archive  
+**Policy:** [[Operations/Vault-Distillation-Policy]] L1 digest ? L2 archive  
 **Batch:** references-reverification-2026-07-18  
 **Count archived this run:** {len(noise)}
 
 Repetitive no-new confirmation dumps from Karpathy / Brian / ArXiv ingestion crons.
-Research signal lives in Growth-Blueprints — not in these confirmations.
+Research signal lives in Growth-Blueprints ? not in these confirmations.
 
 ## Keep using
 - [[Operations/Growth-Blueprints/00-GROWTH-BLUEPRINTS-INDEX]]
@@ -384,7 +384,7 @@ Research signal lives in Growth-Blueprints — not in these confirmations.
         shutil.move(str(p), str(dest_v))
         moved.append(p.name)
 
-    # Stub pointer notes? Policy says digest wins — no stubs needed if redirects map phronesisvault- prefix
+    # Stub pointer notes? Policy says digest wins ? no stubs needed if redirects map phronesisvault- prefix
     # Refresh archive index note
     arch_idx = ARCH_VAULT / "00-INDEX.md"
     arch_idx.write_text(
@@ -451,7 +451,7 @@ def item5_vaultwalker() -> dict:
     }
     (state_dir / "vaultwalker_auto_live.json").write_text(json.dumps(auto, indent=2), encoding="utf-8")
 
-    # 2) Patch vaultwalker skip if easy — search for SKIP or noise patterns
+    # 2) Patch vaultwalker skip if easy ? search for SKIP or noise patterns
     vw = SCRIPTS / "vaultwalker.py"
     vw_txt = vw.read_text(encoding="utf-8")
     patch_note = "no_code_patch"
@@ -459,7 +459,7 @@ def item5_vaultwalker() -> dict:
     if skip_needle not in vw_txt:
         # inject near top after VERSION
         inject = '''
-# five-item cook 2026-07-18 — never plant indexes in junk trees
+# five-item cook 2026-07-18 ? never plant indexes in junk trees
 SKIP_INDEX_PARTS = {
     "site-packages", "alice_venv", "node_modules", ".git", ".smart-env",
     "__pycache__", "venv", ".venv", "Lib", "Scripts", "dist-info",
@@ -481,7 +481,7 @@ SKIP_INDEX_PARTS = {
     r_idx = run([PY, str(SCRIPTS / "refresh_folder_indexes.py")], timeout=600)
     r_vw = run([PY, str(SCRIPTS / "vaultwalker.py"), "--dry-run", "--cycle", "light", "--silos", "PhronesisVault"], timeout=300)
 
-    # 4) Scoreboard receipt (ops log — atomic publish)
+    # 4) Scoreboard receipt (ops log ? atomic publish)
     scoreboard = LOGS / "vaultwalker-effectiveness-scoreboard-2026-07-18.md"
     atomic_write_text(
         scoreboard,
@@ -491,7 +491,7 @@ tags:
   - type/receipt
 ---
 
-# VaultWalker Effectiveness Scoreboard — {TS}
+# VaultWalker Effectiveness Scoreboard ? {TS}
 
 ## Role split (locked)
 | Actor | Owns | Writes |
@@ -500,18 +500,18 @@ tags:
 | **VaultWalker v0.8.0** | Walk, resurface, classify proposals | Dry-run default; LIVE only if auto_live.armed + Jeff |
 | **gardener autonomy suite** | Distill proposals + safe waves + repair | Daily light / weekly safe |
 | **vault_wikilink_repair** | Redirect map after archive | Yes |
-| **vault_hub_backlink_pass** | Orphan → hub edges | Yes --apply |
+| **vault_hub_backlink_pass** | Orphan ? hub edges | Yes --apply |
 
 ## Guardrails now
 - `vaultwalker_auto_live.json`: **armed=false** (safe)
-- forbid_deep=true · silos PhronesisVault only
+- forbid_deep=true ? silos PhronesisVault only
 - Junk skip parts documented (site-packages / venv / Alice sandbox)
 - Index plant must not clobber rich hubs (0.8.0 doctrine)
 
 ## This cook
 - refresh_folder_indexes exit: see cook report
 - vaultwalker dry light exit: see cook report
-- Distill batch: references-reverification → Archive + Hermes archives
+- Distill batch: references-reverification ? Archive + Hermes archives
 
 ## Vault links
 - [[Operations/VaultWalker-PhronesisVault-Focus-0.8.0-2026-07-17]]
@@ -604,7 +604,7 @@ tags:
   - type/receipt
 ---
 
-# Five-Item Vault Clarity Cook — {TS}
+# Five-Item Vault Clarity Cook ? {TS}
 
 **Research:** Karpathy LLM Wiki lint (orphans/broken links/graph shape); verify-then-repair after build; Vault-Distillation-Policy L0/L1/L2 (distill first, archive, never hard-delete).
 
@@ -613,7 +613,7 @@ tags:
 2. Graph: both filters **and** real distill/archive
 3. Thorough distill + archive via existing infra
 4. Safe autonomy with guardrails
-5–6. Detective entity resolve from silo PKO cards
+5?6. Detective entity resolve from silo PKO cards
 
 ## Results
 ```json
@@ -646,14 +646,14 @@ tags:
   - type/receipt
 ---
 
-# Five-Item Vault Clarity — Receipt {TS}
+# Five-Item Vault Clarity ? Receipt {TS}
 
 | Item | Result |
 |------|--------|
-| 1 Tags/lint | missing→0 (see report) |
+| 1 Tags/lint | missing?0 (see report) |
 | 2 Graph | search filter + orphans off + hideUnresolved |
 | 3 Links | entity redirects + repair + hub backlinks |
-| 4 Distill | references reverification → Archive + Hermes |
+| 4 Distill | references reverification ? Archive + Hermes |
 | 5 VaultWalker | auto_live unarmed; scoreboard; refresh indexes |
 
 **Backup:** `{BAK}`  
@@ -676,7 +676,7 @@ def touch_housekeeping() -> None:
     t = hk.read_text(encoding="utf-8", errors="replace")
     line = (
         f"\n| {TS[:16]} | Five-item clarity cook | "
-        f"tags green · graph filter · link repair · refs archived · VW scoreboard | "
+        f"tags green ? graph filter ? link repair ? refs archived ? VW scoreboard | "
         f"[[Operations/logs/Five-Item-Vault-Clarity-Cook-latest]] |\n"
     )
     if "Five-item clarity cook" in t:

@@ -50,12 +50,12 @@ def strip_template_sections(content):
             has_specifics = any(kw in body_text.lower() for kw in ['install', 'command', 'script', 'python', 'node', 'docker', 'git ', 'http', 'config'])
             
             if not has_code and not has_specifics and len(body_text) < 500:
-                # Generic filler — remove entire section
+                # Generic filler ? remove entire section
                 removed.append(line.strip())
                 i = j  # Skip to next section
                 continue
             else:
-                # Has real content — keep body, rename header
+                # Has real content ? keep body, rename header
                 # Rename to just the first word or merge into previous
                 result.append(line)  # Keep header for now (will clean later)
                 for sl in section_lines:
@@ -159,7 +159,7 @@ def main():
         if os.path.isdir(src_path):
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             os.rename(src_path, dest_path)
-            print(f"  Moved {src} → {dest}")
+            print(f"  Moved {src} ? {dest}")
             moved_count += 1
     print(f"  Total moves: {moved_count}")
     

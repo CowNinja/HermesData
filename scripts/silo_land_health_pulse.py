@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Silo land health pulse — freeze/crash/dual-writer detector ($0 LLM).
+"""Silo land health pulse ? freeze/crash/dual-writer detector ($0 LLM).
 
-Run every 10–20 min via schtasks or ad-hoc. Never touches gateway.
+Run every 10?20 min via schtasks or ad-hoc. Never touches gateway.
 Writes:
   D:/HermesData/state/silo_land_health_pulse.json
   D:/PhronesisVault/Operations/logs/silo-land-health-pulse-latest.md
 
 Actions (safe, reversible):
-  - If drain count > 1 and continuous heartbeat fresh → soft-prune excess drains
-  - If continuous missing and no STOP → invoke overnight watchdog start path
+  - If drain count > 1 and continuous heartbeat fresh ? soft-prune excess drains
+  - If continuous missing and no STOP ? invoke overnight watchdog start path
   - Never taskkill gateway; never start second continuous if one is alive
 
 Research anchors (2026-07-18):
   - SQLite WAL still single-writer (sqlite.org/wal.html)
-  - Windows orphan children after parent timeout → taskkill /T tree kill
-  - Heartbeat vs cycle `at` — long ticks are healthy if heartbeat pulses
+  - Windows orphan children after parent timeout ? taskkill /T tree kill
+  - Heartbeat vs cycle `at` ? long ticks are healthy if heartbeat pulses
 """
 from __future__ import annotations
 
@@ -248,10 +248,10 @@ def main() -> int:
             actions.append(f"soft_prune_sprints={killed_s}")
             counts["sprint"] = _count("silo_autonomous_sprint.py")
 
-    # Stuck orch: long tick, no drain/focus, registry flat → ask overnight WD only if freeze
-    # (continuous timeout is 2400s; pulse just flags — does not kill cont)
+    # Stuck orch: long tick, no drain/focus, registry flat ? ask overnight WD only if freeze
+    # (continuous timeout is 2400s; pulse just flags ? does not kill cont)
 
-    # Continuous dead + no STOP → ask overnight watchdog to start
+    # Continuous dead + no STOP ? ask overnight watchdog to start
     if counts.get("continuous", 0) <= 0 and not STOP.is_file():
         try:
             r = subprocess.run(
@@ -311,11 +311,11 @@ def main() -> int:
     OUT_JSON.write_text(json.dumps(msg, indent=2), encoding="utf-8")
     VAULT_LOG.parent.mkdir(parents=True, exist_ok=True)
     VAULT_LOG.write_text(
-        f"# Silo land health pulse — {msg['at']}\n\n"
-        f"**alert:** `{alert}` · **dual_bad:** `{dual_bad}` · **freeze:** `{freeze}`\n\n"
+        f"# Silo land health pulse ? {msg['at']}\n\n"
+        f"**alert:** `{alert}` ? **dual_bad:** `{dual_bad}` ? **freeze:** `{freeze}`\n\n"
         f"```json\n{json.dumps(msg, indent=2)}\n```\n\n"
         f"## Notes\n"
-        f"- Single-writer land (SQLite WAL) — drain count must stay ≤1\n"
+        f"- Single-writer land (SQLite WAL) ? drain count must stay ?1\n"
         f"- Heartbeat fresher than cycle `at` during long ticks is healthy\n"
         f"- Soft prune keeps oldest drain; full tree restart only if soft fails\n",
         encoding="utf-8",

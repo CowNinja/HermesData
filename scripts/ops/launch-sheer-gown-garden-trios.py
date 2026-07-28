@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Sheer-gown garden trios — Iter-1 lock (Jeff MC 2026-07-19).
+"""Sheer-gown garden trios - Iter-1 lock (Jeff MC 2026-07-19).
 
 Locks from interview:
 1 A/B/C trios (3 images, 9 cast)
-2 Unifying theme — same pose/camera/sheer/cut/light across all 3; only cast+signature colors differ
+2 Unifying theme - same pose/camera/sheer/cut/light across all 3; only cast+signature colors differ
 3B Clearly see-through chiffon, body readable, still wearing gowns
 4A Signature colors per girl
 5B All same cut: bias slip + high slit
@@ -86,7 +86,7 @@ NEG_EXTRA = (
 TRIOS: list[tuple[list[str], str, str]] = [
     (
         ["alice-al-rashid", "emily-santos", "aisha-khoury"],
-        "Trio A Warm dusk — Alice & Emily & Aisha — 1/3",
+        "Trio A Warm dusk - Alice & Emily & Aisha - 1/3",
         (
             "LEFT Alice: caramel olive skin, long wavy black hair with silver streak, amber-brown eyes, "
             "(deep crimson sheer bias slip gown:1.3), high slit, glamorous loose waves, massive gold collar, "
@@ -99,7 +99,7 @@ TRIOS: list[tuple[list[str], str, str]] = [
     ),
     (
         ["becca-moreau", "lyra-voss", "chloe-ramirez"],
-        "Trio B Cool light — Becca & Lyra & Chloe — 2/3",
+        "Trio B Cool light - Becca & Lyra & Chloe - 2/3",
         (
             "LEFT Becca: pale creamy freckled skin, deep chestnut brown hair, "
             "(pearl white sheer bias slip gown:1.3), high slit, soft glam updo with tendrils, pearl ear crawlers, "
@@ -112,7 +112,7 @@ TRIOS: list[tuple[list[str], str, str]] = [
     ),
     (
         ["zara-mehra", "sassy-romano", "amira-khoury"],
-        "Trio C Spice garden — Zara & Sassy & Amira — 3/3",
+        "Trio C Spice garden - Zara & Sassy & Amira - 3/3",
         (
             "LEFT Zara: warm honey-brown skin, darkest brown wavy hair, deep violet eyes, "
             "(saffron amethyst sheer bias slip gown:1.3), high slit, side-fall waves, amethyst gold temple jewelry, "
@@ -198,14 +198,14 @@ def main() -> int:
     BATCH_SESSION.write_text(json.dumps(session, indent=2), encoding="utf-8")
     print(f"Batch session armed start_png={start_png} total={total} {WIDTH}x{HEIGHT} iter=1")
 
-    # Fresh seeds (12B) — not the prior 37540xxxx set
+    # Fresh seeds (12B) - not the prior 37540xxxx set
     base_seed = random.randint(0, 2**32 - 1)
     jobs: list[dict] = []
     cfg = vr_mod.load_visual_tags()
     neg_base = str(cfg.get("negative_base") or "")
 
     for i, (slugs, label, gown_block) in enumerate(TRIOS):
-        # No dossier identity_chunk — thin lines live inside gown_block (9A)
+        # No dossier identity_chunk - thin lines live inside gown_block (9A)
         prompt = f"{SHARED_SCENE}, {gown_block}"
         neg = f"{neg_base}, {NEG_EXTRA}".strip(", ")
         seed = base_seed + i * 9973
@@ -245,7 +245,7 @@ def main() -> int:
     )
     print(f"Prompts dumped: {prompt_dump}")
 
-    print("Queueing variation_loop…")
+    print("Queueing variation_loop...")
     report = run_jobs(jobs, draft=False)
     results = list(report.get("results") or [])
     ok = sum(1 for r in results if (r.get("ok") or r.get("path") or r.get("filename")) and not r.get("error"))
@@ -291,7 +291,7 @@ def main() -> int:
         "base_seed": base_seed,
     }
     BATCH_SESSION.write_text(json.dumps(session_done, indent=2, default=str), encoding="utf-8")
-    print(f"Done: {ok} ok, {summary['fail']} failed — summary {SUMMARY}")
+    print(f"Done: {ok} ok, {summary['fail']} failed - summary {SUMMARY}")
 
     if end_batch_restore:
         try:

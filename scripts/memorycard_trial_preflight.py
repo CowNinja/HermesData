@@ -57,7 +57,7 @@ def main() -> int:
 
     failed = sum(1 for c in checks if not c["ok"])
     lines = [
-        f"# MemoryCard trial preflight — {utc()}",
+        f"# MemoryCard trial preflight ? {utc()}",
         "",
         f"**Overall:** {'PASS' if failed == 0 else 'FAIL'} ({failed} failed)",
         "",
@@ -70,7 +70,7 @@ def main() -> int:
         )
     lines += [
         "",
-        "Next: census · domain audit · `run memorycard trial` when ready",
+        "Next: census ? domain audit ? `run memorycard trial` when ready",
         "[[Operations/G-MemoryCard-Ingestion-Trial-Five-Actions-2026-07-10]]",
         "",
     ]

@@ -2,7 +2,7 @@
 """Normalize contacts_db handles into validity-aware records + historical ledger.
 
 - Split concatenated ':::' values
-- Promote strings → handle_record with status/validity
+- Promote strings ? handle_record with status/validity
 - Heuristic active vs historical (never delete)
 - Append ledger observations
 - Optional silo registry link scan
@@ -220,7 +220,7 @@ def link_silo(person: dict, limit: int = 5) -> int:
     if not REG.exists():
         return 0
     tokens = []
-    # Prefer full names (>= 2 tokens or len>=8) — avoid "Jan"/"Dad" false positives
+    # Prefer full names (>= 2 tokens or len>=8) ? avoid "Jan"/"Dad" false positives
     for n in [person.get("canonical_name"), *(person.get("name_variants") or [])][:8]:
         if not n:
             continue
@@ -397,15 +397,15 @@ def main() -> int:
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Contacts normalize + ledger — {utc()}",
+        f"# Contacts normalize + ledger ? {utc()}",
         "",
         f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'}",
         f"**People:** {stats['people']}",
-        f"**Emails:** total {stats['emails_total']} · active {stats['emails_active']} · historical {stats['emails_historical']} · unknown {stats['emails_unknown']}",
+        f"**Emails:** total {stats['emails_total']} ? active {stats['emails_active']} ? historical {stats['emails_historical']} ? unknown {stats['emails_unknown']}",
         f"**Phones:** {stats['phones_total']}",
         f"**Silo-linked people:** {stats['linked_people']}",
         "",
-        "Principle: old addresses/phones/emails stay in **ledger** + handles with status — never deleted.",
+        "Principle: old addresses/phones/emails stay in **ledger** + handles with status ? never deleted.",
         "",
         "[[Operations/Contact-Ledger-and-Validity-CANONICAL-2026-07-12]]",
         "",

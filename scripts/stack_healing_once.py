@@ -355,7 +355,7 @@ def list_gateway_pids() -> list[int]:
     """Enumerate live gateway processes via CIM (Windows) or pgrep-like scan.
 
     Hermes on Windows often has a parent+child pythonw tree (venv re-exec into
-    system python -m gateway.run). Multiple PIDs here is NORMAL — not a double
+    system python -m gateway.run). Multiple PIDs here is NORMAL ? not a double
     boot. A true double boot = multiple distinct LISTENING PIDs on :8642.
     """
     pids: set[int] = set()
@@ -365,7 +365,7 @@ def list_gateway_pids() -> list[int]:
             pids.add(int(rec["pid"]))
 
     if sys.platform == "win32":
-        # Narrow CIM filter — only real python gateway processes.
+        # Narrow CIM filter ? only real python gateway processes.
         # Exclude powershell/cmd whose *script text* mentions gateway.run (false positives
         # caused healers to treat diagnostic shells as hung gateways).
         ps = (
@@ -494,12 +494,12 @@ def wait_until(
 
 
 # ---------------------------------------------------------------------------
-# Restore path — single launcher
+# Restore path ? single launcher
 # ---------------------------------------------------------------------------
 
 
 def start_via_phronesis_gateway() -> dict:
-    """Canonical launcher — matches ForkGuard / Phronesis-Guardian."""
+    """Canonical launcher ? matches ForkGuard / Phronesis-Guardian."""
     ps1 = SCRIPTS / "Phronesis.ps1"
     try:
         flags = (
@@ -626,7 +626,7 @@ def restore_gateway(*, force: bool = False) -> dict:
             "restart_loop": clear_restart_loop(force=False),
         }
 
-    # Port down but process(es) already present → wait for bind, do NOT spawn.
+    # Port down but process(es) already present ? wait for bind, do NOT spawn.
     existing = list_gateway_pids()
     if existing:
         actions.append(
@@ -650,11 +650,11 @@ def restore_gateway(*, force: bool = False) -> dict:
                 "actions": actions,
             }
         # Hung process tree: port never bound. Kill whole gateway PID set, then one start.
-        # (Parent+child re-exec is one instance — kill all listed gateway PIDs.)
+        # (Parent+child re-exec is one instance ? kill all listed gateway PIDs.)
         actions.append({"step": "kill_hung_gateways", **kill_pids(existing)})
         time.sleep(2)
 
-    # Cooldown — enforced
+    # Cooldown ? enforced
     age = read_last_heal_age()
     if not force and age is not None and age < RESTART_COOLDOWN_SEC:
         # Re-check: maybe it recovered during cooldown window
@@ -691,7 +691,7 @@ def restore_gateway(*, force: bool = False) -> dict:
     # --- SSOT primary: durable Hermes_Gateway task (same argv always) ---
     primary = start_via_schtasks()
     actions.append(primary)
-    write_last_heal()  # stamp even if start fails — cooldown still applies
+    write_last_heal()  # stamp even if start fails ? cooldown still applies
 
     up = wait_until(health_ok, START_WAIT_SEC, 2.0)
     if up:
@@ -705,7 +705,7 @@ def restore_gateway(*, force: bool = False) -> dict:
             "actions": actions,
         }
 
-    # After owner task wait: if a process appeared, wait more — never dual-start.
+    # After owner task wait: if a process appeared, wait more ? never dual-start.
     spawned = list_gateway_pids()
     if spawned:
         actions.append({"step": "post_schtasks_boot_wait", "pids": spawned})
@@ -754,7 +754,7 @@ def restore_gateway(*, force: bool = False) -> dict:
         time.sleep(2)
 
     # Last resort: direct pythonw with SAME argv as Hermes_Gateway task
-    # (schtasks already tried first — do not call it again)
+    # (schtasks already tried first ? do not call it again)
     if list_gateway_pids() or health_ok():
         return {
             "action": "restore",
@@ -842,7 +842,7 @@ def main() -> int:
             "policy": "single_loop",
         }
         _log(summary)
-        # Exit 0 if gateway healthy — concurrent healer is fine.
+        # Exit 0 if gateway healthy ? concurrent healer is fine.
         if summary["health"]:
             return 0
         print(json.dumps(summary, indent=2))
@@ -959,6 +959,35 @@ def main() -> int:
         except Exception:
             pass
 
+        # 2026-07-27: Discord 503 storms = local :8091 compress when dual/loading :8090.
+        # Soft brain heal after gateway path (never blocks Discord restore; best-effort).
+        brain_503 = None
+        try:
+            brain_script = SCRIPTS / "discord_503_heal_once.py"
+            if brain_script.is_file():
+                bp = subprocess.run(
+                    [sys.executable, str(brain_script), "--json"],
+                    cwd=str(ROOT),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=240,
+                    creationflags=(0x08000000 if sys.platform == "win32" else 0),
+                )
+                try:
+                    brain_503 = json.loads((bp.stdout or "").strip() or "{}")
+                except json.JSONDecodeError:
+                    brain_503 = {"ok": False, "rc": bp.returncode, "stdout_tail": (bp.stdout or "")[-300:]}
+                summary["discord_503_heal"] = {
+                    "rc": bp.returncode,
+                    "clean": bool((brain_503 or {}).get("clean")),
+                    "dual": (brain_503 or {}).get("dual_collapse"),
+                    "smoke_ok": ((brain_503 or {}).get("smoke_chat") or {}).get("ok"),
+                }
+        except Exception as _brain_exc:
+            summary["discord_503_heal"] = {"error": f"{type(_brain_exc).__name__}:{_brain_exc}"[:160]}
+
         port_ok = bool(summary["health"])
         multi = bool(summary.get("multi_listener"))
         silent = (
@@ -969,13 +998,14 @@ def main() -> int:
             and wd.get("status") in ("GREEN", "YELLOW")
             and not wd.get("error")
             and not wd.get("skipped")
+            # brain 503 heal is best-effort; do not noise the gateway silent path on slow smoke
         )
         if silent:
             return 0
 
         print(json.dumps(summary, indent=2))
         # Soft-fail: multi_listener while health up is advisory (exit 0) + printed.
-        # Exit 0 if Discord path is up — critical remote-access path.
+        # Exit 0 if Discord path is up - critical remote-access path.
         return 0 if port_ok else 1
     finally:
         lock.release()

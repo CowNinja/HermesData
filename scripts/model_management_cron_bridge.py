@@ -33,7 +33,9 @@ STATE_PATH = Path(r"D:\PhronesisVault\Operations\model-management-agent-state.js
 BRIDGE_JSONL = LOCK_DIR / "model-management-cron-bridge.jsonl"
 # Stale lock older than this is stolen (crashed prior run).
 LOCK_STALE_SEC = 3600
-TIMEOUT_LIGHT_SEC = 600
+# 2026-07-27: light tick often 120-180s under queue/image pressure; 100s caused
+# exit 124 x2 (~205s) false A5 RED while agent_status stayed green (R02=eff YELLOW).
+TIMEOUT_LIGHT_SEC = 300
 TIMEOUT_FULL_SEC = 2700
 MAX_ATTEMPTS = 2
 
@@ -222,7 +224,7 @@ def run(mode: str) -> int:
 
     lock = _try_acquire_lock(mode)
     if lock is None:
-        # Overlap is not a hard failure for the scheduler — next slot retries.
+        # Overlap is not a hard failure for the scheduler - next slot retries.
         return 0
 
     py = _resolve_python()

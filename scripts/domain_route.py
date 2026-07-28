@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Broad domain routing from filename (+ optional path). Open taxonomy, lenient silo.
 
-Friends ≠ Family. Home security/automation → Projects (not Family).
+Friends ? Family. Home security/automation ? Projects (not Family).
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path as _Path
 
 _ENTITY = _Path(r"D:\HermesData\config\entity_context.json")
 
-# Order matters — first regex match wins (after entity longest-match)
+# Order matters ? first regex match wins (after entity longest-match)
 RULES: list[tuple[re.Pattern[str], str]] = [
     # --- Origin-folder bulk (Paperless-style path routing; 2026-07-12) ---
     (
@@ -34,11 +34,11 @@ RULES: list[tuple[re.Pattern[str], str]] = [
     ),
     (re.compile(r"\bifttt\b", re.I), "Digital-Footprint"),
     (re.compile(r"cowninja\.com|\bcowninja\b", re.I), "Core-Personal/Projects"),
-    # Sisters — Jeff 2026-07-12 (marital surnames)
+    # Sisters ? Jeff 2026-07-12 (marital surnames)
     (
         re.compile(
             r"jodi\s+(suzanne\s+)?(bloom|edwards|eichelberger)|"
-            r"eichelberger|"
+            r"eichelberger|"
             r"jenni\s+(debra\s+)?(bloom|harris|kamies)|"
             r"jennifer\s+(debra\s+)?(bloom|harris|kamies)",
             re.I,
@@ -75,7 +75,7 @@ RULES: list[tuple[re.Pattern[str], str]] = [
         ),
         "Navy-Service",
     ),
-    # Home automation / security / network → Projects (Jeff 2026-07-11)
+    # Home automation / security / network ? Projects (Jeff 2026-07-11)
     (
         re.compile(
             r"ring\b|doorbell|ringvideo|hubitat|smartthings|home.?automation|"
@@ -114,7 +114,7 @@ RULES: list[tuple[re.Pattern[str], str]] = [
         ),
         "Core-Personal/Career",
     ),
-    # Family (blood/household life — NOT friends)
+    # Family (blood/household life ? NOT friends)
     (
         re.compile(
             r"family|letter from dad|wedding|kids|spouse|bloom family|"
@@ -181,7 +181,7 @@ def _entity_domain(blob: str) -> str | None:
             dom = row.get("domain")
             if not dom:
                 continue
-            # map friend role → Friends domain
+            # map friend role ? Friends domain
             role = (row.get("role") or "").lower()
             if role in {
                 "friend",

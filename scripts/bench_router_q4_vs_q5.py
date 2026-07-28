@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-bench_router_q4_vs_q5.py — Benchmark Q5_K_M vs Q4_K_M on the 8090 router.
+bench_router_q4_vs_q5.py ? Benchmark Q5_K_M vs Q4_K_M on the 8090 router.
 
 Test matrix:
   - Models: qwen25-7b-q5 vs qwen25-7b-q4
@@ -89,14 +89,14 @@ def main():
 
     results = {}
     print(f"\n{'='*70}")
-    print(f"BENCH: Q4_K_M vs Q5_K_M — {datetime.now().isoformat()}")
+    print(f"BENCH: Q4_K_M vs Q5_K_M ? {datetime.now().isoformat()}")
     print(f"URL: {bench_url}")
     print(f"{'='*70}\n")
 
     for model in MODELS:
-        print(f"\n{'─'*40}")
+        print(f"\n{'?'*40}")
         print(f"Model: {model}")
-        print(f"{'─'*40}")
+        print(f"{'?'*40}")
         model_results = {}
 
         # VRAM before loading model

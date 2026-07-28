@@ -114,7 +114,7 @@ def main() -> int:
             skipped += 1
             continue
         body = (
-            f"# Train extract — {p.name}\n\n"
+            f"# Train extract ? {p.name}\n\n"
             f"source: silo_ocr_text_clean\n"
             f"cleaned_at: {utc()}\n"
             f"chars: {len(cleaned)}\n\n"
@@ -138,9 +138,9 @@ def main() -> int:
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# OCR text clean — {utc()}",
+        f"# OCR text clean ? {utc()}",
         "",
-        f"written **{written}** · skipped **{skipped}** · domain `{args.domain or 'any'}`",
+        f"written **{written}** ? skipped **{skipped}** ? domain `{args.domain or 'any'}`",
         "",
     ]
     for s in samples[:20]:

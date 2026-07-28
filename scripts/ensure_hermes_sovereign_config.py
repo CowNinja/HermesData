@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-ensure_hermes_sovereign_config.py — Persist Phronesis MoE Hermes config (64K + P1 routing).
+ensure_hermes_sovereign_config.py ? Persist Phronesis MoE Hermes config (64K + P1 routing).
 
 Hermes Agent requires model.context_length >= 64000. The phronesis-moe-gateway (8091) advertises
 a flat 64K window while trimming payloads per MoE tier before llama-server dispatch.
 
 Also enforces P1 local-first defaults:
-  - delegation → phronesis-sovereign-code @ 8091 (no Grok subagent leak)
-  - auxiliary.compression → phronesis-sovereign-synthesis (8082 warm digest)
+  - delegation ? phronesis-sovereign-code @ 8091 (no Grok subagent leak)
+  - auxiliary.compression ? phronesis-sovereign-synthesis (8082 warm digest)
   - local_sovereign per-step routing flags
 
 Run automatically from Start-Sovereign-Proxy-8091.ps1 and sovereign_openai_proxy.py boot.
@@ -84,9 +84,9 @@ _CLOUD_FALLBACK_PROVIDERS = frozenset(
 
 SOVEREIGN_ENVIRONMENT_HINT = (
     f"Phronesis Sovereign Stack: Qwythos-9B Q6_K @ {MIN_CONTEXT} ctx on llama-server:8090 "
-    "via phronesis-sovereign proxy:8091. Model rotation is LOCKED — 9B only, no 14B "
+    "via phronesis-sovereign proxy:8091. Model rotation is LOCKED ? 9B only, no 14B "
     "fallback. ALWAYS invoke terminal/file tools for factual queries (disk space, "
-    "file listings, system state) — never hallucinate command output. Deliver clean "
+    "file listings, system state) ? never hallucinate command output. Deliver clean "
     "final answers only; no scratch reasoning in replies."
 )
 
@@ -239,7 +239,7 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
                 compression.clear()
                 compression["provider"] = "auto"
                 compression["timeout"] = 360
-                changes.append("auxiliary.compression→auto(cloud-primary)")
+                changes.append("auxiliary.compression?auto(cloud-primary)")
             elif not cloud_primary and (
                 "11434" in old_url
                 or "ollama" in old_model.lower()
@@ -249,7 +249,7 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
             ):
                 compression.update(COMPRESSION_DEFAULTS)
                 compression["provider"] = f"custom:{SOVEREIGN_PROVIDER}"
-                changes.append("auxiliary.compression→8091-synthesis")
+                changes.append("auxiliary.compression?8091-synthesis")
 
     if force_local:
         fallback = patched.get("fallback_model")
@@ -266,40 +266,40 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         )
         if has_cloud or len(entries) != 1 or entries[0].get("provider") != f"custom:{SOVEREIGN_PROVIDER}":
             patched["fallback_model"] = deepcopy(FALLBACK_SOVEREIGN_ONLY)
-            changes.append("fallback_model→sovereign-only")
+            changes.append("fallback_model?sovereign-only")
 
     agent = patched.setdefault("agent", {})
     if isinstance(agent, dict):
         if agent.get("environment_hint") != SOVEREIGN_ENVIRONMENT_HINT:
             agent["environment_hint"] = SOVEREIGN_ENVIRONMENT_HINT
-            changes.append("agent.environment_hint→9B-locked")
+            changes.append("agent.environment_hint?9B-locked")
         if agent.get("reasoning_effort") not in (None, "", "low", "none"):
             agent["reasoning_effort"] = "low"
-            changes.append("agent.reasoning_effort→low")
+            changes.append("agent.reasoning_effort?low")
         if str(agent.get("tool_use_enforcement") or "").lower() in (
             "true", "always", "yes", "on",
         ):
             agent["tool_use_enforcement"] = "auto"
-            changes.append("agent.tool_use_enforcement→auto")
+            changes.append("agent.tool_use_enforcement?auto")
 
     display = patched.setdefault("display", {})
     if isinstance(display, dict):
         if display.get("show_reasoning") is not False:
             display["show_reasoning"] = False
-            changes.append("display.show_reasoning→false")
+            changes.append("display.show_reasoning?false")
         if display.get("reasoning_full") is not False:
             display["reasoning_full"] = False
-            changes.append("display.reasoning_full→false")
+            changes.append("display.reasoning_full?false")
         platforms = display.setdefault("platforms", {})
         if isinstance(platforms, dict):
             discord = platforms.setdefault("discord", {})
             if isinstance(discord, dict):
                 if discord.get("show_reasoning") is not False:
                     discord["show_reasoning"] = False
-                    changes.append("display.platforms.discord.show_reasoning→false")
+                    changes.append("display.platforms.discord.show_reasoning?false")
                 if discord.get("streaming") is not False:
                     discord["streaming"] = False
-                    changes.append("display.platforms.discord.streaming→false")
+                    changes.append("display.platforms.discord.streaming?false")
 
     local_sovereign = patched.setdefault("local_sovereign", {})
     if isinstance(local_sovereign, dict):
@@ -310,19 +310,32 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
                 changes.append("local_sovereign.opportunistic_fleet.registry")
             if fleet.get("prefer_free_before_grok") is None:
                 fleet["prefer_free_before_grok"] = True
-                changes.append("local_sovereign.opportunistic_fleet.prefer_free_before_grok→true")
+                changes.append("local_sovereign.opportunistic_fleet.prefer_free_before_grok?true")
             if fleet.get("augment_local_with_context") is None:
                 fleet["augment_local_with_context"] = True
-                changes.append("local_sovereign.opportunistic_fleet.augment_local_with_context→true")
+                changes.append("local_sovereign.opportunistic_fleet.augment_local_with_context?true")
             if fleet.get("fallback_on_local_fail") is None:
                 fleet["fallback_on_local_fail"] = True
-                changes.append("local_sovereign.opportunistic_fleet.fallback_on_local_fail→true")
+                changes.append("local_sovereign.opportunistic_fleet.fallback_on_local_fail?true")
             if fleet.get("proactive_realtime_triggers") is None:
                 fleet["proactive_realtime_triggers"] = True
-                changes.append("local_sovereign.opportunistic_fleet.proactive_realtime_triggers→true")
+                changes.append("local_sovereign.opportunistic_fleet.proactive_realtime_triggers?true")
             if fleet.get("proactive_offload") is None:
                 fleet["proactive_offload"] = True
                 changes.append("local_sovereign.opportunistic_fleet.proactive_offload->true")
+            # Policy B (2026-07-27): auto Grok for hard reasoning only; thrift caps 5%/20%
+            if fleet.get("grok_policy") in (None, ""):
+                fleet["grok_policy"] = "B"
+                changes.append("local_sovereign.opportunistic_fleet.grok_policy->B")
+            if fleet.get("hard_prompt_auto_t3") is None:
+                fleet["hard_prompt_auto_t3"] = True
+                changes.append("local_sovereign.opportunistic_fleet.hard_prompt_auto_t3->true")
+            if fleet.get("grok_share_cap_yellow") is None:
+                fleet["grok_share_cap_yellow"] = 0.05
+                changes.append("local_sovereign.opportunistic_fleet.grok_share_cap_yellow->0.05")
+            if fleet.get("grok_share_cap_red") is None:
+                fleet["grok_share_cap_red"] = 0.20
+                changes.append("local_sovereign.opportunistic_fleet.grok_share_cap_red->0.20")
         for key, value in LOCAL_SOVEREIGN_DEFAULTS.items():
             if key == "tiers" and isinstance(value, dict):
                 tiers = local_sovereign.setdefault("tiers", {})

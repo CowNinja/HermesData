@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Jan Library framework health check — resilient, double-checked inventory."""
+"""Jan Library framework health check ? resilient, double-checked inventory."""
 from __future__ import annotations
 
 import json
@@ -114,7 +114,7 @@ def check() -> dict:
         hard = True
         flag(f"script:{s}", p.exists(), str(p), hard=hard)
 
-    # Discord wire — yaml optional; missing PyYAML is soft (run via hermes venv)
+    # Discord wire ? yaml optional; missing PyYAML is soft (run via hermes venv)
     try:
         try:
             import yaml  # type: ignore
@@ -123,7 +123,7 @@ def check() -> dict:
             flag(
                 "discord_config",
                 False,
-                "PyYAML missing in this interpreter — use hermes-agent venv",
+                "PyYAML missing in this interpreter ? use hermes-agent venv",
                 hard=False,
             )
             yaml = None  # type: ignore
@@ -155,7 +155,7 @@ def check() -> dict:
         with urllib.request.urlopen("http://127.0.0.1:8091/v1/models", timeout=5) as r:
             flag("llm_proxy", r.status == 200, "8091 ok")
     except Exception as e:
-        flag("llm_proxy", False, f"down: {e}")  # soft — heuristic still works
+        flag("llm_proxy", False, f"down: {e}")  # soft ? heuristic still works
 
     # Retrieval smoke
     try:

@@ -13,7 +13,7 @@ ROOTS = [
 ]
 OUT_MD = Path(r"D:\PhronesisVault\Operations\logs\g-memorycard-census-latest.md")
 OUT_JSON = Path(r"D:\HermesData\Backups\g-memorycard-census-latest.json")
-# Cap walk for safety on huge trees — sample first MAX files per root then report
+# Cap walk for safety on huge trees ? sample first MAX files per root then report
 MAX_PER_ROOT = 50000
 
 
@@ -59,9 +59,9 @@ def main() -> int:
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     lines = [
-        f"# MemoryCard Google Drive census — {ts}",
+        f"# MemoryCard Google Drive census ? {ts}",
         "",
-        f"**Total files counted:** {total_f} · **Bytes:** {total_b:,}",
+        f"**Total files counted:** {total_f} ? **Bytes:** {total_b:,}",
         "",
     ]
     for r in results:
@@ -70,7 +70,7 @@ def main() -> int:
             lines.append("MISSING")
             continue
         lines.append(
-            f"- files={r['files_counted']} · bytes={r['bytes']:,} · capped={r['capped']} · errors={r['errors']}"
+            f"- files={r['files_counted']} ? bytes={r['bytes']:,} ? capped={r['capped']} ? errors={r['errors']}"
         )
         lines.append("")
         lines.append("| Ext | Count |")

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Convert WordPerfect (.wpd) → UTF-8 text via Microsoft Word COM.
+"""Convert WordPerfect (.wpd) ? UTF-8 text via Microsoft Word COM.
 
 LibreOffice MSI install was blocked (stuck msiexec / elevation). Word 16
-successfully opens our WSWTR .wpd files — use that path instead.
+successfully opens our WSWTR .wpd files ? use that path instead.
 
 Each file runs in a fresh Python subprocess with timeout so one hang
 cannot freeze the whole batch.

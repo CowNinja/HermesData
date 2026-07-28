@@ -102,7 +102,7 @@ def is_excluded_from_silo(path: Path) -> bool:
 
 
 def is_useful_for_silo(path: Path) -> bool:
-    """Bucket 3: Useful data for silo / twins — conservative, high-signal only"""
+    """Bucket 3: Useful data for silo / twins ? conservative, high-signal only"""
     if is_excluded_from_silo(path):
         return False
     name_lower = path.name.lower()
@@ -240,7 +240,7 @@ def analyze_c_drive(dry_run=True, max_files=5000) -> Dict:
 
 
 if __name__ == "__main__":
-    print("Three-Bucket C: Cleaner — Starting dry-run analysis...")
+    print("Three-Bucket C: Cleaner ? Starting dry-run analysis...")
     print("This will NOT delete anything.")
     analyze_c_drive(dry_run=True, max_files=3000)
     print("\nReview the JSON report. To execute scrub actions later, we will add a --execute flag.")

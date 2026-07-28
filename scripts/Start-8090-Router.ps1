@@ -1,4 +1,4 @@
-# Start-8090-Router.ps1 — llama-server multi-model router (local-first three-tier)
+# Start-8090-Router.ps1 - llama-server multi-model router (local-first three-tier)
 # Research: put --models-max on CLI; clean models-8090.ini; load-on-startup DEFAULT only
 param(
     [switch]$Force,
@@ -23,6 +23,7 @@ Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     }
 Start-Sleep -Seconds 2
 
+# Phase3 2026-07-25/27: q8_0 both K/V (avoid q4_0 tunnel vision), kv-offload, batch 512/256
 $argList = @(
     "--host", "127.0.0.1",
     "--port", "8090",
@@ -31,12 +32,16 @@ $argList = @(
     "--models-autoload",
     "--flash-attn", "on",
     "--cache-type-k", "q8_0",
-    "--cache-type-v", "q4_0"
+    "--cache-type-v", "q8_0",
+    "--kv-offload",
+    "--mmap",
+    "--batch-size", "512",
+    "--ubatch-size", "256"
 )
 Write-Host "Starting router: $exe $($argList -join ' ')"
 $p = Start-Process -FilePath $exe -ArgumentList $argList -PassThru -WindowStyle Hidden `
     -RedirectStandardOutput $outLog -RedirectStandardError $errLog
-Write-Host "PID $($p.Id) — waiting for health..."
+Write-Host "PID $($p.Id) - waiting for health..."
 
 $ready = $false
 for ($i = 0; $i -lt 36; $i++) {

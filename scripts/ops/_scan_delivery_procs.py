@@ -1,5 +1,9 @@
-﻿import subprocess, re, time, json
+import json
+import re
+import subprocess
+import time
 from pathlib import Path
+
 
 def pids():
     out = subprocess.check_output(

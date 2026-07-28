@@ -818,7 +818,7 @@ def trim_messages_tier_aware(
     """
     from model_resource_manager import context_budget_for_tier, input_budget_for_tier
 
-    # Flatten Grok/OpenAI tool-call history before budgeting — primary fix path for
+    # Flatten Grok/OpenAI tool-call history before budgeting ? primary fix path for
     # llama-server template 400s (CallExpression). Logged so soak/watchdog can see it.
     pre_flat = messages or []
     had_tool_shape = any(
@@ -1720,7 +1720,7 @@ def dispatch_via_native_router(
                 if not recovered:
                     rb = result.get("body") or b""
                     err_tail = rb.decode("utf-8", errors="replace") if isinstance(rb, (bytes, bytearray)) else str(rb)
-                    # Permanent template failure — surface as 400 upstream HTTP so
+                    # Permanent template failure ? surface as 400 upstream HTTP so
                     # the proxy maps to invalid_request_error (not retriable 503).
                     raise RuntimeError(
                         f"upstream returned HTTP 400: template/grammar permanent fail: {err_tail[:200]!r}"
@@ -1985,6 +1985,87 @@ def openai_chat_response(
     if extra:
         resp["phronesis_provenance"] = extra
     return resp
+
+
+def build_rp_gpu_wait_message(reason: str = "") -> Tuple[str, int]:
+    """RP-safe graceful wait under GPU contention (image lock / dual / 8090 down).
+
+    Law 2026-07-27:
+      - Never surface raw HTTP 503 to RP sandbox when GPU tenant is image.
+      - Never offload RP narrative to free/Grok (local uncensored lane).
+      - Return a normal assistant message Hermes can post as a wait notice.
+
+    Returns (message, retry_after_sec).
+    Network-free: uses local ETA tables + lock status only (no HTTP probes).
+    """
+    reason = (reason or "").strip()
+    retry_s = 90
+    eta_lo, eta_hi = 2, 4
+    job = ""
+    lock_held = reason.startswith("image_lock") or "image_lock" in reason
+    # Local ETA tables only (no forge/llm HTTP probes on the request path).
+    try:
+        import wait_visibility as wv
+
+        eta_tab = getattr(wv, "ETA", {}) or {}
+        cold = eta_tab.get("image_forge_cold") or (120, 240)
+        lo_f, hi_f = float(cold[0]), float(cold[1])
+        eta_lo = max(1, int(lo_f // 60) or 1)
+        eta_hi = max(2, int((hi_f + 59) // 60))
+        retry_s = max(retry_s, int(hi_f))
+    except Exception:
+        pass
+    try:
+        from image_job_lock import status as _lock_status
+
+        st = _lock_status() or {}
+        if st.get("held"):
+            lock_held = True
+            job = str(st.get("job") or st.get("owner") or "")[:80]
+            ttl = st.get("ttl_remaining_s")
+            if ttl is not None:
+                try:
+                    retry_s = max(retry_s, min(300, int(float(ttl)) + 20))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    if lock_held or reason.startswith("image_lock"):
+        why = "GPU is busy generating images"
+        if job:
+            why += f" (`{job}`)"
+        line = (
+            f"**Wait:** {why}. Local RP brain (Qwythos) is parked on the single "
+            f"12GB tenant - not a Discord outage, not a crash.\n"
+            f"Expect about **{eta_lo}-{eta_hi} min**, then resend your last line. "
+            f"If the thread still feels stuck after the image finishes, `/reset` once.\n"
+            f"_reason: {reason or 'image_lock'}_"
+        )
+    elif "dual_tenant" in reason:
+        line = (
+            "**Wait:** Local GPU is dual-tenant contended (image engine + brain). "
+            "RP is staying on the local uncensored lane (no cloud offload). "
+            f"Hold on ~{eta_lo}-{eta_hi} min, then resend.\n"
+            f"_reason: {reason}_"
+        )
+        retry_s = max(retry_s, 60)
+    elif "8090_down" in reason:
+        line = (
+            "**Wait:** Local brain (:8090) is reloading/restoring after image work. "
+            "Usually 30-90s cold, faster when mmap page-cache is warm. "
+            "Resend shortly; `/reset` only if still wedged after restore.\n"
+            f"_reason: {reason}_"
+        )
+        retry_s = max(45, min(retry_s, 120))
+    else:
+        line = (
+            "**Wait:** Local RP inference is deferred (GPU/router contention). "
+            f"Try again in ~{max(1, retry_s // 60)}-{max(2, (retry_s + 59) // 60)} min. "
+            "This is a graceful park, not a hard failure.\n"
+            f"_reason: {reason or 'prefer_fleet'}_"
+        )
+    return line, int(retry_s)
 
 
 def openai_error(status: int, message: str, err_type: str = "server_error") -> Tuple[int, Dict[str, Any]]:
@@ -2440,6 +2521,109 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 _log_event({"event": "proactive_offload_error", "error": str(pro_exc)})
 
         use_native = _unified_router_up()
+        prefer_fleet_now = False
+        prefer_fleet_reason = ""
+        # Hard free-fleet path under local contention: skip GPU FIFO so text
+        # work does not pile onto dead/contended :8090 (Grok-token-outage path).
+        try:
+            from inference_queue import should_prefer_fleet_offload
+            from escalation_router import is_roleplay_route
+
+            prefer_fleet_now, prefer_fleet_reason = should_prefer_fleet_offload()
+            # RP under contention: graceful 200 Wait: (never raw 503, never cloud RP).
+            # Root cause of beauty-sandbox "503" while image lock held (2026-07-27).
+            if prefer_fleet_now and is_roleplay_route(routing):
+                wait_msg, retry_s = build_rp_gpu_wait_message(prefer_fleet_reason)
+                extra_prov = {
+                    "path": "proxy_8091_rp_graceful_wait",
+                    "prefer_fleet_reason": prefer_fleet_reason,
+                    "graceful_wait": True,
+                    "not_error": True,
+                    "retry_after_sec": retry_s,
+                }
+                _log_event(
+                    {
+                        "event": "rp_graceful_wait",
+                        "reason": prefer_fleet_reason,
+                        "retry_after_sec": retry_s,
+                        "stream": bool(stream),
+                        "model": model,
+                    }
+                )
+                hdrs = {
+                    "Retry-After": str(int(retry_s)),
+                    "X-Phronesis-Wait": "gpu_tenant",
+                    "X-Phronesis-Wait-Reason": (prefer_fleet_reason or "")[:120],
+                }
+                if stream:
+                    self._send_sse_chunk(model, wait_msg)
+                else:
+                    self._send_json(
+                        200,
+                        openai_chat_response(model, wait_msg, extra=extra_prov),
+                        extra_headers=hdrs,
+                    )
+                return
+            if prefer_fleet_now and not is_roleplay_route(routing) and not stream:
+                # Attempt proactive free offload again if first pass skipped local_first
+                if not proactive_handled:
+                    try:
+                        from escalation_router import try_proactive_offload_dispatch
+
+                        req_headers = {
+                            k: v
+                            for k, v in self.headers.items()
+                            if k.lower().startswith("x-phronesis-")
+                        }
+                        # Stamp skip so classify/policy sees contention
+                        routing = {
+                            **routing,
+                            "prefer_fleet": True,
+                            "prefer_fleet_reason": prefer_fleet_reason,
+                            "local_fail_reason": prefer_fleet_reason,
+                        }
+                        pr2 = try_proactive_offload_dispatch(
+                            prompt,
+                            routing,
+                            trimmed_messages,
+                            body,
+                            headers=req_headers,
+                        )
+                        if pr2.get("success"):
+                            result = pr2
+                            proactive_handled = True
+                            prov = result.setdefault("provenance", {})
+                            prov["context_trim"] = trim_meta
+                            prov["prefer_fleet_reason"] = prefer_fleet_reason
+                            prov["hard_skip_local_fifo"] = True
+                            _log_event(
+                                {
+                                    "event": "prefer_fleet_skip_fifo_ok",
+                                    "reason": prefer_fleet_reason,
+                                    "backend": prov.get("selected_backend"),
+                                }
+                            )
+                    except Exception as pf_exc:
+                        _log_event(
+                            {
+                                "event": "prefer_fleet_skip_fifo_error",
+                                "error": str(pf_exc)[:200],
+                                "reason": prefer_fleet_reason,
+                            }
+                        )
+                if not proactive_handled:
+                    # Fast-fail local ? free via resolve_post_local without FIFO wait
+                    use_native = False
+                    _log_event(
+                        {
+                            "event": "prefer_fleet_bypass_fifo",
+                            "reason": prefer_fleet_reason,
+                            "note": "skip GPU queue; free-before-grok ladder",
+                        }
+                    )
+        except Exception as pref_exc:
+            _log_event({"event": "prefer_fleet_check_error", "error": str(pref_exc)[:160]})
+
         if use_native and not proactive_handled:
             try:
                 from inference_queue import (
@@ -2550,7 +2734,26 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
 
         if not proactive_handled:
             try:
-                if use_native:
+                if prefer_fleet_now and not use_native:
+                    # Contended/down local: do not call bridge/native ? synthetic local fail
+                    # then free-before-grok ladder via resolve_post_local_dispatch.
+                    result = {
+                        "success": False,
+                        "error": f"prefer_fleet_bypass:{prefer_fleet_reason}",
+                        "provenance": {
+                            "path": "proxy_8091",
+                            "selected_backend": "skipped_local",
+                            "prefer_fleet_reason": prefer_fleet_reason,
+                            "hard_skip_local_fifo": True,
+                        },
+                    }
+                    routing = {
+                        **routing,
+                        "path": "proxy_8091",
+                        "local_fail_reason": prefer_fleet_reason or "prefer_fleet",
+                        "prefer_fleet": True,
+                    }
+                elif use_native:
                     result = dispatch_via_native_router(
                         body,
                         trimmed_messages,

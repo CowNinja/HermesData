@@ -47,7 +47,7 @@ def ensure_placeholder(
         "names": [key],
         "role": "placeholder",
         "domain": domain,
-        "notes": f"PLACEHOLDER — annotate until more data. ctx: {context[:200]}",
+        "notes": f"PLACEHOLDER - annotate until more data. ctx: {context[:200]}",
         "status": "placeholder",
         "source": "auto_placeholder",
         "updated": utc(),

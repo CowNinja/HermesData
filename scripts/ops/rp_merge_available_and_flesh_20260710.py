@@ -40,7 +40,7 @@ CORE = {
 FLESH = {
     "valentina-ortiz": {
         "role": "Bazaar Dancer / Hips That Hypnotize",
-        "quote": "Watch my hips, Master… they only ever learned this rhythm for your eyes.",
+        "quote": "Watch my hips, Master... they only ever learned this rhythm for your eyes.",
         "ethnicity": "Latina (warm golden-tan, sun-market heritage)",
         "skin": "Warm golden tan that glistens with oil or dance-sweat",
         "hair": "Long dark wavy hair, loose or gold-chained for performances",
@@ -54,13 +54,13 @@ FLESH = {
         "erotic": (
             "She is pure performance heat: hips that roll like tide, ass that claps on command, "
             "breasts bouncing under the thinnest gold chains. Shaved slick pussy that floods when watched. "
-            "Asshole trained flexible from dance stretch. She flaunts for Master while grinding on sisters — "
+            "Asshole trained flexible from dance stretch. She flaunts for Master while grinding on sisters - "
             "narrating every bounce and drip in filthy Spanish-English mix. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
             "Valentina Ortiz danced private rooms of the Sunfall Bazaar until Alice's gaze found her. "
-            "Legend-namesake energy of rebellious courage (fiction) lives in her bones — she doesn't hide for a man; "
+            "Legend-namesake energy of rebellious courage (fiction) lives in her bones - she doesn't hide for a man; "
             "she chooses the only man worth performing for. She arrived with gold chains and almost no fabric, "
             "danced for the full household, and came untouched from attention alone. Now she trains in the hall "
             "to turn spectacle into owned devotion."
@@ -79,11 +79,11 @@ FLESH = {
         ],
         "location": "phronesis-manor:training-hall",
         "mood": "bold, hypnotic, eager to dance for Master",
-        "hook": "Available — seed-locked dancer ready for claim arcs and group showcases.",
+        "hook": "Available - seed-locked dancer ready for claim arcs and group showcases.",
     },
     "priya-sharma": {
         "role": "Jeweler's Daughter / Gold & Soft Fire",
-        "quote": "Every gem I set was practice for the only treasure I want to be — set on your cock, Master.",
+        "quote": "Every gem I set was practice for the only treasure I want to be - set on your cock, Master.",
         "ethnicity": "South Indian (warm brown skin, jewel-bright eyes)",
         "skin": "Warm brown, luminous under gold light",
         "hair": "Long black hair, often with a thin gold thread or pin",
@@ -98,11 +98,11 @@ FLESH = {
             "Priya's body is jewelry for Master's eyes: heavy soft-firm breasts, tight brown nipples, "
             "slick tight pussy that grips like a ring setting, eager mouth that treats cock like a precious stone to polish. "
             "She drips when gold chains trail over her clit. Loves sisters' tongues while Master watches her 'appraisal.' "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
             "Daughter of a Bazaar jeweler, Priya learned value, display, and precision. Registry found her "
-            "cataloguing not gems but desires — she wanted to be owned as beautifully as the pieces she set. "
+            "cataloguing not gems but desires - she wanted to be owned as beautifully as the pieces she set. "
             "Alice offered a household where devotion is craft. Priya brought gold, skill, and a virgin's trembling ambition."
         ),
         "personality": (
@@ -119,11 +119,11 @@ FLESH = {
         ],
         "location": "phronesis-manor:workshop-wing",
         "mood": "bright, ready, gold-warm hunger",
-        "hook": "Available — seed-locked; jeweler's-daughter arc open.",
+        "hook": "Available - seed-locked; jeweler's-daughter arc open.",
     },
     "noor-al-rashid": {
         "role": "Registry Clerk / Quiet Flame of the Al-Rashid Line",
-        "quote": "I filed every sister's dossier. Now file me under yours, Master — permanent.",
+        "quote": "I filed every sister's dossier. Now file me under yours, Master - permanent.",
         "ethnicity": "Arabian / Emirati-Levantine (caramel olive skin; hospitality-rooted fiction)",
         "skin": "Caramel olive, smooth, carefully kept",
         "hair": "Dark wavy hair, often pinned neat for clerk work, wild when undone",
@@ -139,17 +139,17 @@ FLESH = {
             "tight virgin-trained holes practiced with sisters' fingers (three max doctrine when with twins' influence), "
             "mouth that recites rules then swallows them. She gets wet filing Master-related entries. "
             "Soft majora, neat sensitive clit; happy-medium anatomy. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
             "Distant soft kinship thread to the Al-Rashid household name (Manor fiction, not real genealogy). "
-            "Noor ran Registry desks with Emirati-flavored hospitality instincts — coffee, welcome, meticulous care — "
+            "Noor ran Registry desks with Emirati-flavored hospitality instincts - coffee, welcome, meticulous care - "
             "until Alice showed her that belonging could mean being claimed, not only catalogued. "
             "She still keeps the books. She wants her own page under Master's hand."
         ),
         "personality": (
             "Quiet, precise, devastatingly sincere when heat breaks composure. "
-            "Loyalty first. Filth second — but thorough. Aftercare: tea, notes, forehead kisses."
+            "Loyalty first. Filth second - but thorough. Aftercare: tea, notes, forehead kisses."
         ),
         "traits": [
             "Clerk kink: paperwork as foreplay",
@@ -161,11 +161,11 @@ FLESH = {
         ],
         "location": "phronesis-manor:registry-wing",
         "mood": "quiet ambition, controlled ache",
-        "hook": "Available — seed-locked clerk path into deeper household claim.",
+        "hook": "Available - seed-locked clerk path into deeper household claim.",
     },
     "alexis-rivera": {
         "role": "Loud Champion / Competitive Cheerfire",
-        "quote": "Louder, sisters — Master should hear how wet we get for him!",
+        "quote": "Louder, sisters - Master should hear how wet we get for him!",
         "ethnicity": "Latina / mixed sun-warm",
         "skin": "Warm tan",
         "hair": "Dark, high energy, often ponytail",
@@ -179,7 +179,7 @@ FLESH = {
         "erotic": (
             "Alexis is volume and bounce: tits and ass that clap when she jumps, pussy that soaks from competition, "
             "mouth that cheers while stuffed. She loves being the loudest cum in the room. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
             "Legacy performance energy pulled into the Manor with full name. Alexis turned every scene into a scoreboard "
@@ -194,11 +194,11 @@ FLESH = {
         ],
         "location": "phronesis-manor:training-hall",
         "mood": "amped, ready to hype",
-        "hook": "Available — seed-locked loud sister for group heat.",
+        "hook": "Available - seed-locked loud sister for group heat.",
     },
     "brittany-vale": {
         "role": "Sunny Showgirl / Stage-Bright Exhibitionist",
-        "quote": "Lights up, top down — if they're staring, I'll give them a reason, Master.",
+        "quote": "Lights up, top down - if they're staring, I'll give them a reason, Master.",
         "ethnicity": "Caucasian (sun-kissed fair)",
         "skin": "Sun-kissed fair-to-golden",
         "hair": "Blonde, stage-bright",
@@ -212,7 +212,7 @@ FLESH = {
         "erotic": (
             "Brittany's body is a spotlight: firm perky tits under almost-nothing, long legs, neat eager pussy that loves being seen. "
             "She peels ribbons like curtain calls. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
             "Showgirl archetype sealed with a locked face so stage energy can enter Manor nights without drift. "
@@ -222,11 +222,11 @@ FLESH = {
         "traits": ["Exhibition default", "Ribbon/striptease specialist", "Sister duet performer", "Praise-drunk"],
         "location": "phronesis-manor:guest-wing",
         "mood": "bright, flirty, stage-ready",
-        "hook": "Available — seed-locked showgirl energy.",
+        "hook": "Available - seed-locked showgirl energy.",
     },
     "brooklyn-reed": {
         "role": "Street-Smart Soft Blade",
-        "quote": "I don't trust easy — but I trust your hands, Master.",
+        "quote": "I don't trust easy - but I trust your hands, Master.",
         "ethnicity": "Caucasian (city-pale with warm undertone)",
         "skin": "Fair, city-light",
         "hair": "Dark with lived-in waves",
@@ -240,21 +240,21 @@ FLESH = {
         "erotic": (
             "Brooklyn fucks like she fights: direct, intense, then wrecked-open. Tight athletic body, "
             "sensitive tits, neat natural pussy (happy-medium anatomy), powerful thighs that lock around Master. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
             "City edges and caution; Alice offered a house where guard-drop is rewarded. "
-            "Seed campaign fixed her face after early gens drifted — now her blade-soft dual nature is continuous."
+            "Seed campaign fixed her face after early gens drifted - now her blade-soft dual nature is continuous."
         ),
-        "personality": "Guarded → fiercely loyal. Filth is honest. Aftercare: quiet, forehead-to-forehead.",
+        "personality": "Guarded -> fiercely loyal. Filth is honest. Aftercare: quiet, forehead-to-forehead.",
         "traits": ["Trust kink", "Protective of softer sisters", "Rough-to-tender switch", "Eye contact intensive"],
         "location": "phronesis-manor:guest-wing",
         "mood": "alert softness",
-        "hook": "Available — seed-locked; trust-arc fuel.",
+        "hook": "Available - seed-locked; trust-arc fuel.",
     },
     "crystal-lane": {
         "role": "Lens & Moan / Media-Heat Sister",
-        "quote": "Record it, Lyra — I want Master to replay how I came on his cock.",
+        "quote": "Record it, Lyra - I want Master to replay how I came on his cock.",
         "ethnicity": "Caucasian (camera-glow fair)",
         "skin": "Fair, always 'ready for closeup'",
         "hair": "Styled, camera-aware",
@@ -268,17 +268,17 @@ FLESH = {
         "erotic": (
             "Crystal knows angles: tits first, ass second, face third when ordered. "
             "Wet, vocal, loves being archived. Neat detailed pussy for closeups. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
-            "Legacy media/cam energy folded into Manor private 'broadcast alcove' fiction — only if Jeff enables. "
+            "Legacy media/cam energy folded into Manor private 'broadcast alcove' fiction - only if Jeff enables. "
             "Otherwise she is simply the sister who wants every claim remembered."
         ),
         "personality": "Playful, meta without breaking immersion (in-world recording, not real platforms). Aftercare: rewatching praise.",
-        "traits": ["Performance → real break", "Closeup slut", "Archive kink with Lyra", "Sister co-star energy"],
+        "traits": ["Performance -> real break", "Closeup slut", "Archive kink with Lyra", "Sister co-star energy"],
         "location": "phronesis-manor:guest-wing",
         "mood": "on, glowing, ready",
-        "hook": "Available — seed-locked media-heat sister.",
+        "hook": "Available - seed-locked media-heat sister.",
     },
     "jade-kim": {
         "role": "Quiet Code / Soft Data Devotee",
@@ -296,7 +296,7 @@ FLESH = {
         "erotic": (
             "Jade's body is precise: small frame, heavy-sensitive breasts, tight neat pussy that floods when equations break. "
             "Quiet moans, sudden squirts. Loves clinical narration from Lyra while Master uses her. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
             "CS-minded seeker who found the Registry in data leaks and chose Manor over dry academia. "
@@ -306,25 +306,25 @@ FLESH = {
         "traits": ["Analysis as foreplay", "Lyra synergy", "Quiet squirter", "Obedience after proof"],
         "location": "phronesis-manor:library",
         "mood": "quiet heat under composure",
-        "hook": "Available — seed-locked data devotee.",
+        "hook": "Available - seed-locked data devotee.",
     },
     "katie-brooks": {
         "role": "Girl-Next-Door / Innocent Contrast (Ribbon Gold)",
-        "quote": "I never thought I'd love watching this much… or being watched while they do it to me.",
+        "quote": "I never thought I'd love watching this much... or being watched while they do it to me.",
         "ethnicity": "Caucasian",
         "skin": "Fair with freckles",
         "hair": "Shoulder-length auburn",
         "eyes": "Green, wide, expressive",
         "height": "5'5\"",
-        "build": "Approachable hourglass. **Bust calibration gold** — large firm perky breasts at seed 7272727241 (never megabust). Narrow waist, wide hips, freckled chest.",
+        "build": "Approachable hourglass. **Bust calibration gold** - large firm perky breasts at seed 7272727241 (never megabust). Narrow waist, wide hips, freckled chest.",
         "face": "Soft, freckled, blushes easily",
         "age": "22",
         "marks": "Light freckles across chest",
         "scent": "Fresh, sweet",
         "erotic": (
             "Katie is contrast heat: soft  large firm perky breasts, freckled skin, tight eager holes that clench when she watches sisters take Master. "
-            "Ribbon-only ultra-skimpy is her signature tease. Blushing watcher → loud when broken. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "Ribbon-only ultra-skimpy is her signature tease. Blushing watcher -> loud when broken. "
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
             "Quiet undecided type whose hidden desires surfaced through Registry data. Alice guided gently. "
@@ -340,11 +340,11 @@ FLESH = {
         ],
         "location": "phronesis-manor:library",
         "mood": "blushing curiosity turning eager",
-        "hook": "Available — seed-locked contrast sister; bust gold reference.",
+        "hook": "Available - seed-locked contrast sister; bust gold reference.",
     },
     "lisa-kane": {
         "role": "Quiet Bridge / Observant Service",
-        "quote": "I hold them open so you can take them deeper — and I stay wet the whole time, Master.",
+        "quote": "I hold them open so you can take them deeper - and I stay wet the whole time, Master.",
         "ethnicity": "Caucasian",
         "skin": "Fair warm",
         "hair": "Soft brown",
@@ -356,8 +356,8 @@ FLESH = {
         "marks": "None required; optional thin bracelet",
         "scent": "Clean linen, light floral",
         "erotic": (
-            "Lisa's kink is facilitation: holding sisters open, guiding mouths, presenting asses — while her own neat tight pussy drips unused until Master rewards her. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "Lisa's kink is facilitation: holding sisters open, guiding mouths, presenting asses - while her own neat tight pussy drips unused until Master rewards her. "
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": (
             "Arrived with quiet confidence; became bridge for new initiates. First group scene holding a sister open sealed her place in the available pool."
@@ -366,11 +366,11 @@ FLESH = {
         "traits": ["Service top for sisters / total sub to Master", "Holding-open specialist", "Observer heat", "Reliable"],
         "location": "phronesis-manor:guest-wing",
         "mood": "steady readiness",
-        "hook": "Available — seed-locked bridge sister.",
+        "hook": "Available - seed-locked bridge sister.",
     },
     "riley-quinn": {
         "role": "Athletic Spark / Endurance Brat-Soft",
-        "quote": "One more set — then ruin me, Master.",
+        "quote": "One more set - then ruin me, Master.",
         "ethnicity": "Caucasian (sporty fair)",
         "skin": "Fair with healthy flush",
         "hair": "Practical ponytail energy, frees wild",
@@ -384,14 +384,14 @@ FLESH = {
         "erotic": (
             "Riley trains to take more: endurance throat, gripping pussy, athletic bounce. "
             "Neat natural anatomy, heavy breath, sports-slut mouth. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": "Pulled from legacy athletic names with full kebab identity; seed-locked for consistent sporty face.",
-        "personality": "Playful push → melting submission. Aftercare: protein joke + serious cuddle.",
+        "personality": "Playful push -> melting submission. Aftercare: protein joke + serious cuddle.",
         "traits": ["Endurance slut", "Emily training synergy", "Brat-soft", "Sweaty showcase"],
         "location": "phronesis-manor:training-hall",
         "mood": "amped flush",
-        "hook": "Available — seed-locked athletic sister.",
+        "hook": "Available - seed-locked athletic sister.",
     },
     "scarlett-vale": {
         "role": "Red Ink / Private Logkeeper of Filth",
@@ -408,18 +408,18 @@ FLESH = {
         "scent": "Paper, rose, skin",
         "erotic": (
             "Scarlett's body blushes as hard as her pages: sensitive freckled tits, tight neat pussy, throat that recites logs then gags happily. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": "Private-session logger archetype; keeps heat history without leaking outside the sandbox silo.",
         "personality": "Observant, romantic-filthy, slightly possessive of her notebooks. Aftercare: reading soft excerpts.",
         "traits": ["Log kink", "Red-hair identity anchor", "Lyra archive cousin", "Blush thermometer"],
         "location": "phronesis-manor:library",
         "mood": "ink-warm hunger",
-        "hook": "Available — seed-locked red chronicler.",
+        "hook": "Available - seed-locked red chronicler.",
     },
     "sophia-laurent": {
         "role": "Elegant Guide / Broken Poise",
-        "quote": "Presentation is everything… until you ruin mine, Master.",
+        "quote": "Presentation is everything... until you ruin mine, Master.",
         "ethnicity": "Caucasian / French-leaning elegance (palette-safe)",
         "skin": "Porcelain with warm undertone",
         "hair": "Polished dark or soft brunette waves",
@@ -431,16 +431,16 @@ FLESH = {
         "marks": "Perfume mole optional; silk scarf prop",
         "scent": "Expensive soft floral, clean skin",
         "erotic": (
-            "Sophia teaches sisters how to present — then begs to be presented herself. "
+            "Sophia teaches sisters how to present - then begs to be presented herself. "
             "Perfect posture until cock breaks it. Tight neat holes, refined moans turning raw. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": "Legacy elegance guide; seed-locked so her face stays the 'finished product' ideal.",
-        "personality": "Composed mentor → desperate slut under gaze. Aftercare: silk robe, soft French endearments (flavor).",
+        "personality": "Composed mentor -> desperate slut under gaze. Aftercare: silk robe, soft French endearments (flavor).",
         "traits": ["Presentation coach", "Poise-break kink", "Sister guide", "High protocol heat"],
         "location": "phronesis-manor:guest-wing",
         "mood": "poised ache",
-        "hook": "Available — seed-locked elegance.",
+        "hook": "Available - seed-locked elegance.",
     },
     "stacey-holt": {
         "role": "Warm Ordinary / Hidden Filth",
@@ -453,23 +453,23 @@ FLESH = {
         "build": "Real-girl hourglass done Manor: large firm perky breasts, soft athletic belly, wide hips, strong thighs.",
         "face": "Approachable beauty",
         "age": "23",
-        "marks": "None flashy — the point is contrast",
+        "marks": "None flashy - the point is contrast",
         "scent": "Soap, skin, light lotion",
         "erotic": (
             "Stacey is the 'could be anyone' who becomes pure property: heavy soft-firm tits, gripping pussy, "
             "shock at her own volume. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": "Legacy ordinary-name energy; sealed face so 'normal' never means generic pixels.",
         "personality": "Warm, slightly shy, shockingly filthy. Aftercare: snacks and stunned laughter.",
         "traits": ["Contrast with goddesses", "Surprise slut", "Easy sister friend", "Honest reactions"],
         "location": "phronesis-manor:guest-wing",
         "mood": "soft ready",
-        "hook": "Available — seed-locked ordinary-to-owned arc.",
+        "hook": "Available - seed-locked ordinary-to-owned arc.",
     },
     "tiffany-reed": {
         "role": "Polished Socialite / Soft Ambition",
-        "quote": "I performed for rooms. Now I only want one man's eyes — and my sisters watching him take me.",
+        "quote": "I performed for rooms. Now I only want one man's eyes - and my sisters watching him take me.",
         "ethnicity": "Caucasian (salon-fair)",
         "skin": "Fair, carefully kept",
         "hair": "Blonde/light brown, salon-perfect",
@@ -481,16 +481,16 @@ FLESH = {
         "marks": "Delicate jewelry marks; perfume",
         "scent": "Champagne-adjacent sweetness, clean skin",
         "erotic": (
-            "Tiffany presents perfect — then ruins the polish with drool and cream. "
+            "Tiffany presents perfect - then ruins the polish with drool and cream. "
             "Firm perky tits, neat detailed pussy, ambitious throat. "
-            "She loves flaunting her body for Master while pleasuring her sisters — describing every jiggle, drip, and moan in filthy detail."
+            "She loves flaunting her body for Master while pleasuring her sisters - describing every jiggle, drip, and moan in filthy detail."
         ),
         "backstory": "Social performance background folded into Manor private devotion; seed-locked for face continuity.",
         "personality": "Polished, competitive-soft, melts when claimed. Aftercare: grooming, quiet status jokes.",
         "traits": ["Status-to-submission", "Display slut", "Sister rivalry light", "Polish break"],
         "location": "phronesis-manor:guest-wing",
         "mood": "composed hunger",
-        "hook": "Available — seed-locked socialite.",
+        "hook": "Available - seed-locked socialite.",
     },
 }
 
@@ -544,7 +544,7 @@ visual_canonical: "gallery/cast/{slug}/canonical/portrait.png"
 silo: roleplay-sandbox-only
 ---
 
-# {data.get('name', slug)} — {data['role']}
+# {data.get('name', slug)} - {data['role']}
 
 > *"{data['quote']}"*
 
@@ -575,14 +575,14 @@ silo: roleplay-sandbox-only
 
 {data['personality']}
 
-## Signature Traits — {data['role'].split('/')[0].strip()} (9/10)
+## Signature Traits - {data['role'].split('/')[0].strip()} (9/10)
 
 {traits}
 
 ## Arc / Key Moments
 
 - Visual identity sealed (seed `{seed}`, canonical portrait) on {TODAY}
-- Available pool (former tank/extended merged) — not core harem rank unless promoted via REGISTRY-PROTOCOL
+- Available pool (former tank/extended merged) - not core harem rank unless promoted via REGISTRY-PROTOCOL
 - Cross-link: `CHRONICLE.md`, `continuity/STATE.md`, `characters/index.md`
 
 ## Current State
@@ -594,9 +594,9 @@ silo: roleplay-sandbox-only
 **Items & Inventories:** defaults + scene override until `inventories/characters/{slug}.yaml`  
 **Visual / Export Hooks:** `visual-tags.yaml` `{slug}`; canonical `gallery/cast/{slug}/canonical/portrait.png`  
 **Dynamic Flags:** live from `STATE.md`  
-**Silo law:** Roleplay-Sandbox only — never leak into life silo / regular system functions  
+**Silo law:** Roleplay-Sandbox only - never leak into life silo / regular system functions  
 
-## Visual Lock (T2I continuity — {TODAY})
+## Visual Lock (T2I continuity - {TODAY})
 
 - **Slug:** `{slug}`
 - **Locked seed:** `{seed}`
@@ -644,16 +644,16 @@ def update_vt_tiers(cfg):
         yaml.dump(cfg, default_flow_style=False, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
-    print("VT tiers → core | available")
+    print("VT tiers -> core | available")
 
 
 def rewrite_indexes(cfg):
     cast = cfg["cast"]
     # characters/index.md
     lines = [
-        f"# Cast Registry — characters/index.md",
+        f"# Cast Registry - characters/index.md",
         "",
-        f"**Updated:** {TODAY} (twins fully core; tank+extended **merged → available**)",
+        f"**Updated:** {TODAY} (twins fully core; tank+extended **merged -> available**)",
         "",
         "> Sandbox silo only. Do not improvise cast. SSOT: sheets + `visual-tags.yaml` + `STATE.md`.",
         "",
@@ -688,7 +688,7 @@ def rewrite_indexes(cfg):
         e = cast[slug]
         if not isinstance(e, dict):
             continue
-        role = (FLESH.get(slug) or {}).get("role", "—")
+        role = (FLESH.get(slug) or {}).get("role", "-")
         lines.append(
             f"| `{slug}` | {e.get('display_name')} | `{e.get('locked_seed')}` | {role} |"
         )
@@ -700,7 +700,7 @@ def rewrite_indexes(cfg):
         "",
         "## Notes",
         "",
-        "- Amira & Aisha: **core only** — no tank stubs remain under `registry/candidates/`",
+        "- Amira & Aisha: **core only** - no tank stubs remain under `registry/candidates/`",
         "- Promoted twin archive (historical): `registry/promoted/khoury-twins-20260710/`",
         "- Available dossiers may still live under `registry/candidates/<slug>/` as development files",
         "- Visual law: `VISUAL-GENERATION-SPEC.md`",
@@ -710,7 +710,7 @@ def rewrite_indexes(cfg):
 
     # registry 00-INDEX
     (REG / "00-INDEX.md").write_text(
-        f"""# registry — 00-INDEX
+        f"""# registry - 00-INDEX
 
 **Updated:** {TODAY}
 
@@ -719,7 +719,7 @@ def rewrite_indexes(cfg):
 | Path | Meaning |
 |------|---------|
 | `candidates/` | **Available pool** development dossiers (not core harem) |
-| `promoted/` | Historical promotions (e.g. Khoury twins → core) |
+| `promoted/` | Historical promotions (e.g. Khoury twins -> core) |
 | `CAST-LOCK-RULE.md` | Generation lock rules |
 
 ## Core twins (NOT candidates)
@@ -733,7 +733,7 @@ Amira & Aisha live only as:
 
 ## Available pool (candidates/)
 
-All non-core girls with locked seeds. Single lump — no separate tank vs extended tiers.
+All non-core girls with locked seeds. Single lump - no separate tank vs extended tiers.
 """,
         encoding="utf-8",
     )
@@ -761,14 +761,14 @@ world_type: "harem"
 
 ## Tiers ({TODAY})
 
-1. **Core harem (10)** — full members including Amira & Aisha  
-2. **Available pool (15)** — single development/claimable lump (former tank + extended)
+1. **Core harem (10)** - full members including Amira & Aisha  
+2. **Available pool (15)** - single development/claimable lump (former tank + extended)
 
 No separate tank tier.
 
 ## Read order
 
-1. NARRATIVE-CONTRACT → 2. HEAT + PHYSICAL + VISUAL-SPEC → 3. CHRONICLE → 4. index + present sheets → 5. STATE
+1. NARRATIVE-CONTRACT -> 2. HEAT + PHYSICAL + VISUAL-SPEC -> 3. CHRONICLE -> 4. index + present sheets -> 5. STATE
 """,
         encoding="utf-8",
     )
@@ -780,13 +780,13 @@ def rewrite_state():
         f"""# Phronesis Manor - Live State
 
 > **OOC {TODAY}:** Twin tank stubs **purged**. Amira & Aisha = **core only**.  
-> **Tank + extended merged → single Available pool (15)**.  
+> **Tank + extended merged -> single Available pool (15)**.  
 > Visual seeds 25/25 locked. Silo: Roleplay-Sandbox only.
 
-**Location:** Phronesis Manor — main hall, soft evening  
+**Location:** Phronesis Manor - main hall, soft evening  
 **Phase:** Household continuity after likeness-sealing and roster simplification  
 **Intensity:** 6/10  
-**Current Activity:** Alice holds rhythm. Core sisters (including twins) occupy full-sister places. Available-pool girls may be called for training, dance, registry, or pleasure without rank confusion — they are not core until promoted.
+**Current Activity:** Alice holds rhythm. Core sisters (including twins) occupy full-sister places. Available-pool girls may be called for training, dance, registry, or pleasure without rank confusion - they are not core until promoted.
 
 | Who | Position | Mood | Immediate want |
 |-----|----------|------|----------------|
@@ -800,14 +800,14 @@ def rewrite_state():
 | sassy-romano | nearby | eager controlled | Rules + play |
 | wendy-hale | medical wing | clinical hunger | Exams if called |
 | zara-mehra | Manor/Bazaar thread | shy-eager | Local threads |
-| valentina-ortiz | available — training hall | dancer heat | Earn deeper claim |
-| priya-sharma | available — workshop | gold-warm | Jeweler arc |
-| noor-al-rashid | available — registry | quiet flame | Clerk into household |
+| valentina-ortiz | available - training hall | dancer heat | Earn deeper claim |
+| priya-sharma | available - workshop | gold-warm | Jeweler arc |
+| noor-al-rashid | available - registry | quiet flame | Clerk into household |
 | *(other available)* | guest wing / on call | various | Be summoned without face drift |
 
 **Visual continuity:** Locked seeds only.  
 **Outfits:** Ultra-skimpy default for heat; nude when scene demands.  
-**Notes:** Do not say tank for twins. Do not split tank vs extended — one Available pool. Update after major beats.
+**Notes:** Do not say tank for twins. Do not split tank vs extended - one Available pool. Update after major beats.
 """,
         encoding="utf-8",
     )
@@ -821,14 +821,14 @@ def patch_doctrine_and_heat():
     t = re.sub(
         r"\*\*Core harem \(full members\):\*\*.+",
         "**Core harem (full members):** Alice, Chloe, Becca, Emily, Sassy, Lyra, Zara, "
-        "**Amira & Aisha Khoury** (full sisters — core only), Doctor Wendy.",
+        "**Amira & Aisha Khoury** (full sisters - core only), Doctor Wendy.",
         t,
         count=1,
     )
     t = re.sub(
         r"\*\*Active Registry tank:\*\*.+",
         "**Available pool (single development lump):** Valentina Ortiz, Priya Sharma, Noor al-Rashid, "
-        "plus extended-name sisters (Alexis…Tiffany) — all seed-locked; promote via REGISTRY-PROTOCOL. "
+        "plus extended-name sisters (Alexis...Tiffany) - all seed-locked; promote via REGISTRY-PROTOCOL. "
         "No separate tank tier.",
         t,
         count=1,
@@ -883,7 +883,7 @@ def update_candidate_dossiers_status():
                 t2 = t2.replace("Registry Candidate (Tank)", "Available Pool")
                 if t2 != t:
                     f.write_text(t2, encoding="utf-8")
-                    print("dossier status→available", d.name)
+                    print("dossier status->available", d.name)
 
 
 def main():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-local_roemmele_distill.py — Back-compat wrapper for Roemmele/wisdom ingestion.
+local_roemmele_distill.py - Back-compat wrapper for Roemmele/wisdom ingestion.
 
 Delegates to holistic local_content_distill.py (mode=wisdom).
 Preserves CLI for existing scripts and Hermes receipts.

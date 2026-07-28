@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Retry open drain DLQ items once (bounded). Success → status closed."""
+"""Retry open drain DLQ items once (bounded). Success -> status closed."""
 from __future__ import annotations
 
 import argparse

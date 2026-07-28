@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Optional local-AI domain suggestion for borderline filenames.
 
-Uses grunt_local only — never Grok. Does not move files.
+Uses grunt_local only - never Grok. Does not move files.
 Deterministic domain_route still wins when it matches a non-inbox domain.
 """
 from __future__ import annotations

@@ -279,7 +279,7 @@ def set_alias(alias: str, model: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sovereign nanoDB — model stat persistence")
+    parser = argparse.ArgumentParser(description="Sovereign nanoDB - model stat persistence")
     parser.add_argument("--init", action="store_true", help="Initialize database files")
     parser.add_argument("--record-model", metavar="MODEL", help="Record/update model metadata")
     parser.add_argument("--set", nargs=2, metavar=("KEY", "VALUE"), action="append", help="Key=value pairs with --record-model")

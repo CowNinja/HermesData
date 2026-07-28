@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Resilience backup — runs via no_agent cron every 4h.
+"""Resilience backup ? runs via no_agent cron every 4h.
 
-v3 — allowlist staging (sovereign core paths) + tracked updates + drift report.
+v3 ? allowlist staging (sovereign core paths) + tracked updates + drift report.
 Never commits .env or secret files.
 """
 from __future__ import annotations
@@ -102,7 +102,7 @@ def backup_repo(name: str, repo_dir: str, branch: str) -> None:
     # 1) Tracked file updates only (fast; never git add -A on huge trees)
     code, _, err = run_git(["add", "-u"], repo_dir, timeout=GIT_ADD_U_TIMEOUT)
     if code == 124:
-        log(f"WARN {name}: git add -u timeout — skip repo to stay under cron cap")
+        log(f"WARN {name}: git add -u timeout ? skip repo to stay under cron cap")
         ERRORS.append(f"{name} add -u timeout")
         return
 
@@ -157,11 +157,11 @@ def main() -> int:
         backup_repo("PhronesisSilo", silo_candidate, "main")
     else:
         log("\n## PhronesisSilo Backup")
-        log("OK PhronesisSilo: skip git (bulk silo — K mirror + cloud recovery pack)")
+        log("OK PhronesisSilo: skip git (bulk silo ? K mirror + cloud recovery pack)")
 
     log("\n## Summary")
     if ERRORS:
-        log(f"SOFT_ISSUES: {len(ERRORS)} (exit 0 — cron stays green)")
+        log(f"SOFT_ISSUES: {len(ERRORS)} (exit 0 ? cron stays green)")
         for e in ERRORS:
             log(f"  - {e}")
         print(f"\n[SOFT_ISSUES: {len(ERRORS)}]")

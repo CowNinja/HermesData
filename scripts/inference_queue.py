@@ -881,7 +881,7 @@ def should_defer_comfy_render() -> tuple[bool, str]:
 
 
 def should_defer_background_work() -> tuple[bool, str]:
-    """Shared gate for cron/inbox consumers — defer when RP owns or waits on GPU."""
+    """Shared gate for cron/inbox consumers ? defer when RP owns or waits on GPU."""
     q = get_inference_queue()
     snap = q.snapshot()
     active = snap.get("active") or {}
@@ -896,8 +896,99 @@ def should_defer_background_work() -> tuple[bool, str]:
     return False, "ok"
 
 
+def image_gpu_tenant_held() -> tuple[bool, str]:
+    """True when hermes_image single-GPU lock is live (not stale).
+
+    SSOT: image_job_lock.status() ? do not reimplement TTL/pid/orphan logic here.
+    Used to prefer fleet offload for non-RP work while Forge owns VRAM.
+    Never raises ? proxy hot path must stay resilient.
+    """
+    try:
+        # Prefer in-process import (same scripts dir on path for proxy workers)
+        try:
+            import image_job_lock as ijl  # type: ignore
+        except Exception:
+            import importlib.util
+            from pathlib import Path
+
+            p = Path(r"D:\HermesData\scripts\image_job_lock.py")
+            spec = importlib.util.spec_from_file_location("image_job_lock_ssot", p)
+            if spec is None or spec.loader is None:
+                raise ImportError("image_job_lock_spec")
+            ijl = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(ijl)  # type: ignore[attr-defined]
+        st = ijl.status()
+        if not isinstance(st, dict):
+            return False, "lock_status_invalid"
+        if st.get("held"):
+            meta = st.get("meta") if isinstance(st.get("meta"), dict) else {}
+            owner = str(meta.get("owner") or "image")
+            job = str(meta.get("job") or "")[:48]
+            return True, f"image_lock:{owner}" + (f":{job}" if job else "")
+        if st.get("stale"):
+            return False, "stale_orphan"
+        if st.get("released"):
+            return False, "released"
+        return False, "no_lock"
+    except Exception as exc:
+        return False, f"lock_check_error:{type(exc).__name__}"
+
+
+def should_prefer_fleet_offload() -> tuple[bool, str]:
+    """Prefer T2 free fleet offload when local GPU cannot efficiently serve.
+
+    Triggers: live image lock, dual-tenant ports, or 8090 unreachable while
+    proxy is up. Also honors fresh muscle signal file (hard_fleet_offload).
+    RP lane still stays local via should_defer_proactive_offload / classify.
+    Free before Grok ? Grok-token-outage resilience (2026-07-27).
+    """
+    held, reason = image_gpu_tenant_held()
+    if held:
+        return True, reason
+    # Cheap dual-port / 8090-down check without importing board
+    try:
+        import socket
+
+        def _up(port: int) -> bool:
+            try:
+                with socket.create_connection(("127.0.0.1", int(port)), timeout=0.25):
+                    return True
+            except OSError:
+                return False
+
+        if _up(8090) and (_up(7860) or _up(8188)):
+            return True, "dual_tenant_ports"
+        if (not _up(8090)) and _up(8091):
+            return True, "8090_down_proxy_up"
+    except Exception:
+        pass
+    # Muscle signal (written every board/muscle tick) ? max age 120s
+    try:
+        from pathlib import Path
+
+        sig_p = Path(r"D:\HermesData\state\prefer_fleet_signal_latest.json")
+        if sig_p.is_file():
+            age = time.time() - sig_p.stat().st_mtime
+            if age <= 120.0:
+                sig = json.loads(sig_p.read_text(encoding="utf-8"))
+                if isinstance(sig, dict) and (
+                    sig.get("hard_fleet_offload") or sig.get("prefer_fleet_offload")
+                ):
+                    return True, str(sig.get("prefer_fleet_reason") or "muscle_signal")
+    except Exception:
+        pass
+    return False, "ok"
+
+
 def should_defer_proactive_offload() -> tuple[bool, str]:
-    """Defer T2/T3 proactive offload while GPU FIFO is hot (RP or deep queue)."""
+    """Gate T2/T3 proactive offload.
+
+    Law (2026-07-26 efficiency codification):
+      - ALWAYS defer while roleplay lane active/waiting (sandbox stays local).
+      - NEVER defer when local GPU is image-contended or 8090 down ? prefer fleet.
+      - Otherwise defer only on deep non-RP backlog if local is healthy (thrift:
+        burn local queue before paid; free fleet still allowed via prefer path).
+    """
     q = get_inference_queue()
     snap = q.snapshot()
     active = snap.get("active") or {}
@@ -907,6 +998,13 @@ def should_defer_proactive_offload() -> tuple[bool, str]:
         return True, "roleplay_active"
     if rp_waiting > 0:
         return True, f"roleplay_waiting_{rp_waiting}"
+
+    # Local contended ? do NOT defer offload (allow proactive fleet)
+    prefer, pref_reason = should_prefer_fleet_offload()
+    if prefer:
+        return False, f"prefer_fleet:{pref_reason}"
+
+    # Local healthy: keep thrift bias ? don't spray fleet on mild backlog
     if active and normal_waiting >= 2:
         return True, f"normal_backlog_{normal_waiting}"
     waiting = int(snap.get("waiting_count") or 0)

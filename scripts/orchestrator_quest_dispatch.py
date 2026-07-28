@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Master-orchestrator quest runner — read-only muscle.
+"""Master-orchestrator quest runner ? read-only muscle.
 
 Parent (Hermes) or cron runs this; no deletes, no gateway restarts, no K moves.
 """
@@ -116,7 +116,7 @@ def main() -> int:
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Orchestrator quest receipt — {ts}",
+        f"# Orchestrator quest receipt ? {ts}",
         "",
         f"**Score:** {passed}/{total} = **{score}%**",
         "",

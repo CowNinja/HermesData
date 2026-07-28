@@ -2,7 +2,7 @@
 """
 rclone_setup_helper.py - Session 14+
 Helps configure and run filtered Medical pulls.
-Main working dir: D:\HermesData (C: only for rclone config/temps)
+Main working dir: D:/HermesData (C: only for rclone config/temps)
 
 Updated to recommend the new multi-account ingestion orchestrator.
 """
@@ -14,7 +14,7 @@ RCLONE = Path("D:/HermesData/rclone_test/rclone.exe")
 WORK_DIR = Path("D:/HermesData")
 
 def main():
-    print("=== rclone Setup Helper (D:\HermesData primary) ===")
+    print("=== rclone Setup Helper (D:/HermesData primary) ===")
     print("rclone:", RCLONE)
     print("Main data always under:", WORK_DIR)
 
@@ -53,7 +53,7 @@ def main():
     print("  --remote-name old_backup_gdrive \\")
     print(f"  --output {WORK_DIR / 'manifests' / 'session14_navy_medical_manifest.json'}")
 
-    print("\nAll main data stays in D:\HermesData. Use --dry-run first if desired.")
+    print("\nAll main data stays in D:/HermesData. Use --dry-run first if desired.")
     print("See also: multi_account_ingest_orchestrator.py , discovery_walker.py , personal-data-silo skill.")
 
 if __name__ == "__main__":

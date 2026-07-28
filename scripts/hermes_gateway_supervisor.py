@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Hermes gateway supervisor v2 — primary Discord :8642 restarter.
+"""Hermes gateway supervisor v2 ? primary Discord :8642 restarter.
 
 Root causes of repeated drops (2026-07-17):
-  1. Gateway process dies mid-turn (silent) — no traceback
-  2. Dual starters (keepalive + supervisor + heal) race → "runtime lock already held"
-  3. list_gateway_pids returned dead PIDs → boot_wait forever / no restart
-  4. Supervisor + keepalive themselves die → no recovery until human
+  1. Gateway process dies mid-turn (silent) ? no traceback
+  2. Dual starters (keepalive + supervisor + heal) race ? "runtime lock already held"
+  3. list_gateway_pids returned dead PIDs ? boot_wait forever / no restart
+  4. Supervisor + keepalive themselves die ? no recovery until human
 
 Policy:
   - This process is the ONLY automatic gateway starter
@@ -225,7 +225,7 @@ def start_gateway() -> bool:
     env["HERMES_CONFIG_PATH"] = str(ROOT / "config.yaml")
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env["HERMES_GATEWAY_DETACHED"] = "1"
-    # Skip integrity gate entirely — timeouts blocked starts and caused drop storms
+    # Skip integrity gate entirely ? timeouts blocked starts and caused drop storms
     env["PHRONESIS_BOOT_INTEGRITY"] = "0"
     env["PHRONESIS_BOOT_INTEGRITY_MODE"] = "fast"
     env["PHRONESIS_BOOT_INTEGRITY_FAIL"] = "warn"
@@ -259,13 +259,13 @@ def start_gateway() -> bool:
             return True
         time.sleep(2)
     log("ERR start timed out waiting for /health")
-    # failed start may leave lock — clean
+    # failed start may leave lock ? clean
     kill_gateway_tree()
     return False
 
 
 def _publish_lock_body(body: str) -> None:
-    """Atomic lock publish (min_bytes=1) — never truncate mid-write."""
+    """Atomic lock publish (min_bytes=1) ? never truncate mid-write."""
     if atomic_write_text is not None:
         atomic_write_text(LOCK, body if body.endswith("\n") else body + "\n", min_bytes=1)
     else:
@@ -329,7 +329,7 @@ def tick() -> str:
 
         existing = list_gateway_pids()
         if existing:
-            # Process alive but no health — wait briefly for boot
+            # Process alive but no health ? wait briefly for boot
             log(f"unhealthy_alive pids={existing} wait_boot")
             deadline = time.time() + min(BOOT_WAIT_SEC, 25)
             while time.time() < deadline:

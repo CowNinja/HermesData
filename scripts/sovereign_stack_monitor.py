@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-sovereign_stack_monitor.py — 8090 router + VRAM + nanoDB + port health.
+sovereign_stack_monitor.py ? 8090 router + VRAM + nanoDB + port health.
 
 Script-only (no_agent) monitoring for cron. Outputs JSONL to operator-console.jsonl.
 Alerts via stdout (non-zero exit triggers cron delivery).
@@ -174,7 +174,7 @@ def get_nanodb_stats() -> Optional[Dict[str, Any]]:
     try:
         if not NANODB_PATH.exists():
             return None
-        # nanoDB stores dispatches in a JSONL or SQLite — try both
+        # nanoDB stores dispatches in a JSONL or SQLite ? try both
         db_file = NANODB_PATH / "dispatches.jsonl"
         if not db_file.exists():
             db_file = NANODB_PATH / "nanodb.jsonl"
@@ -332,7 +332,7 @@ def main():
     elif warnings:
         for a in warnings:
             print(a)
-        # Warnings don't trigger alert delivery — just log
+        # Warnings don't trigger alert delivery ? just log
     else:
         print(f"Stack healthy: {healthy_ports}/{total_ports} ports, GPU OK, router loaded")
 

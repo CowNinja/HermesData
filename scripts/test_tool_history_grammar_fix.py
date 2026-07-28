@@ -231,7 +231,7 @@ def main() -> int:
         "probes": probes,
         "proxy_log_marker_delta": delta,
         "notes": [
-            "PASS if tool-history probes are 200 OR permanent 400 — never 503 retry-storm shape.",
+            "PASS if tool-history probes are 200 OR permanent 400 ? never 503 retry-storm shape.",
             "proactive_tool_history_flatten delta > 0 is strong evidence of fix path.",
         ],
     }
@@ -239,7 +239,7 @@ def main() -> int:
     RECEIPT_JSON.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT_JSON.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     lines = [
-        f"# Tool-history grammar fix probe — {receipt['ts']}",
+        f"# Tool-history grammar fix probe ? {receipt['ts']}",
         "",
         f"**PASS:** `{pass_overall}`",
         f"**Seal:** `{SEAL}`",

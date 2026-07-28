@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-shot silo + stack brief — $0 Grok. For cron no_agent or thin chat pulses."""
+"""One-shot silo + stack brief ? $0 Grok. For cron no_agent or thin chat pulses."""
 from __future__ import annotations
 
 import json
@@ -28,13 +28,13 @@ def port(p: int) -> bool:
 
 def main() -> int:
     lines = [
-        f"# Silo brief — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        f"# Silo brief ? {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
         "",
     ]
     lines.append(
-        f"**Ports:** gw8642={'UP' if port(8642) else 'DOWN'} · "
-        f"qwy8090={'UP' if port(8090) else 'DOWN'} · "
-        f"proxy8091={'UP' if port(8091) else 'DOWN'} · "
+        f"**Ports:** gw8642={'UP' if port(8642) else 'DOWN'} ? "
+        f"qwy8090={'UP' if port(8090) else 'DOWN'} ? "
+        f"proxy8091={'UP' if port(8091) else 'DOWN'} ? "
         f"comfy8188={'UP' if port(8188) else 'DOWN'}"
     )
     if PRIMARY.is_file():
@@ -76,7 +76,7 @@ def main() -> int:
             "SELECT COUNT(*) FROM ingest WHERE domain LIKE '%Inbox%'"
         ).fetchone()[0]
         lines.append(
-            f"**registry:** {tot} · unique={uniq} · archive_rows={arch} · "
+            f"**registry:** {tot} ? unique={uniq} ? archive_rows={arch} ? "
             f"inbox_domain={inbox}"
         )
         lines.append("- **MemoryCard land: 100% COMPLETE** (campaign 1)")
@@ -109,7 +109,7 @@ def main() -> int:
     except Exception as e:
         lines.append(f"- coverage holistic: err {e}")
         lines.append("")
-    lines.append("_Script-only brief — no SuperGrok tokens._")
+    lines.append("_Script-only brief ? no SuperGrok tokens._")
     text = "\n".join(lines)
     out = Path(r"D:\PhronesisVault\Operations\logs\silo-status-brief-latest.md")
     out.parent.mkdir(parents=True, exist_ok=True)

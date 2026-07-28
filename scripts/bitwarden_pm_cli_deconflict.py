@@ -131,7 +131,7 @@ def main() -> int:
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(report, indent=2), encoding="utf-8")
     lines = [
-        f"# Bitwarden PM CLI de-conflict — {report['at']}",
+        f"# Bitwarden PM CLI de-conflict ? {report['at']}",
         "",
         f"- Total items: **{report['total_items']}**",
         f"- Duplicate clusters: **{report['duplicate_clusters']}**",
@@ -141,7 +141,7 @@ def main() -> int:
     ]
     for c in report["top_clusters"]:
         lines.append(
-            f"| {c['count']} | {', '.join(c['hosts'])[:40]} | {', '.join(c['usernames'])[:30]} | `{(c.get('prefer_id') or '')[:8]}…` |"
+            f"| {c['count']} | {', '.join(c['hosts'])[:40]} | {', '.join(c['usernames'])[:30]} | `{(c.get('prefer_id') or '')[:8]}?` |"
         )
     lines += ["", "No secrets printed. Delete candidates only after Jeff OK.", ""]
     OUT_REPORT.write_text("\n".join(lines), encoding="utf-8")

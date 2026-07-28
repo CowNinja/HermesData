@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Mark/repoint unprocessed registry rows whose dest_path is missing (ghosts).
 
-Catalog hygiene only — does not delete files or restart gateway.
+Catalog hygiene only ? does not delete files or restart gateway.
 Policy:
-  1) If sha256 has another live dest_path → repoint dest+domain
+  1) If sha256 has another live dest_path ? repoint dest+domain
   2) Else mark process_status=ghost_cleared (idempotent)
 
-Research basis: post-land registry truth; missing dest ≠ OCR work
+Research basis: post-land registry truth; missing dest ? OCR work
 (Karpathy wiki: raw immutable, don't thrash compiled layer on ghosts).
 """
 from __future__ import annotations
@@ -99,7 +99,7 @@ def main() -> int:
                             {"from": dest[:120], "to": new_dest[:120], "domain": new_dom}
                         )
                 except sqlite3.IntegrityError:
-                    # UNIQUE(source_path, dest_path) collision — mark cleared instead
+                    # UNIQUE(source_path, dest_path) collision ? mark cleared instead
                     con.execute(
                         f"UPDATE ingest SET process_status='ghost_cleared' WHERE {id_col}=?",
                         (rid,),
@@ -149,9 +149,9 @@ def main() -> int:
     JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     lines = [
-        f"# Ghost clear — {payload['at']}",
+        f"# Ghost clear ? {payload['at']}",
         "",
-        f"**Mode:** {'DRY-RUN' if args.dry_run else 'LIVE'} · limit={args.limit}",
+        f"**Mode:** {'DRY-RUN' if args.dry_run else 'LIVE'} ? limit={args.limit}",
         "",
         f"| Metric | N |",
         f"|--------|--:|",
@@ -161,7 +161,7 @@ def main() -> int:
         f"| repointed | {repointed} |",
         f"| ghost_cleared | {cleared} |",
         "",
-        "Policy: missing dest + live sha twin → repoint; else `ghost_cleared`. No deletes.",
+        "Policy: missing dest + live sha twin ? repoint; else `ghost_cleared`. No deletes.",
         "",
         f"JSON: `{JSON}`",
         "",

@@ -3,7 +3,7 @@
 Tightened Classifier for Digital Twin Ingestion
 - Rich context: source_folder_path, parent_folders, sibling_files
 - User exact 3 buckets + Hybrid overlay
-- source_drive_defaults: paths containing MemoryCard_Backups/Google Drive → high-confidence PERSONAL unless explicit orphan/stub
+- source_drive_defaults: paths containing MemoryCard_Backups/Google Drive -> high-confidence PERSONAL unless explicit orphan/stub
 - Entity keywords: bloom, spencer, booksbloom, jeff, cowni in name OR full_path
 - Fixed indentation and syntax
 - schema v2 manifest support

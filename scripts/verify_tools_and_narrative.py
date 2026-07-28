@@ -122,12 +122,12 @@ def main() -> int:
     failures = []
 
     ok_a, msg_a = test_tool_passthrough()
-    print(f"Test A (tool passthrough): {'PASS' if ok_a else 'FAIL'} — {msg_a}")
+    print(f"Test A (tool passthrough): {'PASS' if ok_a else 'FAIL'} ? {msg_a}")
     if not ok_a:
         failures.append("tool_passthrough")
 
     ok_b, msg_b = test_narrative_fast_path()
-    print(f"Test B (narrative fast): {'PASS' if ok_b else 'FAIL'} — {msg_b}")
+    print(f"Test B (narrative fast): {'PASS' if ok_b else 'FAIL'} ? {msg_b}")
     if not ok_b:
         failures.append("narrative_fast")
 

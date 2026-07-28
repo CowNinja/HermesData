@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Future projects parking lot — list / add / set-status / readiness (unpark check).
+"""Future projects parking lot ? list / add / set-status / readiness (unpark check).
 
 Jeff 2026-07-14: single inventory for future silo-powered projects.
 Silo focus remains personal gold; products stay parked until green light.
@@ -18,7 +18,7 @@ VAULT_LOT = Path(
 SILO = Path(r"K:\Phronesis-Sovereign\Personal-Digital-Silo")
 RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\silo-parking-readiness-latest.md")
 
-# Map silo_depends_on tokens → shelf probes under K silo
+# Map silo_depends_on tokens ? shelf probes under K silo
 FUEL_MAP = {
     "Medical-Records": SILO / "Medical-Records",
     "Navy-Service": SILO / "Navy-Service",
@@ -171,7 +171,7 @@ def cmd_readiness(doc: dict, pid: str | None) -> int:
         )
     # write vault receipt
     lines = [
-        f"# Parking lot readiness — {utc()}",
+        f"# Parking lot readiness ? {utc()}",
         "",
         "| Project | Status | Fuel % | Unpark suggest |",
         "|---------|--------|-------:|:--------------:|",
@@ -183,7 +183,7 @@ def cmd_readiness(doc: dict, pid: str | None) -> int:
         )
     lines += [
         "",
-        "Unpark still requires Jeff green light — readiness is technical fuel only.",
+        "Unpark still requires Jeff green light ? readiness is technical fuel only.",
         f"Config: `{CFG}`",
         f"Canon: `{VAULT_LOT}`",
     ]

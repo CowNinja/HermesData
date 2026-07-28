@@ -92,21 +92,46 @@ def to_ascii(text: str) -> str:
         o = ord(ch)
         if ch in "\t\n\r" or 32 <= o <= 126:
             out.append(ch)
-        else:
-            out.append("?")
+        # Drop unknown non-ASCII (do NOT insert '?'; ? breaks `import` lines).
     return "".join(out)
+
+
+def _py_strip_leading_junk(text: str) -> str:
+    """Remove leftover junk before first real Python token after ASCII repair."""
+    lines = text.splitlines(keepends=True)
+    if not lines:
+        return text
+    first = lines[0]
+    stripped = first.lstrip("?\x00 ")
+    if stripped != first and (
+        stripped.startswith(
+            ("import ", "from ", "def ", "class ", "#", '"""', "'''", "#!/")
+        )
+        or stripped.startswith("@")
+    ):
+        lines[0] = stripped
+        return "".join(lines)
+    return text
 
 
 def repair_file(path: Path, *, dry_run: bool = False) -> tuple[str, int]:
     raw = path.read_bytes()
     if raw.startswith(b"\xef\xbb\xbf"):
         raw = raw[3:]
+    # UTF-16 BOM rare but seen
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        try:
+            raw = raw.decode("utf-16").encode("utf-8")
+        except UnicodeError:
+            pass
     newline = detect_newline(raw)
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
         text = raw.decode("latin-1")
     repaired = to_ascii(text)
+    if path.suffix.lower() == ".py":
+        repaired = _py_strip_leading_junk(repaired)
     if newline == "\r\n":
         repaired = repaired.replace("\n", "\r\n").replace("\r\r\n", "\r\n")
     # HARD GUARD: never flatten multi-line sources (2026-07-09 zero-newline incident)
@@ -129,6 +154,29 @@ def repair_file(path: Path, *, dry_run: bool = False) -> tuple[str, int]:
     if dry_run:
         return "would_fix", non_ascii_before
     path.write_bytes(out_bytes)
+    # 2026-07-27: curly quotes -> straight can break nested Python strings.
+    # Best-effort quote heal for .py only (ast-safe); never for dry-run.
+    if path.suffix.lower() == ".py":
+        try:
+            from ops.fix_nested_quotes_after_ascii import fix_file  # type: ignore
+        except Exception:
+            try:
+                import importlib.util
+
+                helper = Path(__file__).resolve().parent / "ops" / "fix_nested_quotes_after_ascii.py"
+                if helper.is_file():
+                    spec = importlib.util.spec_from_file_location("fix_nested_quotes_after_ascii", helper)
+                    mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+                    assert spec and spec.loader
+                    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+                    mod.fix_file(path)
+            except Exception:
+                pass
+        else:
+            try:
+                fix_file(path)
+            except Exception:
+                pass
     return "fixed", non_ascii_before
 
 

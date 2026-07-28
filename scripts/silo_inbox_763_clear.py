@@ -32,14 +32,14 @@ def codify(now: str) -> None:
             "match_any_path_substr": ["99_braingps", "mricloud", "braingps"],
             "domain": "Medical-Records",
             "confidence": "high",
-            "note": "Jeff Q1A brain imaging → Medical",
+            "note": "Jeff Q1A brain imaging ? Medical",
         },
         {
             "id": "volbrain_imaging",
             "match_any_path_substr": ["99_volbrain", "volbrain"],
             "domain": "Medical-Records",
             "confidence": "high",
-            "note": "Jeff Q1A volBrain → Medical",
+            "note": "Jeff Q1A volBrain ? Medical",
         },
         {
             "id": "private_nsfw",
@@ -53,7 +53,7 @@ def codify(now: str) -> None:
             ],
             "domain": "Core-Personal/Projects",
             "confidence": "high",
-            "note": "Jeff Q5A → Projects/_private_nsfw",
+            "note": "Jeff Q5A ? Projects/_private_nsfw",
         },
     ]
     for r in news:
@@ -272,7 +272,7 @@ def main() -> int:
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text(
-        f"""# Inbox 763 clear — {now}
+        f"""# Inbox 763 clear ? {now}
 
 Jeff: 1A 2A 3A 4A 5A(+_private_nsfw) 6A 7A 8A
 

@@ -154,7 +154,7 @@ def main() -> int:
         "errors": errors,
         "import_file": str(import_path) if import_path else None,
         "import_hint": (
-            "Secrets Manager → Settings → Import data → choose import file "
+            "Secrets Manager ? Settings ? Import data ? choose import file "
             "(or grant machine account Can read, write on project and re-run)"
             if import_path
             else None

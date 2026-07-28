@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Contacts / person graph — robust relational store for silo + twin.
+"""Contacts / person graph - robust relational store for silo + twin.
 
 JSON SSOT now; SQLite export optional later.
 Merge evidence, handles, aliases without losing history.

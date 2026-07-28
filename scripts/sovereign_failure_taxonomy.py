@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 """
-sovereign_failure_taxonomy.py — Shared failure classes for Phronesis router/agent.
+sovereign_failure_taxonomy.py ? Shared failure classes for Phronesis router/agent.
 
 Used by model_management_agent, docs, and (optionally) proxy diagnostics.
-Keep thin: classify → retry policy hints. No network I/O.
+Keep thin: classify ? retry policy hints. No network I/O.
 
 Research basis (2026-07-18):
-- LLM gateway resilience: retry → fallback → circuit-break (per provider+model)
+- LLM gateway resilience: retry ? fallback ? circuit-break (per provider+model)
 - FIFO 503 = capacity, not crash (local-model-management FIFO load testing)
 - reasoning_content empty-content false negative (L07 2026-07-18)
-- LiteLLM cooldown/connection pitfalls — avoid retry storms
+- LiteLLM cooldown/connection pitfalls ? avoid retry storms
 """
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
 # Canonical classes
-TRANSIENT = "transient"  # timeout, connection reset, CUDA busy — retry with backoff
-PERMANENT = "permanent"  # missing GGUF, bad config, 4xx auth — do not retry same path
-CAPACITY = "capacity"  # FIFO full, VRAM pressure, rate limit — wait / degrade
-DEGRADED = "degraded"  # smoke weak, stale bench, fallback tier — operate with warning
-POLICY = "policy"  # fail_closed, fleet locked, fleet OFF — intentional block
+TRANSIENT = "transient"  # timeout, connection reset, CUDA busy ? retry with backoff
+PERMANENT = "permanent"  # missing GGUF, bad config, 4xx auth ? do not retry same path
+CAPACITY = "capacity"  # FIFO full, VRAM pressure, rate limit ? wait / degrade
+DEGRADED = "degraded"  # smoke weak, stale bench, fallback tier ? operate with warning
+POLICY = "policy"  # fail_closed, fleet locked, fleet OFF ? intentional block
 UNKNOWN = "unknown"
 
 CLASS_HINTS: Dict[str, Dict[str, Any]] = {
@@ -65,10 +65,10 @@ CLASS_HINTS: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# Map agent issue codes → class
+# Map agent issue codes ? class
 ISSUE_CODE_CLASS = {
     "L01": PERMANENT,  # missing file
-    "L02": TRANSIENT,  # wrong model loaded — restart often fixes
+    "L02": TRANSIENT,  # wrong model loaded ? restart often fixes
     "L03": TRANSIENT,  # 8090 down
     "L04": PERMANENT,  # split GGUF manual
     "L05": DEGRADED,  # no bench
@@ -97,7 +97,7 @@ def classify_issue_code(code: Optional[str]) -> str:
 
 def classify_exception_message(msg: str) -> str:
     m = (msg or "").lower()
-    # Permanent: malformed requests / template grammar — must NOT retry as 503.
+    # Permanent: malformed requests / template grammar ? must NOT retry as 503.
     if any(
         x in m
         for x in (
@@ -154,7 +154,7 @@ def classify_http_status(status: Optional[int], msg: str = "") -> str:
 
 
 def http_status_for_failure_class(cls: str, *, default_transient: int = 503) -> int:
-    """Map failure class → client-facing HTTP status.
+    """Map failure class ? client-facing HTTP status.
 
     Critical: PERMANENT must return 4xx so OpenAI SDKs and Hermes do not
     treat the error as retriable infrastructure (503).

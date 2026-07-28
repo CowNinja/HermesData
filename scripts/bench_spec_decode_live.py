@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-bench_spec_decode_live.py — Real A/B test: same model, spec decode ON vs OFF.
+bench_spec_decode_live.py ? Real A/B test: same model, spec decode ON vs OFF.
 
 Port 8090 = Q5_K_M no spec (our production router)
 Port 8092 = Q5_K_M + ngram-mod (test server)
@@ -19,7 +19,7 @@ SPEC_OFF = "http://127.0.0.1:8090"
 MODEL_NAME = "qwen25-7b-q5"
 MAX_TOKENS = 200
 
-# Diverse prompts (NOT repeated — avoids n-gram cache memorization artifact)
+# Diverse prompts (NOT repeated ? avoids n-gram cache memorization artifact)
 PROMPTS = [
     ("binary_tree", "Write a Python function `max_depth(root)` that returns the maximum depth of a binary tree. TreeNode has .left and .right."),
     ("async_fetch", "Write a JavaScript async function that fetches JSON from a URL and handles errors with try/catch."),
@@ -77,7 +77,7 @@ def main():
     results = {"spec_off": [], "spec_on": [], "timestamp": datetime.now(timezone.utc).isoformat()}
 
     print(f"\n{'='*80}")
-    print(f"SPEC DECODE A/B — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"SPEC DECODE A/B ? {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Model: Qwen2.5-7B Q5_K_M | Max tokens: {MAX_TOKENS}")
     print(f"SPEC_OFF={SPEC_OFF} | SPEC_ON={SPEC_ON}")
     print(f"{'='*80}\n")
@@ -102,8 +102,8 @@ def main():
         off_avg = sum(off_tps) / len(off_tps) if off_tps else 0
         on_avg = sum(on_tps) / len(on_tps) if on_tps else 0
         ratio = on_avg / off_avg if off_avg > 0 else 0
-        symbol = "↑" if ratio > 1.02 else ("↓" if ratio < 0.98 else "=")
-        print(f"{off_avg:5.1f} t/s  →  {on_avg:5.1f} t/s  {symbol} {ratio:.2f}x")
+        symbol = "?" if ratio > 1.02 else ("?" if ratio < 0.98 else "=")
+        print(f"{off_avg:5.1f} t/s  ?  {on_avg:5.1f} t/s  {symbol} {ratio:.2f}x")
 
         results["spec_off"].append({"prompt": name, "avg_tps": round(off_avg, 1), "runs": len(off_tps)})
         results["spec_on"].append({"prompt": name, "avg_tps": round(on_avg, 1), "runs": len(on_tps)})
@@ -116,13 +116,13 @@ def main():
     overall = on_mean / off_mean if off_mean > 0 else 0
 
     print(f"\n{'='*80}")
-    print(f"OVERALL: SPEC_OFF={off_mean:.1f} t/s →_ON={on_mean:.1f} t/s = {overall:.2f}x")
+    print(f"OVERALL: SPEC_OFF={off_mean:.1f} t/s ?_ON={on_mean:.1f} t/s = {overall:.2f}x")
     if overall > 1.05:
-        print(f"Verdict: POSITIVE — spec decode improves throughput by {(overall-1)*100:.0f}%")
+        print(f"Verdict: POSITIVE ? spec decode improves throughput by {(overall-1)*100:.0f}%")
     elif overall < 0.95:
-        print(f"Verdict: NEGATIVE — spec decode reduces throughput by {(1-overall)*100:.0f}%")
+        print(f"Verdict: NEGATIVE ? spec decode reduces throughput by {(1-overall)*100:.0f}%")
     else:
-        print(f"Verdict: NEUTRAL — spec decode has no meaningful impact ({(overall-1)*100:+.1f}%)")
+        print(f"Verdict: NEUTRAL ? spec decode has no meaningful impact ({(overall-1)*100:+.1f}%)")
     print(f"{'='*80}")
 
     # Write log

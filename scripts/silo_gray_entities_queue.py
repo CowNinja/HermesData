@@ -20,7 +20,7 @@ DB = Path(r"D:\HermesData\state\ingest_registry.sqlite3")
 # roles that need Jeff for intimate/relationship gray
 GRAY_ROLES = {"unknown", "unsure", "", None}
 INTIMATE_HINTS = re.compile(
-    r"\b(girlfriend|boyfriend|wife|husband|ex[- ]|dating|partner|fiance|fiancé|lover|crush)\b",
+    r"\b(girlfriend|boyfriend|wife|husband|ex[- ]|dating|partner|fiance|fianc?|lover|crush)\b",
     re.I,
 )
 
@@ -92,7 +92,7 @@ def main() -> int:
             "reasons": reasons,
             "question": (
                 f"Who is **{can}** to you? "
-                f"(A) Family (B) Friend (C) Medical/professional (D) Other — free text. "
+                f"(A) Family (B) Friend (C) Medical/professional (D) Other ? free text. "
                 f"Context: {reasons}"
             ),
             "first_seen": by_id.get(key, {}).get("first_seen") or utc(),
@@ -108,13 +108,13 @@ def main() -> int:
         {
             "id": "Aryel",
             "canonical": "Aryel",
-            "question": "Aryel — friend / family / unsure? (gdoc stub only until Takeout)",
+            "question": "Aryel ? friend / family / unsure? (gdoc stub only until Takeout)",
             "reasons": ["gdoc_stub", "identity_unsure"],
             "status": "open",
         },
         {
             "id": "Jodi_third_marriage",
-            "canonical": "Jodi Suzanne Bloom — 3rd marriage surname",
+            "canonical": "Jodi Suzanne Bloom ? 3rd marriage surname",
             "question": "Jodi's third (short) marriage surname if it appears in files?",
             "reasons": ["optional_when_found"],
             "status": "open",
@@ -139,9 +139,9 @@ def main() -> int:
     QUEUE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     lines = [
-        f"# Gray entities queue — {utc()}",
+        f"# Gray entities queue ? {utc()}",
         "",
-        f"**Open:** {len(open_items)} · **Added this run:** {added}",
+        f"**Open:** {len(open_items)} ? **Added this run:** {added}",
         "",
         "_Travel mode: accumulate only. Jeff answers when convenient._",
         "",

@@ -80,9 +80,9 @@ def main() -> int:
         cache["queries"][name] = uniq
     OUT.write_text(json.dumps(cache, indent=2), encoding="utf-8")
     lines = [
-        f"# Twin retrieval cache — {cache['at']}",
+        f"# Twin retrieval cache ? {cache['at']}",
         "",
-        f"k_light **{cache['stats']['k_light']}** · med_navy **{cache['stats']['med_navy']}**",
+        f"k_light **{cache['stats']['k_light']}** ? med_navy **{cache['stats']['med_navy']}**",
         "",
         "| Query | Hits |",
         "|-------|-----:|",

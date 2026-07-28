@@ -158,7 +158,7 @@ def main() -> int:
                 "policy": "paths_only_no_secret_values_in_this_file",
                 "count": len(prev),
                 "items": prev[:2000],
-                "next": "Jeff green light → Bitwarden import → verify → purge phrase",
+                "next": "Jeff green light ? Bitwarden import ? verify ? purge phrase",
             },
             indent=2,
         ),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Housekeeping for K Personal-Digital-Silo — tidy, intuitive interface.
+"""Housekeeping for K Personal-Digital-Silo ? tidy, intuitive interface.
 
 - Ensure domain shelves + 00-INDEX
 - Ensure Friends shelf
@@ -43,7 +43,7 @@ def ensure_shelf(rel: str) -> None:
     (p / "from-g-drive").mkdir(exist_ok=True)
     idx = p / "00-INDEX.md"
     if not idx.exists():
-        title = rel.replace("/", " · ")
+        title = rel.replace("/", " ? ")
         idx.write_text(
             f"# {title}\n\nShelf for K personal digital silo.\n\nUpdated: {utc()[:10]}\n",
             encoding="utf-8",
@@ -51,7 +51,7 @@ def ensure_shelf(rel: str) -> None:
 
 
 def main() -> int:
-    lines = [f"# K silo housekeeping — {utc()}", ""]
+    lines = [f"# K silo housekeeping ? {utc()}", ""]
     for s in SHELVES:
         ensure_shelf(s)
         lines.append(f"- ensured `{s}`")
@@ -60,7 +60,7 @@ def main() -> int:
     root_idx.write_text(
         f"""# Personal Digital Silo (K:)
 
-**Role:** Jeff life footprint — training + twin source of truth (copy-first).
+**Role:** Jeff life footprint ? training + twin source of truth (copy-first).
 
 ## Domains
 | Shelf | Intent |
@@ -75,10 +75,10 @@ def main() -> int:
 | Spiritual | Faith content; church directories as community docs |
 | Life-Archive | Clubs, hobbies, media |
 | Digital-Footprint | Accounts, hosts |
-| _Inbox | On K but primary shelf unclear — re-home later |
+| _Inbox | On K but primary shelf unclear ? re-home later |
 
 ## Compound docs
-Photo directories / multi-person pages → `.compound.json` + `.compound.train.md`
+Photo directories / multi-person pages ? `.compound.json` + `.compound.train.md`
 
 ## Housekeeping
 Run `k_silo_housekeeping.py` periodically.

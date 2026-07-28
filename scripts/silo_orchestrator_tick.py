@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Silo orchestrator tick — Grok plans once; this script runs the swarm.
+"""Silo orchestrator tick ? Grok plans once; this script runs the swarm.
 
 Layers (Jeff target perpetual state):
   1) Grok/Hermes  = orchestrator (chat, judgment, rare green lights)
@@ -50,7 +50,7 @@ _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform
 
 
 def _worker_python() -> str:
-    """pythonw for children — avoids a new console/conhost per silo script."""
+    """pythonw for children ? avoids a new console/conhost per silo script."""
     try:
         from windows_subprocess import prefer_pythonw  # type: ignore
 
@@ -87,9 +87,9 @@ def run(cmd: List[str], timeout: int = 600) -> Tuple[int, str]:
     """Run worker; on timeout kill the full process tree (not just parent).
 
     2026-07-18: plain subprocess.run(timeout=) left orphan g_to_k_safe_drain
-    children → dual land writers every ~2h (overnight watchdog thrash).
-    2026-07-19: do NOT force pythonw for silo_focus_land / g_to_k_safe_drain —
-    nested pythonw→pythonw under PIPEd stdio exits 1 silent (GB land stall).
+    children ? dual land writers every ~2h (overnight watchdog thrash).
+    2026-07-19: do NOT force pythonw for silo_focus_land / g_to_k_safe_drain ?
+    nested pythonw?pythonw under PIPEd stdio exits 1 silent (GB land stall).
     """
     try:
         if (
@@ -191,7 +191,7 @@ def main() -> int:
     }
     local_llm = bool(gh.get("ok")) and report["ports"]["8090_qwythos"]
 
-    # Worker swarm (script sub-agents) — sequential for GPU/disk safety on one machine
+    # Worker swarm (script sub-agents) ? sequential for GPU/disk safety on one machine
     workers: List[Tuple[str, List[str], int]] = []
     if not args.no_drain:
             # Focus land: only top incomplete priority folder (self-improve efficiency)
@@ -201,7 +201,7 @@ def main() -> int:
             # Refs: sqlite WAL single-writer; Temporal activity StartToClose > p95 work;
             # k8s: probe/timeout budget > expected work or thrash-restart orphans writers.
             # focus_land: use console python.exe (not pythonw). Nested pythonw
-            # under run()'s PIPEs made drain exit 1 silent — GB land stalled
+            # under run()'s PIPEs made drain exit 1 silent ? GB land stalled
             # at ~59.5% (2026-07-19). prefer_python_console inside focus_land
             # is belt; orch entry also forces console interpreter.
             try:
@@ -228,7 +228,7 @@ def main() -> int:
     workers.extend(
         [
             (
-                # Fast recursive origin-folder sort (Amazon/CPAP/…) — no LLM
+                # Fast recursive origin-folder sort (Amazon/CPAP/?) ? no LLM
                 "rehome_bulk_origin",
                 [
                     sys.executable,
@@ -331,14 +331,14 @@ def main() -> int:
         (
             "domain_indexes",
             [sys.executable, str(SCRIPTS / "silo_domain_indexes.py")],
-            # 2026-07-18: was 180s → exit 124 full-rglob; script now caps scan
+            # 2026-07-18: was 180s ? exit 124 full-rglob; script now caps scan
             300,
         )
     )
     workers.append(
         (
             "layout_health",
-            # 2026-07-21: was 180s → exit 124 full K rglob; script now time-budgeted + registry mode
+            # 2026-07-21: was 180s ? exit 124 full K rglob; script now time-budgeted + registry mode
             [sys.executable, str(SCRIPTS / "silo_layout_health.py"), "--budget-s", "240"],
             300,
         )
@@ -409,64 +409,64 @@ def main() -> int:
 
     
     # 2026-07-26d post_ocr: do not burn 480s OCR slot when open==0 (depth starves).
-        # Celery optimizing: back-of-envelope - if task is empty, skip/short-circuit.
+    # Celery optimizing: back-of-envelope - if task is empty, skip/short-circuit.
+    _ocr_open_n = -1
+    try:
+        import sqlite3 as _sq
+
+        _oc = _sq.connect(r"D:\HermesData\state\ocr_backlog.sqlite3", timeout=10)
+        _ocr_open_n = 0
+        for _st, _n in _oc.execute(
+            "SELECT status, COUNT(*) FROM ocr_queue "
+            "WHERE status IN ('queued','needs_ocr','error') GROUP BY status"
+        ):
+            _ocr_open_n += int(_n)
+        _oc.close()
+    except Exception:
         _ocr_open_n = -1
-        try:
-            import sqlite3 as _sq
+    if _ocr_open_n == 0:
+        workers.append(
+            (
+                "ocr_backlog_worker",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "silo_ocr_backlog_worker.py"),
+                    "--process-only",
+                    "--limit",
+                    "2",
+                    "--wall-s",
+                    "45",
+                ],
+                60,
+            )
+        )
+    else:
+        workers.append(
+            (
+                "ocr_backlog_worker",
+                # 2026-07-26: smaller batches + soft-ok; per-file timeout inside worker
+                [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--process-only", "--limit", "12"],
+                480,
+            )
+        )
 
-            _oc = _sq.connect(r"D:\HermesData\state\ocr_backlog.sqlite3", timeout=10)
-            _ocr_open_n = 0
-            for _st, _n in _oc.execute(
-                "SELECT status, COUNT(*) FROM ocr_queue "
-                "WHERE status IN ('queued','needs_ocr','error') GROUP BY status"
-            ):
-                _ocr_open_n += int(_n)
-            _oc.close()
-        except Exception:
-            _ocr_open_n = -1
-        if _ocr_open_n == 0:
-            workers.append(
-                (
-                    "ocr_backlog_worker",
-                    [
-                        sys.executable,
-                        str(SCRIPTS / "silo_ocr_backlog_worker.py"),
-                        "--process-only",
-                        "--limit",
-                        "2",
-                        "--wall-s",
-                        "45",
-                    ],
-                    60,
-                )
+    # Multimodal fabric (T18): gold STT backlog - CPU-only, slightly higher drain
+    # 2026-07-26d: 1800s STT alone could equal TICK_WALL and starve depth tail.
+    if (SCRIPTS / "silo_audio_stt_backlog_worker.py").is_file():
+        _stt_lim, _stt_to = ("2", 300) if _ocr_open_n == 0 else ("4", 600)
+        workers.append(
+            (
+                "stt_backlog_worker",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "silo_audio_stt_backlog_worker.py"),
+                    "--process-only",
+                    "--limit",
+                    _stt_lim,
+                ],
+                _stt_to,
             )
-        else:
-            workers.append(
-                (
-                    "ocr_backlog_worker",
-                    # 2026-07-26: smaller batches + soft-ok; per-file timeout inside worker
-                    [sys.executable, str(SCRIPTS / "silo_ocr_backlog_worker.py"), "--process-only", "--limit", "12"],
-                    480,
-                )
-            )
-
-        # Multimodal fabric (T18): gold STT backlog - CPU-only, slightly higher drain
-        # 2026-07-26d: 1800s STT alone could equal TICK_WALL and starve depth tail.
-        if (SCRIPTS / "silo_audio_stt_backlog_worker.py").is_file():
-            _stt_lim, _stt_to = ("2", 300) if _ocr_open_n == 0 else ("4", 600)
-            workers.append(
-                (
-                    "stt_backlog_worker",
-                    [
-                        sys.executable,
-                        str(SCRIPTS / "silo_audio_stt_backlog_worker.py"),
-                        "--process-only",
-                        "--limit",
-                        _stt_lim,
-                    ],
-                    _stt_to,
-                )
-            )
+        )
     # STT->registry truth after STT drain
     if (SCRIPTS / "silo_sync_stt_to_registry.py").is_file():
         workers.append(
@@ -477,7 +477,7 @@ def main() -> int:
             )
         )
     # HTML thin gold extract (stdlib only)
-    # 2026-07-26: 120s hard budget — prior 300s + context_enriched requeue loop hung tick 20m+
+    # 2026-07-26: 120s hard budget ? prior 300s + context_enriched requeue loop hung tick 20m+
     if (SCRIPTS / "silo_html_thin_extract.py").is_file():
         workers.append(
             (
@@ -532,7 +532,7 @@ def main() -> int:
     
     # continuous-only: OCR/brief already run as separate workers above.
     # Full self-heal previously hung tick on OCR rediscover + status brief (~OCR/brief timeouts).
-    # v1.10: critical-path isolation — restart/recovery + post-verify only (~1s when healthy).
+    # v1.10: critical-path isolation ? restart/recovery + post-verify only (~1s when healthy).
     workers.append(
         (
             "self_heal_monitor",
@@ -606,7 +606,7 @@ def main() -> int:
         )
     )
 
-    # Post-OCR twin depth (zero Grok) — bounded stamp + local cache + status
+    # Post-OCR twin depth (zero Grok) ? bounded stamp + local cache + status
     workers.append(
         (
             "twin_meta_stamp",
@@ -707,7 +707,7 @@ def main() -> int:
     else:
         report["cadence"] = {"n": n, "mode": "full"}
 
-    # Jeff 2026-07-20: seven synapse-lag concerns — board+densify on full cadence
+    # Jeff 2026-07-20: seven synapse-lag concerns ? board+densify on full cadence
     # (even ticks). Standalone: python silo_synapse_densify_tick.py
     if n % 2 == 0 and not any(w[0] == "synapse_densify" for w in workers):
         workers.append(
@@ -745,7 +745,7 @@ def main() -> int:
         workers.append(
             (
                 'inbox_ghost_repoint',
-                # 2026-07-21: smaller batches — busy_timeout races with land writer caused exit 1
+                # 2026-07-21: smaller batches ? busy_timeout races with land writer caused exit 1
                 [sys.executable, str(SCRIPTS / 'silo_inbox_ghost_repoint.py'), '--batch', '1200', '--rounds', '2'],
                 300,
             )
@@ -770,7 +770,7 @@ def main() -> int:
         )
 
     # Tick wall-clock: leave room for scoreboard_pulse; continuous parent is 4200s.
-    # Research: k8s activeDeadlineSeconds / Celery soft_time_limit — fail partial, not hang.
+    # Research: k8s activeDeadlineSeconds / Celery soft_time_limit ? fail partial, not hang.
     TICK_WALL_S = 1800
     skipped_wall: List[str] = []
     for name, cmd, timeout in workers:
@@ -797,9 +797,9 @@ def main() -> int:
         # Soft-ok: rehome/bulk may exit nonzero on partial move errors but still progress
         if not ok and name in ("rehome_bulk_origin", "rehome", "inbox_ghost_repoint"):
             if '"applied"' in out or '"planned"' in out or '"repointed"' in out or code in (0, 1, 2):
-                # exit 1/2 flake / lock busy / partial I/O — not a factory red
+                # exit 1/2 flake / lock busy / partial I/O ? not a factory red
                 ok = True
-        # Soft-ok: layout_health timeout (124) or partial — receipt still useful
+        # Soft-ok: layout_health timeout (124) or partial ? receipt still useful
         if not ok and name == "layout_health":
             if code in (124, -1) or "offenders" in out or "layout-health" in out.lower() or "silo-layout-health" in out:
                 ok = True
@@ -845,10 +845,10 @@ def main() -> int:
     VAULT_LOG.mkdir(parents=True, exist_ok=True)
     md = VAULT_LOG / "silo-orchestrator-tick-latest.md"
     lines = [
-        f"# Silo orchestrator tick — {report['at']}",
+        f"# Silo orchestrator tick ? {report['at']}",
         "",
-        f"**Mode:** `{report['mode']}` · elapsed **{report['elapsed_s']}s**",
-        f"**Ports:** 8090={report['ports']['8090_qwythos']} · 8091={report['ports']['8091_proxy']}",
+        f"**Mode:** `{report['mode']}` ? elapsed **{report['elapsed_s']}s**",
+        f"**Ports:** 8090={report['ports']['8090_qwythos']} ? 8091={report['ports']['8091_proxy']}",
         "",
         "| Worker | OK | Exit |",
         "|--------|----|------|",

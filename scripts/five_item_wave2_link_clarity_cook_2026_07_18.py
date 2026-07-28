@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Five-item Wave-2 vault link clarity cook — 2026-07-18.
+"""Five-item Wave-2 vault link clarity cook ? 2026-07-18.
 
 Items:
   1. Wikilink repair wave-2 (top unresolved + restore thin living hubs)
@@ -11,10 +11,10 @@ Items:
 Guardrails: no gateway, no VaultWalker LIVE arm, no mass delete, backup first.
 Research notes (forum/plugin/docs 2026):
   - Prefer redirect map + vault-wide replace over blind delete of broken links
-  - Distill→archive leaves path rot; thin living digests keep graph edges
+  - Distill?archive leaves path rot; thin living digests keep graph edges
   - Obsidian Bases live as .base; wikilinks without ext need MD companion or
     resolver that accepts non-md vault files
-  - Dual-pass: apply → recount unresolved → apply residuals → recount
+  - Dual-pass: apply ? recount unresolved ? apply residuals ? recount
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ SKIP_PARTS = {
     "alice_venv",
     "backups",
 }
-SKIP_SCAN_EXTRA = {"Distillations-2026-07-10"}  # archive bulk — still rewrite lightly
+SKIP_SCAN_EXTRA = {"Distillations-2026-07-10"}  # archive bulk ? still rewrite lightly
 
 # ---------------------------------------------------------------------------
 # Redirect map (stem + full path keys)
@@ -77,10 +77,10 @@ EXPLICIT: dict[str, str] = {
     # Canonical walkthroughs (dated living files)
     "Hermes-Factual-vs-RP-Sanity-Walkthrough": "Operations/Hermes-Factual-vs-RP-Sanity-Walkthrough-2026-07-17",
     "Hermes-Factual-vs-RP-Sanity-Walkthrough-2026-07-17": "Operations/Hermes-Factual-vs-RP-Sanity-Walkthrough-2026-07-17",
-    # Missing curator → gardener charter / STATUS
+    # Missing curator ? gardener charter / STATUS
     "Operations/Phronesis-Curator-Librarian": "Operations/STATUS",
     "Phronesis-Curator-Librarian": "Operations/STATUS",
-    # Health rounds → living STATUS + coordination
+    # Health rounds ? living STATUS + coordination
     "docs/agent-coordination/Sovereign-Stack-Health-Check-2026-06-24-round1": "docs/agent-coordination/STATUS",
     "docs/agent-coordination/Sovereign-Stack-Health-Check-2026-06-24-round1.md": "docs/agent-coordination/STATUS",
     "Sovereign-Stack-Health-Check-2026-06-24-round1": "docs/agent-coordination/STATUS",
@@ -132,7 +132,7 @@ PREFIX_REDIRECTS: list[tuple[str, str]] = [
     ("Tiny-Classifier-", "Operations/Session-Reports-2026-06-19-MASTER"),
 ]
 
-# Generic / intentional non-notes — do not count as "broken" in audit severity
+# Generic / intentional non-notes ? do not count as "broken" in audit severity
 ALLOWLIST_STEMS = {
     "wikilinks",
     "Person",
@@ -300,7 +300,7 @@ def create_thin_hubs() -> dict:
         / "Session-Reports-2026-06-19-MASTER.md"
     )
     body = f"""---
-title: Session Reports 2026-06-19 — MASTER (living hub)
+title: Session Reports 2026-06-19 ? MASTER (living hub)
 date: {TS_DAY}
 tags:
   - domain/ops
@@ -311,7 +311,7 @@ aliases:
   - june19 session master
 ---
 
-# Session / Micro-Reports — 2026-06-19 MASTER (living)
+# Session / Micro-Reports ? 2026-06-19 MASTER (living)
 
 > [!info] Wave-2 restore
 > Thin living hub restored {TS_ISO} so graph edges resolve. Full swarm archived.
@@ -355,7 +355,7 @@ aliases:
     # VaultWalker Snapshots INDEX living
     vw = VAULT / "Operations" / "VaultWalker-Snapshots-INDEX.md"
     vw_body = f"""---
-title: VaultWalker Status Snapshots — Index
+title: VaultWalker Status Snapshots ? Index
 date: {TS_DAY}
 tags:
   - domain/ops
@@ -365,7 +365,7 @@ aliases:
   - VaultWalker-Snapshots-INDEX
 ---
 
-# VaultWalker Status Snapshots — Index (living)
+# VaultWalker Status Snapshots ? Index (living)
 
 > Restored thin hub {TS_ISO}. Dated snapshot noise lives under Archive Wave5.
 
@@ -390,7 +390,7 @@ aliases:
     lint_md = VAULT / "Operations" / "Vault-Link-Lint-latest.md"
     lint_json = VAULT / "Operations" / "Vault-Link-Lint-latest.json"
     lint_body = f"""---
-title: Vault Link Lint — latest (wrapper)
+title: Vault Link Lint ? latest (wrapper)
 date: {TS_DAY}
 tags:
   - domain/ops
@@ -400,7 +400,7 @@ aliases:
   - Vault-Link-Lint-latest
 ---
 
-# Vault Link Lint — latest
+# Vault Link Lint ? latest
 
 Machine report (if present): `Operations/Vault-Link-Lint-latest.json`  
 Wave-2 companion MD so wikilinks resolve ({TS_ISO}).
@@ -478,7 +478,7 @@ Companion for [[Bases/Setup-Playbooks.base|Setup-Playbooks.base]] ({TS_ISO}).
 """
     actions["Setup-Playbooks.md"] = write_new(sp, sp_body)
 
-    # Optional thin curator stub → points at STATUS (avoid inventing role)
+    # Optional thin curator stub ? points at STATUS (avoid inventing role)
     # We redirect links to STATUS instead of creating fake librarian note.
     actions["Phronesis-Curator-Librarian"] = "redirect-to-STATUS"
 
@@ -527,7 +527,7 @@ def rewrite_pass(
             base = Path(key).name
             force_noise = base.startswith("phronesisvault-") or "phronesisvault-" in key
             if file_exists_fast(key, living_stems, living_paths) and not force_noise:
-                # already good — but if explicit says different living target for alias stems
+                # already good ? but if explicit says different living target for alias stems
                 if dest_n != key and key not in living_paths and key.lower() not in living_paths:
                     pass  # fall through
                 else:
@@ -670,9 +670,9 @@ def densify_hubs() -> dict:
     medical_block = f"""
 
 ## Medical entity hubs (wave-2 {TS_DAY})
-- [[Research/Silo-Entities/dr-kapoor|Dr Kapoor — PCM Hampton VAMC]]
-- [[Research/Silo-Entities/dr-foster|Dr Foster — psychologist NMCP]]
-- [[Research/Silo-Entities/richardson|Dr Richardson — endocrinology]]
+- [[Research/Silo-Entities/dr-kapoor|Dr Kapoor ? PCM Hampton VAMC]]
+- [[Research/Silo-Entities/dr-foster|Dr Foster ? psychologist NMCP]]
+- [[Research/Silo-Entities/richardson|Dr Richardson ? endocrinology]]
 """
     ops_block = f"""
 
@@ -700,7 +700,7 @@ def densify_hubs() -> dict:
             t = t.rstrip() + ops_block
             changed = True
         if h.name == "REVERIFICATION-NOISE-INDEX.md" and "wave-2 link clarity" not in t.lower():
-            t = t.rstrip() + f"\n\n_Wave-2 link clarity cook {TS_ISO}: living `references/phronesisvault-*` noise → this index._\n"
+            t = t.rstrip() + f"\n\n_Wave-2 link clarity cook {TS_ISO}: living `references/phronesisvault-*` noise ? this index._\n"
             changed = True
         if changed:
             h.write_text(t, encoding="utf-8", newline="\n")
@@ -719,7 +719,7 @@ def write_receipts(payload: dict) -> None:
 
     top = payload.get("after_top") or []
     lines = [
-        f"# Wave-2 Link Clarity Cook — {TS_DAY}",
+        f"# Wave-2 Link Clarity Cook ? {TS_DAY}",
         "",
         f"- UTC: `{payload.get('ts')}`",
         f"- Backup: `{payload.get('backup')}`",
@@ -735,7 +735,7 @@ def write_receipts(payload: dict) -> None:
         f"- Thin hubs: `{json.dumps(payload.get('thin_hubs'), default=str)[:500]}`",
         f"- Rewrite pass1: files={payload.get('pass1', {}).get('rewritten_files')} repl={payload.get('pass1', {}).get('replacements')}",
         f"- Rewrite pass2: files={payload.get('pass2', {}).get('rewritten_files')} repl={payload.get('pass2', {}).get('replacements')}",
-        f"- Unresolved before→after: **{payload.get('unresolved_before')} → {payload.get('unresolved_after')}**",
+        f"- Unresolved before?after: **{payload.get('unresolved_before')} ? {payload.get('unresolved_after')}**",
         f"- False-positive classes: `{payload.get('class_counts')}`",
         f"- Hub densify: `{payload.get('hub_densify')}`",
         "",
@@ -772,7 +772,7 @@ tags:
   - status/live
 ---
 
-# Wave-2 Link Clarity Cook Receipt — {TS_DAY}
+# Wave-2 Link Clarity Cook Receipt ? {TS_DAY}
 
 **UTC:** {payload.get('ts')}  
 **Dual-verify:** {payload.get('dual_verify')}  
@@ -780,14 +780,14 @@ tags:
 
 | Item | Result |
 |------|--------|
-| 1 Wikilink repair wave-2 | unresolved {payload.get('unresolved_before')} → {payload.get('unresolved_after')}; repl p1/p2 = {payload.get('pass1',{}).get('replacements')}/{payload.get('pass2',{}).get('replacements')} |
+| 1 Wikilink repair wave-2 | unresolved {payload.get('unresolved_before')} ? {payload.get('unresolved_after')}; repl p1/p2 = {payload.get('pass1',{}).get('replacements')}/{payload.get('pass2',{}).get('replacements')} |
 | 2 False-positive audit | classes {payload.get('class_counts')} |
 | 3 Bases Domain-Tag-Index | MD companions + .base kept |
-| 4 phronesisvault-* sweep | prefix → REVERIFICATION-NOISE-INDEX |
+| 4 phronesisvault-* sweep | prefix ? REVERIFICATION-NOISE-INDEX |
 | 5 Hub densify | medical entities + STATUS/session |
 
 ## Jeff once
-Ctrl+R if graph still sticky — optional.
+Ctrl+R if graph still sticky ? optional.
 
 ## Logs
 - [[Operations/logs/wave2-link-clarity-cook-latest]]
@@ -806,7 +806,7 @@ tags:
   - status/live
 ---
 
-# VaultWalker / Gardener scoreboard — {TS_DAY}
+# VaultWalker / Gardener scoreboard ? {TS_DAY}
 
 | Metric | Value |
 |--------|-------|
@@ -909,13 +909,13 @@ def main() -> int:
         "research_notes": [
             "Map+replace preferred over batch-delete broken links (Obsidian forum).",
             "Bases are .base files; lint tools need MD companion or multi-ext index.",
-            "Archive-only targets → thin living digest, not deep archive path in graph.",
+            "Archive-only targets ? thin living digest, not deep archive path in graph.",
         ],
     }
     AUDIT_JSON.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(AUDIT_JSON, audit)
     alines = [
-        f"# Wikilink False-Positive Audit — {TS_DAY}",
+        f"# Wikilink False-Positive Audit ? {TS_DAY}",
         "",
         f"- Total still unresolved (living scan): **{len(after_unres)}**",
         f"- Classes: `{dict(class_counts)}`",
@@ -928,7 +928,7 @@ def main() -> int:
     alines += ["", "## Top unresolved"]
     for t, n in after_top.most_common(30):
         alines.append(f"- ({n}) `{t}`")
-    alines += ["", "## Class legend", "- `real_broken` — no living file", "- `archive_only` — only under Archive/Distillations", "- `false_positive_base` — .base exists", "- `companion_mismatch` — json/md wrapper issue", "- `allowlist_or_folderish` / `entity_stub_candidate` — intentional stubs", ""]
+    alines += ["", "## Class legend", "- `real_broken` ? no living file", "- `archive_only` ? only under Archive/Distillations", "- `false_positive_base` ? .base exists", "- `companion_mismatch` ? json/md wrapper issue", "- `allowlist_or_folderish` / `entity_stub_candidate` ? intentional stubs", ""]
     AUDIT_MD.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(AUDIT_MD, "\n".join(alines))
 

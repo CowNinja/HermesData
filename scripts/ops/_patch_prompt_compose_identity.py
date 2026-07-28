@@ -35,7 +35,7 @@ LAYER_ORDER = (
     "suffix",
 )
 
-# Scene/OOC text → expression tags (face stays locked; emotion changes).
+# Scene/OOC text ? expression tags (face stays locked; emotion changes).
 _EXPRESSION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\b(surpris|shock|startl|wide[- ]eyed|gasp)\w*\b", re.I),
      "surprised expression, wide eyes, parted lips, soft gasp"),
@@ -61,7 +61,7 @@ _EXPRESSION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 
 
 def expression_layer(scene: str = "", *, explicit: bool = False) -> str:
-    """Dynamic facial emotion from scene/heat text — never part of identity_lock."""
+    """Dynamic facial emotion from scene/heat text ? never part of identity_lock."""
     text_s = scene or ""
     hits: list[str] = []
     for pat, phrase in _EXPRESSION_PATTERNS:

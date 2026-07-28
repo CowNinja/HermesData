@@ -87,9 +87,9 @@ def main():
         "files": results,
         "flexibility_notes": {
             "design": "Silo is the versatile core. Most data tagged for multi-twin use.",
-            "multi_domain": "twin_domains is a list — supports overlapping twins.",
+            "multi_domain": "twin_domains is a list ? supports overlapping twins.",
             "extensible": "Fields like extensible_tags, knowledge_graph_relations, version ready for growth.",
-            "modular": "Uses dt_tagging_helper + simple_classify — easy to swap/enhance.",
+            "modular": "Uses dt_tagging_helper + simple_classify ? easy to swap/enhance.",
             "future": "New domains, projects, or twins can be added without schema breakage."
         },
         "note": "All items approved as high-relevance from Session 6 carried forward. New items auto-suggested."

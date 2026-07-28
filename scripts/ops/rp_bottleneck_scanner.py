@@ -138,7 +138,7 @@ def scan() -> dict:
         "alive": daemon_alive,
         "process_running": daemon_process,
     }
-    # filled after batch_active is known — see below
+    # filled after batch_active is known ? see below
 
     batch: dict = {}
     if batch_file.is_file():
@@ -164,7 +164,7 @@ def scan() -> dict:
     elif not checks["delivery_watcher"]:
         issues.append({"code": "watcher_idle", "severity": "info"})
 
-    # Production: Comfy inference :8188; gallery SPA :8189 (HTML 200 on /system_stats — never treat as Comfy).
+    # Production: Comfy inference :8188; gallery SPA :8189 (HTML 200 on /system_stats ? never treat as Comfy).
     # Prefer COMFY_URL env, else probe 8188 then 8189 with JSON validation only.
     comfy_env = (os.environ.get("COMFY_URL") or "").strip().rstrip("/")
     comfy_candidates: list[str] = []
@@ -184,11 +184,11 @@ def scan() -> dict:
     checks["comfy_url"] = comfy_url_hit or "http://127.0.0.1:8188"
     checks["comfy_8188"] = _comfy_json_ok("http://127.0.0.1:8188/system_stats")
     checks["gallery_8189"] = _http_ok("http://127.0.0.1:8189/")  # SPA only
-    checks["comfy_8189_is_gallery"] = True  # label lock — do not probe 8189 as Comfy
+    checks["comfy_8189_is_gallery"] = True  # label lock ? do not probe 8189 as Comfy
     if not comfy_up and batch_active:
         issues.append({"code": "comfy_down", "severity": "critical", "url": checks["comfy_url"]})
     elif not comfy_up:
-        # Idle / intentional offline — info only (no score hit)
+        # Idle / intentional offline ? info only (no score hit)
         issues.append({"code": "comfy_idle", "severity": "info", "url": checks["comfy_url"]})
 
     checks["gateway_8642"] = _http_ok("http://127.0.0.1:8642/health")
@@ -270,7 +270,7 @@ def scan() -> dict:
         elif sev == "medium":
             score -= 10
         elif sev == "info":
-            score -= 0  # idle / intentional offline — not a failure
+            score -= 0  # idle / intentional offline ? not a failure
         else:
             score -= 5
     score = max(0, min(100, score))

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Conversation → intent queue (dry-run default) — Jarvis spine muscle.
+"""Conversation ? intent queue (dry-run default) ? Jarvis spine muscle.
 
 Research (2026-07-18 / refreshed 2026-07-20):
-  - Draft→Approve→Execute HITL (Medium/Data Science Collective; human-approval inbox)
+  - Draft?Approve?Execute HITL (Medium/Data Science Collective; human-approval inbox)
   - Action-control over access-control (UnderDefense SOC 2026)
   - Allowlist tool-use (OpenAI/Anthropic agent safety: never free-form shell from chat)
-  - Maker ≠ checker + STOP outside body (Codifying-Loops map)
+  - Maker ? checker + STOP outside body (Codifying-Loops map)
   - Reflexion / evaluator-optimizer: score gate before commit (arXiv 2303.11366)
 
 Contract:
@@ -56,7 +56,7 @@ LATEST = VAULT_LOG / "intent-queue-latest.json"
 EXEC_LOG = VAULT_LOG / "intent-execute-latest.json"
 CANON = "Operations/Conversation-to-Action-Ladder-CANONICAL-2026-07-18.md"
 
-# Risk classes — only low can ever be auto-eligible later; high always human
+# Risk classes ? only low can ever be auto-eligible later; high always human
 RISK_KEYWORDS = {
     "high": [
         r"\bpurge\b",
@@ -82,8 +82,8 @@ RISK_KEYWORDS = {
     ],
 }
 
-# Score-gate allowlist: LOW risk only. Fixed argv — never free-form shell.
-# Research: OpenAI tool allowlists; Anthropic computer-use sandbox; HITL draft→approve.
+# Score-gate allowlist: LOW risk only. Fixed argv ? never free-form shell.
+# Research: OpenAI tool allowlists; Anthropic computer-use sandbox; HITL draft?approve.
 ALLOWLIST: Dict[str, Dict[str, Any]] = {
     "stack_snapshot": {
         "patterns": [r"\bstack[_\s-]?snapshot\b", r"\bsnapshot\s+the\s+stack\b"],
@@ -217,11 +217,11 @@ def suggest_lane(text: str, risk: str) -> str:
 
 
 def score_allowlist(text: str, risk: str) -> Dict[str, Any]:
-    """Map intent text → allowlisted script or none. Never invent argv."""
+    """Map intent text ? allowlisted script or none. Never invent argv."""
     if risk != "low":
         return {
             "eligible": False,
-            "reason": f"risk={risk} not low — allowlist execute blocked",
+            "reason": f"risk={risk} not low ? allowlist execute blocked",
             "match": None,
         }
     t = text or ""
@@ -234,7 +234,7 @@ def score_allowlist(text: str, risk: str) -> Dict[str, Any]:
     if not hits:
         return {
             "eligible": False,
-            "reason": "no allowlist pattern matched — propose/arm only",
+            "reason": "no allowlist pattern matched ? propose/arm only",
             "match": None,
         }
     if len(hits) > 1:
@@ -258,7 +258,7 @@ def score_allowlist(text: str, risk: str) -> Dict[str, Any]:
 
 
 def dry_run_plan(text: str, risk: str, lane: str, score: Dict[str, Any]) -> dict:
-    """Propose steps only — never execute."""
+    """Propose steps only ? never execute."""
     steps = [
         {"step": 1, "action": "capture", "detail": "intent recorded to queue (this step)"},
         {
@@ -281,7 +281,7 @@ def dry_run_plan(text: str, risk: str, lane: str, score: Dict[str, Any]) -> dict
             {
                 "step": 5,
                 "action": "human_gate",
-                "detail": "HIGH risk — Jeff explicit approve required; never auto",
+                "detail": "HIGH risk ? Jeff explicit approve required; never auto",
             }
         )
     elif risk == "medium":
@@ -289,14 +289,14 @@ def dry_run_plan(text: str, risk: str, lane: str, score: Dict[str, Any]) -> dict
             {
                 "step": 5,
                 "action": "human_gate",
-                "detail": "MEDIUM — arm phrase + optional Discord confirm; no allowlist exec",
+                "detail": "MEDIUM ? arm phrase + optional Discord confirm; no allowlist exec",
             }
         )
     else:
         gate = (
-            "LOW + allowlisted — arm then execute --commit permitted"
+            "LOW + allowlisted ? arm then execute --commit permitted"
             if score.get("eligible")
-            else "LOW — arm still required; execute blocked until allowlist match"
+            else "LOW ? arm still required; execute blocked until allowlist match"
         )
         steps.append({"step": 5, "action": "human_gate", "detail": gate})
     steps.append(
@@ -316,7 +316,7 @@ def dry_run_plan(text: str, risk: str, lane: str, score: Dict[str, Any]) -> dict
         "steps": steps,
         "forbidden_until_arm": True,
         "sources": [
-            "Draft→Approve→Execute HITL",
+            "Draft?Approve?Execute HITL",
             "action-control + tool allowlist",
             "Reflexion score-before-commit",
             CANON,
@@ -371,28 +371,49 @@ def update_entry(eid: str, mutator) -> dict | None:
     return found
 
 
+def _stt_align(text: str, source: str = "") -> dict:
+    """Conservative STT/noise align before intent classify (standing law 2026-07-27)."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import stt_intent_align as sia  # type: ignore
+
+        maps = sia.load_maps(sia.DEFAULT_MAP)
+        return sia.align_text(text, list(maps.get("mappings") or []), hints=source or "")
+    except Exception as exc:
+        return {"ok": False, "changed": False, "error": str(exc)[:160], "aligned": text, "original": text}
+
+
 def cmd_propose(args: argparse.Namespace) -> int:
     text = (args.text or "").strip()
     if not text:
         print("ERROR: --text required", file=sys.stderr)
         return 2
-    risk = classify_risk(text)
-    lane = suggest_lane(text, risk)
-    score = score_allowlist(text, risk)
-    plan = dry_run_plan(text, risk, lane, score)
+    # Standing law: recover true intention before risk/lane/score (never invent).
+    align = _stt_align(text, source=str(args.source or ""))
+    text_aligned = str(align.get("aligned") or text).strip() or text
+    risk = classify_risk(text_aligned)
+    lane = suggest_lane(text_aligned, risk)
+    score = score_allowlist(text_aligned, risk)
+    plan = dry_run_plan(text_aligned, risk, lane, score)
     entry = {
         "id": uuid.uuid4().hex[:12],
         "ts": utc(),
         "status": "proposed",
         "source": args.source or "cli",
-        "text": text,
+        "text": text_aligned,
+        "text_original": text if text_aligned != text else None,
+        "stt_align": {
+            "changed": bool(align.get("changed")),
+            "applied": align.get("applied") or [],
+            "ok": align.get("ok", True),
+        },
         "risk": risk,
         "lane": lane,
         "score": score,
         "plan": plan,
         "armed": False,
         "executed": False,
-        "seal": "intent-queue-v2-score-gate-allowlist",
+        "seal": "intent-queue-v3-stt-align-score-gate",
         "canon": CANON,
     }
     append_entry(entry)
@@ -455,7 +476,7 @@ def cmd_score(args: argparse.Namespace) -> int:
 
 def cmd_arm(args: argparse.Namespace) -> int:
     if STOP.is_file():
-        print("BLOCKED: intent_queue.STOP present — clear only with Jeff intent", file=sys.stderr)
+        print("BLOCKED: intent_queue.STOP present ? clear only with Jeff intent", file=sys.stderr)
         return 3
     phrase_ok = (args.phrase or "").strip() == "ARMED_INTENT" or os.environ.get("INTENT_ARM") == "1"
     if not phrase_ok:
@@ -497,7 +518,7 @@ def cmd_execute(args: argparse.Namespace) -> int:
         print(f"not found: {args.id}", file=sys.stderr)
         return 1
     if not found.get("armed"):
-        print("BLOCKED: not armed — arm with ARMED_INTENT first", file=sys.stderr)
+        print("BLOCKED: not armed ? arm with ARMED_INTENT first", file=sys.stderr)
         return 3
     risk = found.get("risk") or "low"
     score = score_allowlist(found.get("text") or "", risk)
@@ -541,7 +562,7 @@ def cmd_execute(args: argparse.Namespace) -> int:
         print("DRY-RUN execute only. Re-run with --commit to run allowlisted script.")
         return 0
 
-    # commit path — still only allowlisted low
+    # commit path ? still only allowlisted low
     try:
         proc = subprocess.run(
             cmd,
@@ -594,7 +615,7 @@ def cmd_reject(args: argparse.Namespace) -> int:
 
 
 def format_discord_card(entry: dict) -> str:
-    """≤6-line Discord card for Hermes standing order."""
+    """?6-line Discord card for Hermes standing order."""
     score = entry.get("score") or {}
     allow = score.get("match") or "none"
     elig = score.get("eligible")
@@ -602,13 +623,13 @@ def format_discord_card(entry: dict) -> str:
     if len(text) > 80:
         text = text[:77] + "..."
     lines = [
-        f"**Intent** `{entry.get('id')}` · status={entry.get('status')}",
-        f"risk=**{entry.get('risk')}** · lane=`{entry.get('lane')}` · allow=`{allow}` eligible={elig}",
+        f"**Intent** `{entry.get('id')}` ? status={entry.get('status')}",
+        f"risk=**{entry.get('risk')}** ? lane=`{entry.get('lane')}` ? allow=`{allow}` eligible={elig}",
         f"text: {text}",
-        "Next: Jeff `ARMED_INTENT` → "
+        "Next: Jeff `ARMED_INTENT` ? "
         f"`python D:/HermesData/scripts/conversation_intent_queue.py arm {entry.get('id')} --phrase ARMED_INTENT`",
-        "Then dry: `execute <id>` · commit low+allowlisted only: `execute <id> --commit`",
-        "STOP: `D:/HermesData/state/intent_queue.STOP` · never free-form shell from chat",
+        "Then dry: `execute <id>` ? commit low+allowlisted only: `execute <id> --commit`",
+        "STOP: `D:/HermesData/state/intent_queue.STOP` ? never free-form shell from chat",
     ]
     return "\n".join(lines[:6])
 
@@ -635,7 +656,7 @@ def cmd_card(args: argparse.Namespace) -> int:
     ns = NS()
     ns.text = text
     ns.source = args.source or "discord:card"
-    # cmd_propose prints full JSON — capture via direct logic
+    # cmd_propose prints full JSON ? capture via direct logic
     risk = classify_risk(text)
     lane = suggest_lane(text, risk)
     score = score_allowlist(text, risk)
@@ -691,7 +712,7 @@ def main() -> int:
 
     p_card = sub.add_parser(
         "card",
-        help="Discord thin wrapper: propose from last user message + ≤6-line card",
+        help="Discord thin wrapper: propose from last user message + ?6-line card",
     )
     p_card.add_argument("--text", default="", help="Last user message text")
     p_card.add_argument("--file", default="", help="Read message text from file")

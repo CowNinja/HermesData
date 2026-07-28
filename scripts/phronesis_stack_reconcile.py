@@ -261,7 +261,7 @@ def main() -> int:
             log(f"WARN {role} process count={c}")
 
     if args.start_missing:
-        # supervisor — count venv+base re-exec as one instance (2 PIDs OK)
+        # supervisor ? count venv+base re-exec as one instance (2 PIDs OK)
         if report["roles"]["supervisor"]["count"] == 0:
             start_hidden([pyw(), str(SCRIPTS / "hermes_gateway_supervisor.py")])
             report["actions"].append("started_supervisor")
@@ -269,10 +269,10 @@ def main() -> int:
             time.sleep(1)
         elif report["roles"]["supervisor"]["count"] > 2:
             report["actions"].append(
-                f"WARN supervisor count={report['roles']['supervisor']['count']} (expected 1–2 for re-exec)"
+                f"WARN supervisor count={report['roles']['supervisor']['count']} (expected 1?2 for re-exec)"
             )
 
-        # gateway — SSOT owner first (schtask), never -m gateway.run dual-argv
+        # gateway ? SSOT owner first (schtask), never -m gateway.run dual-argv
         if not report["ports"]["8642"]["listen_pid"] or not health(8642):
             try:
                 import subprocess as _sp

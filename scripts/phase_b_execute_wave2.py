@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase B wave 2 — remaining clusters (first-principles, recoverable).
+"""Phase B wave 2 ? remaining clusters (first-principles, recoverable).
 
 Rules:
 - cron-append: INDEX digest of lines; archive old dated files (crons recreate new days)
@@ -53,7 +53,7 @@ def index_cron_job(job_id: str) -> None:
         receipts.append(f"SKIP cron job {job_id}: no files")
         return
     lines = [
-        f"# Cron Append Index — job `{job_id}` ({TS})",
+        f"# Cron Append Index ? job `{job_id}` ({TS})",
         "",
         f"**Files:** {len(files)} dated thin logs (policy: one-line-ish per run).",
         "**Action:** singular index + archive dated files (recoverable). New cron days recreate.",
@@ -70,7 +70,7 @@ def index_cron_job(job_id: str) -> None:
         lines.append("")
     lines += [
         "## Policy",
-        "See [[Operations/Cron-Append-Policy]] — do not re-expand into full protocol dumps.",
+        "See [[Operations/Cron-Append-Policy]] ? do not re-expand into full protocol dumps.",
         "",
         "## Vault links",
         "- [[Operations/Cron-Append-Policy]]",
@@ -105,7 +105,7 @@ def main() -> int:
     ]
     write(
         OPS / "logs" / "cron-append" / "CRON-APPEND-JOBS-INDEX.md",
-        f"""# Cron Append Jobs — Master Index ({TS})
+        f"""# Cron Append Jobs ? Master Index ({TS})
 
 Thin logs by job id. Wave2 distilled series into per-job INDEX + archive.
 
@@ -126,27 +126,27 @@ Thin logs by job id. Wave2 distilled series into per-job INDEX + archive.
     )
     receipts.append(f"cron remaining dated files: {len(remaining)}")
 
-    # --- Cluster 3: orchestrator — intentional dual (already pointer) ---
+    # --- Cluster 3: orchestrator ? intentional dual (already pointer) ---
     ops_orch = OPS / "Orchestrator-Pilot-Run-Log.md"
     if ops_orch.exists():
         t = ops_orch.read_text(encoding="utf-8", errors="ignore")
         if "pointer only" in t.lower() or "Canonical" in t:
-            receipts.append("ORCHESTRATOR: intentional dual OK (ops pointer / docs canonical) — no further merge")
+            receipts.append("ORCHESTRATOR: intentional dual OK (ops pointer / docs canonical) ? no further merge")
         else:
-            receipts.append("ORCHESTRATOR: unexpected content — left untouched")
+            receipts.append("ORCHESTRATOR: unexpected content ? left untouched")
 
-    # --- Cluster 4: STATUS — different domains; cross-link, don't glue ---
+    # --- Cluster 4: STATUS ? different domains; cross-link, don't glue ---
     ops_status = OPS / "STATUS.md"
     docs_status = VAULT / "docs" / "agent-coordination" / "STATUS.md"
     if ops_status.exists() and docs_status.exists():
         ops_body = ops_status.read_text(encoding="utf-8", errors="ignore")
         # Keep stack status content; add clear role banner if missing
         if "Role: Stack / RP pipeline" not in ops_body:
-            banner = f"""# STATUS — Stack / Runtime (Operations)
+            banner = f"""# STATUS ? Stack / Runtime (Operations)
 
 **Role:** Phronesis host + RP/Comfy stack health (lean).  
 **Not the same as** coordination live status: [[docs/agent-coordination/STATUS]]  
-**Updated distill note:** {TS} Phase B wave2 — dual STATUS files kept on purpose (separation of concerns).
+**Updated distill note:** {TS} Phase B wave2 ? dual STATUS files kept on purpose (separation of concerns).
 
 ---
 
@@ -178,7 +178,7 @@ Thin logs by job id. Wave2 distilled series into per-job INDEX + archive.
 ---
 
 ## Related (Phase B wave2 {TS})
-- **Stack/runtime STATUS (Operations):** [[Operations/STATUS]] — host, Comfy, RP pipeline (separate concern)
+- **Stack/runtime STATUS (Operations):** [[Operations/STATUS]] ? host, Comfy, RP pipeline (separate concern)
 - Do not merge these two STATUS files; different audiences.
 
 ## Vault links
@@ -192,7 +192,7 @@ Thin logs by job id. Wave2 distilled series into per-job INDEX + archive.
     receipts_files = sorted(coord.glob("Thread-Update-Receipt-*.md"))
     if receipts_files:
         parts = [
-            f"# Thread Update Receipts — Digest ({TS})",
+            f"# Thread Update Receipts ? Digest ({TS})",
             "",
             f"**Count:** {len(receipts_files)}",
             "Originals archived Wave2 (recoverable).",
@@ -226,16 +226,16 @@ Thin logs by job id. Wave2 distilled series into per-job INDEX + archive.
     ]
     write(
         OPS / "Resurface-Queue-Phase-B.md",
-        f"""# Resurface Queue — Phase B ({TS})
+        f"""# Resurface Queue ? Phase B ({TS})
 
-Forgotten / stale **high-value** notes — do **not** auto-archive. Open when ready.
+Forgotten / stale **high-value** notes ? do **not** auto-archive. Open when ready.
 
 """
         + "\n".join(f"- [[{r.replace('.md','')}]]" for r in resurface)
         + """
 
 ## Intent
-Re-emerge ideas for the Machine (guardrails, Roemmele, forensics) — Jeff dreamer review.
+Re-emerge ideas for the Machine (guardrails, Roemmele, forensics) ? Jeff dreamer review.
 
 ## Vault links
 - [[Operations/Grand-Vision-Silo-Gardener-and-Hermes-Continuity-2026-07-10]]
@@ -248,20 +248,20 @@ Re-emerge ideas for the Machine (guardrails, Roemmele, forensics) — Jeff dream
         ARCHIVE / "README.md",
         f"""# Phase B Wave2 archive {TS}
 
-- cron-*/ — archived thin cron-append dated files (indexes remain in Operations/logs/cron-append/)
-- Thread-Receipts/ — archived thread update receipts
+- cron-*/ ? archived thin cron-append dated files (indexes remain in Operations/logs/cron-append/)
+- Thread-Receipts/ ? archived thread update receipts
 
 Recoverable. Indexes/digests live in vault working tree.
 """,
     )
     write(
         OPS / "logs" / f"phase-b-merge-execution-wave2-{TS}.md",
-        f"""# Phase B Wave2 Execution — {TS}
+        f"""# Phase B Wave2 Execution ? {TS}
 
 ## First principles applied
-1. **cron-append** = thin timeline → per-job INDEX + archive dates (not one megafile)
-2. **STATUS dual** = different concerns (stack vs coordination) → link, don't glue
-3. **Orchestrator dual** = already pointer/canonical → leave
+1. **cron-append** = thin timeline ? per-job INDEX + archive dates (not one megafile)
+2. **STATUS dual** = different concerns (stack vs coordination) ? link, don't glue
+3. **Orchestrator dual** = already pointer/canonical ? leave
 4. **Thread receipts** = digest + archive
 5. **Resurface** research = queue only (no archive)
 

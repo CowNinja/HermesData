@@ -141,7 +141,7 @@ def main() -> int:
         ocr_path.write_text(body, encoding="utf-8")
         # Autonomy: also emit .train.md so train-manifest / depth score see the twin.
         train_path.write_text(
-            f"# PDF train — {p.name}\n\n- engine: {eng}\n- at: {at}\n\n{text[:12000]}\n",
+            f"# PDF train - {p.name}\n\n- engine: {eng}\n- at: {at}\n\n{text[:12000]}\n",
             encoding="utf-8",
         )
         # Clear stale handoff if digital text now present.

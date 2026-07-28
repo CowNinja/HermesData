@@ -1,4 +1,4 @@
-# Phronesis-Guardian.ps1 — schtask entry (often bare powershell.exe; cannot rebind without Admin).
+# Phronesis-Guardian.ps1 - schtask entry (often bare powershell.exe; cannot rebind without Admin).
 # 2026-07-26: Always FreeConsole + exit under lockdown/STOP so Task Scheduler shows SUCCESS (0)
 # instead of 267014 TERMINATED (looks like "error" when suppress force-ends the task).
 $ErrorActionPreference = "SilentlyContinue"
@@ -6,7 +6,7 @@ try {
   Add-Type -Name K -Namespace W -MemberDefinition '[DllImport("kernel32.dll")] public static extern bool FreeConsole();' -ErrorAction SilentlyContinue
   [W.K]::FreeConsole() | Out-Null
 } catch {}
-# Permanent travel lockdown + focus STOP — no body, no elevate, no Write-Host.
+# Permanent travel lockdown + focus STOP - no body, no elevate, no Write-Host.
 # Use Environment.Exit so schtasks Last Result is truly 0 (PS `exit 0` can
 # still report 1 when non-terminating errors sit in $Error).
 function Exit-Ok([string]$reason) {
@@ -53,6 +53,6 @@ try {
     $w = New-Object -ComObject WScript.Shell
     $null = $w.Run($cmd, 0, $false)
 } catch {
-    # No Start-Process fallback that can flash — silent fail
+    # No Start-Process fallback that can flash - silent fail
 }
 Exit-Ok "trampoline"

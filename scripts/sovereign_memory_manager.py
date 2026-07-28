@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-sovereign_memory_manager.py — Virtualized session/workspace memory (Milestone 3).
+sovereign_memory_manager.py ? Virtualized session/workspace memory (Milestone 3).
 
 SQLite-backed checkpointing for working memory + procedural state.
 Auto-hydrates last active session on boot; archives episodic summaries to sqlite-vec.
@@ -442,7 +442,7 @@ class SovereignMemoryManager:
         preserve_procedural: bool = False,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Truncate working history for a scoped session — poisoned-context purge."""
+        """Truncate working history for a scoped session ? poisoned-context purge."""
         scope = (platform or "roleplay").strip()
         sid = session_id or self.find_active_session_for_platform(scope) or self.ensure_active_session(scope)
         state = self.hydrate_for_platform(scope)
@@ -554,7 +554,7 @@ def wipe_discord_roleplay_context(
             "parent_channel_id": parent_channel_id,
         },
     )
-    # Legacy global roleplay bucket — wipe if no scoped session existed
+    # Legacy global roleplay bucket ? wipe if no scoped session existed
     if platform and platform != scope:
         legacy = mgr.wipe_working_memory(
             platform=platform,
@@ -614,7 +614,7 @@ def checkpoint_roleplay_turn(
     parent_channel_id: str = "",
     memory_scope: str = "",
 ) -> Optional[Dict[str, Any]]:
-    """Unfiltered roleplay checkpoint — preserves full working memory for D&D sessions."""
+    """Unfiltered roleplay checkpoint ? preserves full working memory for D&D sessions."""
     try:
         mgr = get_memory_manager()
         scope = memory_scope or make_memory_scope(

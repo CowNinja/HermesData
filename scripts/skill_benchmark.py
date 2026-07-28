@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_benchmark.py — Skill Evolution Benchmark Harness
+skill_benchmark.py - Skill Evolution Benchmark Harness
 Runs deterministic micro-benchmarks across skill domains.
 Stores results as JSONL for trend tracking.
 
@@ -33,11 +33,11 @@ BENCH_TS = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 RESULTS_FILE = BENCH_DATA / f"bench_{BENCH_TS}.jsonl"
 TREND_FILE = BENCH_DATA / "trends.jsonl"
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Benchmark Task Definitions
 # Each task: {id, skill, domain, description, fn, max_seconds}
 # fn() -> dict with keys: passed (bool), score (0-1), notes (str)
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 
 def bench_skill_file_exists():
     """Verify all installed skills have SKILL.md (skip category grouping dirs)"""
@@ -65,7 +65,7 @@ def bench_skill_file_exists():
             total += 1
             passed += 1
         elif children_with_skills:
-            # Category grouping dir — count as valid structure
+            # Category grouping dir - count as valid structure
             total += 1
             passed += 1
         else:
@@ -90,7 +90,7 @@ def bench_vault_lint():
     if total == 0:
         return {"passed": False, "score": 0, "notes": "No .md files in vault"}
     
-    # Check for broken [[links]] — link target exists
+    # Check for broken [[links]] - link target exists
     broken = 0
     checked = 0
     for md_file in md_files[:50]:  # sample first 50
@@ -200,7 +200,7 @@ def bench_skill_content_quality():
     """Measure whether skills have actionable content (not empty stubs).
     
     Structural checks: does the skill have the expected sections?
-    This is the original benchmark — kept for trend continuity.
+    This is the original benchmark - kept for trend continuity.
     """
     skills_dir = HERMESDATA / "skills"
     total = 0
@@ -246,13 +246,13 @@ def bench_skill_content_quality():
     return {
         "passed": passing == total,
         "score": passing / total if total else 0,
-        "notes": f"{passing}/{total} skills pass quality gate (≥3/5 signals)",
+        "notes": f"{passing}/{total} skills pass quality gate (?3/5 signals)",
         "issues": issues[:5],
     }
 
 
 def bench_skill_actionability():
-    """Measure information density — does the skill contain concrete actionable content?
+    """Measure information density - does the skill contain concrete actionable content?
     
     Unlike skill_content_quality (structural), this measures:
     - Code blocks with actual commands (not just ``` markers)
@@ -286,7 +286,7 @@ def bench_skill_actionability():
             scores[skill_path.name] = 0.0
             continue
         
-        # Count truly actionable lines — must be SPECIFIC, not generic
+        # Count truly actionable lines - must be SPECIFIC, not generic
         actionable = 0
         in_code_block = False
         code_block_content_lines = 0
@@ -294,10 +294,10 @@ def bench_skill_actionability():
         for line in lines:
             stripped = line.strip()
             
-            # Code block markers — count the block as actionable only if it has content
+            # Code block markers - count the block as actionable only if it has content
             if stripped.startswith("```"):
                 if in_code_block:
-                    # End of code block — count it if it had content
+                    # End of code block - count it if it had content
                     if code_block_content_lines > 0:
                         actionable += 1  # count the whole block as 1 actionable unit
                     code_block_content_lines = 0
@@ -374,16 +374,16 @@ def bench_skill_actionability():
     return {
         "passed": passing == total,
         "score": passing / total if total else 0,
-        "notes": f"{passing}/{total} skills pass actionability gate (≥50% score, avg={avg_score:.2f})",
+        "notes": f"{passing}/{total} skills pass actionability gate (?50% score, avg={avg_score:.2f})",
         "avg_actionability": round(avg_score, 3),
         "worst_skills": worst,
         "details": {"scores": scores},
     }
 
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Registry
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 BENCHMARKS = [
     {
         "id": "skill_files_integrity",
@@ -496,7 +496,7 @@ def run_all(skill_filter=None):
     
     results = []
     print(f"\n{'='*60}")
-    print(f"  SKILL EVOLUTION BENCHMARK — {BENCH_TS}")
+    print(f"  SKILL EVOLUTION BENCHMARK - {BENCH_TS}")
     print(f"  Running {len(to_run)} tests")
     print(f"{'='*60}\n")
     
@@ -513,9 +513,9 @@ def run_all(skill_filter=None):
     total = len(results)
     passed = sum(1 for r in results if r["passed"])
     avg_score = sum(r["score"] for r in results) / total if total else 0
-    print(f"\n{'─'*60}")
+    print(f"\n{'-'*60}")
     print(f"  RESULT: {passed}/{total} passed | avg score {avg_score*100:.1f}%")
-    print(f"{'─'*60}\n")
+    print(f"{'-'*60}\n")
     
     # Write results
     with open(RESULTS_FILE, "w", encoding="utf-8") as f:

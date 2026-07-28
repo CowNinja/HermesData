@@ -113,7 +113,7 @@ def main() -> int:
     link_doc(
         Path(r"D:\PhronesisVault\Operations\Data-Management-and-Ingestion-Policy.md"),
         "Four-Worlds-Silo-Architecture-CANONICAL",
-        f"## Four Worlds (canonical — do not drift)\n\nSee **{link}**.\n\n"
+        f"## Four Worlds (canonical ? do not drift)\n\nSee **{link}**.\n\n"
         "| World | Path | Role |\n|-------|------|------|\n"
         "| 1 Hermes | `D:\\\\HermesData` | Runtime |\n"
         "| 2 Vault | `D:\\\\PhronesisVault` | Second brain |\n"
@@ -164,7 +164,7 @@ def main() -> int:
             kidx.write_text(
                 t.rstrip()
                 + "\n\n---\n\n## Four Worlds lock (2026-07-10)\n\n"
-                "This tree is **World 3 — Life / digital twin SSOT**.\n\n"
+                "This tree is **World 3 ? Life / digital twin SSOT**.\n\n"
                 "- World 1: `D:\\\\HermesData`\n"
                 "- World 2: `D:\\\\PhronesisVault`\n"
                 "- World 4: `D:\\\\PhronesisVault\\\\Roleplay-Sandbox` (never store explicit RP on K:)\n\n"
@@ -179,7 +179,7 @@ def main() -> int:
     # RP readme
     rp = Path(r"D:\PhronesisVault\Roleplay-Sandbox\README.md")
     block = (
-        "\n\n## Four Worlds — World 4 (walled garden)\n\n"
+        "\n\n## Four Worlds ? World 4 (walled garden)\n\n"
         "Explicit/roleplay only. Do not put life SSOT here; do not leak explicit into K: or Operations research.\n"
         f"Canonical: {link}\n"
     )
@@ -193,7 +193,7 @@ def main() -> int:
         print("RP readme created")
 
     Path(r"D:\HermesData\FOUR-WORLDS.md").write_text(
-        "# Four Worlds — HermesData is World 1\n\n"
+        "# Four Worlds ? HermesData is World 1\n\n"
         f"Canonical: `{CANON_PATH}`\n\n"
         "Config: `config/data_silos.yaml` + `data_silos.json`\n",
         encoding="utf-8",
@@ -219,7 +219,7 @@ def main() -> int:
             skill.write_text(
                 t.rstrip()
                 + "\n\n## Four Worlds\n\n"
-                "Route all file work by world: HermesData · PhronesisVault · K:Phronesis-Sovereign · Roleplay-Sandbox.\n"
+                "Route all file work by world: HermesData ? PhronesisVault ? K:Phronesis-Sovereign ? Roleplay-Sandbox.\n"
                 f"Canonical: `{CANON_PATH}`\n",
                 encoding="utf-8",
             )

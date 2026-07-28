@@ -87,6 +87,11 @@ def fleet_policy() -> Dict[str, Any]:
         "fallback_on_local_fail": bool(fleet.get("fallback_on_local_fail", True)),
         "proactive_realtime_triggers": bool(fleet.get("proactive_realtime_triggers", True)),
         "proactive_offload": bool(fleet.get("proactive_offload", True)),
+        # Policy B: auto T3 for hard prompts; share caps mirror thrift gate
+        "grok_policy": str(fleet.get("grok_policy") or "B").upper(),
+        "hard_prompt_auto_t3": bool(fleet.get("hard_prompt_auto_t3", True)),
+        "grok_share_cap_yellow": float(fleet.get("grok_share_cap_yellow", 0.05)),
+        "grok_share_cap_red": float(fleet.get("grok_share_cap_red", 0.20)),
         "registry": str(fleet.get("registry") or HERMES_ROOT / "config" / "fleet_registry.yaml"),
         "block_roleplay": True,
     }
@@ -378,10 +383,50 @@ def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
+def _grok_share_blocks_t3() -> tuple[bool, str]:
+    """Policy B thrift guard: block auto T3 when rolling Grok share already at/above RED."""
+    try:
+        rollup_path = HERMES_ROOT / "state" / "router-thrift-rollup-latest.json"
+        if not rollup_path.is_file():
+            rollup_path = HERMES_ROOT / "state" / "router_thrift_rollup_latest.json"
+        if not rollup_path.is_file():
+            return False, "no_rollup"
+        data = json.loads(rollup_path.read_text(encoding="utf-8"))
+        thrift = data.get("thrift") if isinstance(data.get("thrift"), dict) else {}
+        share = data.get("share") if isinstance(data.get("share"), dict) else {}
+        local_n = int(thrift.get("local") or 0)
+        free_n = int(thrift.get("free") or 0)
+        grok_n = int(thrift.get("grok") or 0)
+        total = local_n + free_n + grok_n
+        if total < 10:
+            return False, "low_sample"
+        grok_s = float(share.get("grok") or (grok_n / total if total else 0.0))
+        pol = fleet_policy()
+        red = float(pol.get("grok_share_cap_red") or 0.20)
+        if grok_s >= red:
+            return True, f"grok_share_red:{grok_s:.3f}>={red}"
+        return False, f"grok_share_ok:{grok_s:.3f}"
+    except Exception as exc:
+        return False, f"share_check_err:{exc}"
+
+
 def _proactive_wants_t3(prompt: str, routing: Dict[str, Any]) -> bool:
+    """
+    Policy B hard-prompt detector.
+
+    Grok only when work needs reasoning/planning beyond local+free:
+    architecture, multi-step design, judgment, or repeated tool failure.
+    Explicit T3 / driver always wins. Roleplay never.
+    """
+    pol = fleet_policy()
     tier = str(routing.get("escalation_tier") or "")
     if tier == "T3":
         return True
+    if str(routing.get("force_grok") or "").lower() in ("1", "true", "yes"):
+        return True
+    # Policy A was driver-only rare; Policy B enables marker auto-T3 (default).
+    if not pol.get("hard_prompt_auto_t3", True) and str(pol.get("grok_policy") or "B") == "A":
+        return False
     low = (prompt or "").lower()
     heavy_markers = (
         "heavy reasoning",
@@ -393,10 +438,35 @@ def _proactive_wants_t3(prompt: str, routing: Dict[str, Any]) -> bool:
         "system design",
         "deep synthesis",
         "multi-hour",
+        # Policy B expansions - planning/judgment beyond 9B grunt
+        "tradeoff analysis",
+        "trade-off analysis",
+        "design decision",
+        "root cause analysis",
+        "failure mode",
+        "codify autonomy",
+        "programmatically codify",
+        "anti-hallucination audit",
+        "policy judgment",
+        "gray policy",
+        "escalate to grok",
+        "needs grok",
+        "beyond local",
+        "plan the next",
+        "multi-step plan",
+        "strategic plan",
     )
     if any(m in low for m in heavy_markers):
+        blocked, reason = _grok_share_blocks_t3()
+        if blocked:
+            _log({"event": "t3_blocked_share_cap", "reason": reason})
+            return False
         return True
     if int(routing.get("tool_fail_count") or 0) > 2:
+        blocked, reason = _grok_share_blocks_t3()
+        if blocked:
+            _log({"event": "t3_blocked_share_cap", "reason": reason})
+            return False
         return True
     return False
 
@@ -458,41 +528,105 @@ def try_proactive_offload_dispatch(
     if not pol.get("proactive_offload", True):
         return {"success": False, "proactive_offload": False, "skipped": "proactive_disabled"}
 
+    # Local GPU contention (image lock / dual / 8090 down) ? prefer fleet for non-RP.
+    prefer_fleet = False
+    prefer_reason = ""
     try:
-        from inference_queue import should_defer_proactive_offload
+        from inference_queue import should_prefer_fleet_offload, should_defer_proactive_offload
 
-        defer, defer_reason = should_defer_proactive_offload()
-        if defer:
-            return {
-                "success": False,
-                "proactive_offload": False,
-                "skipped": "gpu_fifo_busy",
-                "reasons": [defer_reason],
-            }
+        prefer_fleet, prefer_reason = should_prefer_fleet_offload()
+        if not prefer_fleet:
+            defer, defer_reason = should_defer_proactive_offload()
+            if defer:
+                return {
+                    "success": False,
+                    "proactive_offload": False,
+                    "skipped": "gpu_fifo_busy",
+                    "reasons": [defer_reason],
+                }
+        else:
+            _log({"event": "proactive_offload_prefer_fleet", "reason": prefer_reason})
     except Exception as exc:
         _log({"event": "proactive_offload_defer_check_error", "error": str(exc)})
 
-    from proactive_routing_policy import ROUTING_OFFLOAD_COMPUTE, classify_proactive_routing
+    from proactive_routing_policy import (
+        ROUTING_OFFLOAD_COMPUTE,
+        ROUTING_LOCAL_FIRST,
+        ROUTING_LOCAL_ONLY,
+        ROUTING_AUGMENT_LOCAL,
+        classify_proactive_routing,
+    )
 
     classification = classify_proactive_routing(
         prompt, routing, messages, body or {}, headers=headers or {},
     )
-    if classification.get("mode") != ROUTING_OFFLOAD_COMPUTE:
-        return {
-            "success": False,
-            "proactive_offload": False,
-            "skipped": classification.get("mode"),
-            "reasons": classification.get("reasons"),
-        }
+    mode = str(classification.get("mode") or "")
+    # When local is contended/down, hard-upgrade safe non-private modes to free fleet.
+    # Never upgrade local_only / RP / private / augment_local (sandbox stays local).
+    # Prefer free before Grok ? token-outage resilience (2026-07-27).
+    private_modes = {
+        ROUTING_LOCAL_ONLY,
+        "local_only",
+        "local_private",
+        ROUTING_AUGMENT_LOCAL,
+        "augment_local",
+    }
+    upgradeable_modes = {
+        ROUTING_LOCAL_FIRST,
+        "local_first",
+        "local_default",
+        "keep_local",
+        "local",
+    }
+    if mode != ROUTING_OFFLOAD_COMPUTE:
+        if prefer_fleet and mode in upgradeable_modes:
+            from_mode = mode
+            classification = dict(classification)
+            classification["mode"] = ROUTING_OFFLOAD_COMPUTE
+            classification["prefer_fleet_reason"] = prefer_reason
+            classification["hard_prefer_fleet"] = True
+            reasons = list(classification.get("reasons") or [])
+            reasons.append(f"hard_prefer_fleet:{prefer_reason}")
+            classification["reasons"] = reasons
+            mode = ROUTING_OFFLOAD_COMPUTE
+            _log(
+                {
+                    "event": "proactive_offload_hard_upgrade",
+                    "from_mode": from_mode,
+                    "reason": prefer_reason,
+                }
+            )
+        elif prefer_fleet and mode in private_modes:
+            return {
+                "success": False,
+                "proactive_offload": False,
+                "skipped": mode,
+                "reasons": list(classification.get("reasons") or [])
+                + [f"prefer_fleet_blocked:{prefer_reason}"],
+            }
+        else:
+            return {
+                "success": False,
+                "proactive_offload": False,
+                "skipped": classification.get("mode"),
+                "reasons": classification.get("reasons"),
+            }
+    if prefer_fleet:
+        classification = dict(classification)
+        classification["prefer_fleet_reason"] = prefer_reason
 
     safe_prompt = str(classification.get("sanitized_prompt") or prompt)
     wants_t3 = _proactive_wants_t3(safe_prompt, routing)
 
     t2_result: Dict[str, Any] = {"success": False}
-    if not wants_t3:
+    # Under hard prefer_fleet, always try free T2 first even if wants_t3
+    # (prefer_free_before_grok law ? never burn Grok when free can serve).
+    if not wants_t3 or prefer_fleet:
         t2_result = try_proactive_t2_dispatch(safe_prompt, routing)
         if t2_result.get("success"):
             t2_result["classification"] = classification
+            if prefer_fleet:
+                t2_result.setdefault("provenance", {})["prefer_fleet_reason"] = prefer_reason
             return t2_result
 
     if wants_t3 or pol.get("prefer_free_before_grok"):
@@ -502,6 +636,8 @@ def try_proactive_offload_dispatch(
                 t2_result["classification"] = classification
                 return t2_result
 
+    # Only escalate to T3 (paid Grok) when free failed AND not blocked by thrift
+    # Under prefer_fleet with free available, still allow T3 as last resort for wants_t3.
     t3_route = {**routing, "escalation_tier": "T3"}
     t3_result = try_t3_paid_dispatch(safe_prompt, t3_route)
     if t3_result.get("success"):
@@ -522,6 +658,8 @@ def try_proactive_offload_dispatch(
         "t2_error": t2_result.get("error"),
         "t3_error": t3_result.get("error"),
         "reasons": classification.get("reasons"),
+        "prefer_fleet": prefer_fleet,
+        "prefer_fleet_reason": prefer_reason if prefer_fleet else None,
     }
 
 

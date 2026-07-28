@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Jan library TTS summary — local muscle path, zero Grok tokens.
+"""Jan library TTS summary ? local muscle path, zero Grok tokens.
 
 Pipeline:
-  1) talk_to_jan.py  → retrieve + local Qwythos (8091) answer  [no Grok]
-  2) local_edge_tts.py → Edge neural MP3                     [no Grok]
+  1) talk_to_jan.py  ? retrieve + local Qwythos (8091) answer  [no Grok]
+  2) local_edge_tts.py ? Edge neural MP3                     [no Grok]
   3) optional Discord file attach via bot token              [no Grok]
 
 Usage:
@@ -62,7 +62,7 @@ def _extract_spoken(answer: str, max_chars: int = 3200) -> str:
             continue
         lines.append(line)
     body = "\n".join(lines).strip()
-    # Soft cap for a ~3–4 min listen
+    # Soft cap for a ~3?4 min listen
     if len(body) > max_chars:
         cut = body[:max_chars]
         # end on sentence if possible
@@ -131,7 +131,7 @@ def _post_discord(channel_id: str, content: str, mp3: Path) -> dict:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Jan TTS summary — no Grok")
+    ap = argparse.ArgumentParser(description="Jan TTS summary ? no Grok")
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--question", type=str, help="Ask talk_to_jan then speak")
     g.add_argument("--text-file", type=Path, help="Speak an existing markdown/text file")
@@ -178,8 +178,8 @@ def main() -> int:
 
     if args.post_discord:
         caption = (
-            "**Local TTS** (edge · no Grok) — Jan / BooksBloom spoken pass.\n"
-            f"File: `{Path(tts['path']).name}` · {tts.get('bytes', 0)} bytes · voice `{args.voice}`"
+            "**Local TTS** (edge ? no Grok) ? Jan / BooksBloom spoken pass.\n"
+            f"File: `{Path(tts['path']).name}` ? {tts.get('bytes', 0)} bytes ? voice `{args.voice}`"
         )
         post = _post_discord(str(args.post_discord), caption, Path(tts["path"]))
         result["discord"] = post

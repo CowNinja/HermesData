@@ -4,7 +4,7 @@
 ACT moves live in vault_gardener_tick.py (05:15). This job never mutates notes.
 
 2026-07-18 residual seal:
-- Child measure failures → warn + receipt + exit 0 (advisory).
+- Child measure failures ? warn + receipt + exit 0 (advisory).
 - Capture stderr tails so cron MD is debuggable.
 - Hard-fail only if vault root missing (true misconfig).
 Research: structured soft-fail + receipt > exit-1 red noise for measure jobs
@@ -105,7 +105,7 @@ def main() -> int:
             print("--- stderr_tail ---")
             print(audit["stderr_tail"][-800:])
 
-    # 2) Living-set orphan signal (read-only count) — optional module
+    # 2) Living-set orphan signal (read-only count) ? optional module
     living_orphan_count = None
     try:
         import importlib.util
@@ -130,7 +130,7 @@ def main() -> int:
     except Exception as e:
         print(f"living_orphan_count=skip ({type(e).__name__}: {e})")
 
-    # 3) Link lint — advisory only (never fails the job)
+    # 3) Link lint ? advisory only (never fails the job)
     lint = _run(
         "vault_link_lint",
         [py, str(VAULT / "scripts" / "vault_link_lint.py")],
@@ -142,7 +142,7 @@ def main() -> int:
         f"(advisory; gardener owns ACT)"
     )
 
-    # 3b) Living unresolved scan — truth surface for CNS hygiene (advisory)
+    # 3b) Living unresolved scan ? truth surface for CNS hygiene (advisory)
     living_scan = Path(r"D:\HermesData\scripts") / "vault_living_unresolved_scan.py"
     living_unresolved = None
     if living_scan.is_file():
@@ -163,7 +163,7 @@ def main() -> int:
     else:
         print("living_unresolved_scan=skip (script missing)")
 
-    # 4) Optional deeper link audit if present — advisory
+    # 4) Optional deeper link audit if present ? advisory
     deep = VAULT / "scripts" / "vault_link_audit.py"
     if deep.is_file():
         deep_r = _run("vault_link_audit", [py, str(deep)], timeout=600)
@@ -189,7 +189,7 @@ def main() -> int:
         ],
         "soft_fail": True,
         "seal": "2026-07-19-hygiene-living-unresolved",
-        "note": "ACT path is vault_gardener_tick @05:15 — this job never moves notes. Living unresolved = CNS hygiene truth surface.",
+        "note": "ACT path is vault_gardener_tick @05:15 ? this job never moves notes. Living unresolved = CNS hygiene truth surface.",
     }
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     _write_receipt(payload)

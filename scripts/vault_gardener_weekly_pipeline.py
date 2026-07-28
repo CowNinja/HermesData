@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Weekly vault gardener pipeline (system mechanics — NOT only VaultWalker).
+"""Weekly vault gardener pipeline (system mechanics - NOT only VaultWalker).
 
 Order:
   1) gardener_phase_b_proposals.py  (propose clusters)

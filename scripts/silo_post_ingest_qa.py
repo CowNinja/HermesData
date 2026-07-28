@@ -239,9 +239,9 @@ def main() -> int:
     navy = report["domains"].get("Navy-Service", {})
     ocr = report["ocr"]
     lines = [
-        f"# Post-ingest QA (Kitchen) — {report['at']}",
+        f"# Post-ingest QA (Kitchen) ? {report['at']}",
         "",
-        "**Lane:** land done → cook (fixity · OCR · clean text · train)",
+        "**Lane:** land done ? cook (fixity ? OCR ? clean text ? train)",
         "",
         "## Scoreboard",
         "",
@@ -258,7 +258,7 @@ def main() -> int:
         )
     lines += [
         "",
-        f"**OCR queue:** open **{ocr.get('queue_open')}** · ok_text **{ocr.get('ok_text')}** · thin ok **{ocr.get('thin_ok_text')}**",
+        f"**OCR queue:** open **{ocr.get('queue_open')}** ? ok_text **{ocr.get('ok_text')}** ? thin ok **{ocr.get('thin_ok_text')}**",
         f"**Registry total:** {overall['registry_total']}",
         "",
         "## Issues (inventory)",
@@ -275,10 +275,10 @@ def main() -> int:
         sc = st.get("sidecars") or {}
         if sc.get("media_files") and sc.get("ocr_md", 0) / max(sc["media_files"], 1) < 0.2:
             issues.append(
-                f"- {name}: OCR coverage low on sample ({sc.get('ocr_md')}/{sc.get('media_files')}) — backlog cooking"
+                f"- {name}: OCR coverage low on sample ({sc.get('ocr_md')}/{sc.get('media_files')}) ? backlog cooking"
             )
         if st.get("depth_pct", 0) < 20:
-            issues.append(f"- {name}: depth {st.get('depth_pct')}% — extract/enrich lag (expected while land >> depth)")
+            issues.append(f"- {name}: depth {st.get('depth_pct')}% ? extract/enrich lag (expected while land >> depth)")
     if not issues:
         issues.append("- No critical integrity reds on sample.")
     lines.extend(issues)
@@ -290,7 +290,7 @@ def main() -> int:
         "2. OCR backlog worker priority Medical/Navy (already scored)",
         "3. Requeue thin OCR (<200 chars) for re-ladder",
         "4. Text clean + medical_navy_text_index on new .ocr.md",
-        "5. Zero-byte / fixity_ok=0 → re-pull from G: when source online",
+        "5. Zero-byte / fixity_ok=0 ? re-pull from G: when source online",
         "",
         "[[Operations/Post-Ingest-QA-Repair-Enrichment-CANONICAL-2026-07-13]]",
         "",

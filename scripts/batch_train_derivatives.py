@@ -73,7 +73,7 @@ def mark_skip(src: Path, reason: str) -> None:
 
 
 def candidates_from_ocr_queue(limit: int, root: Path) -> list[Path]:
-    """Prefer ok_text sources that still lack .train.md — O(queue) not O(tree)."""
+    """Prefer ok_text sources that still lack .train.md ? O(queue) not O(tree)."""
     out: list[Path] = []
     if not OCR_DB.is_file():
         return out
@@ -113,7 +113,7 @@ def candidates_from_ocr_queue(limit: int, root: Path) -> list[Path]:
 
 
 def candidates_from_walk(root: Path, limit: int, max_scan: int) -> list[Path]:
-    # 2026-07-18: include takeout/html/email — Google_Backups land wave is mostly .html
+    # 2026-07-18: include takeout/html/email ? Google_Backups land wave is mostly .html
     exts = {".pdf", ".txt", ".md", ".csv", ".json", ".html", ".htm", ".eml", ".msg", ".rtf"}
     gold: list[Path] = []
     other: list[Path] = []
@@ -153,7 +153,7 @@ def candidates_from_registry(root: Path, limit: int) -> list[Path]:
     """Prefer recent unprocessed lands under root (O(registry) not full-tree).
 
     Overnight 2026-07-18 lesson: Google_Backups HTML never hit OCR queue and
-    walk defaulted to Medical-only PDF/txt — train stayed at attempted=0.
+    walk defaulted to Medical-only PDF/txt ? train stayed at attempted=0.
     """
     out: list[Path] = []
     reg = Path(r"D:/HermesData/state/ingest_registry.sqlite3")

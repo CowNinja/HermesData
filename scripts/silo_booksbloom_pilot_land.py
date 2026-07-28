@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Controlled Booksbloom residual pilot — direct to Projects shelf, NO Inbox.
+"""Controlled Booksbloom residual pilot ? direct to Projects shelf, NO Inbox.
 
 Copy-first (evidence zone). Nested under:
   K:/.../Core-Personal/Projects/from-g-drive/Booksbloom/<relpath>
@@ -7,7 +7,7 @@ Copy-first (evidence zone). Nested under:
 Does not purge G:. Dry-run default; --apply to land.
 
 Hang-fix 2026-07-14:
-- Load already-landed source_path set from registry (O(1) skip) — no re-stat of 70k+ dests.
+- Load already-landed source_path set from registry (O(1) skip) ? no re-stat of 70k+ dests.
 - Fast fingerprint (size+mtime+first 4MB) instead of full-file SHA for land speed.
 - Skip junk tree segments (AppData, caches, node_modules, browser profiles).
 """
@@ -76,7 +76,7 @@ def is_junk_rel(rel: Path) -> bool:
 
 
 def fast_fp(p: Path, head: int = 4 * 1024 * 1024) -> str | None:
-    """size + mtime + first 4MB — enough for land dedup, not full hash tax."""
+    """size + mtime + first 4MB ? enough for land dedup, not full hash tax."""
     try:
         st = p.stat()
         h = hashlib.sha256()
@@ -212,7 +212,7 @@ def main() -> int:
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text(
-        f"""# Booksbloom pilot — {now}
+        f"""# Booksbloom pilot ? {now}
 
 | | |
 |--|--|
@@ -224,7 +224,7 @@ def main() -> int:
 | Errors | {errors} |
 | Landed set size | {len(landed)} |
 | Dest | `{DEST_ROOT}` |
-| Rule | **No Inbox** · copy-first · nested origin · junk-skip default |
+| Rule | **No Inbox** ? copy-first ? nested origin ? junk-skip default |
 """,
         encoding="utf-8",
     )

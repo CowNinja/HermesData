@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-time env consolidation — merge live .env files into D:\\HermesData\\.env.
+"""One-time env consolidation ? merge live .env files into D:\\HermesData\\.env.
 
 Archival copies under Backups/ and state-snapshots/ are backed up but not merged.
 Never prints secret values.
@@ -86,7 +86,7 @@ def write_canonical(merged: Dict[str, str], template: Path) -> None:
             else:
                 lines.append(line)
     else:
-        lines.append("# Hermes canonical environment — D:\\HermesData\\.env")
+        lines.append("# Hermes canonical environment ? D:\\HermesData\\.env")
         lines.append(f"# Consolidated {datetime.now().isoformat(timespec='seconds')}")
         lines.append("")
 

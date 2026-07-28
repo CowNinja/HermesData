@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-A-Evolve Engine v2 — First-Principles Self-Improvement Loop
+A-Evolve Engine v2 - First-Principles Self-Improvement Loop
 
-Architecture: Observe → Diagnose → Mutate → Gate → Commit
+Architecture: Observe -> Diagnose -> Mutate -> Gate -> Commit
 Research basis: Voyager, A-Evolve, SkillForge, SkillAudit, SkillOpt, R-Zero
 
 Key design decisions:
   - Bounded edits only (never full rewrite)
-  - Diagnosis before prescription (5 failure modes → 4 strategies)
+  - Diagnosis before prescription (5 failure modes -> 4 strategies)
   - 3-layer gate (pre-check, benchmark, structural)
   - EGL convergence detection
   - Every mutation reversible via git snapshot
@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# ─── Configuration ───────────────────────────────────────────────────────────
+# --- Configuration -----------------------------------------------------------
 
 SCRIPTS_DIR = Path(__file__).parent
 SKILLS_DIR = SCRIPTS_DIR.parent / "skills"
@@ -43,7 +43,7 @@ MAX_MUTATION_RATIO = 0.20  # Mutation can add at most 20% of file size
 CONVERGENCE_EGL = 0.02     # EGL below this for N cycles = converged
 CONVERGENCE_PATIENCE = 3   # Cycles below threshold before convergence
 
-# Failure mode → strategy mapping
+# Failure mode -> strategy mapping
 FAILURE_MODES = {
     "knowledge_gap": {
         "signal": "mentions concepts without defining them",
@@ -99,7 +99,7 @@ _FILLER_WORDS = {
 }
 
 
-# ─── State Management ────────────────────────────────────────────────────────
+# --- State Management --------------------------------------------------------
 
 def load_state() -> dict:
     """Load evolution state from disk."""
@@ -127,7 +127,7 @@ def save_state(state: dict):
     STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
-# ─── Episodic Memory ──────────────────────────────────────────────────────────
+# --- Episodic Memory ----------------------------------------------------------
 
 EPISODIC_FILE = EVO_DIR / "episodic.jsonl"
 
@@ -158,7 +158,7 @@ def load_episodic_memory() -> dict[str, int]:
     return failures
 
 
-# ─── Mutation Budget / Convergence ────────────────────────────────────────────
+# --- Mutation Budget / Convergence --------------------------------------------
 
 MAX_MUTATIONS_PER_SKILL = 5       # Hard cap on total mutations per skill
 MIN_DELTA_TO_KEEP_BUDGET = 0.01   # Delta below this consumes budget without improvement
@@ -198,7 +198,7 @@ def get_strategy_blacklist(episodic_failures: dict[str, int], threshold: int = 2
     return {s for s, c in episodic_failures.items() if c >= threshold}
 
 
-# ─── Benchmark Suite ─────────────────────────────────────────────────────────
+# --- Benchmark Suite ---------------------------------------------------------
 
 def run_benchmarks(skill_path: Path) -> dict[str, float]:
     """
@@ -281,7 +281,7 @@ def run_benchmarks(skill_path: Path) -> dict[str, float]:
                             results[f"{prefix}_{k}"] = v
                 del spec  # Cleanup module cache
             except Exception as e:
-                print(f"    ⚠️  Domain benchmark {bench_file.name}: {e}")
+                print(f"    [WARN]  Domain benchmark {bench_file.name}: {e}")
     
     return results
 
@@ -289,7 +289,7 @@ def run_benchmarks(skill_path: Path) -> dict[str, float]:
 def _walk_skills(skills_dir: Path) -> list[tuple[str, Path]]:
     """Recursively walk subdirectories and return (skill_name, skimmd_path) pairs.
     
-    Discovers skills at any nesting depth — both top-level (skills/foo/SKILL.md)
+    Discovers skills at any nesting depth - both top-level (skills/foo/SKILL.md)
     and nested under category dirs (skills/mlops/foo/SKILL.md). Skips known
     non-skill files (.bundled_manifest, .curator_state, etc.) and dirs that
     don't contain a SKILL.md.
@@ -298,12 +298,12 @@ def _walk_skills(skills_dir: Path) -> list[tuple[str, Path]]:
     for entry in sorted(skills_dir.iterdir()):
         if not entry.is_dir():
             continue
-        # Direct child — top-level skill
+        # Direct child - top-level skill
         md = entry / "SKILL.md"
         if md.exists():
             found.append((entry.name, md))
             continue
-        # Category dir — walk subdirs for nested skills
+        # Category dir - walk subdirs for nested skills
         for sub in sorted(entry.iterdir()):
             if sub.is_dir():
                 sub_md = sub / "SKILL.md"
@@ -349,7 +349,7 @@ def compute_overall_score(benchmarks: dict[str, float]) -> float:
     return sum(benchmarks.get(k, 0) * w for k, w in weights.items())
 
 
-# ─── Diagnosis Engine ────────────────────────────────────────────────────────
+# --- Diagnosis Engine --------------------------------------------------------
 
 def diagnose_skill(skill_name: str, benchmarks: dict[str, float], content: str) -> dict:
     """
@@ -433,7 +433,7 @@ def diagnose_skill(skill_name: str, benchmarks: dict[str, float], content: str) 
     }
 
 
-# ─── Mutation Strategies ─────────────────────────────────────────────────────
+# --- Mutation Strategies -----------------------------------------------------
 
 def _is_generic_content(text: str) -> bool:
     """Check if text is generic filler (tautology detection)."""
@@ -462,10 +462,10 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
     """
     name_lower = skill_name.lower()
     
-    # Domain keyword mapping — single-quoted to avoid ** conflicts
+    # Domain keyword mapping - single-quoted to avoid ** conflicts
     # Covers all ~60 skill domains in the inventory
     domain_keywords = {
-        # ─── Infrastructure / DevOps ──────────────────────────────────────
+        # --- Infrastructure / DevOps --------------------------------------
         'backup': ['- **Snapshot**: Point-in-time copy of data for recovery',
                  '- **Retention**: Policy defining how long backups are kept',
                  '- **Integrity**: Checksum/validation to verify backup completeness',
@@ -487,7 +487,7 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                    '- **Escalation**: Procedure when automated recovery fails',
                    '- **Watchdog**: Process that monitors and restarts failed daemons'],
         
-        # ─── Data / Pipeline ──────────────────────────────────────────────
+        # --- Data / Pipeline ----------------------------------------------
         'data': ['- **Schema**: Structure definition for data validation',
                  '- **Pipeline**: Sequence of data transformation steps',
                  '- **Ingestion**: Process of importing data from sources',
@@ -505,7 +505,7 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                    '- **ANN**: Approximate Nearest Neighbor search algorithm',
                    '- **Dimensionality**: Number of components in the embedding vector'],
         
-        # ─── GitHub / Version Control ──────────────────────────────────────
+        # --- GitHub / Version Control --------------------------------------
         'git': ['- **Branch**: Divergent line of development',
                 '- **Commit**: Snapshot of changes with metadata',
                 '- **PR (Pull Request)**: Proposed changes for review',
@@ -519,9 +519,9 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                     '- **Rollback**: Revert to previous known-good version',
                     '- **Tag**: Named reference to specific commit'],
         
-        # ─── AI / ML / Model Management ────────────────────────────────────
+        # --- AI / ML / Model Management ------------------------------------
         'model': ['- **Inference**: Forward pass through a neural network',
-                  '- **Quantization**: Reducing precision (FP16→INT4) for speed',
+                  '- **Quantization**: Reducing precision (FP16->INT4) for speed',
                   '- **Context Window**: Max tokens the model can process',
                   '- **VRAM**: GPU memory required to load and run the model'],
         'llm': ['- **Prompt**: Input text conditioning model output',
@@ -541,7 +541,7 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                       '- **KV-Cache**: Stored attention keys/values to avoid recomputation',
                       '- **Batching**: Grouping requests to maximize GPU utilization'],
         
-        # ─── Wisdom / Knowledge / Self-Evaluation ──────────────────────────
+        # --- Wisdom / Knowledge / Self-Evaluation --------------------------
         'wisdom': ['- **Extraction**: Distilling principles from experience',
                    '- **Distillation**: Condensing large content to essentials',
                    '- **Pattern**: Recurring structure across sessions',
@@ -561,7 +561,7 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                         '- **Meta-cognition**: Thinking about thinking patterns',
                         '- **Course Correction**: Adjusting trajectory based on reflection'],
         
-        # ─── Security / Testing ────────────────────────────────────────────
+        # --- Security / Testing --------------------------------------------
         'test': ['- **Assertion**: Condition that must hold true',
                  '- **Fixture**: Fixed baseline for reproducible testing',
                  '- **Mock**: Simulated dependency for isolation',
@@ -574,7 +574,7 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                   '- **Rotation**: Periodic replacement of credentials',
                   '- **Least Privilege**: Granting minimum necessary permissions'],
         
-        # ─── Communication / Social / Web ──────────────────────────────────
+        # --- Communication / Social / Web ----------------------------------
         'post': ['- **Engagement**: Likes, replies, reposts on content',
                  '- **Thread**: Sequence of connected posts',
                  '- **Mention**: Reference to another user via @handle'],
@@ -592,7 +592,7 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                '- **Retweet**: Sharing another user\'s tweet with followers',
                '- **Reply**: Response to a tweet, visible in conversation thread'],
         
-        # ─── Hermes / Agent Infrastructure ─────────────────────────────────
+        # --- Hermes / Agent Infrastructure ---------------------------------
         'hermes': ['- **Skill**: Reusable procedure with frontmatter metadata',
                    '- **Toolset**: Group of related tools available to the agent',
                    '- **Cron**: Scheduled recurring task with prompt + skills',
@@ -609,7 +609,7 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                     '- **Goal decomposition**: Breaking objectives into actionable sub-tasks',
                     '- **Execution discipline**: Completing all steps before reporting success'],
         
-        # ─── Productivity / Notes ──────────────────────────────────────────
+        # --- Productivity / Notes ------------------------------------------
         'obsidian': ['- **Vault**: Root folder containing all notes and config',
                      '- **Wikilink**: Double-bracket syntax `[[note]]` for internal links',
                      '- **Plugin**: Community extension adding functionality',
@@ -619,10 +619,10 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                    '- **WIP Limit**: Max cards in a column to prevent overload',
                    '- **Sprint**: Time-boxed work cycle with defined goals'],
         
-        # ─── Creative / Media ──────────────────────────────────────────────
+        # --- Creative / Media ----------------------------------------------
         'image': ['- **Prompt**: Text description for image generation',
                   '- **Seed**: Random number controlling generation reproducibility',
-                  '- **CFG Scale**: Classifier-Free Guidance — prompt adherence strength',
+                  '- **CFG Scale**: Classifier-Free Guidance - prompt adherence strength',
                   '- **Sampler**: Noise scheduling algorithm (euler, dpmpp)'],
         'comfyui': ['- **Node**: Processing unit in the ComfyUI graph',
                     '- **Workflow**: DAG of nodes defining the image pipeline',
@@ -633,7 +633,7 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                   '- **Timbre**: Tonal quality distinguishing different instruments',
                   '- **Chord Progression**: Sequence of harmonic structures'],
         
-        # ─── Research ──────────────────────────────────────────────────────
+        # --- Research ------------------------------------------------------
         'research': ['- **Peer Review**: Expert evaluation before publication',
                      '- **Reproducibility**: Ability to replicate experimental results',
                      '- **Citation**: Reference to prior work supporting claims',
@@ -642,18 +642,18 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                   '- **Abstract**: Concise summary of the paper\'s contributions',
                   '- **DOI**: Digital Object Identifier for permanent citation'],
         
-        # ─── Smart Home / IoT ──────────────────────────────────────────────
+        # --- Smart Home / IoT ----------------------------------------------
         'home': ['- **Hub**: Central controller coordinating smart devices',
                  '- **Zigbee**: Low-power mesh protocol for IoT devices',
                  '- **Scene**: Predefined configuration of multiple device states',
                  '- **Automation**: Rule: "if sensor X, then action Y"'],
         
-        # ─── Backup / Restore ──────────────────────────────────────────────
+        # --- Backup / Restore ----------------------------------------------
         'restore': ['- **Verification**: Confirming restored data matches source',
                     '- **Point-in-Time**: Restoring to a specific moment, not latest',
                     '- **Partial Restore**: Recovering a subset of data, not everything'],
         
-        # ─── Loop Detection / Anti-Pattern ─────────────────────────────────
+        # --- Loop Detection / Anti-Pattern ---------------------------------
         'loop': ['- **Cycle**: Repeated execution without progress condition',
                  '- **Stagnation**: Agent repeating same approach expecting different result',
                  '- **Escalation Threshold**: Max retries before human intervention required',
@@ -666,7 +666,7 @@ def _get_domain_terms(skill_name: str, desc_lower: str) -> str:
                  '- **Stack Trace**: Call hierarchy showing error origin',
                  '- **Graceful Degradation**: Continuing with reduced functionality after error'],
         
-        # ─── Logging / Resilience ──────────────────────────────────────────
+        # --- Logging / Resilience ------------------------------------------
         'log': ['- **Severity**: Level indicating importance (DEBUG, INFO, WARN, ERROR)',
                 '- **Appender**: Destination where log entries are written',
                 '- **Rotation**: Archiving old logs to prevent disk exhaustion'],
@@ -700,7 +700,7 @@ def generate_mutation(skill_name: str, strategy: str, diagnosis: dict, content: 
     """
     skill_md = resolve_skill_path(skill_name)
     if skill_md is None:
-        print(f"  ⚠️  Cannot generate mutation: skill '{skill_name}' not found on disk")
+        print(f"  [WARN]  Cannot generate mutation: skill '{skill_name}' not found on disk")
         return None
     skill_dir = skill_md.parent
     
@@ -722,7 +722,7 @@ def generate_mutation(skill_name: str, strategy: str, diagnosis: dict, content: 
     }
     
     if strategy == "extend":
-        # Add missing sections — domain-aware content based on skill name/desc
+        # Add missing sections - domain-aware content based on skill name/desc
         sections_to_add = []
         desc_lower = skill_name.replace("-", " ").replace("_", " ")
         
@@ -730,16 +730,16 @@ def generate_mutation(skill_name: str, strategy: str, diagnosis: dict, content: 
             if not re.search(r"^#{1,3}\s+steps", body, re.MULTILINE | re.IGNORECASE):
                 sections_to_add.append(
                     f"## Steps\n\n"
-                    f"1. **Analyze** — Determine the scope and requirements for {desc_lower}\n"
-                    f"2. **Prepare** — Gather necessary inputs, validate preconditions\n"
-                    f"3. **Execute** — Run the core operation using appropriate tools\n"
-                    f"4. **Verify** — Confirm the output matches expected results\n"
-                    f"5. **Log** — Record actions taken for audit trail"
+                    f"1. **Analyze** - Determine the scope and requirements for {desc_lower}\n"
+                    f"2. **Prepare** - Gather necessary inputs, validate preconditions\n"
+                    f"3. **Execute** - Run the core operation using appropriate tools\n"
+                    f"4. **Verify** - Confirm the output matches expected results\n"
+                    f"5. **Log** - Record actions taken for audit trail"
                 )
             if not re.search(r"^#{1,3}\s+pitfall", body, re.MULTILINE | re.IGNORECASE):
                 sections_to_add.append(
                     "## Pitfalls\n\n"
-                    "- Validate all inputs before processing — malformed data should fail fast\n"
+                    "- Validate all inputs before processing - malformed data should fail fast\n"
                     "- Handle concurrent access: lock resources before mutation\n"
                     "- Timeout protection: set max execution time, retry with backoff\n"
                     "- Always log errors with full context for debugging"
@@ -759,10 +759,10 @@ def generate_mutation(skill_name: str, strategy: str, diagnosis: dict, content: 
             sections_to_add.append(
                 f"## Tool Usage\n\n"
                 f"For {desc_lower}, use these tools in sequence:\n\n"
-                f"1. **Inspect** — Use `read_file` or `search_files` to examine current state\n"
-                f"2. **Modify** — Use `patch` or `write_file` for targeted changes\n"
-                f"3. **Validate** — Verify the change with a follow-up read or test\n"
-                f"4. **Document** — Log what changed and why"
+                f"1. **Inspect** - Use `read_file` or `search_files` to examine current state\n"
+                f"2. **Modify** - Use `patch` or `write_file` for targeted changes\n"
+                f"3. **Validate** - Verify the change with a follow-up read or test\n"
+                f"4. **Document** - Log what changed and why"
             )
         
         if sections_to_add:
@@ -790,10 +790,10 @@ def generate_mutation(skill_name: str, strategy: str, diagnosis: dict, content: 
                 f'### Key Concepts\n\n'
                 f'{domain_terms}\n\n'
                 f'### Workflow\n\n'
-                f'1. **Initialize** — Set up config, validate environment\n'
-                f'2. **Execute** — Run core operation with error handling\n'
-                f'3. **Verify** — Check output integrity (checksum, test)\n'
-                f'4. **Log** — Record actions to audit trail with timestamp'
+                f'1. **Initialize** - Set up config, validate environment\n'
+                f'2. **Execute** - Run core operation with error handling\n'
+                f'3. **Verify** - Check output integrity (checksum, test)\n'
+                f'4. **Log** - Record actions to audit trail with timestamp'
             )
             mutation.update({
                 "edit_type": "append",
@@ -844,7 +844,7 @@ def generate_mutation(skill_name: str, strategy: str, diagnosis: dict, content: 
             return mutation
     
     elif strategy == "actionability_patch":
-        # Inject concrete executable examples — code blocks, CLI commands, tool calls
+        # Inject concrete executable examples - code blocks, CLI commands, tool calls
         desc_lower = skill_name.replace("-", " ").replace("_", " ")
         # Map skill domains to realistic tool/command examples
         examples = _get_actionability_examples(skill_name, desc_lower)
@@ -866,7 +866,7 @@ def _get_actionability_examples(skill_name: str, desc_lower: str) -> str | None:
     """Generate domain-appropriate executable examples (code blocks, CLI, tool calls).
     
     Returns markdown-formatted examples section content, or None if no examples match.
-    Injects concrete commands, tool call patterns, and file paths — the elements
+    Injects concrete commands, tool call patterns, and file paths - the elements
     that the actionability benchmark measures.
     """
     name_lower = skill_name.lower()
@@ -939,7 +939,7 @@ def _get_actionability_examples(skill_name: str, desc_lower: str) -> str | None:
     return fallback
 
 
-# ─── Gate (3-Layer) ──────────────────────────────────────────────────────────
+# --- Gate (3-Layer) ----------------------------------------------------------
 
 def gate_pre_check(mutation: dict, content: str) -> tuple[bool, str]:
     """
@@ -1019,9 +1019,9 @@ def gate_benchmark(
             continue
         new_score = new_benchmarks.get(bench, 0)
         if new_score < old_score - REGRESSION_TOLERANCE:
-            return False, f"Regression on '{bench}': {old_score:.3f} → {new_score:.3f}", new_benchmarks
+            return False, f"Regression on '{bench}': {old_score:.3f} -> {new_score:.3f}", new_benchmarks
     
-    return True, f"Target '{target_benchmark}' improved {old_target:.3f} → {new_target:.3f} (Δ={delta:.3f})", new_benchmarks
+    return True, f"Target '{target_benchmark}' improved {old_target:.3f} -> {new_target:.3f} (?={delta:.3f})", new_benchmarks
 
 
 def resolve_skill_path(skill_name: str, skill_map: dict[str, Path] = None) -> Path | None:
@@ -1071,7 +1071,7 @@ def gate_structural(skill_name: str) -> tuple[bool, str]:
     # Check 3: Extract frontmatter and validate as YAML
     fm_text = "\n".join(lines[1:closing_pos])
     import re
-    # Check for merged frontmatter separators — the critical bug that corrupted
+    # Check for merged frontmatter separators - the critical bug that corrupted
     # monitoring-dashboard-summary. Valid YAML allows empty values (e.g. `metadata:`).
     for fm_line in fm_text.split("\n"):
         if ":" in fm_line:
@@ -1096,14 +1096,14 @@ def gate_structural(skill_name: str) -> tuple[bool, str]:
     return True, "Structural check passed"
 
 
-# ─── Commit ──────────────────────────────────────────────────────────────────
+# --- Commit ------------------------------------------------------------------
 
 def commit_mutation(skill_name: str, mutation: dict, new_benchmarks: dict):
-    """Finalize mutation — file already has mutation applied from Layer 3 check.
+    """Finalize mutation - file already has mutation applied from Layer 3 check.
     Only bumps version and logs. Does NOT re-apply edit to avoid duplication."""
     skill_md = resolve_skill_path(skill_name)
     if skill_md is None:
-        print(f"  ⚠️  Cannot commit mutation for '{skill_name}': skill not found on disk")
+        print(f"  [WARN]  Cannot commit mutation for '{skill_name}': skill not found on disk")
         return
     new_content = skill_md.read_text(encoding="utf-8")
     
@@ -1134,7 +1134,7 @@ def commit_mutation(skill_name: str, mutation: dict, new_benchmarks: dict):
     with open(MUTATIONS_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(log_entry) + "\n")
     
-    print(f"  ✅ COMMITTED: {skill_name} via {mutation['strategy']} ({mutation['diagnosis']})")
+    print(f"  [OK] COMMITTED: {skill_name} via {mutation['strategy']} ({mutation['diagnosis']})")
 
 
 def log_gate_result(skill_name: str, layer: str, passed: bool, reason: str, benchmarks: dict = None):
@@ -1170,7 +1170,7 @@ def log_gate_result(skill_name: str, layer: str, passed: bool, reason: str, benc
         f.write(json.dumps(entry) + "\n")
 
 
-# ─── Snapshot & Rollback ─────────────────────────────────────────────────────
+# --- Snapshot & Rollback -----------------------------------------------------
 
 def snapshot_skill(skill_name: str, cycle: int) -> Path:
     """Create a pre-mutation snapshot."""
@@ -1188,13 +1188,13 @@ def rollback_skill(skill_name: str, cycle: int):
     if snap_path.exists():
         skill_md = resolve_skill_path(skill_name)
         if skill_md is None:
-            print(f"  ⚠️  Cannot rollback '{skill_name}': skill directory missing on disk")
+            print(f"  [WARN]  Cannot rollback '{skill_name}': skill directory missing on disk")
             return
         skill_md.write_text(snap_path.read_text(encoding="utf-8"), encoding="utf-8")
-        print(f"  ↩️  ROLLED BACK: {skill_name} to snapshot {snap_path.name}")
+        print(f"  ??  ROLLED BACK: {skill_name} to snapshot {snap_path.name}")
 
 
-# ─── EGL Convergence ─────────────────────────────────────────────────────────
+# --- EGL Convergence ---------------------------------------------------------
 
 def update_egl(state: dict, skill_name: str, old_score: float, new_score: float) -> bool:
     """
@@ -1221,28 +1221,28 @@ def update_egl(state: dict, skill_name: str, old_score: float, new_score: float)
     return False
 
 
-# ─── Main Evolution Loop ─────────────────────────────────────────────────────
+# --- Main Evolution Loop -----------------------------------------------------
 
 def run_cycle(state: dict, dry_run: bool = False) -> dict:
     """
     Run one full evolution cycle.
     
-    Phases: Observe → Diagnose → Mutate → Gate → Commit
+    Phases: Observe -> Diagnose -> Mutate -> Gate -> Commit
     """
     state["cycle"] += 1
     cycle = state["cycle"]
     
     print(f"\n{'='*60}")
-    print(f"  A-Evolve v2 — Cycle #{cycle}")
+    print(f"  A-Evolve v2 - Cycle #{cycle}")
     print(f"  Mode: {'DRY RUN' if dry_run else 'LIVE'}")
     print(f"{'='*60}")
     
-    # Phase 0a: ORPHAN CLEANUP — remove skills from state that no longer exist
-    print("\n🧹 Phase 0a: Cleanup — Checking for orphaned skills...")
+    # Phase 0a: ORPHAN CLEANUP - remove skills from state that no longer exist
+    print("\n? Phase 0a: Cleanup - Checking for orphaned skills...")
     state = cleanup_orphan_skills(state)
     save_state(state)
     
-    # Phase 0: REGRESSION CHECK ───────────────────────────────────────
+    # Phase 0: REGRESSION CHECK ---------------------------------------
     # If a previous mutation caused overall score to drop, auto-rollback
     post_scores = state.get("post_mutation_scores", {})
     if post_scores:
@@ -1251,25 +1251,25 @@ def run_cycle(state: dict, dry_run: bool = False) -> dict:
             if skill_name in all_current:
                 current_score = compute_overall_score(all_current[skill_name])
                 if current_score < expected_score - REGRESSION_TOLERANCE:
-                    print(f"\n⚠️  REGRESSION DETECTED: {skill_name} dropped {expected_score:.3f} → {current_score:.3f}")
+                    print(f"\n[WARN]  REGRESSION DETECTED: {skill_name} dropped {expected_score:.3f} -> {current_score:.3f}")
                     if not dry_run:
                         # Find the cycle we snapshotted at
                         snap = SNAPSHOTS_DIR / f"{skill_name}-evo-{cycle - 1}.md"
                         if snap.exists():
                             rollback_skill(skill_name, cycle - 1)
                             del post_scores[skill_name]
-                            print(f"  ↩️  Auto-rolled back {skill_name}")
+                            print(f"  ??  Auto-rolled back {skill_name}")
     
-    # ─── Phase 1: OBSERVE ────────────────────────────────────────────────
-    print("\n📊 Phase 1: Observe — Running benchmarks...")
+    # --- Phase 1: OBSERVE ------------------------------------------------
+    print("\n? Phase 1: Observe - Running benchmarks...")
     
     # Load episodic memory to blacklist failing strategies
     episodic_failures = load_episodic_memory()
     strategy_blacklist = get_strategy_blacklist(episodic_failures)
     if strategy_blacklist:
-        print(f"  🧠 Episodic memory: {len(episodic_failures)} failed strategies blacklisted")
+        print(f"  ? Episodic memory: {len(episodic_failures)} failed strategies blacklisted")
         for s in sorted(strategy_blacklist):
-            print(f"     ✗ {s}: {episodic_failures[s]} failures")
+            print(f"     [FAIL] {s}: {episodic_failures[s]} failures")
     
     all_benchmarks = run_all_skills_benchmark()
     
@@ -1293,14 +1293,14 @@ def run_cycle(state: dict, dry_run: bool = False) -> dict:
     
     print(f"  Target: {target_skill} (overall={target_score:.3f})")
     for bench, score in sorted(target_benchmarks.items(), key=lambda x: x[1]):
-        indicator = "⚠️" if score < 0.4 else "✓" if score > 0.7 else "·"
+        indicator = "[WARN]" if score < 0.4 else "[OK]" if score > 0.7 else "?"
         print(f"    {indicator} {bench}: {score:.3f}")
     
-    # ─── Phase 2: DIAGNOSE ───────────────────────────────────────────────
-    print(f"\n🔍 Phase 2: Diagnose — Analyzing {target_skill}...")
+    # --- Phase 2: DIAGNOSE -----------------------------------------------
+    print(f"\n[search] Phase 2: Diagnose - Analyzing {target_skill}...")
     skill_md = resolve_skill_path(target_skill)
     if skill_md is None:
-        print(f"  ⚠️  Cannot diagnose '{target_skill}': skill not found on disk")
+        print(f"  [WARN]  Cannot diagnose '{target_skill}': skill not found on disk")
         return state
     content = skill_md.read_text(encoding="utf-8")
     
@@ -1324,15 +1324,15 @@ def run_cycle(state: dict, dry_run: bool = False) -> dict:
             diagnosis["primary_mode"] = fallback_diagnoses[0]["mode"]
             diagnosis["strategy"] = FAILURE_MODES[fallback_diagnoses[0]["mode"]]["strategy"]
             diagnosis["confidence"] = fallback_diagnoses[0]["confidence"]
-            print(f"  ⛔ Strategy '{FAILURE_MODES[prev]['strategy']}' blacklisted by episodic memory")
-            print(f"     Fallback: {diagnosis['primary_mode']} → '{diagnosis['strategy']}'")
+            print(f"  ? Strategy '{FAILURE_MODES[prev]['strategy']}' blacklisted by episodic memory")
+            print(f"     Fallback: {diagnosis['primary_mode']} -> '{diagnosis['strategy']}'")
     
     # Save diagnosis
     diag_path = DIAGNOSIS_DIR / f"{target_skill}-cycle-{cycle}.json"
     diag_path.write_text(json.dumps(diagnosis, indent=2), encoding="utf-8")
     
-    # ─── Phase 3: MUTATE ─────────────────────────────────────────────────
-    print(f"\n🧬 Phase 3: Mutate — Generating {diagnosis['strategy']} mutation...")
+    # --- Phase 3: MUTATE -------------------------------------------------
+    print(f"\n? Phase 3: Mutate - Generating {diagnosis['strategy']} mutation...")
     mutation = generate_mutation(target_skill, diagnosis["strategy"], diagnosis, content)
     
     if not mutation:
@@ -1347,13 +1347,13 @@ def run_cycle(state: dict, dry_run: bool = False) -> dict:
     
     state["mutations_attempted"] += 1
 
-    # ─── Phase 4: GATE ───────────────────────────────────────────────────
-    print(f"\n🚦 Phase 4: Gate — 3-layer validation...")
+    # --- Phase 4: GATE ---------------------------------------------------
+    print(f"\n? Phase 4: Gate - 3-layer validation...")
     
     # Layer 1: Pre-check
     pre_passed, pre_reason = gate_pre_check(mutation, content)
     log_gate_result(target_skill, "pre_check", pre_passed, pre_reason)
-    print(f"  Layer 1 (Pre-check): {'✅' if pre_passed else '❌'} {pre_reason}")
+    print(f"  Layer 1 (Pre-check): {'[OK]' if pre_passed else '[FAIL]'} {pre_reason}")
     
     if not pre_passed:
         state["mutations_rejected"] += 1
@@ -1375,7 +1375,7 @@ def run_cycle(state: dict, dry_run: bool = False) -> dict:
         target_skill, mutation, target_benchmarks, target_benchmark
     )
     log_gate_result(target_skill, "benchmark", bench_passed, bench_reason, new_benchmarks)
-    print(f"  Layer 2 (Benchmark): {'✅' if bench_passed else '❌'} {bench_reason}")
+    print(f"  Layer 2 (Benchmark): {'[OK]' if bench_passed else '[FAIL]'} {bench_reason}")
     
     if not bench_passed:
         state["mutations_rejected"] += 1
@@ -1394,23 +1394,23 @@ def run_cycle(state: dict, dry_run: bool = False) -> dict:
     
     struct_passed, struct_reason = gate_structural(target_skill)
     log_gate_result(target_skill, "structural", struct_passed, struct_reason)
-    print(f"  Layer 3 (Structural): {'✅' if struct_passed else '❌'} {struct_reason}")
+    print(f"  Layer 3 (Structural): {'[OK]' if struct_passed else '[FAIL]'} {struct_reason}")
     
     if not struct_passed:
         # Rollback
         skill_md.write_text(content, encoding="utf-8")
-        print(f"  ↩️  Rolled back due to structural failure")
+        print(f"  ??  Rolled back due to structural failure")
         state["mutations_rejected"] += 1
         return state
 
     if dry_run:
-        print(f"\n  🔒 DRY RUN — mutation gated and bench-verified but NOT committed")
+        print(f"\n  ? DRY RUN - mutation gated and bench-verified but NOT committed")
         # Rollback temp write from Layer 3 structural check
         skill_md.write_text(content, encoding="utf-8")
         return state
 
-    # ─── Phase 5: COMMIT ────────────────────────────────────────────────
-    print(f"\n💾 Phase 5: Commit — Finalizing mutation...")
+    # --- Phase 5: COMMIT ------------------------------------------------
+    print(f"\n? Phase 5: Commit - Finalizing mutation...")
     
     # Snapshot first (for potential rollback)
     snapshot_skill(target_skill, cycle)
@@ -1423,7 +1423,7 @@ def run_cycle(state: dict, dry_run: bool = False) -> dict:
     converged = update_egl(state, target_skill, target_score, new_overall)
     
     if converged:
-        print(f"  🎯 CONVERGED: {target_skill} (EGL below threshold)")
+        print(f"  [target] CONVERGED: {target_skill} (EGL below threshold)")
         state.setdefault("skills_converged", []).append(target_skill)
     
     state["mutations_accepted"] += 1
@@ -1431,13 +1431,13 @@ def run_cycle(state: dict, dry_run: bool = False) -> dict:
     # Post-mutation scores for next-cycle regression check
     state.setdefault("post_mutation_scores", {})[target_skill] = new_overall
     
-    print(f"\n  Cycle #{cycle} complete: {target_skill} {target_score:.3f} → {new_overall:.3f}")
+    print(f"\n  Cycle #{cycle} complete: {target_skill} {target_score:.3f} -> {new_overall:.3f}")
     
-    # Check mutation budget — freeze if over budget or no improvement in 3 runs
+    # Check mutation budget - freeze if over budget or no improvement in 3 runs
     delta = new_overall - target_score
     over_budget = check_mutation_budget(state, target_skill, delta)
     if over_budget:
-        print(f"  🧊 FREEZING {target_skill} — mutation budget exhausted ({state['mutation_budget'][target_skill]['count']} mutations)")
+        print(f"  ? FREEZING {target_skill} - mutation budget exhausted ({state['mutation_budget'][target_skill]['count']} mutations)")
         state.setdefault("skills_frozen", []).append(target_skill)
     
     return state
@@ -1463,7 +1463,7 @@ def cleanup_orphan_skills(state: dict) -> dict:
             with open(MUTATIONS_LOG, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry) + "\n")
             del state["egl_history"][skill_name]
-            print(f"  🧹 Cleaned: {skill_name} removed from egl_history (orphaned)")
+            print(f"  ? Cleaned: {skill_name} removed from egl_history (orphaned)")
     
     # Check converged/frozen skills
     for key in ("skills_converged", "skills_frozen"):
@@ -1476,13 +1476,13 @@ def cleanup_orphan_skills(state: dict) -> dict:
     
     # Clear last_target if orphaned
     if state.get("last_target") and state["last_target"] not in live_skills:
-        print(f"  🧹 Cleared last_target: {state['last_target']} (orphaned)")
+        print(f"  ? Cleared last_target: {state['last_target']} (orphaned)")
         state["last_target"] = None
     
     return state
 
 
-# ─── CLI ─────────────────────────────────────────────────────────────────────
+# --- CLI ---------------------------------------------------------------------
 
 def ensure_dirs():
     """Create required directories."""
@@ -1492,7 +1492,7 @@ def ensure_dirs():
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="A-Evolve v2 — Self-improving skill evolution")
+    parser = argparse.ArgumentParser(description="A-Evolve v2 - Self-improving skill evolution")
     parser.add_argument("--cycle", action="store_true", help="Run one evolution cycle")
     parser.add_argument("--dry-run", action="store_true", help="Don't apply mutations")
     parser.add_argument("--benchmark", action="store_true", help="Run benchmarks only")
@@ -1519,7 +1519,7 @@ def main():
             overall = compute_overall_score(benchmarks)
             print(f"{skill:40s} overall={overall:.3f}")
             for bench, score in sorted(benchmarks.items(), key=lambda x: x[1]):
-                bar = "█" * int(score * 20) + "░" * (20 - int(score * 20))
+                bar = "?" * int(score * 20) + "?" * (20 - int(score * 20))
                 print(f"  {bench:20s} {bar} {score:.3f}")
             print()
         return

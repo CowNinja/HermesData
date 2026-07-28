@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unprocessed triage — bucket sample for depth planning (no OCR thrash)."""
+"""Unprocessed triage ? bucket sample for depth planning (no OCR thrash)."""
 from __future__ import annotations
 
 import json
@@ -20,7 +20,7 @@ OFF = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"}
 CODE = {".py", ".js", ".ts", ".sql", ".db", ".sqlite", ".bin", ".exe", ".dll"}
 
 ACTIONS = {
-    "native_text": "status batch → train",
+    "native_text": "status batch ? train",
     "office_pdf": "extract/OCR if Medical-Navy gold else defer",
     "image": "OCR queue only gold; else skip/catalog",
     "audio_video": "STT ladder / catalog-only",
@@ -106,7 +106,7 @@ def main() -> int:
     JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     lines = [
-        f"# Unprocessed triage — {payload['at']}",
+        f"# Unprocessed triage ? {payload['at']}",
         "",
         f"**Sampled unprocessed rows:** {scanned} (cap 8000)",
         "",
@@ -138,7 +138,7 @@ def main() -> int:
         "",
         f"JSON: `{JSON}`",
         "",
-        "Research: post-OCR twin canon — do not OCR-all; bucket first.",
+        "Research: post-OCR twin canon ? do not OCR-all; bucket first.",
         "[[Operations/logs/next-five-primary-actions-2026-07-18]]",
         "",
     ]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Single-pulse kitchen scoreboard — one JSON/MD snapshot for Discord or vault.
+"""Single-pulse kitchen scoreboard ? one JSON/MD snapshot for Discord or vault.
 
 Post-OCR era: includes twin depth (derivative_ok, med index, k_light, BB, OCR open).
 No LLM. Safe to run every tick.
@@ -130,7 +130,7 @@ def main() -> int:
     RECEIPT_JSON.write_text(json.dumps(snap, indent=2), encoding="utf-8")
     RECEIPT_MD.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT_MD.write_text(
-        f"""# Silo scoreboard pulse — {snap['at']}
+        f"""# Silo scoreboard pulse ? {snap['at']}
 
 | Metric | Value |
 |--------|------:|

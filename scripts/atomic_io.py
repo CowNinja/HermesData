@@ -2,13 +2,13 @@
 """Shared atomic publish helpers for kitchen receipts.
 
 Research / sources (2026-07-19 overnight):
-- Python os.replace — atomic on same volume (POSIX rename; Windows ReplaceFile).
-- Prior jan_unified incident: open(target, "w") truncated mid-build → 0-byte SSOT.
+- Python os.replace ? atomic on same volume (POSIX rename; Windows ReplaceFile).
+- Prior jan_unified incident: open(target, "w") truncated mid-build ? 0-byte SSOT.
 - Local parity: jan_unified_index._atomic_write_jsonl, vaultwalker._atomic_write_text,
   sovereign_ops_pulse._atomic_write_text, single_gateway tmp.replace.
 
 Contract:
-  write complete .tmp → flush/fsync → os.replace(tmp, target)
+  write complete .tmp ? flush/fsync ? os.replace(tmp, target)
   On Windows lock (PermissionError/OSError): copy2 over target only AFTER tmp is complete.
   Never open(target, "w") first. Refuse tiny publishes when min_bytes set.
   Returns method string for forensics ("os.replace" | "copy2_fallback").

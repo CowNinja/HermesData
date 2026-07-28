@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Full rebuild of Jan Bloom author corpus — clean extract + inventory.
+"""Full rebuild of Jan Bloom author corpus ? clean extract + inventory.
 
 Priority: WSWTR folder (all files), Keepers handouts, known top-level WSWTR docs.
 .wpd: improved binary text recovery (WordPerfect is messy; best-effort).
@@ -320,17 +320,17 @@ def main() -> int:
     (SHELF / "00-INDEX.md").write_text(
         "\n".join(
             [
-                "# Jan Bloom Author — corpus shelf",
+                "# Jan Bloom Author ? corpus shelf",
                 "",
                 f"**Updated:** {utc()}",
-                f"**Sources:** {len(sources)} · **Extracted:** {extracted} · **Chars:** {chars}",
+                f"**Sources:** {len(sources)} ? **Extracted:** {extracted} ? **Chars:** {chars}",
                 f"**Methods:** {methods}",
                 "",
                 "Tags: `jan-author` `wswtr` `keepers` `booksbloom`",
                 "",
                 "Goal: [[Operations/GOAL-Talk-to-Jan-Writing-Agent-2026-07-14]]",
                 "SOUL: [[Operations/SOUL-Jan-Library-Agent-2026-07-14]]",
-                "CLI: `python D:/HermesData/scripts/talk_to_jan.py \"…\"`",
+                "CLI: `python D:/HermesData/scripts/talk_to_jan.py \"?\"`",
                 "",
             ]
         ),

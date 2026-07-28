@@ -69,9 +69,9 @@ def index_shelf(rel: str, max_scan: int = 25000) -> dict:
     lines = [
         f"# {rel}",
         "",
-        f"_Auto index — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
+        f"_Auto index ? {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
         "",
-        "**Access:** catalog-first — `python D:/HermesData/scripts/silo_retrieve.py \"…\"` or ask Hermes.",
+        "**Access:** catalog-first ? `python D:/HermesData/scripts/silo_retrieve.py \"?\"` or ask Hermes.",
         "**Layout:** nested `from-g-drive/<origin tree>/` (copy directory structure; open taxonomy).",
         "",
         f"- files (approx): **{files}**{approx_note}",

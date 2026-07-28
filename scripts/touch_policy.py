@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve path → data class from touch_policy_registry.json."""
+"""Resolve path ? data class from touch_policy_registry.json."""
 from __future__ import annotations
 
 import json
@@ -25,7 +25,7 @@ def classify(path: str | Path, reg: dict | None = None) -> tuple[int, str]:
             best_len = len(pref)
     if best:
         return int(best["class"]), best.get("note", "")
-    return int(reg.get("default_unknown", 3)), "unknown→default"
+    return int(reg.get("default_unknown", 3)), "unknown?default"
 
 
 def main() -> int:

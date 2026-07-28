@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Phronesis Vault Gardener — full autonomy suite (periodic).
+"""Phronesis Vault Gardener ? full autonomy suite (periodic).
 
 Captures the human+Hermes workflow as one repeatable pipeline:
 
-  A. Integrity   — zero-newline scan (report)
-  B. Proposals   — Phase B cluster report
-  C. Safe auto-distill — only known noise classes (optional --execute-safe)
-  D. Wikilinks   — repair after moves
-  E. Indexes     — refresh + fill missing 00-INDEX maps
-  F. Status      — thin orchestrator + receipt in vault
+  A. Integrity   ? zero-newline scan (report)
+  B. Proposals   ? Phase B cluster report
+  C. Safe auto-distill ? only known noise classes (optional --execute-safe)
+  D. Wikilinks   ? repair after moves
+  E. Indexes     ? refresh + fill missing 00-INDEX maps
+  F. Status      ? thin orchestrator + receipt in vault
 
 Design:
   - Daily: call with --mode daily (integrity + indexes light + status)
   - Weekly: --mode weekly (all of the above + proposals + safe execute)
-  - VaultWalker stays SEPARATE (daily dry walk) — see automation system doc.
+  - VaultWalker stays SEPARATE (daily dry walk) ? see automation system doc.
 
 Usage:
   python vault_gardener_autonomy_suite.py --mode weekly --execute-safe
@@ -98,7 +98,7 @@ def main() -> int:
         r_drain = run_script("g_to_k_drain_autonomous.py", timeout=900)
         if r_drain.get("exit") in (1, 124):
             r_drain["exit"] = 0
-            r_drain["out"] = (r_drain.get("out") or "") + "\n[soft] G→K autonomous wave non-fatal (kitchen continuous owns land)"
+            r_drain["out"] = (r_drain.get("out") or "") + "\n[soft] G?K autonomous wave non-fatal (kitchen continuous owns land)"
         results.append(r_drain)
         results.append(run_script("backup_layers_status.py", timeout=60))
         results.append(run_script("k_test_ingest_domain_propose.py", timeout=180))
@@ -146,7 +146,7 @@ def main() -> int:
             r_wiki["out"] = (r_wiki.get("out") or "") + "\n[soft] wikilink repair timeout non-fatal"
         results.append(r_wiki)
     else:
-        # daily light: indexes (wikilinked) → hub backlinks for living orphans → repair
+        # daily light: indexes (wikilinked) ? hub backlinks for living orphans ? repair
         results.append(run_script("refresh_folder_indexes.py", timeout=300))
         results.append(run_script("vault_index_census.py", ["--json"], timeout=180))
         results.append(
@@ -194,12 +194,12 @@ def main() -> int:
     rec = VAULT / "Operations" / "logs" / f"autonomy-suite-{datetime.now().strftime('%Y-%m-%d')}.md"
     rec.parent.mkdir(parents=True, exist_ok=True)
     rec_body = (
-        f"# Autonomy Suite Run — {datetime.now().strftime('%Y-%m-%d')}\n\n"
+        f"# Autonomy Suite Run ? {datetime.now().strftime('%Y-%m-%d')}\n\n"
         f"- mode: `{args.mode}`\n"
         f"- execute_safe: `{args.execute_safe}`\n"
         f"- worst_exit: `{worst}`\n\n"
         "## Steps\n"
-        + "\n".join(f"- `{r['script']}` → exit {r['exit']}" for r in results)
+        + "\n".join(f"- `{r['script']}` ? exit {r['exit']}" for r in results)
         + "\n\n## Vault links\n"
         "- [[Operations/Vault-Gardener-Automation-System-2026-07-10]]\n"
         "- [[Operations/Lesson-to-Automation-Protocol-2026-07-10]]\n"

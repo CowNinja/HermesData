@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Grok↔Hermes joint data-silo truth test (2026-07-17).
+"""Grok?Hermes joint data-silo truth test (2026-07-17).
 
 1) Grok side measures six numbers via silo_discord_six_numbers.py
 2) Hermes API session runs the same command via terminal tool
@@ -185,7 +185,7 @@ def compare(g: dict, h: dict) -> dict:
 
 def write_receipt(result: dict) -> None:
     lines = [
-        f"# Grok↔Hermes joint silo test — {result.get('at')}",
+        f"# Grok?Hermes joint silo test ? {result.get('at')}",
         "",
         f"**PASS:** **{result.get('pass')}**",
         f"**API:** `{API_BASE}` session `{SESSION_KEY}`",
@@ -208,7 +208,7 @@ def write_receipt(result: dict) -> None:
         "## Standing agreement",
         "1. Silo metrics only from `silo_discord_six_numbers.py` or `silo_scoreboard_pulse.py`.",
         "2. Discord data-silo lane = local grunt + tools; never invent KPIs.",
-        "3. Hard judgment → Grok via `prepare_grok_escalation_brief.py`.",
+        "3. Hard judgment ? Grok via `prepare_grok_escalation_brief.py`.",
         "4. Hybrid policy: [[Operations/Hybrid-Local-Grok-Token-Policy-CANONICAL-2026-07-17]]",
         "",
         "[[docs/agent-coordination/GROK-HERMES-MASTER-PLAN]]",
@@ -222,7 +222,7 @@ def append_master_round(result: dict) -> None:
     if not MASTER.is_file():
         return
     block = f"""
-## Round 39 — Grok+Hermes joint — 2026-07-17 — Silo truth test
+## Round 39 ? Grok+Hermes joint ? 2026-07-17 ? Silo truth test
 **PASS:** {result.get('pass')}
 **Grok nums:** {json.dumps((result.get('compare') or {}).get('grok') or {})}
 **Hermes nums:** {json.dumps((result.get('compare') or {}).get('hermes') or {})}
@@ -296,7 +296,7 @@ def main() -> int:
         g_n = cmp_.get("grok") or {}
         h_n = cmp_.get("hermes") or {}
         msg = (
-            f"**Grok↔Hermes joint silo test** PASS=**{passed}**\n"
+            f"**Grok?Hermes joint silo test** PASS=**{passed}**\n"
             f"Grok: `{json.dumps(g_n)}`\n"
             f"Hermes: `{json.dumps(h_n)}`\n"
             f"Receipt: `Operations/logs/grok-hermes-joint-silo-test-latest.md`\n"

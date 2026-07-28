@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Silo segment CLI — list / init / status for World-3 sub-projects.
+"""Silo segment CLI ? list / init / status for World-3 sub-projects.
 
 Codifies Jeff 2026-07-18: four worlds walls + expandable segments inside K silo.
 Jeff-first train; rabbit-hole templates on demand; 4D graph stubs in vault.
@@ -63,11 +63,11 @@ def ensure_templates() -> None:
     STATE.mkdir(parents=True, exist_ok=True)
     if not STUB_TEMPLATE.is_file():
         STUB_TEMPLATE.write_text(
-            """# PROJECT STUB — {title}
+            """# PROJECT STUB ? {title}
 
 **Segment id:** `{id}`  
-**Status:** {status} · **Priority:** {priority}  
-**World:** 3 (K data silo bulk) · CNS maps stay world 2  
+**Status:** {status} ? **Priority:** {priority}  
+**World:** 3 (K data silo bulk) ? CNS maps stay world 2  
 **Four Worlds:** [[Operations/Four-Worlds-Silo-Architecture-CANONICAL-2026-07-10]]  
 **Segments:** [[Operations/Silo-Segment-Infrastructure-CANONICAL-2026-07-18]]
 
@@ -82,7 +82,7 @@ def ensure_templates() -> None:
 | Bulk evidence | `K:/Phronesis-Sovereign/Personal-Digital-Silo/` shelves below |
 | CNS / ops | `D:/PhronesisVault/Operations/` this stub + 4D map |
 | Runtime | `D:/HermesData/state/segments/{id}/` |
-| RP | **Never** — world 4 only |
+| RP | **Never** ? world 4 only |
 
 ## Shelves (world 3)
 
@@ -124,33 +124,33 @@ Map: [[{graph_4d_link}]]
         )
     if not GRAPH_TEMPLATE.is_file():
         GRAPH_TEMPLATE.write_text(
-            """# 4D Graph — {title}
+            """# 4D Graph ? {title}
 
-**Segment:** `{id}` · **World 2 CNS map** (not bulk)  
-**Axes:** T time · P place · W who · A artifact  
+**Segment:** `{id}` ? **World 2 CNS map** (not bulk)  
+**Axes:** T time ? P place ? W who ? A artifact  
 **Rule:** No invented people/dates/books. Evidence = path, registry, or labeled source.
 
 Updated: {updated}
 
-## T — Time nodes
+## T ? Time nodes
 
 | When | Node | Evidence |
 |------|------|----------|
 | | | |
 
-## P — Place nodes
+## P ? Place nodes
 
 | Place | Role | Era |
 |-------|------|-----|
 | | | |
 
-## W — Who nodes
+## W ? Who nodes
 
 ```
 (person tree)
 ```
 
-## A — Artifact anchors (K paths)
+## A ? Artifact anchors (K paths)
 
 | Artifact | Path / hash | Links (W/P/T) |
 |----------|-------------|-----------------|
@@ -218,7 +218,7 @@ def cmd_status(data: dict) -> int:
     receipt = VAULT_OPS / "logs" / "silo-segment-status-latest.md"
     receipt.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Silo segment status — {out['at']}",
+        f"# Silo segment status ? {out['at']}",
         "",
         "| id | status | pri | train | stub | 4d | scopes |",
         "|----|--------|----:|:-----:|:----:|:--:|--------|",
@@ -226,7 +226,7 @@ def cmd_status(data: dict) -> int:
     for r in out["segments"]:
         lines.append(
             f"| {r['id']} | {r['status']} | {r['priority']} | {r['train_default']} | "
-            f"{'Y' if r['stub_exists'] else '·'} | {'Y' if r['graph_exists'] else '·'} | "
+            f"{'Y' if r['stub_exists'] else '?'} | {'Y' if r['graph_exists'] else '?'} | "
             f"{','.join(r.get('twin_scopes') or [])} |"
         )
     lines += [
@@ -279,7 +279,7 @@ def cmd_init(data: dict, sid: str, title: str, notes: str) -> int:
     # write stub + graph from templates
     stub_t = STUB_TEMPLATE.read_text(encoding="utf-8")
     graph_t = GRAPH_TEMPLATE.read_text(encoding="utf-8")
-    shelves = "_TBD — add K shelves_"
+    shelves = "_TBD ? add K shelves_"
     stub_path.write_text(
         _fill(
             stub_t,

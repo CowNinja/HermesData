@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drain state/grok-inbox.json — run Hermes for queued work, report to Lane C."""
+"""Drain state/grok-inbox.json ? run Hermes for queued work, report to Lane C."""
 from __future__ import annotations
 
 import argparse
@@ -33,7 +33,7 @@ MAX_RETRIES = 2
 MAX_DRAIN = 5
 
 CONSUMER_SYSTEM = (
-    "Grok-inbox consumer — Jeff mobile command via Grok Build (NOT roleplay). Platform=api_server.\n"
+    "Grok-inbox consumer ? Jeff mobile command via Grok Build (NOT roleplay). Platform=api_server.\n"
     "Execute with REAL tool_calls only. tool_choice is required.\n"
     "FORBIDDEN: image_generate, roleplay, OOC narration, narrated JSON, web_extract, guessing paths.\n"
     "REQUIRED: read_file on exact D:\\ paths given, then write_file or terminal with evidence.\n"
@@ -41,7 +41,7 @@ CONSUMER_SYSTEM = (
 )
 
 RETRY_SUFFIX = (
-    "\n\n[RETRY — prior turn had tool_turns=0]\n"
+    "\n\n[RETRY ? prior turn had tool_turns=0]\n"
     "Call read_file on the first path in the task. Do NOT narrate tools.\n"
     "If proxy stale: still attempt read_file on D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md"
 )
@@ -186,11 +186,11 @@ def _sharpen_prompt(request_text: str) -> str:
     if "master plan" in low or "grok-hermes" in low:
         hints.append("read_file: D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md")
     if not hints:
-        hints.append("read_file: D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md (§6)")
+        hints.append("read_file: D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md (?6)")
     hint_block = "\n".join(f"- {h}" for h in hints[:6])
     return (
         f"{base}\n\n"
-        f"[Grok Build — sharpened paths]\n{hint_block}\n"
+        f"[Grok Build ? sharpened paths]\n{hint_block}\n"
         "Use tool_calls. No narration."
     )
 
@@ -371,12 +371,12 @@ def process_one(*, dry_run: bool = False) -> dict:
     _save_json(STATE_FILE, consumer_state)
 
     if thread_id:
-        emoji = "✅" if item["status"] == "done" else "🔴"
+        emoji = "?" if item["status"] == "done" else "?"
         summary = content[:300] if content else (err or "no reply")
         try:
             _post_lane_c(
                 thread_id,
-                f"{emoji} **Hermes inbox** `{item_id[:8]}` → {item['status']} (try {attempts})\n"
+                f"{emoji} **Hermes inbox** `{item_id[:8]}` ? {item['status']} (try {attempts})\n"
                 f"tools={tool_turns} | {summary}",
             )
         except Exception as post_exc:

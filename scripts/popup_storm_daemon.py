@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Long-running popup storm daemon (travel mode, no Admin).
 
-Lightweight loop — DO NOT call full suppress()/WMIC every tick (that freezes RDP).
+Lightweight loop ? DO NOT call full suppress()/WMIC every tick (that freezes RDP).
 
 Cadence (2026-07-26 RDP-calm retune; was 1s/2s/5s/10s/60s):
   - every ~5s: hide flashy windows + UAC consent kill + restore protected
@@ -13,7 +13,7 @@ Cadence (2026-07-26 RDP-calm retune; was 1s/2s/5s/10s/60s):
 Single-instance (2026-07-25 harden):
   1. If launched via venv Scripts\\pythonw.exe, os.execv into home pythonw
      (uv/venv trampoline otherwise leaves parent+child both running this file).
-  2. Win32 named mutex Local\\HermesPopupStormDaemon — second start exits 0.
+  2. Win32 named mutex Local\\HermesPopupStormDaemon ? second start exits 0.
   3. msvcrt lock on popup_storm_daemon.lock as secondary signal.
   No PowerShell process scans on the start path (those hung dual-start races).
 
@@ -21,7 +21,7 @@ Start: pythonw popup_storm_daemon.py
        preferred: home pythonw (C:\\Users\\...\\Python311\\pythonw.exe)
 Stop:  write D:\\HermesData\\state\\popup_storm_daemon.STOP
 
-Never hides Windows Terminal / Cascadia / grok titles — see popup_storm_suppress.PROTECT_*.
+Never hides Windows Terminal / Cascadia / grok titles ? see popup_storm_suppress.PROTECT_*.
 """
 from __future__ import annotations
 
@@ -151,7 +151,7 @@ def _try_mutex() -> bool | None:
         kernel32.CreateMutexW.restype = wintypes.HANDLE
         kernel32.GetLastError.restype = wintypes.DWORD
         ERROR_ALREADY_EXISTS = 183
-        # bInitialOwner=False then Wait — clearer ownership semantics
+        # bInitialOwner=False then Wait ? clearer ownership semantics
         handle = kernel32.CreateMutexW(None, False, MUTEX_NAME)
         if not handle:
             return None
@@ -162,11 +162,11 @@ def _try_mutex() -> bool | None:
         if wr == WAIT_OBJECT_0:
             _mutex_handle = handle
             return True
-        # Someone else owns it (or abandoned we didn't get — treat as peer)
+        # Someone else owns it (or abandoned we didn't get ? treat as peer)
         kernel32.CloseHandle(handle)
         if wr == WAIT_TIMEOUT:
             return False
-        # WAIT_ABANDONED_0 (0x80) counts as ownership — recreate properly
+        # WAIT_ABANDONED_0 (0x80) counts as ownership ? recreate properly
         if wr == 0x00000080:
             handle2 = kernel32.CreateMutexW(None, False, MUTEX_NAME)
             if handle2 and kernel32.WaitForSingleObject(handle2, 0) == WAIT_OBJECT_0:
@@ -231,7 +231,7 @@ def _acquire_single_instance() -> bool:
 
 
 def main() -> int:
-    # Collapse venv trampoline → single home pythonw process first.
+    # Collapse venv trampoline ? single home pythonw process first.
     _reexec_if_venv_pythonw()
 
     STATE.mkdir(parents=True, exist_ok=True)
@@ -259,7 +259,7 @@ def main() -> int:
     while True:
         if STOP_FILE.is_file():
             break
-        # Every tick (~5s): UAC consent is the worst RDP blocker — kill first.
+        # Every tick (~5s): UAC consent is the worst RDP blocker ? kill first.
         try:
             kill_uac_consent()
         except Exception:
@@ -280,7 +280,7 @@ def main() -> int:
                 end_tasks()
             except Exception:
                 pass
-        # elevation spawners every tick (~5s) — catch cua Start-Process early
+        # elevation spawners every tick (~5s) ? catch cua Start-Process early
         if tick % 1 == 0:
             try:
                 kill_elevation_spawners()

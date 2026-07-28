@@ -3,7 +3,7 @@
 
 Rules:
 - Only files missing domain/* tags
-- Folder → domain mapping (conservative)
+- Folder ? domain mapping (conservative)
 - Optional type/canon|index from filename
 - Never touches Archive, Roleplay-Sandbox, logs, .obsidian
 - Writes manifest for undo
@@ -257,7 +257,7 @@ def cmd_dry_or_apply(apply: bool) -> int:
         latest.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
     md_lines = [
-        f"# Domain tag batch — {'APPLY' if apply else 'DRY-RUN'}",
+        f"# Domain tag batch ? {'APPLY' if apply else 'DRY-RUN'}",
         "",
         f"**TS:** {ts}",
         f"**Scanned:** {len(candidates)}",
@@ -270,9 +270,9 @@ def cmd_dry_or_apply(apply: bool) -> int:
         if "error" in it:
             md_lines.append(f"- ERROR `{it['path']}`: {it['error']}")
         else:
-            md_lines.append(f"- `{it['path']}` ← `{', '.join(it['add'])}`")
+            md_lines.append(f"- `{it['path']}` ? `{', '.join(it['add'])}`")
     if len(plan) > 300:
-        md_lines.append(f"- … +{len(plan)-300} more")
+        md_lines.append(f"- ? +{len(plan)-300} more")
     md_lines += [
         "",
         "## Undo",

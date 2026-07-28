@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Contact merge hygiene — clean messy historical contact merges without deleting history.
+"""Contact merge hygiene ? clean messy historical contact merges without deleting history.
 
 Jeff 2026-07-12: past contact merges were messy; phones/emails may be wrong, old, or
 corrupt concatenations. Keep everything in ledger; flag and split for training/twin.
@@ -8,8 +8,8 @@ Actions:
 - Split ':::' / multi-phone strings into separate handle records
 - Flag sms gateways, facebook bridges, masked **** phones
 - Flag multi-line / multi-number blobs as merge_relic
-- Shared org emails (booksbloom@*) → link both parents + jeff relation note
-- Never delete handles — status/signals only
+- Shared org emails (booksbloom@*) ? link both parents + jeff relation note
+- Never delete handles ? status/signals only
 
 Usage:
   python contacts_merge_hygiene.py
@@ -56,7 +56,7 @@ def split_blob(val: str) -> List[str]:
 
 def phone_signals(val: str) -> List[str]:
     sig = []
-    if "****" in val or "…" in val or "..." in val:
+    if "****" in val or "?" in val or "..." in val:
         sig.append("masked_export")
     if "voice.google.com" in val.lower():
         sig.append("sms_gateway")
@@ -148,7 +148,7 @@ def hygiene_handles(person: dict) -> Dict[str, int]:
                         elif "masked_export" in sigs:
                             rec["status"] = "historical"
                             rec["validity"]["confidence"] = "stale"
-                            rec["notes"] = "Masked export — not dialable/usable as-is"
+                            rec["notes"] = "Masked export ? not dialable/usable as-is"
                     key = rec["normalized"]
                     if key in seen:
                         continue
@@ -198,7 +198,7 @@ def hygiene_handles(person: dict) -> Dict[str, int]:
                 if rec.get("status") == "active":
                     rec["status"] = "unknown"
                     rec["validity"]["confidence"] = "unknown"
-                    rec["notes"] = (rec.get("notes") or "") + " | many numbers from messy merges — verify before trust"
+                    rec["notes"] = (rec.get("notes") or "") + " | many numbers from messy merges ? verify before trust"
 
     person["handles"] = handles
     # refresh summaries
@@ -240,7 +240,7 @@ def apply_shared_orgs(people: dict) -> int:
                 rec = ensure_record("email", email)
                 rec["status"] = "unknown"
                 rec["validity"]["signals"] = ["shared_family_business", "booksbloom"]
-                rec["notes"] = "BooksBloom family business — Jeff helps; not exclusive to one person"
+                rec["notes"] = "BooksBloom family business ? Jeff helps; not exclusive to one person"
                 emails.append(rec)
                 n += 1
             # relation/org note
@@ -295,12 +295,12 @@ def main() -> int:
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Contacts merge hygiene — {utc()}",
+        f"# Contacts merge hygiene ? {utc()}",
         "",
         f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'}",
-        f"**People touched:** {totals['people']} · **splits:** {totals['split']} · **flags:** {totals['flagged']} · **shared org adds:** {shared}",
+        f"**People touched:** {totals['people']} ? **splits:** {totals['split']} ? **flags:** {totals['flagged']} ? **shared org adds:** {shared}",
         "",
-        "Policy: never delete; messy merges → historical/unknown + signals; BooksBloom shared.",
+        "Policy: never delete; messy merges ? historical/unknown + signals; BooksBloom shared.",
         "",
         "## Per person",
         "",

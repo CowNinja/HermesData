@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch 4-frame rotating harem trio — kitchen island (user OOC, cast enriched)."""
+"""Launch 4-frame rotating harem trio ? kitchen island (user OOC, cast enriched)."""
 from __future__ import annotations
 
 import json

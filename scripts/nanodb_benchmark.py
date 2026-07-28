@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""nanodb_benchmark.py — No-agent nanoDB benchmark snapshot.
+"""nanodb_benchmark.py ? No-agent nanoDB benchmark snapshot.
 
 Calls the local sovereign proxy on :8091 and captures a simple benchmark
 (per-token latency, throughput) and logs it to D:/HermesData/benchmark-results/.
@@ -72,7 +72,7 @@ def main():
         json.dump(report, f, indent=2)
 
     avg_tps = sum(r.get("tps", 0) for r in results if "tps" in r) / max(len([r for r in results if "tps" in r]), 1)
-    print(f"nanoDB: {len(results)} probes, avg {avg_tps:.1f} t/s → {path}")
+    print(f"nanoDB: {len(results)} probes, avg {avg_tps:.1f} t/s ? {path}")
 
 if __name__ == "__main__":
     main()

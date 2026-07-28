@@ -18,7 +18,7 @@ param(
 )
 
 $ErrorActionPreference = "SilentlyContinue"
-# Detach console first — schtask still starts bare powershell (Access denied rebind).
+# Detach console first - schtask still starts bare powershell (Access denied rebind).
 try {
   Add-Type -Name K -Namespace W -MemberDefinition '[DllImport("kernel32.dll")] public static extern bool FreeConsole();' -ErrorAction SilentlyContinue
   [W.K]::FreeConsole() | Out-Null
@@ -88,7 +88,7 @@ function Resolve-ModelConfig {
 
 Log "=== Phronesis One-Button Start ==="
 
-# --- ForkGuard FIRST (light when :8642 healthy — never kill gateway tree) ---
+# --- ForkGuard FIRST (light when :8642 healthy - never kill gateway tree) ---
 $gwPortEarly = [int]$core.ports.gateway
 $forkLight = (Port-Up $gwPortEarly) -and (Test-GatewayHealth) -and (Test-VenvOwnsGateway)
 $forkKills = Ensure-VenvHermesOnly
@@ -135,7 +135,7 @@ if ($need8090) {
         # agent turns often 400 "Unable to generate parser for this template" via :8091.
         "--jinja"
     )
-    # Never Start-Process llama-server directly — console binary steals focus.
+    # Never Start-Process llama-server directly - console binary steals focus.
     # pythonw + CREATE_NO_WINDOW launcher keeps Jeff's keyboard.
     $hermesRoot = if ($core.hermes_root) { $core.hermes_root } else { "D:\HermesData" }
     $pyw = Join-Path $hermesRoot "hermes-agent\venv\Scripts\pythonw.exe"

@@ -3,9 +3,9 @@
 
 Ladder (fail-soft, never crash wave):
   1) Digital PDF text (pypdf strict=False)
-  2) Quality gate — short/garbled/sparse → needs_ocr
-  3) Images (png/jpg/tif/webp/bmp) → Tesseract + PIL preprocess
-  4) PDF scans → pdftoppm (tool_paths) → Tesseract pages
+  2) Quality gate ? short/garbled/sparse ? needs_ocr
+  3) Images (png/jpg/tif/webp/bmp) ? Tesseract + PIL preprocess
+  4) PDF scans ? pdftoppm (tool_paths) ? Tesseract pages
   5) Optional pypdfium2/PIL render fallback if no pdftoppm
   6) Write best text to .ocr.md + .extract.json + .train.md when useful
   7) Leave .needs_ocr if still inadequate (retry later)
@@ -177,7 +177,7 @@ def preprocess_image(img: Path) -> Path:
             im = im.filter(ImageFilter.MedianFilter(size=3))
         except Exception:
             pass
-        # skip hard binarize — destroys grey medical scan text
+        # skip hard binarize ? destroys grey medical scan text
         tmp = img.with_name(img.stem + ".__prep.png")
         im.save(tmp)
         return tmp
@@ -276,7 +276,7 @@ def pdf_to_pngs(pdf: Path, out_dir: Path, max_pages: int = 8) -> tuple[list[Path
 
 
 def ocr_pdf(pdf: Path, tess: str, max_pages: int = 8, short_temp_copy: bool = True) -> tuple[str, list[str]]:
-    # Poppler fails on some long Windows paths / parentheses — copy to short temp
+    # Poppler fails on some long Windows paths / parentheses ? copy to short temp
     _tmp_dir = None
     if short_temp_copy:
         s = str(pdf)
@@ -307,7 +307,7 @@ def write_sidecars(path: Path, text: str, rec: dict, write_train: bool) -> None:
     ocr_md = Path(str(path) + ".ocr.md")
     extract_json = Path(str(path) + ".extract.json")
     body = (
-        f"# OCR/Extract — {path.name}\n\n"
+        f"# OCR/Extract ? {path.name}\n\n"
         f"- at: {rec.get('at')}\n"
         f"- status: {rec.get('quality', {}).get('status')}\n"
         f"- engine: {rec.get('engine')}\n"
@@ -321,7 +321,7 @@ def write_sidecars(path: Path, text: str, rec: dict, write_train: bool) -> None:
         train = Path(str(path) + ".train.md")
         # don't clobber large existing train
         tbody = (
-            f"# Train extract — {path.name}\n\n"
+            f"# Train extract ? {path.name}\n\n"
             f"source: robust_ocr_ladder\n"
             f"engine: {rec.get('engine')}\n"
             f"status: {rec.get('quality', {}).get('status')}\n\n"
@@ -478,7 +478,7 @@ def _ocr_score(path: Path) -> int:
     if re.search(r"(logo|icon|wallpaper|screenshot|portrait|headshot|badge|dr\.\s)", name):
         return -1
     if "volbrain" in s or "00-pics" in s:
-        # radiology imagery / doctor portraits — not twin train text
+        # radiology imagery / doctor portraits ? not twin train text
         return -1
     if ext in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
         # only keep images that look like scanned docs
@@ -523,7 +523,7 @@ def _ocr_score(path: Path) -> int:
             score += 20
     except Exception:
         pass
-    # already attempted extract with low chars — still allow if needs_ocr flag
+    # already attempted extract with low chars ? still allow if needs_ocr flag
     ej = Path(str(path) + ".extract.json")
     if ej.is_file():
         try:
@@ -535,7 +535,7 @@ def _ocr_score(path: Path) -> int:
                 return -1
             if q.get("status") == "empty" and not Path(str(path) + ".needs_ocr").is_file():
                 score -= 50
-            # already OCR'd once with low yield — only retry if clinical PDF + needs_ocr flag
+            # already OCR'd once with low yield ? only retry if clinical PDF + needs_ocr flag
             chars = int(q.get("chars") or 0)
             eng = str(d.get("engine") or "")
             if chars < 40 and "tesseract" in eng and ext != ".pdf":
@@ -611,11 +611,11 @@ def main() -> int:
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Robust OCR ladder — {utc()}",
+        f"# Robust OCR ladder ? {utc()}",
         "",
         f"- tesseract: `{tess}`",
         f"- pdftoppm: `{pdftoppm_bin()}`",
-        f"- processed: **{len(results)}** · ok_text **{ok}** · needs_ocr **{need}** · twin_useful **{twin}**",
+        f"- processed: **{len(results)}** ? ok_text **{ok}** ? needs_ocr **{need}** ? twin_useful **{twin}**",
         "",
         "| Engine | Status | Chars | File |",
         "|--------|--------|------:|------|",

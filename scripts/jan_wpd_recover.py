@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Improved WordPerfect (.wpd) text recovery — best-effort without LibreOffice.
+"""Improved WordPerfect (.wpd) text recovery - best-effort without LibreOffice.
 
 WP files start with \\xffWPC. Text is often in 8-bit packets mixed with function codes.
 This is NOT perfect fidelity; use LibreOffice when available for full printbooks.

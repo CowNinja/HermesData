@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Thin orchestrator status — one script call for stack+gardener+insights pointers.
+"""Thin orchestrator status ? one script call for stack+gardener+insights pointers.
 
 Grok/Hermes should prefer this single call over multi-tool spam.
 """
@@ -27,7 +27,7 @@ def port_ok(port: int) -> bool:
 
 
 def main() -> int:
-    # Inference is :8188; :8189 is gallery SPA only (HTML 200 ≠ Comfy API).
+    # Inference is :8188; :8189 is gallery SPA only (HTML 200 ? Comfy API).
     ports = {
         8090: "qwythos",
         8091: "proxy",
@@ -43,7 +43,7 @@ def main() -> int:
                 with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=2) as r:
                     status[name] = "UP"
             except Exception:
-                # try TCP-ish via health scripts — simple connect
+                # try TCP-ish via health scripts ? simple connect
                 import socket
                 s = socket.socket()
                 s.settimeout(1.5)

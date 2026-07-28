@@ -40,7 +40,7 @@ _WATCHDOG_LOG_BACKUPS = 3
 LOG_PATTERNS: Dict[str, tuple[str, ...]] = {
     "grammar_crash": ("unable to generate parser", "grammar parser", "callexpression"),
     "provider_503": ("provider unreachable", '"code": 503', "service unavailable"),
-    # Permanent (non-retryable) vs retriable — prevents thrashing on template/400s.
+    # Permanent (non-retryable) vs retriable ? prevents thrashing on template/400s.
     "permanent_fail": (
         '"failure_class": "permanent"',
         '"failure_class":"permanent"',
@@ -545,7 +545,7 @@ def scan_log_patterns() -> Dict[str, Any]:
     """Scan recent agent/errors/proxy logs for recurring sovereign failure signatures.
 
     Classifies permanent (do not thrash) vs retriable failures. Storm alert only when
-    retriable_fail or provider_503 dominate — permanent grammar/400s are fail-closed.
+    retriable_fail or provider_503 dominate ? permanent grammar/400s are fail-closed.
     """
     hits: Dict[str, int] = {k: 0 for k in LOG_PATTERNS}
     samples: Dict[str, str] = {}
@@ -698,7 +698,7 @@ def vram_mode_recovery() -> Dict[str, Any]:
             actions.append({"action": "stop_comfy_pipeline_paused", "ok": False, "error": str(exc)})
 
     # Image engines are ON-DEMAND (hermes_image ensure / forge). Never auto-start
-    # Comfy solely because mode==image — that fights the 12GB single-tenant law
+    # Comfy solely because mode==image ? that fights the 12GB single-tenant law
     # and historically left vram-priority stuck on image while llama held GPU
     # (infra-solidity cook 2026-07-26; SRE: symptoms over thrashy auto-remediation).
     if mode == "image" and not silo_primary and not pipeline_paused:
@@ -713,7 +713,7 @@ def vram_mode_recovery() -> Dict[str, Any]:
                 "note": "no_auto_start; use hermes_image ensure|release for tenant flips",
             }
         )
-        # Dual GPU tenants (llama + image) = thrash on 3060 12GB — yield image if both up.
+        # Dual GPU tenants (llama + image) = thrash on 3060 12GB ? yield image if both up.
         if _port_open(8090) and (forge_up or comfy_up):
             try:
                 release = SCRIPTS / "hermes_image.py"

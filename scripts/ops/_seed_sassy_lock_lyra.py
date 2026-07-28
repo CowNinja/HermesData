@@ -89,7 +89,7 @@ def main() -> int:
     if "bikini" not in old_neg:
         port["negative_extra"] = f"{old_neg}, {CLOTHES_NEG}".strip(", ")
 
-    # Lyra prep — Jeff canon + character face
+    # Lyra prep ? Jeff canon + character face
     lyra = cfg["cast"]["lyra-voss"]
     lyra["bust_emphasis"] = (
         "very large firm perky breasts, full heavy bust, breasts pressing together, "

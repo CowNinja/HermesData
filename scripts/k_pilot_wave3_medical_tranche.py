@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pilot wave 3: small Medical highsignal folders → Medical-Records. Copy-only."""
+"""Pilot wave 3: small Medical highsignal folders ? Medical-Records. Copy-only."""
 from __future__ import annotations
 
 import hashlib
@@ -14,7 +14,7 @@ DEST = ROOT / "Medical-Records"
 TS = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 RECEIPT = Path(r"D:\PhronesisVault\Operations\logs\k-pilot-wave3-receipt-latest.md")
 
-# Small named folders / files only — broad dest, no rabbit-hole permanent homes
+# Small named folders / files only ? broad dest, no rabbit-hole permanent homes
 TARGETS = [
     "00 - medical USEFUL WEBSITES.doc",
     "2018-02-07 - NMCP Ombudsman FAQs(3 pages).pdf",
@@ -52,12 +52,12 @@ def main() -> int:
             "mode": "copy_only_broad",
         }
         out.with_suffix(out.suffix + ".meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-        rows.append(f"COPY `{name}` → Medical-Records/")
+        rows.append(f"COPY `{name}` ? Medical-Records/")
 
     RECEIPT.write_text(
         "\n".join(
             [
-                f"# K Pilot Wave 3 (Medical tranche) — {TS}",
+                f"# K Pilot Wave 3 (Medical tranche) ? {TS}",
                 "",
                 *([f"- {r}" for r in rows]),
                 "",

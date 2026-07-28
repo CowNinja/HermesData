@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a PowerShell .ps1 with CREATE_NO_WINDOW — no focus steal on Win11.
+"""Run a PowerShell .ps1 with CREATE_NO_WINDOW ? no focus steal on Win11.
 
 Task Scheduler should invoke this via pythonw.exe, not powershell.exe:
 

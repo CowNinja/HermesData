@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-extract_wisdom.py — Episodic Memory Extractor
+extract_wisdom.py ? Episodic Memory Extractor
 Scans session logs and error patterns to build structured wisdom entries
 for the evolution loop's Orient phase.
 
@@ -202,7 +202,7 @@ def list_entries(limit: int = 20, category: str = None):
     
     # Show most recent
     print(f"\n  Episodic Memory ({len(entries)} total, showing last {limit}):")
-    print(f"  {'─'*70}")
+    print(f"  {'?'*70}")
     for e in entries[-limit:]:
         ts = e.get("timestamp", "?")[:19]
         cat = e.get("category", "?")
@@ -235,7 +235,7 @@ def show_stats():
         sources[src] = sources.get(src, 0) + 1
     
     print(f"\n  Episodic Memory Stats:")
-    print(f"  {'─'*40}")
+    print(f"  {'?'*40}")
     print(f"  Total entries: {len(entries)}")
     print(f"\n  By category:")
     for cat, count in sorted(categories.items(), key=lambda x: -x[1]):

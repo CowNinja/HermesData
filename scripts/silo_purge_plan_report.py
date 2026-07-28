@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only purge plan report — NEVER deletes.
+"""Read-only purge plan report ? NEVER deletes.
 
 Gates mirror Operations/Purge-Plan-Prep-CANONICAL-2026-07-14.md.
 Not armed until Jeff exact phrase: purge drive OK
@@ -71,7 +71,7 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     miss_md = "\n".join(f"- `{m}`" for m in miss_samples) or "- _(none)_"
     OUT.write_text(
-        f"""# Purge plan report (READ-ONLY) — {now}
+        f"""# Purge plan report (READ-ONLY) ? {now}
 
 **NOT ARMED. No deletions.** Phrase required: `purge drive OK`
 
@@ -79,13 +79,13 @@ def main() -> int:
 
 | Check | Value | Gate |
 |-------|------:|:----:|
-| Registry total | {total} | — |
-| With dest_path | {with_dest} | {"✅" if with_dest == total else "⚠️"} |
-| Spot dest exists (50) | {ok}/{ok+miss} | {"✅" if gate_dest else "⚠️"} |
-| Booksbloom pilot landed | {bb} | {"✅" if gate_bb else "—"} |
-| OCR open (needs/queued/error) | {open_ocr} | — |
-| OCR open **gold** | {gold_open} | {"✅" if gate_ocr_gold else "🚫"} |
-| Jeff green light | required | 🚫 until phrase |
+| Registry total | {total} | ? |
+| With dest_path | {with_dest} | {"?" if with_dest == total else "??"} |
+| Spot dest exists (50) | {ok}/{ok+miss} | {"?" if gate_dest else "??"} |
+| Booksbloom pilot landed | {bb} | {"?" if gate_bb else "?"} |
+| OCR open (needs/queued/error) | {open_ocr} | ? |
+| OCR open **gold** | {gold_open} | {"?" if gate_ocr_gold else "?"} |
+| Jeff green light | required | ? until phrase |
 
 ## OCR status snapshot
 `{json.dumps(ocr_stats)}`
@@ -94,7 +94,7 @@ def main() -> int:
 {miss_md}
 
 ## Ready for Jeff review?
-**{"YES — all automated gates green (still need phrase)" if all_ready else "NO — fix dest/OCR gold first"}**
+**{"YES ? all automated gates green (still need phrase)" if all_ready else "NO ? fix dest/OCR gold first"}**
 
 See [[{CANON}]]
 """,

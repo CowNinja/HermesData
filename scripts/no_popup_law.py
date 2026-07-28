@@ -82,7 +82,7 @@ def clear_focus_stops() -> None:
 
 
 # User-level ticks we can disable/enable without Admin.
-# 2026-07-26: do NOT quiet Phronesis-*-Hidden — those are the CREATE_NO_WINDOW
+# 2026-07-26: do NOT quiet Phronesis-*-Hidden ? those are the CREATE_NO_WINDOW
 # pythonw entrypoints. Bare Phronesis-Guardian / Bridge (powershell.exe) hang
 # under Win11 default-terminal and mint 267014 when force-Ended. Prefer Hidden.
 USER_TICKS_QUIET: list[str] = [
@@ -96,7 +96,7 @@ USER_TICKS_QUIET: list[str] = [
     "ComfyUI-Gallery-Watchdog",
 ]
 
-# Keep these ENABLED (user-IL) even under focus/lockdown — silent pythonw path.
+# Keep these ENABLED (user-IL) even under focus/lockdown ? silent pythonw path.
 USER_TICKS_KEEP_ENABLED: list[str] = [
     "Phronesis-Guardian-Hidden",
     "Phronesis-Grok-Direct-Bridge-Hidden",

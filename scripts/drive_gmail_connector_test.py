@@ -22,7 +22,7 @@ try:
     from googleapiclient.discovery import build
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
-    print("✓ Google API libraries available")
+    print("? Google API libraries available")
     GOOGLE_OK = True
 except ImportError as e:
     print("Google libraries not fully available:", e)
@@ -53,4 +53,4 @@ else:
     print("\nInstall with: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib")
 
 print("\nNext step for full connector: set up OAuth + integrate list_files() into discovery_walker.")
-print("This keeps us from reinventing the wheel — rclone + selective Python is the pattern used by many personal data projects.")
+print("This keeps us from reinventing the wheel ? rclone + selective Python is the pattern used by many personal data projects.")

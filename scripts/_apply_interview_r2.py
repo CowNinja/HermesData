@@ -125,7 +125,7 @@ d["orgs"] = orgs
 ENTITY.write_text(json.dumps(d, indent=2), encoding="utf-8")
 
 Path(r"D:\PhronesisVault\Operations\logs\entity-interview-round2-2026-07-10.md").write_text(
-    f"""# Entity interview Round 2 — {ts}
+    f"""# Entity interview Round 2 - {ts}
 
 | # | Entity | Jeff | Domain |
 |---|--------|------|--------|

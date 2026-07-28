@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Hermes gateway service — Red-style outer restart loop (Windows-hard).
+"""Hermes gateway service ? Red-style outer restart loop (Windows-hard).
 
 Research (2026-07-17):
   - Red Discord Bot: external restart on abnormal exit (docs.discord.red autostart_windows)
-  - Discord: max 1000 IDENTIFY/24h — backoff restarts, avoid thrash
+  - Discord: max 1000 IDENTIFY/24h ? backoff restarts, avoid thrash
   - Windows Job Objects: children die with parent unless BREAKAWAY (Raymond Chen / MS docs)
-  - Community: silent discord.py exits on Windows often have no traceback → outer loop required
+  - Community: silent discord.py exits on Windows often have no traceback ? outer loop required
 
 This process:
   1. Breaks away from parent Job Objects
@@ -167,7 +167,7 @@ def kill_stray_gateways() -> None:
 
 
 def _publish_lock_body(body: str) -> None:
-    """Atomic lock publish (min_bytes=1) — never truncate mid-write."""
+    """Atomic lock publish (min_bytes=1) ? never truncate mid-write."""
     if atomic_write_text is not None:
         atomic_write_text(LOCK, body if body.endswith("\n") else body + "\n", min_bytes=1)
     else:
@@ -210,11 +210,11 @@ def acquire() -> bool:
 def run_gateway_once() -> int:
     """Spawn gateway and wait. Returns process exit code (or -1)."""
     clear_ghosts()
-    # If already healthy, do not start second — wait for it to die.
+    # If already healthy, do not start second ? wait for it to die.
     # Use hung grace: one /health blip during a tool storm is NOT "down"
-    # (same asyncio loop as Discord/tools — see HUNG_HEALTH_GRACE_SEC).
+    # (same asyncio loop as Discord/tools ? see HUNG_HEALTH_GRACE_SEC).
     if health():
-        log("gateway already healthy — monitor until down")
+        log("gateway already healthy ? monitor until down")
         unhealthy_since: float | None = None
         while True:
             heartbeat("monitoring")
@@ -224,10 +224,10 @@ def run_gateway_once() -> int:
                 now = time.monotonic()
                 if unhealthy_since is None:
                     unhealthy_since = now
-                    log("monitor health blip — not treating as down yet")
+                    log("monitor health blip ? not treating as down yet")
                 elif (now - unhealthy_since) >= HUNG_HEALTH_GRACE_SEC:
                     log(
-                        f"monitored gateway unhealthy >{HUNG_HEALTH_GRACE_SEC}s — "
+                        f"monitored gateway unhealthy >{HUNG_HEALTH_GRACE_SEC}s ? "
                         "assuming down"
                     )
                     break
@@ -249,7 +249,7 @@ def run_gateway_once() -> int:
     env["PHRONESIS_BOOT_INTEGRITY_FAIL"] = "warn"
     env["PHRONESIS_BOOT_INTEGRITY_MODE"] = "fast"
     # Crash dumps for silent pythonw deaths (research: discord bots die without traceback on Windows).
-    # PYTHONFAULTHANDLER dumps go to stderr → this child log (see log_path below).
+    # PYTHONFAULTHANDLER dumps go to stderr ? this child log (see log_path below).
     env["PYTHONFAULTHANDLER"] = "1"
     env["PYTHONUNBUFFERED"] = "1"
     # SMS: gateway/config.py enables Platform.SMS when TWILIO_ACCOUNT_SID is truthy.
@@ -311,7 +311,7 @@ def run_gateway_once() -> int:
             break
         time.sleep(1.5)
 
-    # Wait for process exit (blocks — this is the outer service)
+    # Wait for process exit (blocks ? this is the outer service)
     unhealthy_since: float | None = None
     while True:
         code = proc.poll()
@@ -326,13 +326,13 @@ def run_gateway_once() -> int:
             now = time.monotonic()
             if unhealthy_since is None:
                 unhealthy_since = now
-                log("health blip — waiting (busy loop vs real hang)")
+                log("health blip ? waiting (busy loop vs real hang)")
             elif (now - unhealthy_since) >= HUNG_HEALTH_GRACE_SEC:
                 # Still only kill if process is actually alive and health stays down
                 if proc.poll() is None and not health(timeout=2.0):
                     log(
                         f"gateway hung without /health for >{HUNG_HEALTH_GRACE_SEC}s "
-                        f"— taskkill pid={proc.pid}"
+                        f"? taskkill pid={proc.pid}"
                     )
                     try:
                         subprocess.run(

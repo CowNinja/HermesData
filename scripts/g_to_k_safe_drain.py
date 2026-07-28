@@ -92,7 +92,7 @@ def domain_for(name: str, path_hint: str = "") -> str:
 def _win_long(p: Path | str) -> str:
     """Prefix \\\\?\\ for Win32 paths >= ~240 chars (MAX_PATH).
 
-    Research: MS Learn Maximum Path Length Limitation — extended-length
+    Research: MS Learn Maximum Path Length Limitation ? extended-length
     paths require \\\\?\\ + absolute normalized backslashes. Python 3.11
     open()/mkdir honor this when passed as the path string.
     """
@@ -1010,7 +1010,7 @@ def main() -> int:
             # Auto-complete fully hash-known roots (skip thrash).
             # min walked 50: small trees (Misc_Other=60) must not thrash forever.
             # 2026-07-26: emitted>0 can still be residual-exhausted when plan rows
-            # are filtered (policy/symlink) and nothing copies — do not thrash.
+            # are filtered (policy/symlink) and nothing copies ? do not thrash.
             if (
                 not complete
                 and walked >= 50

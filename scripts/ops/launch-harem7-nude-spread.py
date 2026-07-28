@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch 7 solo harem portraits — nude, rear view, hands-and-knees ass spread."""
+"""Launch 7 solo harem portraits ? nude, rear view, hands-and-knees ass spread."""
 from __future__ import annotations
 
 import json

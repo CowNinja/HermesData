@@ -16,7 +16,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         print(f"  PASS {name}")
     else:
         ERRORS.append(f"{name}: {detail}")
-        print(f"  FAIL {name} — {detail}")
+        print(f"  FAIL {name} ? {detail}")
 
 
 def main() -> int:
@@ -102,7 +102,7 @@ def main() -> int:
         for e in ERRORS:
             print(f"  - {e}")
         return 1
-    print("ALL PASS — Procurement Engine wired")
+    print("ALL PASS ? Procurement Engine wired")
     return 0
 
 

@@ -2,7 +2,7 @@
 """
 Multi-Account Ingestion Orchestrator (Session 14+)
 Production-grade handler for pulling from multiple Google accounts (old jeffrey.j.bloom, warz, current)
-into D:\HermesData while tracking full provenance.
+into D:/HermesData while tracking full provenance.
 
 Features:
 - Separate remotes per account

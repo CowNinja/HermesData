@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Grand vision alignment check — report-only.
+"""Grand vision alignment check ? report-only.
 
 Verifies Four Worlds + segments + twin-scope + kitchen invariants match files on disk.
 Writes: D:/PhronesisVault/Operations/logs/grand-vision-align-latest.md
@@ -214,7 +214,7 @@ def main() -> int:
         return "PASS" if b else "FAIL"
 
     lines = [
-        f"# Grand vision align check — {at}",
+        f"# Grand vision align check ? {at}",
         "",
         f"**Overall:** **{yn(payload['pass'])}**",
         "",

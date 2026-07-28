@@ -17,7 +17,7 @@ def _apply_hidden_startup(kwargs: dict[str, Any], *, detach: bool = False) -> No
     """Hide console; optionally detach from parent job/console.
 
     NOTE: Do NOT combine detach=True with parent-owned file handles for stdout/stderr
-    on long-lived daemons — when the parent exits those handles close and the child dies.
+    on long-lived daemons ? when the parent exits those handles close and the child dies.
     Prefer CREATE_NO_WINDOW + DEVNULL (or let the child open its own logs).
 
     Daemons also need CREATE_BREAKAWAY_FROM_JOB so agent/CI Job Objects do not kill them
@@ -56,7 +56,7 @@ def prefer_pythonw(executable: str) -> str:
 def prefer_python_console(executable: str | None = None) -> str:
     """Prefer python.exe over pythonw for long land writers.
 
-    2026-07-19: nested pythonw→pythonw under CREATE_NO_WINDOW + PIPEd stdio
+    2026-07-19: nested pythonw?pythonw under CREATE_NO_WINDOW + PIPEd stdio
     exits 1 with empty stderr (focus_land never reached apply). Direct pythonw
     drain works; nesting fails. Land drain must use console python.exe +
     CREATE_NO_WINDOW instead of another pythonw layer.
@@ -106,7 +106,7 @@ def hidden_powershell_command(cmd: str) -> list[str]:
 
 
 def run_hidden(args: list[str] | tuple[str, ...], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    """Synchronous hidden run (waits). Never detaches — parent owns the wait."""
+    """Synchronous hidden run (waits). Never detaches ? parent owns the wait."""
     _apply_hidden_startup(kwargs, detach=False)
     return subprocess.run(list(args), **kwargs)
 
@@ -123,7 +123,7 @@ def popen_hidden(args: list[str] | tuple[str, ...], **kwargs: Any) -> subprocess
     try:
         return subprocess.Popen(list(args), **kwargs)
     except OSError:
-        # Job may forbid CREATE_BREAKAWAY_FROM_JOB — retry without it.
+        # Job may forbid CREATE_BREAKAWAY_FROM_JOB ? retry without it.
         if detach and (int(kwargs.get("creationflags") or 0) & CREATE_BREAKAWAY_FROM_JOB):
             flags = int(kwargs.get("creationflags") or 0) & ~CREATE_BREAKAWAY_FROM_JOB
             kwargs["creationflags"] = flags
@@ -149,7 +149,7 @@ def kill_process_tree(pid: int, timeout: int = 60) -> bool:
     """Kill pid and all descendants (Windows taskkill /T). Returns True if invoked OK.
 
     Critical for silo land: subprocess.run/Popen timeout that only kills the parent
-    leaves orphan g_to_k_safe_drain / focus_land children → dual SQLite writers.
+    leaves orphan g_to_k_safe_drain / focus_land children ? dual SQLite writers.
     Sources: Microsoft taskkill /T; SQLite single-writer WAL guidance.
     """
     if not pid or int(pid) <= 0:

@@ -110,7 +110,7 @@ def main() -> int:
             }
         )
 
-    # Propose purge/archive for true duplicate non-config runtime? NEVER delete active Hermes profile —
+    # Propose purge/archive for true duplicate non-config runtime? NEVER delete active Hermes profile ?
     # Hermes profiles/alice-roleplay is a Hermes profile SSOT for gateway channel, not pure content dump.
     # If identical resolve or full mirror: recommend POINTER doc, not delete profile.
     archive_purge = []
@@ -118,14 +118,14 @@ def main() -> int:
         archive_purge.append(
             {
                 "item": str(HERMES_PROF),
-                "action": "NONE — same resolved path as sandbox (junction/link). Do not delete.",
+                "action": "NONE ? same resolved path as sandbox (junction/link). Do not delete.",
             }
         )
     elif not only_h and not size_diff and soul_same and len(same_hash) >= max(1, len(ms) - 5):
         archive_purge.append(
             {
                 "item": str(HERMES_PROF),
-                "action": "DO NOT PURGE profile tree — Hermes channel profile required. "
+                "action": "DO NOT PURGE profile tree ? Hermes channel profile required. "
                 "Optional: replace bulk duplicate skill refs with pointer README to sandbox after live verify. "
                 "Keep SOUL/config/memories if Hermes still loads this path.",
             }
@@ -138,7 +138,7 @@ def main() -> int:
             }
         )
 
-    # vault Alice is large twin/avatar — not auto purge; note only
+    # vault Alice is large twin/avatar ? not auto purge; note only
     vault_alice_note = {
         "path": str(VAULT_ALICE),
         "exists": VAULT_ALICE.exists(),
@@ -207,18 +207,18 @@ def main() -> int:
     OUT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     lines = [
-        f"# Four Worlds Optional Dry-Run — {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        f"# Four Worlds Optional Dry-Run ? {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "",
-        "**Mode: DRY-RUN ONLY — no files moved, purged, or archived.**",
+        "**Mode: DRY-RUN ONLY ? no files moved, purged, or archived.**",
         "",
         "## Scope (confirmed optional)",
         "1. Alice profile mirror: `D:\\HermesData\\profiles\\alice-roleplay` vs `Roleplay-Sandbox/profile`",
         "2. `harem-series.log` location",
-        "3. Divine missing → sandbox; archive/purge only if applicable",
+        "3. Divine missing ? sandbox; archive/purge only if applicable",
         "",
         "## Findings",
         f"- Same resolved path (junction/link): **{same_resolve}**",
-        f"- File counts: Hermes **{len(mh)}** · Sandbox **{len(ms)}**",
+        f"- File counts: Hermes **{len(mh)}** ? Sandbox **{len(ms)}**",
         f"- Identical hashes (shared rel paths): **{len(same_hash)}**",
         f"- Only on Hermes: **{len(only_h)}**",
         f"- Only on Sandbox: **{len(only_s)}**",
@@ -231,9 +231,9 @@ def main() -> int:
         for rel in only_h[:40]:
             lines.append(f"- `{rel}` ({mh[rel]['size']}b)")
         if len(only_h) > 40:
-            lines.append(f"- … +{len(only_h)-40}")
+            lines.append(f"- ? +{len(only_h)-40}")
     else:
-        lines.append("- _None — trees already content-mirrored (or linked)._")
+        lines.append("- _None ? trees already content-mirrored (or linked)._")
 
     lines += [
         "",
@@ -245,7 +245,7 @@ def main() -> int:
         "### Archive / purge",
     ]
     for a in archive_purge:
-        lines.append(f"- `{a['item']}` → {a['action']}")
+        lines.append(f"- `{a['item']}` ? {a['action']}")
 
     lines += [
         "",
@@ -260,7 +260,7 @@ def main() -> int:
     ]
     if actions_live:
         for i, a in enumerate(actions_live, 1):
-            lines.append(f"{i}. **{a['op']}** `{a.get('src','')}` → `{a.get('dst')}` — {a['why']}")
+            lines.append(f"{i}. **{a['op']}** `{a.get('src','')}` ? `{a.get('dst')}` ? {a['why']}")
     else:
         lines.append("- _No copy actions needed beyond optional pointer note._")
 

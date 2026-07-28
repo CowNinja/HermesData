@@ -3,7 +3,7 @@
 
 Jeff 2026-07-13: Don't blanket-skip all zips. Distinguish:
   - VM/disk/media bulk (skip land)
-  - Content archives (docs, mail, exports) → land or extract listing + harvest
+  - Content archives (docs, mail, exports) ? land or extract listing + harvest
 
 Never prints file contents that look like secrets into stdout dumps.
 """
@@ -149,7 +149,7 @@ def harvest_zip_text(path: Path, limit_files: int = 30) -> int:
                 if info.file_size > 5_000_000:
                     continue
                 if SECRETISH.search(info.filename):
-                    # list only — do not extract secrets to training inbox
+                    # list only ? do not extract secrets to training inbox
                     continue
                 target = HARVEST_ROOT / path.stem / Path(info.filename).name
                 target.parent.mkdir(parents=True, exist_ok=True)

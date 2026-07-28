@@ -162,10 +162,10 @@ def main() -> int:
     reg = registry_summary()
 
     lines = [
-        f"# Silo layout health — {utc()}",
+        f"# Silo layout health ? {utc()}",
         "",
         f"**Soft limit:** {lim} non-sidecar files per folder",
-        f"**Scan mode:** {scan_meta.get('mode')} · elapsed {scan_meta.get('elapsed_s')}s · timed_out={scan_meta.get('timed_out')}",
+        f"**Scan mode:** {scan_meta.get('mode')} ? elapsed {scan_meta.get('elapsed_s')}s ? timed_out={scan_meta.get('timed_out')}",
         f"**Folders scanned (with files):** {len(ranked)}",
         f"**Offenders (> limit):** {len(offenders)}",
         "",
@@ -181,7 +181,7 @@ def main() -> int:
         "|------:|--------|",
     ]
     for d, c in top:
-        flag = " ⚠️" if c > lim else ""
+        flag = " ??" if c > lim else ""
         short = d.replace(str(SILO), "SILO")
         lines.append(f"| {c} | `{short[:100]}`{flag} |")
 

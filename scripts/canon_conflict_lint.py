@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""N3 — Canon conflict detector (Tier B4). Always read-only.
+"""N3 ? Canon conflict detector (Tier B4). Always read-only.
 
 Scans Operations/*CANONICAL*.md (skips backups/) for lock contradictions and
 hard-rule violations. Never auto-edits law.
@@ -13,7 +13,7 @@ Exit:
   1 = conflicts found (default)
   2 = scan error
 
-Canon: Operations/Codifying-Loops-Guardrails-Map-2026-07-18 §N3
+Canon: Operations/Codifying-Loops-Guardrails-Map-2026-07-18 ?N3
        Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18
 Sources: Anthropic gates; CrewAI guardrail_max_retries; LangGraph HITL pause.
 """
@@ -37,7 +37,7 @@ LOG_MD = OPS / "logs" / "canon-conflict-latest.md"
 LOG_JSON = OPS / "logs" / "canon-conflict-latest.json"
 SKIP_DIR_PARTS = {"backups", "archive", "Archive", "_archive", "node_modules"}
 
-# (rule_id, severity, description, regex) — applied per file (case-insensitive)
+# (rule_id, severity, description, regex) ? applied per file (case-insensitive)
 # severity: hard = always conflict; soft = advisory
 HARD_FORBIDDEN = [
     (
@@ -88,7 +88,7 @@ HARD_FORBIDDEN = [
     ),
 ]
 
-# Pair rules: if A appears in corpus without balancing B in same file → soft/hard
+# Pair rules: if A appears in corpus without balancing B in same file ? soft/hard
 PAIR_LOCKS = [
     (
         "single_writer_with_kill_scope",
@@ -127,7 +127,7 @@ GLOBAL_MUST_EXIST = [
     ),
     (
         "self_correct_schema_stated",
-        re.compile(r"PROPOSE\s*→\s*VERIFY|VERIFY\s*\(non-LLM\)", re.I),
+        re.compile(r"PROPOSE\s*?\s*VERIFY|VERIFY\s*\(non-LLM\)", re.I),
         "Self-correct schema should appear in canon set",
     ),
 ]
@@ -166,7 +166,7 @@ def _is_forbid_context(text: str, start: int, end: int) -> bool:
     window = text[max(0, start - 180) : min(len(text), end + 80)]
     if re.search(
         r"\b(?:never|forbid|forbidden|do\s+not|don't|must\s+not|not\s+allowed|"
-        r"anti-pattern|wrong\s+layer|refuse|no\b\s|✗|❌|not\s+ad-hoc)\b",
+        r"anti-pattern|wrong\s+layer|refuse|no\b\s|?|?|not\s+ad-hoc)\b",
         window,
         re.I,
     ):
@@ -265,10 +265,10 @@ def main() -> int:
 
     LOG_MD.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Canon conflict lint — {report['at']}",
+        f"# Canon conflict lint ? {report['at']}",
         "",
         f"- files_scanned: **{len(files)}**",
-        f"- hard: **{len(hard)}** · soft: **{len(soft)}**",
+        f"- hard: **{len(hard)}** ? soft: **{len(soft)}**",
         f"- ok: **{ok}**",
         "",
         "## Hard",
@@ -278,7 +278,7 @@ def main() -> int:
         lines.append("_None_")
     else:
         for c in hard:
-            lines.append(f"- `{c['rule']}` · `{c['file']}` — {c['detail']}")
+            lines.append(f"- `{c['rule']}` ? `{c['file']}` ? {c['detail']}")
             if c.get("snippet"):
                 lines.append(f"  - snippet: {c['snippet'][:120]}")
     lines += ["", "## Soft / advisory", ""]
@@ -286,7 +286,7 @@ def main() -> int:
         lines.append("_None_")
     else:
         for c in soft:
-            lines.append(f"- `{c['rule']}` · `{c['file']}` — {c['detail']}")
+            lines.append(f"- `{c['rule']}` ? `{c['file']}` ? {c['detail']}")
     lines += [
         "",
         "Read-only. Never auto-edit law. Escalate new hard class via `prepare_grok_escalation_brief.py`.",

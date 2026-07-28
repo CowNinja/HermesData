@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-grunt_local.py — Hybrid grunt CLI for Grok driver / Qwythos worker.
+grunt_local.py - Hybrid grunt CLI for Grok driver / Qwythos worker.
 
 Grok (Hermes primary) should call this via ONE terminal tool instead of
 burning tokens on bulk classify/summarize/extract.

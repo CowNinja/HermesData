@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rerun kitchen kneel trio — completely nude, rear camera (user correction)."""
+"""Rerun kitchen kneel trio ? completely nude, rear camera (user correction)."""
 from __future__ import annotations
 
 import json

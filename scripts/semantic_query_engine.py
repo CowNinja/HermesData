@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-semantic_query_engine.py — Tier-aware local semantic retrieval.
+semantic_query_engine.py - Tier-aware local semantic retrieval.
 
 Combines sqlite-vec ANN search with 8090 LRU router for complexity-based
 tier selection and optional synthesis reranking on complex queries.

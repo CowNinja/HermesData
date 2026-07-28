@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scoreboard v2 — efficiency + effectiveness metrics for the silo factory.
+"""Scoreboard v2 ? efficiency + effectiveness metrics for the silo factory.
 
 Barney board + deep metrics. $0 Grok. Writes:
   state/silo_scoreboard_v2.json
@@ -59,7 +59,7 @@ def chef_count() -> int:
     """Count live continuous-loop chefs.
 
     2026-07-21 fix: continuous is launched via pythonw.exe (headless). Prior
-    filter only matched python.exe → perpetual false NO_CHEF while chef lived.
+    filter only matched python.exe ? perpetual false NO_CHEF while chef lived.
     Lessons: process inventory must match real launcher (python + pythonw);
     secondary heartbeat age is a fallback when WMI flakes.
     """
@@ -311,14 +311,14 @@ def main() -> int:
 
     # Barney MD
     lines = [
-        f"# Silo Scoreboard v2 — {board['at'][:19]} UTC",
+        f"# Silo Scoreboard v2 ? {board['at'][:19]} UTC",
         "",
         "## Kitchen board (Barney)",
         f"- **MemoryCard:** {board['memorycard']}",
-        f"- **Fridge size (registry):** {reg:,} · unique {uniq:,}",
-        f"- **Chef:** {chefs} process · mode {(cont.get('assess') or {}).get('mode')} · age {board['continuous']['age_s']}s",
-        f"- **OCR cooked:** ok_text={ocr.get('ok_text')} · still queued={ocr.get('queued')}",
-        f"- **Throughput:** {thr.get('files_per_hour')} files/h · OCR {thr.get('ocr_per_hour')}/h",
+        f"- **Fridge size (registry):** {reg:,} ? unique {uniq:,}",
+        f"- **Chef:** {chefs} process ? mode {(cont.get('assess') or {}).get('mode')} ? age {board['continuous']['age_s']}s",
+        f"- **OCR cooked:** ok_text={ocr.get('ok_text')} ? still queued={ocr.get('queued')}",
+        f"- **Throughput:** {thr.get('files_per_hour')} files/h ? OCR {thr.get('ocr_per_hour')}/h",
         f"- **ETA (priority remaining):** {eta_h} hours" if eta_h else "- **ETA:** n/a (need more samples)",
         f"- **Bottlenecks:** {', '.join(bottlenecks)}",
         "",
@@ -329,11 +329,11 @@ def main() -> int:
     for f in folders:
         if f.get("mode") == "catalog_only":
             lines.append(
-                f"| {f.get('priority')} | {f.get('label')} | catalog | — | — |"
+                f"| {f.get('priority')} | {f.get('label')} | catalog | ? | ? |"
             )
         elif f.get("missing"):
             lines.append(
-                f"| {f.get('priority')} | {f.get('label')} | missing | — | — |"
+                f"| {f.get('priority')} | {f.get('label')} | missing | ? | ? |"
             )
         else:
             lines.append(
@@ -341,7 +341,7 @@ def main() -> int:
             )
     lines += [
         "",
-        f"_Build {board['build_s']}s · JSON: `state/silo_scoreboard_v2.json`_",
+        f"_Build {board['build_s']}s ? JSON: `state/silo_scoreboard_v2.json`_",
         "",
     ]
     OUT_MD.parent.mkdir(parents=True, exist_ok=True)

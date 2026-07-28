@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compound folder dossiers — neighborhood context for every origin directory.
+"""Compound folder dossiers ? neighborhood context for every origin directory.
 
 For each unique parent folder on G: (from registry source_path), write:
   D:\\HermesData\\state\\folder_dossiers\\<hash>.json
@@ -156,7 +156,7 @@ def main() -> int:
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
     LOG.write_text(
-        f"# Folder dossiers — {utc()}\n\n"
+        f"# Folder dossiers ? {utc()}\n\n"
         f"Written **{written}** / parents seen **{len(by_parent)}**\n\n"
         + "\n".join(f"- {s}" for s in samples),
         encoding="utf-8",

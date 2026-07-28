@@ -69,8 +69,8 @@ def main() -> int:
             break
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text(
-        f"# Orphan sidecar clean — {utc()}\n\n"
-        f"**Apply:** {args.apply} · scanned {scanned} · orphans {removed}\n\n"
+        f"# Orphan sidecar clean ? {utc()}\n\n"
+        f"**Apply:** {args.apply} ? scanned {scanned} ? orphans {removed}\n\n"
         f"Root: `{root}`\n",
         encoding="utf-8",
     )

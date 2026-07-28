@@ -17,7 +17,7 @@ BATCH_SESSION = ROOT / "state" / "comfy-batch-session.json"
 SUMMARY = SANDBOX / "runtime" / "batch-freeform_series-latest.json"
 COMFY_OUTPUT = Path(r"D:\ComfyUI\output")
 
-# Gallery :8189 returns HTML 200 for /system_stats — force real Comfy.
+# Gallery :8189 returns HTML 200 for /system_stats ? force real Comfy.
 os.environ["COMFY_URL"] = os.environ.get("COMFY_URL") or "http://127.0.0.1:8188"
 
 HAREM = [
@@ -111,7 +111,7 @@ def main() -> int:
         )
         print(f"  job {i+1}/{TOTAL}: {slug} seed={jobs[-1]['seed']} prompt_len={len(jobs[-1]['prompt'])}")
 
-    print("Queueing variation_loop…")
+    print("Queueing variation_loop?")
     report = run_jobs(jobs, draft=False)
     print("REPORT", json.dumps({k: report.get(k) for k in report if k != "results"}, default=str))
     results = list(report.get("results") or [])
@@ -135,7 +135,7 @@ def main() -> int:
     sess["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     sess["render_ok"] = ok
     sess["render_fail"] = fail
-    # Do NOT claim Discord delivery from render success — delivery daemon owns delivered_count.
+    # Do NOT claim Discord delivery from render success ? delivery daemon owns delivered_count.
     sess["render_completed"] = ok
     sess.setdefault("delivered_count", int(sess.get("delivered_count") or 0))
     BATCH_SESSION.write_text(json.dumps(sess, indent=2), encoding="utf-8")
@@ -156,7 +156,7 @@ def main() -> int:
         ),
         encoding="utf-8",
     )
-    print(f"Done: {ok} ok, {fail} failed — summary {SUMMARY}")
+    print(f"Done: {ok} ok, {fail} failed ? summary {SUMMARY}")
     try:
         from set_comfy_vram_mode import end_batch_restore  # noqa: WPS433
 

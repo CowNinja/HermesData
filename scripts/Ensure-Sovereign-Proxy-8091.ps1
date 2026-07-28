@@ -1,6 +1,6 @@
-# Ensure-Sovereign-Proxy-8091.ps1 — keep MoE gateway up (venv only, logged)
+# Ensure-Sovereign-Proxy-8091.ps1 - keep MoE gateway up (venv only, logged)
 # Use when 8091 flaps or after heal/restart thrash.
-# Uses Start-HiddenProcess (CreateNoWindow) — NEVER Start-Process -Redirect* which
+# Uses Start-HiddenProcess (CreateNoWindow) - NEVER Start-Process -Redirect* which
 # allocates a console and steals focus while Jeff is typing.
 $ErrorActionPreference = "Continue"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

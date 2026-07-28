@@ -107,7 +107,7 @@ def _stop_cua_driver() -> dict:
         out["schtask_end"] = "cua-driver-serve"
     except Exception:
         pass
-    # Hermes computer_use spawns cua-driver.exe mcp (not serve) — taskkill all
+    # Hermes computer_use spawns cua-driver.exe mcp (not serve) ? taskkill all
     try:
         r2 = subprocess.run(
             ["taskkill", "/IM", "cua-driver.exe", "/F", "/T"],
@@ -127,14 +127,19 @@ def _stop_cua_driver() -> dict:
 
 
 def _end_admin_flashy_tasks() -> list[str]:
-    """Best-effort END (not Disable) of known Admin residual flashy tasks."""
+    """Best-effort END (not Disable) of real elevators only.
+
+    2026-07-26: Do NOT End bare Guardian/Bridge/Loop/Image-Rider on focus on.
+    schtasks /End ? Last Result 0x41306 / 267014 (SCHED_S_TASK_TERMINATED per
+    learn.microsoft.com task-scheduler-error-and-success-constants). UI surfaces
+    that as an error popup. Those trampolines self-exit 0 under lockdown/focus
+    STOP; Hidden pythonw twins do the real heal. Only End elevators that leave
+    long-running focus stealers (CUA / GPU Tweak / Start-At-Logon).
+    """
     names = [
-        "Phronesis-Guardian",
-        "Phronesis-Grok-Direct-Bridge",
-        "Phronesis-Grok-Hermes-Loop",
-        "Phronesis-Image-Rider",
-        "Phronesis-Start-At-Logon",
         "cua-driver-serve",
+        "GPU Tweak III",
+        "Phronesis-Start-At-Logon",
     ]
     ended: list[str] = []
     for n in names:
@@ -146,7 +151,7 @@ def _end_admin_flashy_tasks() -> list[str]:
                 timeout=10,
                 creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
             )
-            if r.returncode == 0 or "SUCCESS" in ((r.stdout or "") + (r.stderr or "")):
+            if r.returncode == 0 or "SUCCESS" in ((r.stdout or "") + (r.stderr or "")).upper():
                 ended.append(n)
         except Exception:
             pass
@@ -158,7 +163,7 @@ def on(reason: str = "focus_mode") -> dict:
     body = f"{reason} {utc()}\n"
     for p in STOPS:
         p.write_text(body, encoding="utf-8")
-    # popup_emergency.STOP — extra brake for trampolines that check it
+    # popup_emergency.STOP ? extra brake for trampolines that check it
     try:
         (STATE / "popup_emergency.STOP").write_text(body, encoding="utf-8")
     except Exception:

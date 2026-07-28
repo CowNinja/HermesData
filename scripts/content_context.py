@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Content sample + directory/sibling context for relevance evaluation.
 
-Google .gdoc/.gsheet stubs are NOT full documents locally — only JSON pointers.
+Google .gdoc/.gsheet stubs are NOT full documents locally ? only JSON pointers.
 """
 from __future__ import annotations
 
@@ -92,9 +92,9 @@ def is_google_stub(path: Path) -> bool:
 
 
 def read_google_stub(path: Path) -> dict:
-    """Local .gdoc is ~300B pseudo-JSON with doc_id/url — no body text.
+    """Local .gdoc is ~300B pseudo-JSON with doc_id/url ? no body text.
 
-    Files often contain // comments so strict json.loads fails — use regex.
+    Files often contain // comments so strict json.loads fails ? use regex.
     """
     raw = path.read_text(encoding="utf-8", errors="replace")
     def grab(key: str) -> str | None:

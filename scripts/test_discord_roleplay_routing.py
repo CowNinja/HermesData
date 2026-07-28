@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-E2E diagnostic — Discord ingest → proxy roleplay routing.
+E2E diagnostic ? Discord ingest ? proxy roleplay routing.
 
 Simulates raw Discord user text through discord_roleplay_connector and
 sovereign_openai_proxy.resolve_roleplay_routing. Logs match the live trace
@@ -33,7 +33,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         print(f"  PASS {name}")
     else:
         ERRORS.append(f"{name}: {detail}")
-        print(f"  FAIL {name} — {detail}")
+        print(f"  FAIL {name} ? {detail}")
 
 
 def _port_open(host: str, port: int, timeout: float = 1.5) -> bool:
@@ -100,7 +100,7 @@ def simulate_discord_to_proxy(
 
 
 def run_connector_cases() -> None:
-    print("\n--- Discord Connector → Proxy Routing ---")
+    print("\n--- Discord Connector ? Proxy Routing ---")
     cases = [
         {
             "label": "slash_roleplay_with_prompt",
@@ -119,7 +119,7 @@ def run_connector_cases() -> None:
         },
         {
             "label": "uncensored_colon",
-            "raw": "UNCENSORED_ROLEPLAY: Combat round — roll initiative",
+            "raw": "UNCENSORED_ROLEPLAY: Combat round ? roll initiative",
             "chat_name": "Phronesis / #general",
         },
         {
@@ -303,7 +303,7 @@ def test_system_prompt_severance() -> None:
 def run_live_proxy_probe() -> None:
     print("\n--- Live Proxy Probe (8091) ---")
     if not _port_open("127.0.0.1", 8091):
-        print("  SKIP live proxy — port 8091 not reachable")
+        print("  SKIP live proxy ? port 8091 not reachable")
         return
 
     import urllib.request

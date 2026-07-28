@@ -3,7 +3,7 @@
 ComfyUI duplicate image purge (content-hash SHA256).
 
 Targets:
-  - D:\\ComfyUI\\gallery\\images   (main bulk — re-import / watchdog copies)
+  - D:\\ComfyUI\\gallery\\images   (main bulk ? re-import / watchdog copies)
   - D:\\ComfyUI\\output           (milder; optional)
 
 Default: DRY-RUN. Prints plan + writes JSON report. No deletes.
@@ -950,7 +950,7 @@ def reconcile_db_fs(*, quarantine_orphan_sidecars: bool = False) -> dict:
         for sc in SIDECAR_DIR.glob("*.json"):
             if sc.stem.lower() in img_stems:
                 continue
-            # keep if any image references this sidecar in DB — already cleaned; move orphan
+            # keep if any image references this sidecar in DB ? already cleaned; move orphan
             try:
                 dest = qdir / sc.name
                 shutil.move(str(sc), str(dest))
@@ -1099,7 +1099,7 @@ def main() -> int:
         "--scope",
         choices=["gallery", "output", "both"],
         default="gallery",
-        help="Where to scan (default: gallery — main waste)",
+        help="Where to scan (default: gallery ? main waste)",
     )
     ap.add_argument("--apply", action="store_true", help="Execute purge (default dry-run)")
     ap.add_argument(
@@ -1111,7 +1111,7 @@ def main() -> int:
     ap.add_argument(
         "--reconcile-only",
         action="store_true",
-        help="Skip scan/purge; only reconcile DB↔FS, stable aliases, FTS rebuild",
+        help="Skip scan/purge; only reconcile DB?FS, stable aliases, FTS rebuild",
     )
     ap.add_argument(
         "--quarantine-orphan-sidecars",
@@ -1176,8 +1176,8 @@ def main() -> int:
     if not args.apply:
         print()
         print("DRY-RUN only. Re-run with --apply to quarantine dups + merge/hardlink immersion names.")
-        print("  --apply                  → quarantine + metadata merge + alias hardlinks")
-        print("  --apply --hard-delete    → permanent delete + DB/sidecar cleanup")
+        print("  --apply                  ? quarantine + metadata merge + alias hardlinks")
+        print("  --apply --hard-delete    ? permanent delete + DB/sidecar cleanup")
         return 0
 
     if plan["files_to_delete"] == 0 and plan["aliases_to_preserve"] == 0:
@@ -1188,7 +1188,7 @@ def main() -> int:
     if DB_PATH.exists():
         bak = GALLERY_DIR / f"gallery.db.bak.dedup_{stamp}"
         shutil.copy2(DB_PATH, bak)
-        print(f"[comfy-dedup] DB backup → {bak}")
+        print(f"[comfy-dedup] DB backup ? {bak}")
 
     result = apply_plan(plan, hard_delete=args.hard_delete)
     # Always reconcile after apply (catches orphan DB rows, stable short aliases, FTS once)
@@ -1212,7 +1212,7 @@ def main() -> int:
         p = IMAGE_DIR / name
         st = "OK" if p.exists() else "MISSING"
         if not p.exists():
-            # only report missing if it was in the pre-plan universe — check report keep wanted lists
+            # only report missing if it was in the pre-plan universe ? check report keep wanted lists
             wanted_any = any(name in (k.get("wanted_alias_names") or []) for k in plan["keep"])
             if wanted_any or name in STABLE_ALIAS_TARGETS:
                 missing.append(name)

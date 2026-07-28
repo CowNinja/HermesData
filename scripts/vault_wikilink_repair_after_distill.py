@@ -461,7 +461,7 @@ def main() -> int:
         OUT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     OUT_MD.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Wikilink Repair — {TS}",
+        f"# Wikilink Repair - {TS}",
         "",
         f"- Redirects known: **{len(redirects)}**",
         f"- Files rewritten: **{rewritten_files}**",

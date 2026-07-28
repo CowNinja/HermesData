@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Detective → codify smoke gate (Tier A6 / N2).
+"""Detective ? codify smoke gate (Tier A6 / N2).
 
 After any entity_context / domain_route change, run deterministic domain_for cases.
 Default dry-run (report only). --commit writes receipt claiming smoke PASS.
@@ -11,7 +11,7 @@ Canon:
 
 Guardrails:
   - non-LLM verify only
-  - Friends ≠ Family hard assert on Abigail-class
+  - Friends ? Family hard assert on Abigail-class
   - dry-run default; no entity_context writes from this script
   - exit 0 soft when ran; JSON has ok=true/false
 """
@@ -46,21 +46,21 @@ SMOKE_CASES: list[dict] = [
         "path_hint": "Family/BLOOM",
         "expect_contains": "Family",
         "forbid_contains": ["Friends"],
-        "note": "Wilhelm → genealogy Family",
+        "note": "Wilhelm ? genealogy Family",
     },
     {
         "name": "Abigail Tulis v Commonwealth affidavit",
         "path_hint": "David Tulis folder VA case",
         "expect_contains": "Friends",
         "forbid_contains": ["Family"],
-        "note": "Abigail Tulis case party — Friends cohort, not Jeff Family",
+        "note": "Abigail Tulis case party ? Friends cohort, not Jeff Family",
     },
     {
         "name": "Rescue Church wifi donation",
         "path_hint": "Spiritual",
         "expect_contains": "Spiritual",
         "forbid_contains": [],
-        "note": "Rescue Church org → Spiritual",
+        "note": "Rescue Church org ? Spiritual",
     },
     {
         "name": "Andrew Latourette birthday photo",
@@ -74,14 +74,14 @@ SMOKE_CASES: list[dict] = [
         "path_hint": "Projects/games",
         "expect_contains": "Projects",
         "forbid_contains": [],
-        "note": "LEWZ → Projects",
+        "note": "LEWZ ? Projects",
     },
     {
         "name": "random unknown scan 12345.pdf",
         "path_hint": "",
         "expect_contains": "_Inbox",
         "forbid_contains": [],
-        "note": "unknown → Inbox placeholder path",
+        "note": "unknown ? Inbox placeholder path",
     },
 ]
 
@@ -120,7 +120,7 @@ def main() -> int:
     results = [run_case(c) for c in SMOKE_CASES]
     ok = all(r["ok"] for r in results)
     evidence = "; ".join(
-        f"{r['name'][:32]}={'PASS' if r['ok'] else 'FAIL'}→{r['got']}" for r in results
+        f"{r['name'][:32]}={'PASS' if r['ok'] else 'FAIL'}?{r['got']}" for r in results
     )
     payload = {
         "at": utc(),
@@ -131,7 +131,7 @@ def main() -> int:
         "n_fail": sum(1 for r in results if not r["ok"]),
         "evidence": evidence,
         "results": results,
-        "hard_rules": ["Friends≠Family for Abigail-class", "unknown→_Inbox"],
+        "hard_rules": ["Friends?Family for Abigail-class", "unknown?_Inbox"],
         "canon": [
             "Operations/Detective-Entity-Codify-Loop-CANONICAL-2026-07-11",
             "Operations/Self-Correcting-Codify-Loops-Safe-Surfaces-CANONICAL-2026-07-18",
@@ -158,7 +158,7 @@ def main() -> int:
     ]
     for r in results:
         mark = "PASS" if r["ok"] else "FAIL"
-        md.append(f"- [{mark}] `{r['name']}` → `{r['got']}` — {r['note']}")
+        md.append(f"- [{mark}] `{r['name']}` ? `{r['got']}` ? {r['note']}")
     md += [
         f"",
         f"## Vault links",

@@ -43,7 +43,7 @@ d["navy_career_arc"] = {
             "phase": "SARP_Great_Lakes",
             "dates": {"approx": "2003_between_A_school_and_Enterprise"},
             "jeff": "SARP at Great Lakes for drinking problem",
-            "evidence": "filename miss so far — Jeff narrative; OCR body search pending",
+            "evidence": "filename miss so far ? Jeff narrative; OCR body search pending",
             "status": "jeff_memory_pending_doc",
         },
         {
@@ -55,7 +55,7 @@ d["navy_career_arc"] = {
                 "onboard_through": "2008-02",
             },
             "jeff": "Thought June/July 2003 transfer",
-            "correction": "Orders 2003-07-30; A-school grad 2003-08-05 → report likely Aug 2003",
+            "correction": "Orders 2003-07-30; A-school grad 2003-08-05 ? report likely Aug 2003",
             "evidence": [
                 "2003-07-30 CVN65 Orders signed",
                 "2003-11-05 CVN65 letters",
@@ -73,7 +73,7 @@ d["navy_career_arc"] = {
                 "boost_photo": "2008-05-01",
                 "detach_hrnrotc": "2008-07-16",
             },
-            "jeff": "Left Enterprise early 2008 for Newport — months then ODU",
+            "jeff": "Left Enterprise early 2008 for Newport ? months then ODU",
             "evidence": [
                 "2008-02-26 NSIPS Newport report / Enterprise to OTCN",
                 "2008-02-28 Tricare Newport RI",
@@ -114,7 +114,7 @@ d["navy_career_arc"] = {
                 "detach": "2015-01-14",
             },
             "jeff": "Thought transferred 2011",
-            "correction": "Orders Dec 2011; ship med Jan 2012 → report ~Jan 2012",
+            "correction": "Orders Dec 2011; ship med Jan 2012 ? report ~Jan 2012",
             "evidence": [
                 "2011-12-15 USS ELROD FFG55 Orders",
                 "2012-01-05 ELROD medication HM2 Murphy",
@@ -168,24 +168,24 @@ d["updated"] = ts
 p.write_text(json.dumps(d, indent=2), encoding="utf-8")
 
 Path(r"D:\PhronesisVault\Research\Silo-Entities\Navy-Career-Arc.md").write_text(
-    f"""# Navy career arc — Jeffrey Jay Bloom (dated)
+    f"""# Navy career arc ? Jeffrey Jay Bloom (dated)
 
 _Updated {ts}_
 
-## Timeline (detective × Jeff)
+## Timeline (detective ? Jeff)
 
 | When | What | Status |
 |------|------|--------|
-| 2003-02-03…12 | MEPS / enlistment | Affirmed |
+| 2003-02-03?12 | MEPS / enlistment | Affirmed |
 | **2003-02-13** | **RTC Great Lakes** gain entry (~8 wk) | Affirmed |
 | **2003-08-05** | **IT A-School** graduate (A-202-0014) Great Lakes | Affirmed |
 | ~2003 | **SARP** Great Lakes | Jeff memory; doc date TBD |
-| **2003-07-30** orders · **~Aug 2003+** | **USS Enterprise CVN-65** until early 2008 | Affirmed (start corrected) |
-| **2008-02-26 → 2008-07-16** | **OTC Newport STA-21** (BOOST/NSI) | Affirmed |
+| **2003-07-30** orders ? **~Aug 2003+** | **USS Enterprise CVN-65** until early 2008 | Affirmed (start corrected) |
+| **2008-02-26 ? 2008-07-16** | **OTC Newport STA-21** (BOOST/NSI) | Affirmed |
 | **2008-07-22+** | **HRNROTC @ ODU** EET | Affirmed |
-| **2009-10-21** | **MVA → TBI** | Affirmed exact |
-| **2011-12-15** orders · **~2012-01** | **USS Elrod FFG-55** until **2015-01-14** detach | Affirmed |
-| **2015-02-12 → ~2018-03** | **NCDOC** last command | Affirmed |
+| **2009-10-21** | **MVA ? TBI** | Affirmed exact |
+| **2011-12-15** orders ? **~2012-01** | **USS Elrod FFG-55** until **2015-01-14** detach | Affirmed |
+| **2015-02-12 ? ~2018-03** | **NCDOC** last command | Affirmed |
 
 ## Corrections
 1. Enterprise report **after A-school Aug 2003**, not June report.  
@@ -193,7 +193,7 @@ _Updated {ts}_
 3. Accident **2009-10-21**.
 
 ## Open
-SARP dated packet · RTC grad day · page-13 Enterprise report · rate timeline
+SARP dated packet ? RTC grad day ? page-13 Enterprise report ? rate timeline
 """,
     encoding="utf-8",
 )

@@ -2,8 +2,8 @@
 """Shared size-based log/JSONL rotator for Phronesis ops logs.
 
 Two modes:
-  rename  — classic cascade path -> path.1 -> path.2 (safe when writer reopens each append)
-  copytruncate — copy then truncate in place (safe when long-lived FD holds the path;
+  rename  ? classic cascade path -> path.1 -> path.2 (safe when writer reopens each append)
+  copytruncate ? copy then truncate in place (safe when long-lived FD holds the path;
                  preferred for multi-process writers that never reopen)
 
 Research (2026-07-18): Python RotatingFileHandler is single-process; multi-writer
@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-DEFAULT_MAX_BYTES = 4 * 1024 * 1024  # 4 MiB — ops JSONL grows fast; agent.log has its own 5MB hermes rot
+DEFAULT_MAX_BYTES = 4 * 1024 * 1024  # 4 MiB ? ops JSONL grows fast; agent.log has its own 5MB hermes rot
 DEFAULT_BACKUPS = 3
 
 # Known fat ops logs (audit 2026-07-18). agent.log already has hermes rotation;
@@ -65,8 +65,8 @@ def rotate_if_needed(
     """Rotate path when size exceeds max_bytes.
 
     mode:
-      rename       — path -> path.1 -> ... (writer must reopen path after)
-      copytruncate — copy to path.1, truncate path to 0 (keeps inode/FD)
+      rename       ? path -> path.1 -> ... (writer must reopen path after)
+      copytruncate ? copy to path.1, truncate path to 0 (keeps inode/FD)
 
     Returns status dict (never raises).
     """
@@ -138,7 +138,7 @@ def rotate_if_needed(
         try:
             p.rename(first)
         except OSError:
-            # Windows: file locked — fall back to copytruncate
+            # Windows: file locked ? fall back to copytruncate
             shutil.copy2(p, first)
             with open(p, "r+b") as fh:
                 fh.truncate(0)

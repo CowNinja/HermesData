@@ -22,7 +22,7 @@ c["agent"]["environment_hint"] = (
     "DRIVER=Grok 4.5 only for hard reasoning/architecture/anti-hallucination audit "
     "(thread 1524846849360531456 or Grok Build). "
     "DEFAULT Hermes chat stays LOCAL to avoid token burn. "
-    "ALWAYS file/terminal tools before facts — never invent registry metrics, "
+    "ALWAYS file/terminal tools before facts ? never invent registry metrics, "
     "corporate silos, or people. If task needs multi-hop judgment, say ESCALATE_GROK "
     "and write a vault brief instead of free-form research roleplay. "
     "Model rotation LOCKED 9B local for grunt. Stack: 8090/8091/8642."
@@ -31,9 +31,9 @@ c["agent"]["environment_hint"] = (
 cp = c.setdefault("discord", {}).setdefault("channel_prompts", {})
 co = c["discord"].setdefault("channel_overrides", {})
 
-cp["1524529242019336434"] = """DATA SILO AGENT (K: personal silo) — HYBRID GRUNT LANE
+cp["1524529242019336434"] = """DATA SILO AGENT (K: personal silo) ? HYBRID GRUNT LANE
 
-PLANE: MUSCLE=scripts · GRUNT=you (local Qwythos) · DRIVER=Grok (not you)
+PLANE: MUSCLE=scripts ? GRUNT=you (local Qwythos) ? DRIVER=Grok (not you)
 
 REAL PATHS (only these are real):
 - K:\\Phronesis-Sovereign\\Personal-Digital-Silo\\
@@ -64,10 +64,10 @@ co["1524529242019336434"] = {
     "enabled_toolsets": ["hermes-cli", "terminal", "file"],
 }
 
-cp["1524846849360531456"] = """GROK DRIVER LANE (Hermes↔Grok coordination).
+cp["1524846849360531456"] = """GROK DRIVER LANE (Hermes?Grok coordination).
 
 You are the judgment plane. Prefer short vault-linked answers.
-Local silo facts come from scripts/scoreboard — do not re-walk K: blindly.
+Local silo facts come from scripts/scoreboard ? do not re-walk K: blindly.
 For bulk land/OCR: defer to scripts / data-silo agent (local).
 Token thrift: measure first with tools, then reason; no fluff.
 Master plan: D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md

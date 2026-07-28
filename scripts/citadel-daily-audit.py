@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Citadel daily channel audit wrapper — partial OK, soft-fail cron.
+"""Citadel daily channel audit wrapper ? partial OK, soft-fail cron.
 
 2026-07-18 residual seal:
 - Never red-fail whole job on partial Discord/API errors.
@@ -21,7 +21,7 @@ except ImportError:  # pragma: no cover
     atomic_write_json = None  # type: ignore
 
 VAULT = Path(r"D:\PhronesisVault")
-# Stack/orch pointers — best-effort; paths moved over time. Never fail job if absent.
+# Stack/orch pointers ? best-effort; paths moved over time. Never fail job if absent.
 STACK_CANDIDATES = [
     VAULT / "Operations" / "STACK-HEALTH.md",
     VAULT / "docs" / "agent-coordination" / "STACK-HEALTH.md",
@@ -121,7 +121,7 @@ def main() -> int:
         payload["ok"] = True
         payload["partial"] = False
     elif channels > 0:
-        # Got some data — partial success, not a red day.
+        # Got some data ? partial success, not a red day.
         payload["ok"] = False
         payload["partial"] = True
     else:

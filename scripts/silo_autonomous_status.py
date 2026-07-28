@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-board autonomous kitchen status — zero Grok, local only."""
+"""One-board autonomous kitchen status ? zero Grok, local only."""
 from __future__ import annotations
 
 import json
@@ -77,7 +77,7 @@ def main() -> int:
         except Exception:
             pass
     lines = [
-        f"# Autonomous status — {board['at']}",
+        f"# Autonomous status ? {board['at']}",
         "",
         f"| Metric | Value |",
         f"|--------|-------|",

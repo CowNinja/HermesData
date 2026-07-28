@@ -205,7 +205,7 @@ def main() -> int:
     }
     LOG.parent.mkdir(parents=True, exist_ok=True)
     LOG.write_text(
-        f"# OCR→registry sync — {utc()}\n\n```json\n{json.dumps(out, indent=2)[:5000]}\n```\n",
+        f"# OCR?registry sync ? {utc()}\n\n```json\n{json.dumps(out, indent=2)[:5000]}\n```\n",
         encoding="utf-8",
     )
     print(json.dumps(out, indent=2)[:6000])

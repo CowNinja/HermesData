@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Timeline harvest — dated life events from paths + OCR for Medical/Navy/etc."""
+"""Timeline harvest ? dated life events from paths + OCR for Medical/Navy/etc."""
 from __future__ import annotations
 
 import argparse
@@ -137,7 +137,7 @@ def main() -> int:
     # vault md sample
     VAULT.mkdir(parents=True, exist_ok=True)
     md = [
-        f"# Life timeline harvest — {utc()}",
+        f"# Life timeline harvest ? {utc()}",
         "",
         f"**Events:** {len(events_sorted)}",
         "",

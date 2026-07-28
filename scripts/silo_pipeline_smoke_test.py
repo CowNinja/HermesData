@@ -115,7 +115,7 @@ def main() -> int:
     except Exception as e:
         add("ingest_registry", False, str(e))
 
-    # 8 drain dry-run — pin MemoryCard GD only (not full-throttle extras / huge archive walks)
+    # 8 drain dry-run ? pin MemoryCard GD only (not full-throttle extras / huge archive walks)
     gd = r"G:\MemoryCard_Backups\Google Drive"
     code, out = run(
         [
@@ -144,7 +144,7 @@ def main() -> int:
     )
     add("drain_apply_tiny", code in (0, 124), out[-300:] if code != 124 else "TIMEOUT soft")
 
-    # 10 meta under from-g-drive — NEVER full K: rglob (multi-TB hang)
+    # 10 meta under from-g-drive ? NEVER full K: rglob (multi-TB hang)
     meta_count = 0
     for dom in (
         "Core-Personal",
@@ -179,7 +179,7 @@ def main() -> int:
         f"sample_metas={meta_count}" if meta_count > 0 else f"structure_only={meta_count}",
     )
 
-    # 11 dedup script — small root + tight timeout (advisory)
+    # 11 dedup script ? small root + tight timeout (advisory)
     code, out = run(
         [
             str(SCRIPTS / "dedup_cluster.py"),
@@ -199,9 +199,9 @@ def main() -> int:
 
 def _write(checks: list, ok: int, fail: int) -> None:
     lines = [
-        f"# Silo pipeline smoke test — {utc()}",
+        f"# Silo pipeline smoke test ? {utc()}",
         "",
-        f"**Result:** {ok} PASS · {fail} FAIL · {ok + fail} checks",
+        f"**Result:** {ok} PASS ? {fail} FAIL ? {ok + fail} checks",
         "",
         "| Check | Result | Detail |",
         "|-------|--------|--------|",
@@ -212,7 +212,7 @@ def _write(checks: list, ok: int, fail: int) -> None:
         lines.append(f"| {c['name']} | {mark} | {detail} |")
     lines += [
         "",
-        "Spine: class → relevance → registry → drain → meta → dedup → lifecycle",
+        "Spine: class ? relevance ? registry ? drain ? meta ? dedup ? lifecycle",
         "[[Operations/logs/infrastructure-buildout-scoreboard-2026-07-10]]",
         "[[Operations/Ingest-Registry-and-Reprocess-Guard-CANONICAL-2026-07-10]]",
         "",

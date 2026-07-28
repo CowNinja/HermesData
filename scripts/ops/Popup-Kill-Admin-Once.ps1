@@ -74,7 +74,7 @@ Set-HiddenPywTask "Hermes_Gateway_ForceReload_Once" "`"$scripts\ops\gateway_forc
 try { Enable-ScheduledTask -TaskName "Phronesis-Guardian-Hidden" -ErrorAction SilentlyContinue | Out-Null } catch {}
 try { Enable-ScheduledTask -TaskName "Phronesis-Grok-Direct-Bridge-Hidden" -ErrorAction SilentlyContinue | Out-Null } catch {}
 
-# GPU Tweak III / Monitor.exe — SOUI_DUMMY_WND focus steal under RDP
+# GPU Tweak III / Monitor.exe - SOUI_DUMMY_WND focus steal under RDP
 # Disable/delete logon task (Highest often; try anyway when elevated)
 Disable-TaskSafe "GPU Tweak III"
 try {

@@ -95,7 +95,7 @@ def main():
         for dn, paths in sorted(dupes.items(), key=lambda x: -len(x[1])):
             print(f"  [{len(paths)}x] {paths[0]}")
             for p in paths[1:]:
-                print(f"        → {p}")
+                print(f"        -> {p}")
         print()
     
     # Similar path clusters

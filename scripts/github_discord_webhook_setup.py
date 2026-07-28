@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create Discord webhooks for GitHub→Citadel relay (fallback when native OAuth unavailable)."""
+"""Create Discord webhooks for GitHub->Citadel relay (fallback when native OAuth unavailable)."""
 from __future__ import annotations
 
 import json

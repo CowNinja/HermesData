@@ -27,7 +27,7 @@ VAULT = Path(r"D:\PhronesisVault")
 REPORT_MD = VAULT / "Operations" / "logs" / "domain-tag-lint-latest.md"
 REPORT_JSON = VAULT / "Operations" / "logs" / "domain-tag-lint-latest.json"
 
-# Hot paths only — not whole vault (Archive/logs noise excluded)
+# Hot paths only ? not whole vault (Archive/logs noise excluded)
 HOT_GLOBS = [
     "Operations/*.md",
     "Setup/*.md",
@@ -98,7 +98,7 @@ def has_domain_tag(text: str) -> bool:
         m = FM_RE.match(text)
         if m and "domain/" in m.group(1):
             return True
-        # bare domain/ in body without # is weak — still count if in tags list line
+        # bare domain/ in body without # is weak ? still count if in tags list line
         if re.search(r"(?m)^\s*-\s*domain/[\w-]+\s*$", text):
             return True
         if re.search(r"(?m)^tags:\s*\[[^\]]*domain/", text):
@@ -148,7 +148,7 @@ def main() -> int:
         REPORT_JSON.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     lines = [
-        f"# Domain tag lint — latest",
+        f"# Domain tag lint ? latest",
         "",
         f"**Generated:** {now}  ",
         f"**Vault:** `{VAULT}`  ",
@@ -164,12 +164,12 @@ def main() -> int:
         "",
     ]
     if not missing:
-        lines.append("_None — hot paths covered._")
+        lines.append("_None ? hot paths covered._")
     else:
         for m in missing[:200]:
             lines.append(f"- `{m['path']}`")
         if len(missing) > 200:
-            lines.append(f"- … +{len(missing) - 200} more")
+            lines.append(f"- ? +{len(missing) - 200} more")
     lines += [
         "",
         "## Tagged sample",

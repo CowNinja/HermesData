@@ -164,15 +164,15 @@ def wikilink_exists(
 ) -> bool:
     """True if target is skippable external URL, resolves as file, or hits index.
 
-    Absolute drive paths (K:/, D:/) are NOT vault notes → False (callers may
-    redirect them). HTTP(S) → True (not a vault defect).
+    Absolute drive paths (K:/, D:/) are NOT vault notes ? False (callers may
+    redirect them). HTTP(S) ? True (not a vault defect).
     """
     t = norm_slash(target)
     if not t:
         return True
     if t.startswith("http://") or t.startswith("https://"):
         return True
-    # Drive / UNC paths are external — do not pretend they are vault notes
+    # Drive / UNC paths are external ? do not pretend they are vault notes
     if re.match(r"^[A-Za-z]:/", t) or t.startswith("//"):
         return False
 
@@ -194,7 +194,7 @@ def wikilink_exists(
         except OSError:
             pass
         # Relative that does not resolve is unresolved (do NOT bare-stem
-        # `../foo` — that masked broken depth in SkillForge practice logs)
+        # `../foo` ? that masked broken depth in SkillForge practice logs)
         return False
 
     # 2) Index / bare-stem (path-free names only inside target_hits_index)

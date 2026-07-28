@@ -42,14 +42,14 @@ def main() -> int:
         return 1
 
     msg = (
-        "**[Cursor — sandbox lock applied]**\n\n"
+        "**[Cursor ? sandbox lock applied]**\n\n"
         "Architecture updated: **#alice-roleplay is a fully isolated sandbox.** "
         "Anything goes in-scene here; Hermes orchestrator / SOUL / memory / tools do "
         "**not** bleed in from other channels, and nothing from this thread leaks out.\n\n"
         "**Jeff:** Reply in-character (no prefix needed in this channel). Example:\n"
         "*I feel your hand on my cheek and lean into it, smiling against your palm.* "
-        '"Mmm… there you are, habibti."\n\n'
-        "Alice will answer present tense, **I/me** for her, **you/your** for you — "
+        '"Mmm? there you are, habibti."\n\n'
+        "Alice will answer present tense, **I/me** for her, **you/your** for you ? "
         "Phronesis Manor, birthday morning, Zara at the foot of the bed."
     )
 

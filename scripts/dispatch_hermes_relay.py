@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HermesData entrypoint for relay dispatch — delegates to PhronesisVault canonical script.
+HermesData entrypoint for relay dispatch - delegates to PhronesisVault canonical script.
 
 Usage:
   python D:\\HermesData\\scripts\\dispatch_hermes_relay.py --assess-local

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Milestone 3 validation — crash-restart memory persistence."""
+"""Milestone 3 validation ? crash-restart memory persistence."""
 from __future__ import annotations
 
 import gc
@@ -19,7 +19,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         print(f"  PASS {name}")
     else:
         ERRORS.append(f"{name}: {detail}")
-        print(f"  FAIL {name} — {detail}")
+        print(f"  FAIL {name} ? {detail}")
 
 
 def _mock_embed(text: str, dim: int = 768):
@@ -59,7 +59,7 @@ def test_checkpoint_and_hydrate() -> None:
         )
         mgr.close()
 
-        # Simulate process crash — new manager instance, same DB
+        # Simulate process crash ? new manager instance, same DB
         smm._MANAGER = None
         mgr2 = smm.SovereignMemoryManager(db)
         hydrated = mgr2.hydrate_last_active()
@@ -141,7 +141,7 @@ def test_boot_hydration_api() -> None:
 
 
 def test_episodic_archive() -> None:
-    print("\n--- Episodic Archive → Vector ---")
+    print("\n--- Episodic Archive ? Vector ---")
     import sovereign_memory_manager as smm
     from semantic_query_engine import SovereignSemanticEngine
 
@@ -240,7 +240,7 @@ def test_simulated_crash_mid_task() -> None:
 
             reboot_mgr.checkpoint(
                 session_id=sid,
-                working_memory=reboot.get("working_memory", []) + [{"role": "assistant", "content": "Step 4 done — pipeline GREEN"}],
+                working_memory=reboot.get("working_memory", []) + [{"role": "assistant", "content": "Step 4 done ? pipeline GREEN"}],
                 procedural_state={**(reboot.get("procedural_state") or {}), "step": 4, "crashed": False, "resumed": True},
             )
             final = reboot_mgr.hydrate_last_active()
@@ -267,7 +267,7 @@ def main() -> int:
         for e in ERRORS:
             print(f"  - {e}")
         return 1
-    print("ALL PASS — Milestone 3 memory persistence GREEN")
+    print("ALL PASS ? Milestone 3 memory persistence GREEN")
     return 0
 
 

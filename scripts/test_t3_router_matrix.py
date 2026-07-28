@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """T3 router test matrix -- local + Tier-1.5 fleet + policy probes (no GPU image).
 
-P3 2026-07-21: prove local-miss → free fleet before Grok; provenance JSONL.
+P3 2026-07-21: prove local-miss ? free fleet before Grok; provenance JSONL.
 Research:
   - OpenRouter model fallbacks (models array, try next on error/rate-limit)
   - Groq deprecations (drop dead model IDs)
@@ -104,7 +104,7 @@ def run_matrix() -> Dict[str, Any]:
     except Exception as exc:
         results.append({"name": "T3 grok_auth import", "ok": False, "error": str(exc)})
 
-    # P3: forced local_failed → fleet (must NOT be Grok paid tier)
+    # P3: forced local_failed ? fleet (must NOT be Grok paid tier)
     fleet_ok = False
     fleet_detail: dict = {}
     if try_t2_fleet_dispatch is not None:
@@ -142,7 +142,7 @@ def run_matrix() -> Dict[str, Any]:
         except Exception as exc:
             fleet_detail = {"error": str(exc)[:200]}
             _append_prov({"ts": _utc(), "event": "forced_local_miss_fleet_exc", "error": str(exc)[:200]})
-    results.append({"name": "P3 local_miss→fleet (not Grok)", "ok": fleet_ok, "detail": fleet_detail})
+    results.append({"name": "P3 local_miss?fleet (not Grok)", "ok": fleet_ok, "detail": fleet_detail})
 
     # Direct fleet manager smoke (secondary)
     try:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local sovereign cook loop — OCR + train + index WITHOUT cloud tokens.
+"""Local sovereign cook loop ? OCR + train + index WITHOUT cloud tokens.
 
 Post-OCR era (2026-07-14): when OCR open==0, skip OCR worker and spend budget
 on train + medical/navy index + twin meta stamp.
@@ -207,9 +207,9 @@ def main() -> int:
 
     STATE.write_text(json.dumps({"at": utc(), "results": results[-5:]}, indent=2), encoding="utf-8")
     lines = [
-        f"# Local cook loop — {utc()}",
+        f"# Local cook loop ? {utc()}",
         "",
-        f"**Rounds:** {rounds} · OCR limit {args.ocr_limit} · post-OCR auto-skip when open=0",
+        f"**Rounds:** {rounds} ? OCR limit {args.ocr_limit} ? post-OCR auto-skip when open=0",
         "",
         "| Round | mode | ok_delta | ok_text | open | codes |",
         "|------:|------|---------:|--------:|-----:|-------|",

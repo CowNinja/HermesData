@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Gardener Phase B — PROPOSAL ONLY (no moves, merges, or archives).
+"""Gardener Phase B ? PROPOSAL ONLY (no moves, merges, or archives).
 
-Grand vision steps 3–5 without execution:
-  cluster duplicate ideas → propose distill into singular MD → propose recoverable archive
+Grand vision steps 3?5 without execution:
+  cluster duplicate ideas ? propose distill into singular MD ? propose recoverable archive
 
 Default roots: PhronesisVault/Operations (+ optional Research, docs).
 Uses local heuristics first; optional --grunt for Qwythos labels via grunt_local.
@@ -116,7 +116,7 @@ def cluster_stems(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "stem": stem,
             "count": len(items),
             "action": "distill_merge_propose",
-            "reason": f"{len(items)} files share stem pattern — candidate singular MD",
+            "reason": f"{len(items)} files share stem pattern ? candidate singular MD",
             "keep_candidate": items_sorted[0]["rel"],
             "merge_from": [x["rel"] for x in items_sorted[1:6]],
             "all": [x["rel"] for x in items_sorted[:12]],
@@ -138,7 +138,7 @@ def archive_candidates(rows: List[Dict[str, Any]], stale_days: int, limit: int) 
                 "rel": r["rel"],
                 "age_days": r["age_days"],
                 "links": r["links"],
-                "reason": f"~{r['age_days']}d old, {r['links']} wikilinks — low graph signal",
+                "reason": f"~{r['age_days']}d old, {r['links']} wikilinks ? low graph signal",
             })
     out.sort(key=lambda x: (-x["age_days"], x["links"]))
     return out[:limit]
@@ -161,7 +161,7 @@ def resurface_candidates(rows: List[Dict[str, Any]], stale_days: int, limit: int
             "age_days": r["age_days"],
             "links": r["links"],
             "score": round(score, 2),
-            "reason": "stale substantial note — possible forgotten project/idea",
+            "reason": "stale substantial note ? possible forgotten project/idea",
             "preview": r["preview"][:160],
         })
     out.sort(key=lambda x: (-x["score"], -x["age_days"]))
@@ -202,9 +202,9 @@ def optional_grunt(paths: List[str], limit: int = 5) -> List[Dict[str, Any]]:
 
 def render_md(payload: Dict[str, Any]) -> str:
     lines = [
-        f"# Gardener Phase B Proposals — {payload.get('ts', '')}",
+        f"# Gardener Phase B Proposals ? {payload.get('ts', '')}",
         "",
-        "**Mode: PROPOSAL ONLY** — no merges, moves, or deletes executed.",
+        "**Mode: PROPOSAL ONLY** ? no merges, moves, or deletes executed.",
         f"Roots: {', '.join(payload.get('roots') or [])}",
         f"Files scanned: {payload.get('scanned')}",
         "",
@@ -228,9 +228,9 @@ def render_md(payload: Dict[str, Any]) -> str:
             lines.append(f"  - `{m}`")
         lines.append(f"- Reason: {c['reason']}")
         lines.append("")
-    lines += ["## Archive proposals (recoverable — do not auto-run)", ""]
+    lines += ["## Archive proposals (recoverable ? do not auto-run)", ""]
     for a in (payload.get("archive_candidates") or [])[:20]:
-        lines.append(f"- `{a['rel']}` — {a['reason']}")
+        lines.append(f"- `{a['rel']}` ? {a['reason']}")
     lines += ["", "## Resurface / forgotten ideas", ""]
     for r in (payload.get("resurface_candidates") or [])[:20]:
         lines.append(f"- `{r['rel']}` (~{r['age_days']}d, links={r['links']}, score={r['score']})")
@@ -243,8 +243,8 @@ def render_md(payload: Dict[str, Any]) -> str:
     lines += [
         "",
         "## Next human gates",
-        "1. Pick 1–3 distill clusters → approve merge text",
-        "2. Pick archive batch → move to Archive/ with pointer from hub",
+        "1. Pick 1?3 distill clusters ? approve merge text",
+        "2. Pick archive batch ? move to Archive/ with pointer from hub",
         "3. Open 1 resurfaced forgotten project and decide: revive / distill / archive",
         "",
         "*Phase B never executes irreversible steps.*",

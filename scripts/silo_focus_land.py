@@ -2,10 +2,10 @@
 """Focus land: drain only the highest-priority incomplete folder.
 
 Self-improve efficiency: don't re-walk completed trees; put full throttle
-on the current top item (Medical→Alex→Booksbloom…→Jeff gold subpaths).
+on the current top item (Medical?Alex?Booksbloom??Jeff gold subpaths).
 Caches disk file counts to avoid full-tree scans every tick.
 
-2026-07-18: empty-plan auto-advance — if drain copies 0 (remainder is
+2026-07-18: empty-plan auto-advance ? if drain copies 0 (remainder is
 catalog/junk/already-on-K), mark source land_complete after N strikes so
 chef advances (disk% can stall below 97% when many files are catalog-only).
 """
@@ -37,7 +37,7 @@ SCRIPTS = Path(r"D:\HermesData\scripts")
 # because both sat just over 97%. Prefer absolute residual + walk_cursor complete.
 MIN_RESIDUAL_ABS = 8
 RESIDUAL_PCT_FLOOR = 0.003  # 0.3% of disk still counts as incomplete
-# Land drain child must be python.exe — nested pythonw under orch PIPEs fails
+# Land drain child must be python.exe ? nested pythonw under orch PIPEs fails
 # silent exit 1 (2026-07-19 repro). See windows_subprocess.prefer_python_console.
 try:
     from windows_subprocess import prefer_python_console  # type: ignore
@@ -148,7 +148,7 @@ def parse_drain_receipt() -> dict:
     auto-advance never fires on probe waves.
 
     2026-07-26: drain receipt uses ASCII ' | ' separators; older parser only
-    matched middle-dot '·' so empty-plan never fired (GDrive thrash).
+    matched middle-dot '?' so empty-plan never fired (GDrive thrash).
     """
     out: dict = {
         "copied": None,
@@ -170,9 +170,9 @@ def parse_drain_receipt() -> dict:
         out["mode"] = mode or None
         if mode and mode != "APPLY":
             return out
-        # Accept · or | or plain spaces between fields
+        # Accept ? or | or plain spaces between fields
         m = re.search(
-            r"\*\*Copied:\*\*\s*(\d+)\s*[·|]\s*\*\*Skipped:\*\*\s*(\d+)\s*[·|]\s*\*\*Planned rows:\*\*\s*(\d+)",
+            r"\*\*Copied:\*\*\s*(\d+)\s*[?|]\s*\*\*Skipped:\*\*\s*(\d+)\s*[?|]\s*\*\*Planned rows:\*\*\s*(\d+)",
             text,
         )
         if not m:
@@ -258,11 +258,11 @@ def _meaningful_residual(disk_n: int, reg_n: int, threshold: float) -> tuple[boo
     """Return (still_incomplete, residual, pct).
 
     Industry lesson (NiFi backpressure / Celery ack): never treat a large tree as
-    done on percentage alone — absolute residual is the real backlog signal.
+    done on percentage alone ? absolute residual is the real backlog signal.
     disk_n==0 is unknown (not complete).
     """
     if disk_n <= 0:
-        return True, -1, 0.0  # unknown — do not auto-skip
+        return True, -1, 0.0  # unknown ? do not auto-skip
     residual = max(0, int(disk_n) - int(reg_n))
     pct = (reg_n / disk_n) if disk_n else 1.0
     # Over-registry (reg>disk) => residual 0, complete for land purposes
@@ -283,7 +283,7 @@ def reconcile_queue(threshold: float = 0.97) -> dict:
     walk-complete items (e.g. Misc_Other) never got synced while GDrive/arch
     blocked the head. Call this each focus dry-run / tick start.
 
-    Research: Celery inspect + NiFi backlog — reconcile side state so the
+    Research: Celery inspect + NiFi backlog ? reconcile side state so the
     priority head is real work, not stale open rows.
     """
     if not QUEUE.is_file():
@@ -484,7 +484,7 @@ def main() -> int:
         )
     )
     # Empty-plan / residual-exhausted auto-advance.
-    # Research: Celery ack + NiFi backpressure — do not requeue work that produced
+    # Research: Celery ack + NiFi backpressure ? do not requeue work that produced
     # zero durable progress after a full skip-pass (poison / already-known tree).
     receipt = parse_drain_receipt()
     copied = receipt.get("copied")
@@ -498,11 +498,11 @@ def main() -> int:
     )
     # residual_exhausted: large walk, >=98% already known, zero copies, AND no
     # planned apply rows. planned>0 with copied=0 is failure (path ERR / hash
-    # skip-all after filter) — do NOT auto-complete; operator/fix can retry.
-    # Research: Celery reject vs ack — only ack when broker work is truly done.
+    # skip-all after filter) ? do NOT auto-complete; operator/fix can retry.
+    # Research: Celery reject vs ack ? only ack when broker work is truly done.
     # 2026-07-26: tiny roots (Images=2, Safari=1) never hit walked>=50; still
     # residual-exhausted when the full walk produced zero durable plan/copy.
-    # Research: Celery ack tiny tasks — complete when broker work is done, not
+    # Research: Celery ack tiny tasks ? complete when broker work is done, not
     # only when batch size exceeds an arbitrary floor.
     residual_exhausted = (
         r.returncode == 0
@@ -553,7 +553,7 @@ def main() -> int:
             st[key] = {"strikes": 0, "at": utc(), "advanced": ok, "reason": ent["reason"]}
             save_empty_state(st)
     else:
-        # productive wave (copied>0) — reset strikes
+        # productive wave (copied>0) ? reset strikes
         if copied and int(copied) > 0:
             if key in st and int((st.get(key) or {}).get("strikes") or 0) > 0:
                 st[key] = {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Parse church/community photo-directory OCR into structured training data.
 
-Handles compound docs: image page + OCR names → families JSON + train.md + placeholders.
+Handles compound docs: image page + OCR names -> families JSON + train.md + placeholders.
 """
 from __future__ import annotations
 

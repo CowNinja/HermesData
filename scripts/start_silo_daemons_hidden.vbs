@@ -1,5 +1,5 @@
 ' Launch continuous + sprint with CREATE_NO_WINDOW (no focus steal).
-' Respect STOP files — overnight/travel should also check those.
+' Respect STOP files - overnight/travel should also check those.
 Option Explicit
 Dim fso, sh, pyw, launcher, py, root
 Set fso = CreateObject("Scripting.FileSystemObject")

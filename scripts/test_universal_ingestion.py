@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Milestone 2 validation — high-signal feed → sqlite-vec pipeline."""
+"""Milestone 2 validation ? high-signal feed ? sqlite-vec pipeline."""
 from __future__ import annotations
 
 import hashlib
@@ -20,7 +20,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         print(f"  PASS {name}")
     else:
         ERRORS.append(f"{name}: {detail}")
-        print(f"  FAIL {name} — {detail}")
+        print(f"  FAIL {name} ? {detail}")
 
 
 def _mock_embed(text: str, dim: int = 768):
@@ -143,7 +143,7 @@ def main() -> int:
         for e in ERRORS:
             print(f"  - {e}")
         return 1
-    print("ALL PASS — Milestone 2 universal ingestion automation GREEN")
+    print("ALL PASS ? Milestone 2 universal ingestion automation GREEN")
     return 0
 
 

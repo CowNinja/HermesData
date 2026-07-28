@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wave4: re-verification sprawl, review-moc batches, test logs — digest + recoverable archive."""
+"""Wave4: re-verification sprawl, review-moc batches, test logs ? digest + recoverable archive."""
 from __future__ import annotations
 
 import re
@@ -80,7 +80,7 @@ def main() -> int:
             files,
             rm / "review-moc-batch-es-ingest-INDEX.md",
             "review-moc-batch-es",
-            "Review-MOC batch es_ingest — Index",
+            "Review-MOC batch es_ingest ? Index",
         )
 
     # 2) references re-verification sprawl (cron noise class)
@@ -101,7 +101,7 @@ def main() -> int:
         if all_re:
             # one master index then archive all
             lines = [
-                f"# Re-Verification Cron Noise — Distilled Index ({TS})",
+                f"# Re-Verification Cron Noise ? Distilled Index ({TS})",
                 "",
                 "These were repetitive 'no-new' confirmation dumps. High-signal research stays in Growth-Blueprints / Research.",
                 f"**Archived count:** {len(all_re)}",
@@ -136,31 +136,31 @@ def main() -> int:
                 files,
                 tlog / "TEST-LOGS-INDEX.md",
                 "test-logs",
-                "Test logs — Index",
+                "Test logs ? Index",
             )
 
     # 4) program + housekeeping check-in
     write(
         ARCHIVE / "README.md",
-        f"# Wave4 {TS}\n\nreview-moc-batch-es · reverification-noise · test-logs\nRecoverable.\n",
+        f"# Wave4 {TS}\n\nreview-moc-batch-es ? reverification-noise ? test-logs\nRecoverable.\n",
     )
     write(
         VAULT / "Operations" / "logs" / f"phase-b-merge-execution-wave4-{TS}.md",
-        f"# Phase B Wave4 — {TS}\n\n"
+        f"# Phase B Wave4 ? {TS}\n\n"
         + "\n".join(f"- {r}" for r in receipts)
         + "\n\n## Vault links\n- [[Operations/Active-Work-Program-Phase-B-Orchestrator-Insights-2026-07-10]]\n",
     )
     prog = VAULT / "Operations" / "Active-Work-Program-Phase-B-Orchestrator-Insights-2026-07-10.md"
     if prog.exists():
         t = prog.read_text(encoding="utf-8")
-        note = f"\n\n## Background wave4 ({TS})\n- Re-verification cron noise → index + archive\n- review-moc es_ingest batches → index + archive\n- tests/logs → index + archive\n- Receipt: [[Operations/logs/phase-b-merge-execution-wave4-{TS}]]\n"
+        note = f"\n\n## Background wave4 ({TS})\n- Re-verification cron noise ? index + archive\n- review-moc es_ingest batches ? index + archive\n- tests/logs ? index + archive\n- Receipt: [[Operations/logs/phase-b-merge-execution-wave4-{TS}]]\n"
         if "Background wave4" not in t:
             write(prog, t.rstrip() + note)
     hk = VAULT / "Housekeeping.md"
     if hk.exists():
         cur = hk.read_text(encoding="utf-8", errors="ignore")
-        line = f"\n- {TS}: Wave4 — re-verify noise + review-moc batches + test logs distilled. [[Operations/logs/phase-b-merge-execution-wave4-{TS}]]\n"
-        if "Wave4 — re-verify" not in cur[-2500:]:
+        line = f"\n- {TS}: Wave4 ? re-verify noise + review-moc batches + test logs distilled. [[Operations/logs/phase-b-merge-execution-wave4-{TS}]]\n"
+        if "Wave4 ? re-verify" not in cur[-2500:]:
             write(hk, cur + line)
 
     print("receipts", len(receipts))

@@ -7,7 +7,7 @@ Parent+child pythonw re-exec with one listener = OK (one instance).
 Contract (Residual Hygiene soft-fail seal 2026-07-18):
 - Always write receipt JSON.
 - Exit 0 when job ran and left evidence (ok / partial / multi_listener advisory).
-- Exit 1 only for misconfig (netstat/cmd unusable AND no health path at all is not hard —
+- Exit 1 only for misconfig (netstat/cmd unusable AND no health path at all is not hard -
   still soft). Hard-fail reserved if script itself cannot write receipt path parent.
 - Non-empty stdout only when not clean single-instance healthy (cron alert).
 - Never kills, never restarts. Heal authority stays stack_healing_once / Phronesis.ps1.

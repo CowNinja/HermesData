@@ -112,7 +112,7 @@ def chat_once(base: str, model: str, prompt: dict) -> dict[str, Any]:
         "temperature": 0.7,
         "stream": False,
     }
-    # Wall clock ≈ total latency; without streaming TTFT ≈ total for small outs
+    # Wall clock ? total latency; without streaming TTFT ? total for small outs
     code, body, wall = http_json(f"{base}/v1/chat/completions", payload, timeout=900)
     out: dict[str, Any] = {
         "http": code,
@@ -207,7 +207,7 @@ def main() -> int:
     json_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
 
     lines = [
-        f"# Bench: Qwen3.6-35B-A3B abliterated vs Qwythos-9B — {results['at']}",
+        f"# Bench: Qwen3.6-35B-A3B abliterated vs Qwythos-9B ? {results['at']}",
         "",
         "## Endpoints",
         "",

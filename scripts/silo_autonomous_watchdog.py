@@ -127,7 +127,7 @@ def main() -> int:
                     f"land_heal dual_bad={dual} hb_age={hb_age} cont_alive={cont_alive}"
                 )
                 # Prefer pythonw + run_hidden (CREATE_NO_WINDOW). Do NOT force
-                # bare python.exe — schtask/parent already focus-safe via pythonw.
+                # bare python.exe - schtask/parent already focus-safe via pythonw.
                 r = run_hidden(
                     [PY, str(SCRIPTS / "silo_recovery_single_writer.py")],
                     capture_output=True,

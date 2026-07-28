@@ -18,7 +18,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         print(f"  PASS {name}")
     else:
         ERRORS.append(f"{name}: {detail}")
-        print(f"  FAIL {name} — {detail}")
+        print(f"  FAIL {name} ? {detail}")
 
 
 def main() -> int:
@@ -68,7 +68,7 @@ def main() -> int:
     local = bridge_dispatch("def foo(): pass", task_type="code", force_local=True, prefer="vault")
     check("local_still_first", local.get("success"), str(local.get("provenance", {})))
 
-    # Fleet path for realtime when we simulate — use explicit fleet trigger prompt
+    # Fleet path for realtime when we simulate ? use explicit fleet trigger prompt
     fleet_prompt = "Search for the latest real-time breaking news about local LLM routers"
     fleet_info = detect_opportunistic_fleet_triggers(fleet_prompt)
     check("fleet_info_route", fleet_info.get("should_route"))
@@ -88,7 +88,7 @@ def main() -> int:
         for e in ERRORS:
             print(f"  - {e}")
         return 1
-    print("ALL PASS — Tier 1.5 wired")
+    print("ALL PASS ? Tier 1.5 wired")
     return 0
 
 

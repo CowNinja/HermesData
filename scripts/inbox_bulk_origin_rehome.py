@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fast bulk re-home of K Inbox using origin-folder rules (no LLM).
 
-Paperless-style path matching + medallion bronze→silver promotion.
+Paperless-style path matching + medallion bronze?silver promotion.
 Recursive. Preserves relative path under target shelf.
 Default dry-run. --apply moves on K only.
 
@@ -254,10 +254,10 @@ def main() -> int:
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Inbox bulk origin re-home — {utc()}",
+        f"# Inbox bulk origin re-home ? {utc()}",
         "",
         f"**Mode:** {'APPLY' if args.apply else 'DRY-RUN'}",
-        f"**Scanned candidates:** {len(files)} · **planned:** {len(planned)} · **applied:** {applied} · **errors:** {errors} · **stay_seen:** {stay}",
+        f"**Scanned candidates:** {len(files)} ? **planned:** {len(planned)} ? **applied:** {applied} ? **errors:** {errors} ? **stay_seen:** {stay}",
         f"**Prefix/only:** `{prefix or '(all)'}`",
         f"**By domain:** {dict(by_dom)}",
         f"**By why:** {dict(by_why)}",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repoint OCR queue rows whose path died after rehome (Inbox→shelf).
+"""Repoint OCR queue rows whose path died after rehome (Inbox?shelf).
 
 Matches basename via ingest registry; sets resolved_dup if shelf path already queued.
 """
@@ -62,7 +62,7 @@ def main() -> int:
     stats = dict(ocr.execute("SELECT status, COUNT(*) FROM ocr_queue GROUP BY status"))
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text(
-        f"# OCR queue repoint — {now}\n\n**Repointed/dup:** {fixed}\n\n{stats}\n",
+        f"# OCR queue repoint ? {now}\n\n**Repointed/dup:** {fixed}\n\n{stats}\n",
         encoding="utf-8",
     )
     print(json.dumps({"fixed": fixed, "stats": stats, "receipt": str(RECEIPT)}))

@@ -22,7 +22,7 @@ LOCAL_BACKENDS = frozenset(
 LOCAL_BILLING_PROVIDERS = frozenset({"custom:phronesis-sovereign", "custom", "local"})
 LOCAL_BILLING_URL_MARKERS = ("127.0.0.1:8091", "127.0.0.1:8090", "localhost:8091", "localhost:8090")
 
-# USD per 1M tokens — official docs snapshots (2026-07).
+# USD per 1M tokens ? official docs snapshots (2026-07).
 CLOUD_BASELINES: Dict[str, Dict[str, Any]] = {
     "grok-4.20": {
         "label": "Grok 4.20",
@@ -407,7 +407,7 @@ def build_usage_savings(*, period_days: int = 30) -> Dict[str, Any]:
             "total_tokens": total_tokens,
             "requests": requests,
             "actual_cost_usd": 0.0,
-            "note": "Local llama inference — API cost is $0; electricity not included.",
+            "note": "Local llama inference ? API cost is $0; electricity not included.",
         },
         "cloud_comparison": {
             "default_baseline_id": DEFAULT_BASELINE_ID,
@@ -418,7 +418,7 @@ def build_usage_savings(*, period_days: int = 30) -> Dict[str, Any]:
                 f"~${default_saved:,.2f} saved vs {CLOUD_BASELINES[DEFAULT_BASELINE_ID]['label']} "
                 f"over {period_days}d"
                 if default_saved > 0
-                else f"Tracking local tokens — savings appear once sovereign dispatches accumulate"
+                else f"Tracking local tokens ? savings appear once sovereign dispatches accumulate"
             ),
         },
         "cloud_paid_period": {

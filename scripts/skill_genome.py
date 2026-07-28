@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_genome.py — Skill Mutation Tracking & Version Control
+skill_genome.py ? Skill Mutation Tracking & Version Control
 Snapshots skill files before mutation, logs changes, supports rollback.
 
 Usage:
@@ -123,7 +123,7 @@ def log_mutation(skill: str, tag: str, reason: str,
     _log_event(event)
     
     delta = f" ({event['score_delta']:+.3f})" if event['score_delta'] is not None else ""
-    print(f"  MUTATION: {skill}/{tag} — {reason}{delta}")
+    print(f"  MUTATION: {skill}/{tag} ? {reason}{delta}")
     return event
 
 
@@ -187,7 +187,7 @@ def show_history(skill: str, limit: int = 10):
         return
     
     print(f"\n  Mutation History for {skill} (last {limit}):")
-    print(f"  {'─'*50}")
+    print(f"  {'?'*50}")
     for ev in events[-limit:]:
         ts = ev.get("timestamp", "?")[:19]
         etype = ev.get("type", "?")

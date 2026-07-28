@@ -2,7 +2,7 @@
 """Deterministic relevance for K silo POPULATION (lenient). Twin train_gold is a later filter.
 
 Rules first (path/name/ext/class). Optional local AI for borderline only.
-Never flips touch class 1/2/3 — only train relevance labels.
+Never flips touch class 1/2/3 ? only train relevance labels.
 """
 from __future__ import annotations
 
@@ -140,7 +140,7 @@ def score_path(path: str | Path, rules: dict | None = None, use_ai: bool = False
         score += int(sc.get("lenient_personal_boost", 15))
         reasons.append("lenient_silo_population_boost")
 
-    # thresholds — when in doubt INCLUDE (train_ok / train_weak), not noise
+    # thresholds ? when in doubt INCLUDE (train_ok / train_weak), not noise
     if cls == 1:
         label = "noise"
     elif score <= sc["max_noise"]:
@@ -150,14 +150,14 @@ def score_path(path: str | Path, rules: dict | None = None, use_ai: bool = False
     elif score >= sc["min_train_ok"]:
         label = "train_ok"
     else:
-        # doubt band → still silo-eligible
+        # doubt band ? still silo-eligible
         label = "train_weak" if not lenient else str(
             (rules.get("lenient") or {}).get("doubt_label", "train_ok")
         )
         reasons.append("doubt_include_lenient" if lenient else "doubt_weak")
 
     ai = None
-    # Local AI: help promote weak→ok; only demote to noise if high confidence junk
+    # Local AI: help promote weak?ok; only demote to noise if high confidence junk
     if use_ai and cls in (2, 3) and label in {"train_weak", "train_ok", "unknown"}:
         ai = _local_ai_relevance(
             name,
@@ -171,7 +171,7 @@ def score_path(path: str | Path, rules: dict | None = None, use_ai: bool = False
             reasons.append("ai_vote_train_ok")
             score += 10
         elif vote == "noise" and label == "train_weak" and not gold_hit:
-            # only demote weak non-gold — never gold
+            # only demote weak non-gold ? never gold
             label = "train_weak"  # keep in silo; flag in reasons
             reasons.append("ai_suggested_noise_kept_lenient")
 

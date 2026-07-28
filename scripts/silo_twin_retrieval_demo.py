@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Twin retrieval demos — prove silo value for day-to-day asks.
+"""Twin retrieval demos ? prove silo value for day-to-day asks.
 
 Post-OCR: more queries + temporal flags from train.meta / k_light_index.
 """
@@ -98,7 +98,7 @@ def temporal_note(path: str) -> str:
 
 
 def main() -> int:
-    lines = [f"# Twin retrieval demo — {utc()}", ""]
+    lines = [f"# Twin retrieval demo ? {utc()}", ""]
     report = {"at": utc(), "demos": []}
     summary = {}
     for name, q in DEMOS:
@@ -116,14 +116,14 @@ def main() -> int:
             }
         )
         summary[name] = len(hits)
-        lines.append(f"## {name} — `{q}`")
+        lines.append(f"## {name} ? `{q}`")
         if hits:
             for h in hits[:5]:
                 p = h.get("path") or ""
                 tn = temporal_note(p)
-                extra = f" · {tn}" if tn else ""
+                extra = f" ? {tn}" if tn else ""
                 lines.append(
-                    f"- **{h.get('domain')}** · `{Path(p).name}` · {h.get('process_status')}{extra}"
+                    f"- **{h.get('domain')}** ? `{Path(p).name}` ? {h.get('process_status')}{extra}"
                 )
         else:
             lines.append("- _(no catalog path hits)_")

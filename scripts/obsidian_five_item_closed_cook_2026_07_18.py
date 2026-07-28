@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Second-Brain five-item closed-app cook — 2026-07-18.
+"""Second-Brain five-item closed-app cook ? 2026-07-18.
 
 Jeff closed Obsidian; residual workspace juggl leaves can stick.
 
@@ -93,7 +93,7 @@ def obsidian_running() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Item 1 — workspace strip
+# Item 1 ? workspace strip
 # ---------------------------------------------------------------------------
 
 def strip_bad_leaves(node, banned_substrings: tuple[str, ...]):
@@ -182,7 +182,7 @@ def item1_workspace() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Item 2 — plugin stack finalize
+# Item 2 ? plugin stack finalize
 # ---------------------------------------------------------------------------
 
 CANON_ENABLED = [
@@ -350,12 +350,12 @@ def item2_plugins() -> dict:
         "omnisearch_added_downranks": om_changed,
         "ok": len(new_enabled) >= 16 and not missing and tp_ok,
     }
-    log(f"  enabled={res['enabled_count']} missing={missing} copilotΔ={copilot_changed} ok={res['ok']}")
+    log(f"  enabled={res['enabled_count']} missing={missing} copilot?={copilot_changed} ok={res['ok']}")
     return res
 
 
 # ---------------------------------------------------------------------------
-# Item 3 — domain tag lint
+# Item 3 ? domain tag lint
 # ---------------------------------------------------------------------------
 
 def item3_tags() -> dict:
@@ -432,7 +432,7 @@ def item3_tags() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Item 4 — smart-env + app.json hygiene
+# Item 4 ? smart-env + app.json hygiene
 # ---------------------------------------------------------------------------
 
 REQUIRED_IGNORE = [
@@ -567,11 +567,11 @@ def item4_hygiene() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Item 5 — X harvest note + dual verify + receipts
+# Item 5 ? X harvest note + dual verify + receipts
 # ---------------------------------------------------------------------------
 
 def dual_verify() -> dict:
-    """Disk dual verification (Obsidian closed → REST N/A)."""
+    """Disk dual verification (Obsidian closed ? REST N/A)."""
     checks = {}
     enabled = load_json(OBS / "community-plugins.json")
     checks["enabled_count"] = len(enabled)
@@ -645,16 +645,16 @@ def item5_receipts(all_results: dict) -> dict:
     triage = VAULT / "Operations" / "Architecture-Idea-Triage.md"
     harvest_block = f"""
 
-## X harvest — second-brain closed-cook ({TS[:8]})
+## X harvest ? second-brain closed-cook ({TS[:8]})
 
 Source filter: Obsidian workspace residue / Smart Connections exclusions / tag+Bases / Minimal+Style Settings (X + forum 2026). Parking only.
 
 **Disable-via-JSON then strip workspace leaves (app closed)**
-Source: Obsidian forum “forced uninstall” + Reddit startup tips (workspace.json retains dead plugin leaves)
-One-sentence: With Obsidian closed, remove disabled-plugin leaves from workspace.json or startup still pays for ghost panes and “plugin no longer active” noise.
+Source: Obsidian forum ?forced uninstall? + Reddit startup tips (workspace.json retains dead plugin leaves)
+One-sentence: With Obsidian closed, remove disabled-plugin leaves from workspace.json or startup still pays for ghost panes and ?plugin no longer active? noise.
 Why it fits: Directly unblocks our Juggl residual after community-plugins disable.
 Triage: Impact H | Effort L | Time-to-Value Done
-Status: **Integrated** — five-item closed cook {TS}
+Status: **Integrated** ? five-item closed cook {TS}
 Revisit trigger: If Jeff re-enables Juggl for a focused graph session.
 Links: [[Setup/Obsidian-Post-Reload-Remaining-Pass-Receipt-2026-07-18]] [[Operations/logs/obsidian-five-item-closed-cook-latest]]
 
@@ -681,7 +681,7 @@ Links: [[Setup/Obsidian-Category-Colors-and-Tags]] [[Dashboard/Domain-Tag-Dashbo
         cur = triage.read_text(encoding="utf-8", errors="replace")
         marker = "five-item closed cook"
         if marker not in cur:
-            # avoid huge duplication if similar blocks exist — still append closed-cook specific
+            # avoid huge duplication if similar blocks exist ? still append closed-cook specific
             if "second-brain closed-cook" not in cur:
                 triage.write_text(cur.rstrip() + harvest_block + "\n", encoding="utf-8")
                 harvest_added = True
@@ -704,7 +704,7 @@ tags:
 ts: {TS}
 ---
 
-# Obsidian five-item closed-cook — {TS}
+# Obsidian five-item closed-cook ? {TS}
 
 **VAULT_CONFIRMED:** `D:\\\\PhronesisVault`  
 **Obsidian process:** CLOSED (required for workspace stick)  
@@ -716,7 +716,7 @@ ts: {TS}
 | Source | Lesson |
 |--------|--------|
 | Obsidian forum: forced uninstall / disable via JSON | Edit `community-plugins.json` with app **closed**; delete plugin folder only if uninstalling |
-| Reddit / forum: workspace residual | Disabled plugins leave ghost leaves in `workspace.json` → strip with app closed or they return / warn |
+| Reddit / forum: workspace residual | Disabled plugins leave ghost leaves in `workspace.json` ? strip with app closed or they return / warn |
 | Smart Connections + large vault X | Exclusion-first + archive heavy multi ajson; prefer neighborhoods over galaxy |
 | kepano / tags+Bases | Namespace tags + Bases = agent query surface without RAG |
 | Style Settings 1.0.9 | `@settings` needs `variable-color`; already shipped |
@@ -729,13 +729,13 @@ ts: {TS}
 
 | # | Action | Result |
 |---|--------|--------|
-| 1 | Workspace Juggl/Agent-Client strip | juggl {all_results['item1'].get('juggl_before')}→{all_results['item1'].get('juggl_after')}; ac {all_results['item1'].get('agent_client_before')}→{all_results['item1'].get('agent_client_after')}; ok={all_results['item1'].get('ok')} |
-| 2 | Plugin stack finalize (16) | enabled={all_results['item2'].get('enabled_count')}; missing={all_results['item2'].get('missing_main_or_manifest')}; copilot quiet Δ={all_results['item2'].get('copilot_changed')}; templater_safe={all_results['item2'].get('templater_safe')}; ok={all_results['item2'].get('ok')} |
+| 1 | Workspace Juggl/Agent-Client strip | juggl {all_results['item1'].get('juggl_before')}?{all_results['item1'].get('juggl_after')}; ac {all_results['item1'].get('agent_client_before')}?{all_results['item1'].get('agent_client_after')}; ok={all_results['item1'].get('ok')} |
+| 2 | Plugin stack finalize (16) | enabled={all_results['item2'].get('enabled_count')}; missing={all_results['item2'].get('missing_main_or_manifest')}; copilot quiet ?={all_results['item2'].get('copilot_changed')}; templater_safe={all_results['item2'].get('templater_safe')}; ok={all_results['item2'].get('ok')} |
 | 3 | Domain-tag lint + format-smoke | missing={all_results['item3'].get('missing_parsed')}; crit={all_results['item3'].get('critical_tagged')}; smoke={all_results['item3'].get('format_smoke',{}).get('ok')}; ok={all_results['item3'].get('ok')} |
 | 4 | Smart-env + app.json hygiene | ignore+={all_results['item4'].get('app_ignore_added')}; se+={all_results['item4'].get('smart_env_added')}; multi_real={all_results['item4'].get('multi_real_files')}; graph={all_results['item4'].get('graph_color_groups')}; ok={all_results['item4'].get('ok')} |
-| 5 | X harvest + dual-verify ×2 | harvest_added={harvest_added}; v1={v1.get('pass')}; v2={v2.get('pass')} |
+| 5 | X harvest + dual-verify ?2 | harvest_added={harvest_added}; v1={v1.get('pass')}; v2={v2.get('pass')} |
 
-## Dual verification (disk ×2)
+## Dual verification (disk ?2)
 
 ### Pass 1
 ```
@@ -750,7 +750,7 @@ ts: {TS}
 **Overall dual-verify:** {"PASS" if v1.get("pass") and v2.get("pass") else "FAIL"}
 
 ## Explicitly NOT done
-- Live visual confirm (Jeff: open vault → Ctrl+R)
+- Live visual confirm (Jeff: open vault ? Ctrl+R)
 - Permanent delete of archived smart-env multi (205MB keep until stable rebuild)
 - API key rotation
 - Mass plugin version upgrades
@@ -789,7 +789,7 @@ tags:
   - status/live
 ---
 
-# Obsidian dual-verify — latest (closed-cook)
+# Obsidian dual-verify ? latest (closed-cook)
 
 **UTC:** {datetime.now(timezone.utc).isoformat()}  
 **TS:** {TS}
@@ -808,7 +808,7 @@ tags:
 | copilot index | {v2.get('copilot_index')} |
 | Dual PASS | {v1.get('pass') and v2.get('pass')} |
 
-Full: [[Operations/logs/obsidian-five-item-closed-cook-latest]] · [[Setup/Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18]]
+Full: [[Operations/logs/obsidian-five-item-closed-cook-latest]] ? [[Setup/Obsidian-Five-Item-Closed-Cook-Receipt-2026-07-18]]
 """
     atomic_write_text(LOGS / "obsidian-dual-verify-latest.md", dual_md)
     dump_json(LOGS / "obsidian-dual-verify-latest.json", {"v1": v1, "v2": v2, "ts": TS})
@@ -819,15 +819,15 @@ Full: [[Operations/logs/obsidian-five-item-closed-cook-latest]] · [[Setup/Obsid
         ct = charter.read_text(encoding="utf-8")
         if "Five-item closed-cook" not in ct:
             inject = (
-                "\n### Five-item closed-cook 2026-07-18 — DONE\n\n"
+                "\n### Five-item closed-cook 2026-07-18 ? DONE\n\n"
                 "See [[Operations/logs/obsidian-five-item-closed-cook-latest]] "
                 "(workspace strip, plugin lock, lint, hygiene, dual-verify).\n"
             )
             # insert after Five-actions section if present
-            if "### Five-actions 2026-07-18 — DONE" in ct:
+            if "### Five-actions 2026-07-18 ? DONE" in ct:
                 ct = ct.replace(
-                    "### Five-actions 2026-07-18 — DONE",
-                    "### Five-actions 2026-07-18 — DONE" + inject.replace("\n### Five-item", "\n\n### Five-item"),
+                    "### Five-actions 2026-07-18 ? DONE",
+                    "### Five-actions 2026-07-18 ? DONE" + inject.replace("\n### Five-item", "\n\n### Five-item"),
                 )
                 # fix double - actually simpler append before Orientation
             if "### Five-item closed-cook" not in ct:
@@ -865,7 +865,7 @@ def main() -> int:
     log(f"FIVE-ITEM CLOSED COOK {TS}")
     log(f"backup dir: {BAK}")
     if obsidian_running():
-        log("ERROR: Obsidian is RUNNING — abort workspace mutations (would be overwritten).")
+        log("ERROR: Obsidian is RUNNING ? abort workspace mutations (would be overwritten).")
         log("Jeff said he closed it; re-check process and re-run.")
         return 2
 

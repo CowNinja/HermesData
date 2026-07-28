@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Final consolidation self-test — watchdog + telemetry + feed + local stress."""
+"""Final consolidation self-test ? watchdog + telemetry + feed + local stress."""
 from __future__ import annotations
 
 import json
@@ -18,7 +18,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         print(f"  PASS {name}")
     else:
         ERRORS.append(f"{name}: {detail}")
-        print(f"  FAIL {name} — {detail}")
+        print(f"  FAIL {name} ? {detail}")
 
 
 def main() -> int:
@@ -77,9 +77,9 @@ def main() -> int:
             print(f"  - {e}")
         return 1
     if status == "GREEN":
-        print("ALL PASS — Sovereign AI Swarm consolidation GREEN")
+        print("ALL PASS ? Sovereign AI Swarm consolidation GREEN")
     else:
-        print(f"PASS with stack {status} — consolidation wired (recover may be needed)")
+        print(f"PASS with stack {status} ? consolidation wired (recover may be needed)")
     return 0
 
 

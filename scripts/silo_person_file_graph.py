@@ -7,7 +7,7 @@ from entity_context + registry source/dest paths + optional .ocr.md peeks.
 Hub-cap lock (2026-07-21, C6 re-inflate):
   Rebuild is additive (INSERT OR IGNORE). Without a post-build path_match
   cap, hubs like dameion re-inflate past board yellow (400) after every orch
-  person_file_graph worker — even when densify hygiene later trims them.
+  person_file_graph worker ? even when densify hygiene later trims them.
   Lessons: entity-resolution degree caps (hub-and-spoke / power-law outliers),
   cap-at-write not only post-hoc, prefer multi-word person tokens.
   Default: keep at most --hub-keep path_match links per person (350 < yellow 400).
@@ -73,7 +73,7 @@ def add_sidecar_text_evidence(
     """Bounded text_match/sidecar_text links from .train.md / .ocr.md peeks.
 
     2026-07-21 C6 evidence-mix: board was 100% path_match. ER lesson (Splink /
-    record linkage) — path co-occurrence is weak evidence; sidecar text is
+    record linkage) ? path co-occurrence is weak evidence; sidecar text is
     stronger and diversifies evidence_mix without reckless entity promote.
 
     UNIQUE(person_id, source_path): use sidecar path as source_path so text
@@ -341,7 +341,7 @@ def main() -> int:
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Person-file graph — {utc()}",
+        f"# Person-file graph ? {utc()}",
         "",
         f"- people: **{total_people}**",
         f"- links: **{total_links}** (new this run path matches counted loosely)",

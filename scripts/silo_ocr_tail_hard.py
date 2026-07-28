@@ -2,9 +2,9 @@
 """Clear OCR tail: park junk, promote fat sidecars, hard-OCR remaining medical gold.
 
 Hang-prevention (2026-07-14):
-- Worker used attempts < 4 so gold DD2807/2808 with attempts 5–6 were never reselected.
+- Worker used attempts < 4 so gold DD2807/2808 with attempts 5?6 were never reselected.
 - Fat .ocr.md could exist while queue still said needs_ocr/chars=0.
-This script always: park chrome → promote fat → force-process remaining open gold.
+This script always: park chrome ? promote fat ? force-process remaining open gold.
 """
 from __future__ import annotations
 

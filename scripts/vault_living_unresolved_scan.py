@@ -97,7 +97,7 @@ def exists(target: str, stems: set[str], paths: set[str], source: Path | None = 
     excluded folders (references/, Archive pointers) and still count as OK
     so we don't false-fail real digests / noise indexes.
 
-    Bare-stem matching only for path-free simple note names — never for
+    Bare-stem matching only for path-free simple note names ? never for
     `skills/.../SKILL.md` style paths (stem collision).
 
     Relative targets (`../`, `./`) resolve against the source note parent.
@@ -147,7 +147,7 @@ def exists(target: str, stems: set[str], paths: set[str], source: Path | None = 
         k = key.rstrip("/")
         if k in paths or k.lower() in paths:
             return True
-    # Simple name only (no /) — stem or path-key match
+    # Simple name only (no /) ? stem or path-key match
     if "/" not in ts and "\\" not in ts and not ts.startswith(".."):
         name = Path(ts).name
         # drop trailing .base/.canvas for simple match
@@ -236,7 +236,7 @@ def main() -> int:
     else:
         OUT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     lines = [
-        f"# Living Unresolved Scan — {payload['ts'][:10]}",
+        f"# Living Unresolved Scan ? {payload['ts'][:10]}",
         "",
         f"- Living md scanned: **{scanned}**",
         f"- Unresolved links: **{len(unresolved)}**",

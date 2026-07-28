@@ -50,7 +50,7 @@ def main() -> int:
             break
         dest = Path(dest_path)
         if dest.is_file():
-            # already back — requeue OCR
+            # already back ? requeue OCR
             if not args.dry_run:
                 oc.execute(
                     "UPDATE ocr_queue SET status='queued', score=score+10, updated_at=? WHERE path=?",
@@ -118,7 +118,7 @@ def main() -> int:
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
     LOG.write_text(
-        f"# Reacquire missing — {utc()}\n\n"
+        f"# Reacquire missing ? {utc()}\n\n"
         + "\n".join(f"- {r}" for r in results)
         + "\n",
         encoding="utf-8",

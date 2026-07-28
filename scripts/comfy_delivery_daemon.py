@@ -113,7 +113,7 @@ def _load_state() -> dict:
 
 
 def _save_state(state: dict) -> None:
-    """Atomic state publish (tmp→fsync→replace). Best-effort .bak of prior file."""
+    """Atomic state publish (tmp?fsync?replace). Best-effort .bak of prior file."""
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     if STATE_FILE.is_file():
         backup = STATE_FILE.with_suffix(".json.bak")
@@ -300,7 +300,7 @@ def _sidecar_for_png(png_name: str) -> dict | None:
 
 
 def _caption_from_sidecar(png_name: str) -> str | None:
-    """Prefer human caption from gallery sidecar over dumb Series — standard__*."""
+    """Prefer human caption from gallery sidecar over dumb Series ? standard__*."""
     meta = _sidecar_for_png(png_name)
     if not meta:
         return None
@@ -311,10 +311,10 @@ def _caption_from_sidecar(png_name: str) -> str | None:
         low = val.lower()
         if low in {"series", "group", "portrait", "group + male center"}:
             continue
-        if low.startswith("series —") or low.startswith("series -"):
+        if low.startswith("series ?") or low.startswith("series -"):
             continue
         # Already good human text.
-        if " — " in val or " - " in val or len(val) >= 8:
+        if " ? " in val or " - " in val or len(val) >= 8:
             return val
     # Build from character + prompt fragments if caption empty/weak.
     try:
@@ -366,19 +366,19 @@ def _batch_caption(png_name: str) -> str | None:
 
     # Sanitize per-label legacy bleed
     if "Amira & Aisha" in label and (" - " in label or "/7" in label or total > 6):
-        label = label.replace("Amira & Aisha - ", "Amira & Aisha — ").replace(" - ", " — ")
+        label = label.replace("Amira & Aisha - ", "Amira & Aisha ? ").replace(" - ", " ? ")
 
     # Prefer sidecar who/pose/clothing; append sequence for active batches.
     if side_cap:
         if total > 1 and f"{index}/{total}" not in side_cap:
-            return f"{side_cap} — {index}/{total}"
+            return f"{side_cap} ? {index}/{total}"
         return side_cap
 
     # Final: caption should be the descriptive name of the picture (who, what they're doing, sequence)
     descriptive = label
-    if not ("/" in descriptive and (" — " in descriptive or " - " in descriptive)):
-        descriptive = f"{label} — {index}/{total}"
-    # Keep png name only as low-priority trace — not the primary text users see.
+    if not ("/" in descriptive and (" ? " in descriptive or " - " in descriptive)):
+        descriptive = f"{label} ? {index}/{total}"
+    # Keep png name only as low-priority trace ? not the primary text users see.
     return descriptive
 
 
@@ -430,7 +430,7 @@ def _deliver(channel: str, png_name: str, *, caption: str | None = None, force: 
         return False, guard_reason
     rich = caption or _batch_caption(png_name) or _caption_from_sidecar(png_name)
     if not rich:
-        # Last resort: session label, then character-ish stem — never bare "Series — standard__*"
+        # Last resort: session label, then character-ish stem ? never bare "Series ? standard__*"
         try:
             sess = _load_batch_session()
             labels = list(sess.get("labels") or [])
@@ -552,15 +552,15 @@ def _undelivered_pngs(state: dict) -> list[tuple[str, float, str]]:
 
     Primary path: mtime > cursor (normal forward scan).
     Hole path: PNGs at/before cursor that never landed in delivered ledger or
-    posted registry — but ONLY within a tight time window of the cursor
+    posted registry ? but ONLY within a tight time window of the cursor
     (default 30m, not multi-hour). Prevents replaying cold historical output
     when the ledger advanced past a mid-series failure (e.g. 759/760 under 761).
 
     Age guard: never auto-queue PNGs older than MAX_AUTO_AGE_SEC (default 20m).
-    Historical dumps (00005… after a channel retarget) must require --force-png.
+    Historical dumps (00005? after a channel retarget) must require --force-png.
     """
     cursor_mtime = float(state.get("last_mtime") or 0)
-    # Tight hole window (was 3h — wide enough to re-flood historical holes).
+    # Tight hole window (was 3h ? wide enough to re-flood historical holes).
     hole_window_sec = float(os.environ.get("COMFY_DELIVERY_HOLE_WINDOW_SEC", str(30 * 60)) or (30 * 60))
     hole_floor = max(0.0, cursor_mtime - hole_window_sec) if cursor_mtime > 0 else 0.0
     max_age = float(os.environ.get("COMFY_DELIVERY_MAX_AUTO_AGE_SEC", str(MAX_AUTO_AGE_SEC)) or MAX_AUTO_AGE_SEC)
@@ -575,7 +575,7 @@ def _undelivered_pngs(state: dict) -> list[tuple[str, float, str]]:
         name = path.name
         if name in seen:
             continue
-        # Age guard first — skip cold archive without hashing.
+        # Age guard first ? skip cold archive without hashing.
         if max_age > 0 and _png_age_sec(mtime) > max_age:
             continue
         digest = _sha256_file(path)
@@ -701,7 +701,7 @@ def seal_cold_backlog(
         name = path.name
         digest = _sha256_file(path)
         if _already_delivered(state, name, digest) or _posted_to_discord(name, digest):
-            # Real Discord id or ledger — leave alone.
+            # Real Discord id or ledger ? leave alone.
             did = _discord_id(name)
             if did.isdigit() and len(did) >= 15:
                 skipped_already.append(name)

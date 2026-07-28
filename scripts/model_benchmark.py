@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-model_benchmark.py — Comprehensive benchmark for all candidate models on RTX 3060 12GB.
+model_benchmark.py ? Comprehensive benchmark for all candidate models on RTX 3060 12GB.
 Tests: TTFT, decode tok/s, VRAM usage, and skill-execution quality score.
 """
 import json
@@ -20,14 +20,14 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 LLAMA_SERVER = Path(r"D:\PhronesisModels\binaries\test-prebuilts\2026-06-28-b9828-cuda13\llama-server.exe")
 
-# All models to benchmark — only files that actually exist will run
+# All models to benchmark ? only files that actually exist will run
 ALL_CANDIDATES = [
     {
         "id": "qwen2-5-7b",
         "file": "Qwen2.5-7B-Instruct-Q5_K_M.gguf",
         "ctx": 8192,
         "ngl": 28,
-        "desc": "Qwen2.5-7B Q5_K_M — current default",
+        "desc": "Qwen2.5-7B Q5_K_M ? current default",
         "abliterated": False,
     },
     {
@@ -43,7 +43,7 @@ ALL_CANDIDATES = [
         "file": "Qwen3.5-9B-Q4_K_M.gguf",
         "ctx": 8192,
         "ngl": 99,
-        "desc": "Qwen3.5-9B Q4_K_M — primary workhorse candidate",
+        "desc": "Qwen3.5-9B Q4_K_M ? primary workhorse candidate",
         "abliterated": False,
     },
     {
@@ -51,7 +51,7 @@ ALL_CANDIDATES = [
         "file": "Huihui-Qwen3-8B-abliterated-v2.i1-Q4_K_M.gguf",
         "ctx": 8192,
         "ngl": 99,
-        "desc": "Qwen3-8B-abliterated-v2 i1-Q4_K_M — RP candidate",
+        "desc": "Qwen3-8B-abliterated-v2 i1-Q4_K_M ? RP candidate",
         "abliterated": True,
     },
     {
@@ -59,7 +59,7 @@ ALL_CANDIDATES = [
         "file": "Qwen2.5-Coder-14B-Instruct-abliterated-Q5_K_M.gguf",
         "ctx": 8192,
         "ngl": 99,
-        "desc": "Qwen2.5-Coder-14B-abliterated Q5_K_M — deep coding",
+        "desc": "Qwen2.5-Coder-14B-abliterated Q5_K_M ? deep coding",
         "abliterated": True,
     },
     {
@@ -67,7 +67,7 @@ ALL_CANDIDATES = [
         "file": "Rocinante-12B-v1.1-Q4_K_M.gguf",
         "ctx": 8192,
         "ngl": 35,
-        "desc": "Rocinante-12B Q4_K_M — RP specialist",
+        "desc": "Rocinante-12B Q4_K_M ? RP specialist",
         "abliterated": True,
     },
     {
@@ -75,7 +75,7 @@ ALL_CANDIDATES = [
         "file": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
         "ctx": 8192,
         "ngl": 35,
-        "desc": "Llama-3.2-3B Q4_K_M — speed baseline",
+        "desc": "Llama-3.2-3B Q4_K_M ? speed baseline",
         "abliterated": False,
     },
 ]
@@ -256,40 +256,40 @@ def score_response(test_type, text):
         for kw, label, pts in checks:
             if kw in text:
                 s += pts
-                notes.append(f"✓ {label}")
+                notes.append(f"? {label}")
             else:
-                notes.append(f"� {label}")
+                notes.append(f"? {label}")
         score = min(s, 100)
 
     elif test_type == "multi_step_reasoning":
-        # Correct answer: (1,1) → up → (1,2) → right 2 → (3,2) → down 1 → (2,2)
+        # Correct answer: (1,1) ? up ? (1,2) ? right 2 ? (3,2) ? down 1 ? (2,2)
         if "(2,2)" in text or "(2, 2)" in text:
             score += 40
-            notes.append("✓ final answer (2,2)")
+            notes.append("? final answer (2,2)")
         elif "(3,2)" in text or "(3, 2)" in text:
             score += 15
-            notes.append("� stopped at intermediate (3,2)")
+            notes.append("? stopped at intermediate (3,2)")
         if "step" in text.lower():
             score += 20
-            notes.append("✓ shows steps")
+            notes.append("? shows steps")
         if "up" in text.lower():
             score += 10
-            notes.append("✓ mentions up")
+            notes.append("? mentions up")
         score = min(score, 100)
 
     elif test_type == "skill_tool_call":
         if '"name"' in text and '"arguments"' in text:
             score += 40
-            notes.append("✓ tool call structure")
+            notes.append("? tool call structure")
         if "terminal" in text.lower():
             score += 30
-            notes.append("✓ terminal tool")
+            notes.append("? terminal tool")
         if "ls" in text.lower():
             score += 20
-            notes.append("✓ ls command")
+            notes.append("? ls command")
         if "```" in text:
             score += 10
-            notes.append("✓ code block")
+            notes.append("? code block")
         score = min(score, 100)
 
     return score, notes
@@ -397,7 +397,7 @@ def main():
 
     # Print ranking table
     print(f"\n\n{'='*80}")
-    print("BENCHMARK COMPLETE — FULL RANKINGS")
+    print("BENCHMARK COMPLETE ? FULL RANKINGS")
     print(f"{'='*80}")
     print(f"{'Model':<32} {'TTFT':>7} {'tok/s':>7} {'VRAM':>5} {'Code':>5} {'Tool':>5} {'JSON':>5} {'Logic':>5} {'AvgQ':>5}")
     print("-" * 80)

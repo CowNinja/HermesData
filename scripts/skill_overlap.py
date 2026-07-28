@@ -64,7 +64,7 @@ def main():
         for titles, names in sorted(same_sections.items(), key=lambda x: -len(x[1])):
             print(f"  [{len(names)}x] Sections: {', '.join(sorted(titles)[:5])}")
             for n in sorted(names):
-                print(f"        → {n} ({skills[n]['chars']}c)")
+                print(f"        ? {n} ({skills[n]['chars']}c)")
             print()
 
     # Find skills with high content overlap in shared sections
@@ -90,7 +90,7 @@ def main():
         print(f"=== HIGH CONTENT OVERLAP PAIRS ({len(overlap_pairs)}) ===")
         for a, b, sim, n_sections, titles in overlap_pairs[:20]:
             print(f"  {sim:.0%} overlap across {n_sections} sections")
-            print(f"    {a} ({skills[a]['chars']}c) ↔ {b} ({skills[b]['chars']}c)")
+            print(f"    {a} ({skills[a]['chars']}c) ? {b} ({skills[b]['chars']}c)")
             print(f"    Shared: {', '.join(sorted(titles)[:5])}")
             print()
 

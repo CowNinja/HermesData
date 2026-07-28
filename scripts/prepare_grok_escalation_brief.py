@@ -2,7 +2,7 @@
 """Build a short, fact-preloaded brief for Grok (token thrift).
 
 Runs local measurements, classifies escalate-worthiness, writes vault receipt.
-Paste path into Grok Discord driver thread 1524846849360531456 — not a raw K: walk.
+Paste path into Grok Discord driver thread 1524846849360531456 ? not a raw K: walk.
 
 Usage:
   python D:\\HermesData\\scripts\\prepare_grok_escalation_brief.py --topic "watchdog dual-writer"
@@ -26,7 +26,7 @@ GROK_THREAD = "1524846849360531456"
 SILO_THREAD = "1524529242019336434"
 CANON = "Operations/Grok-Thread-Architecture-Judgment-CANONICAL-2026-07-18"
 
-# Topic keywords → should escalate to Grok (driver)
+# Topic keywords ? should escalate to Grok (driver)
 ESCALATE_TRIGGERS = {
     "dual-writer": ["dual.writer", "two continuous", "multi.?writer", "second continuous"],
     "purge": ["purge", "wipe drive", "destroy silo"],
@@ -130,7 +130,7 @@ def main() -> int:
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     out = OUT_DIR / f"grok-escalation-brief-{stamp}.md"
-    body = f"""# Grok escalation brief — {utc()}
+    body = f"""# Grok escalation brief ? {utc()}
 
 **Topic (judgment only):** {args.topic}
 
@@ -138,15 +138,15 @@ def main() -> int:
 | Field | Value |
 |-------|-------|
 | Classifier | `{clf['recommendation']}` |
-| Trigger hits | {clf['trigger_hits'] or '—'} |
-| Stay-local hits | {clf['stay_local_hits'] or '—'} |
+| Trigger hits | {clf['trigger_hits'] or '?'} |
+| Stay-local hits | {clf['stay_local_hits'] or '?'} |
 | Deliver to | Discord Grok thread `{GROK_THREAD}` |
 | Not for | Silo kitchen thrash in `{SILO_THREAD}` (unless STAY_LOCAL) |
 
 If **STAY_LOCAL_SILO_THREAD**: answer in silo thread with tools; do **not** burn Grok.
 
 ## Hybrid rule
-- Muscle/scripts measured below — **do not re-scan K:** for vanity.
+- Muscle/scripts measured below ? **do not re-scan K:** for vanity.
 - Grok answers architecture / go-no-go / design only.
 - Token thrift: short verdict + concrete next actions.
 - Canon: [[{CANON.replace('.md','')}]]
@@ -184,7 +184,7 @@ If **STAY_LOCAL_SILO_THREAD**: answer in silo thread with tools; do **not** burn
 {args.topic}
 
 ## Expected Grok output shape
-1. Verdict (1–3 lines)  
+1. Verdict (1?3 lines)  
 2. Risks  
 3. Concrete next actions (who/which thread)  
 4. What **not** to do  

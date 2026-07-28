@@ -2,7 +2,7 @@
 """
 C: Drive Space Helper (Session 13+)
 Proactive cleanup for tight C: (target < 20-30 GB free before big runs).
-Safe, targeted — only Hermes-related temps and common bloat.
+Safe, targeted ? only Hermes-related temps and common bloat.
 Run with caution; review before delete.
 """
 
@@ -36,7 +36,7 @@ def safe_cleanup(dry_run=True):
                 pass
     print(f"Found {len(candidates)} Hermes-related temp files.")
     if dry_run:
-        print("DRY RUN — nothing deleted. Total potential: {:.1f} MB".format(freed / 1024**2))
+        print("DRY RUN ? nothing deleted. Total potential: {:.1f} MB".format(freed / 1024**2))
         for p, s in candidates[:20]:
             print(f"  {p} ({s/1024:.0f} KB)")
     else:
@@ -44,7 +44,7 @@ def safe_cleanup(dry_run=True):
     return freed
 
 if __name__ == "__main__":
-    print("C: Space Helper — dry run first!")
+    print("C: Space Helper ? dry run first!")
     safe_cleanup(dry_run=True)
     # To actually clean: safe_cleanup(dry_run=False)
     print("\nReview output. Uncomment the live call only if safe.")

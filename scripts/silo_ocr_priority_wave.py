@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OCR priority wave — gold PDFs first via robust ladder process_one API.
+"""OCR priority wave ? gold PDFs first via robust ladder process_one API.
 
 Picks highest-gold Medical/Navy PDFs missing useful .ocr.md/.train.md and
 runs silo_robust_ocr_ladder.process_one (NOT a fictional process_file).
@@ -110,7 +110,7 @@ def main() -> int:
     twin = sum(1 for r in results if r.get("twin_useful"))
     lines = [
         "# OCR priority wave",
-        f"picked {len(picked)} · ok/twinish {ok} · needs_ocr {need} · twin_useful {twin}",
+        f"picked {len(picked)} ? ok/twinish {ok} ? needs_ocr {need} ? twin_useful {twin}",
         "",
     ]
     for r in results:

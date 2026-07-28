@@ -39,7 +39,7 @@ FLASY = [
     "GPU Tweak III",
 ]
 # Cmdline substrings that steal focus when launched as bare python/powershell.
-# 2026-07-26: do NOT match launch_hidden_ps / Guardian-Body — those are the
+# 2026-07-26: do NOT match launch_hidden_ps / Guardian-Body ? those are the
 # silent pythonw Hidden twin path. Only bare schtask parents + elevators.
 FLASHY_CMD_RE = re.compile(
     r"(Phronesis-Guardian\.ps1|Ensure-Grok-Direct-Bridge\.ps1|grok_hermes_loop|"
@@ -48,7 +48,7 @@ FLASHY_CMD_RE = re.compile(
     re.I,
 )
 # Window titles that flash/steal focus under RDP (hide, do not kill OS-critical).
-# NOTE: Do NOT match bare "PowerShell" / "Windows PowerShell" — Windows Terminal
+# NOTE: Do NOT match bare "PowerShell" / "Windows PowerShell" ? Windows Terminal
 # Grok Build tabs use those titles and were being SW_HIDE'd mid-typing (2026-07-25).
 FLASHY_TITLE_RE = re.compile(
     r"(SOUI_DUMMY_WND|"
@@ -113,14 +113,14 @@ def run(cmd: list[str], timeout: int = 20) -> subprocess.CompletedProcess:
 def end_tasks() -> list[str]:
     """END only tasks that can leave long-running focus stealers (CUA/GPU/logon).
 
-    Do NOT End Guardian/Bridge/Loop/Image-Rider when lockdown is on — those
+    Do NOT End Guardian/Bridge/Loop/Image-Rider when lockdown is on ? those
     trampolines now exit 0 immediately. Force-End was producing Last Result
     267014 (TERMINATED), which Task Scheduler UI surfaces as an *error* popup.
     """
     lockdown = (STATE / "popup_lockdown.ON").is_file() or (
         STATE / "popup_emergency.STOP"
     ).is_file() or (STATE / "focus_mode.STOP").is_file()
-    # Always end these — they start real daemons/overlays
+    # Always end these ? they start real daemons/overlays
     always = ["cua-driver-serve", "GPU Tweak III", "Phronesis-Start-At-Logon"]
     # Only end flashy PS trampolines if NOT under lockdown (they self-exit 0)
     trampolines = [
@@ -132,7 +132,7 @@ def end_tasks() -> list[str]:
     names = list(always)
     if not lockdown:
         names.extend(trampolines)
-    # Under lockdown trampolines exit 0 themselves — do not End them (avoids 267014 "error").
+    # Under lockdown trampolines exit 0 themselves ? do not End them (avoids 267014 "error").
     ended = []
     for n in names:
         try:
@@ -278,7 +278,7 @@ def kill_uac_consent() -> list[int]:
     """Best-effort kill consent.exe UAC dialogs (PowerShell requesting elevation).
 
     Secure Desktop / system-IL consent is Access-denied for Medium IL taskkill and
-    WMIC ReturnValue=2. Never treat 'Method execution successful' as a kill —
+    WMIC ReturnValue=2. Never treat 'Method execution successful' as a kill ?
     only report PIDs actually gone after re-check. Also shove Secure-UAP dummy
     windows off-screen (hide alone is ignored by the secure class).
     """
@@ -371,8 +371,8 @@ def kill_elevation_spawners() -> list[int]:
     """Kill powershell/cmd trying to elevate (RunAs / cua Highest / Admin bat).
 
     Root UAC source measured 2026-07-26:
-      schtask cua-driver-serve RunLevel=HighestAvailable →
-      powershell -Command \"Start-Process ... cua-driver.exe serve\" →
+      schtask cua-driver-serve RunLevel=HighestAvailable ?
+      powershell -Command \"Start-Process ... cua-driver.exe serve\" ?
       consent.exe \"Windows PowerShell 5.1 is requesting your permission\"
     Also: Run-Popup-Kill-Admin-Once.REAL.bat (Verb RunAs).
     Kill spawners at Medium IL when still visible; consent itself needs Admin/user.
@@ -397,7 +397,7 @@ def kill_elevation_spawners() -> list[int]:
             continue
         # never kill WT-hosted grok/work shells (bare powershell under Cascadia)
         if nlow in ("powershell.exe", "pwsh.exe") and not (cmd or "").strip():
-            # bare cmd with no args is usually a WT tab — leave it
+            # bare cmd with no args is usually a WT tab ? leave it
             continue
         if nlow in ("powershell.exe", "pwsh.exe") and len((cmd or "").strip()) < 40:
             # bare path-only powershell under WT
@@ -412,7 +412,7 @@ def kill_elevation_spawners() -> list[int]:
 
 
 def _list_processes() -> list[tuple[int, str, str]]:
-    """Return (pid, name, cmdline) via WMIC (CREATE_NO_WINDOW — no flash)."""
+    """Return (pid, name, cmdline) via WMIC (CREATE_NO_WINDOW ? no flash)."""
     rows: list[tuple[int, str, str]] = []
     try:
         r = run(
@@ -446,24 +446,35 @@ def _list_processes() -> list[tuple[int, str, str]]:
 
 
 def kill_flashy_console_procs() -> list[int]:
-    """Kill bare powershell/python processes that match flashy trampolines.
+    """Kill bare powershell/python that steal focus (CUA/GPU/elevators).
 
-    Also terminates GPU Tweak / Monitor via WMIC (taskkill often Access-denied
-    on those elevated children; WMIC terminate still works at Medium IL).
+    Under lockdown: do NOT kill Guardian/Bridge/Image-Rider/Loop trampolines ?
+    they FreeConsole+exit 0 in <100ms. Force-kill made schtask Last Result
+    267014 (TERMINATED) which Windows surfaces as an *error* popup.
+    Still kill cua/GPU and elevators.
     """
     killed: list[int] = []
     me = os.getpid()
+    lockdown = (STATE / "popup_lockdown.ON").is_file() or (
+        STATE / "popup_emergency.STOP"
+    ).is_file() or (STATE / "focus_mode.STOP").is_file()
+    # Trampolines that self-exit 0 under lockdown ? never force-kill
+    self_exit_re = re.compile(
+        r"(Phronesis-Guardian|Ensure-Grok-Direct-Bridge|grok_hermes_loop|"
+        r"Start-Image-Rider|Phronesis-OneButton-Start|Guardian-Body)",
+        re.I,
+    )
     for pid, name, cmd in _list_processes():
         if pid == me or pid <= 4:
             continue
         nlow = (name or "").lower()
+        cmd_s = cmd or ""
         if nlow in (
             "gpu tweak iii.exe",
             "monitor.exe",
             "gt3 mobile service.exe",
         ):
             try:
-                # Prefer WMIC terminate — taskkill /F often Access denied
                 r = run(
                     [
                         "wmic",
@@ -494,14 +505,21 @@ def kill_flashy_console_procs() -> list[int]:
             "cmd.exe",
             "conhost.exe",
         ):
-            # Also stop cua-driver serve if present
-            if nlow == "cua-driver.exe" and "serve" in (cmd or "").lower():
+            if nlow in ("cua-driver.exe", "cua-driver-uia.exe"):
                 pass
             else:
                 continue
-        if SAFE_CMD_RE.search(cmd or ""):
+        if SAFE_CMD_RE.search(cmd_s):
             continue
-        if not FLASHY_CMD_RE.search(cmd or "") and nlow != "cua-driver.exe":
+        # Lockdown: leave self-exit trampolines alone
+        if lockdown and self_exit_re.search(cmd_s):
+            # Still kill if clearly elevating / cua start
+            if not re.search(r"cua-driver|RunAs|GPU\s*Tweak", cmd_s, re.I):
+                continue
+        if not FLASHY_CMD_RE.search(cmd_s) and nlow not in (
+            "cua-driver.exe",
+            "cua-driver-uia.exe",
+        ):
             continue
         try:
             run(["taskkill", "/PID", str(pid), "/F", "/T"], timeout=8)
@@ -515,7 +533,7 @@ def hide_visible_flash_windows(*, use_wmic: bool = False) -> int:
     """SW_HIDE flashy console + dummy GPU-tweak windows under focus mode.
 
     Default path is EnumWindows-only (cheap; safe every 1s). Optional WMIC
-    pid map is only for full suppress() passes — WMIC every 2s was freezing RDP.
+    pid map is only for full suppress() passes ? WMIC every 2s was freezing RDP.
 
     NEVER hides Windows Terminal / Cascadia (Grok Build typing surface).
     """
@@ -739,7 +757,7 @@ def suppress() -> dict[str, Any]:
         "elevators_killed": kill_elevation_spawners(),
         "killed_flashy": kill_flashy_console_procs(),
         "hidden_windows": hide_visible_flash_windows(use_wmic=True),
-        # Do NOT kill sovereign_openai_proxy — dual-proxy thrash left :8091 dead.
+        # Do NOT kill sovereign_openai_proxy ? dual-proxy thrash left :8091 dead.
         "killed_dup_dash": dedup_pythonw(r"dashboard --port 9119"),
         "killed_orphan_comfy": kill_orphan_comfy_dup(),
     }
@@ -761,7 +779,7 @@ def suppress() -> dict[str, Any]:
 
 
 def register() -> dict:
-    # Prefer home pythonw — venv Scripts\\pythonw trampolines and dual-starts.
+    # Prefer home pythonw ? venv Scripts\\pythonw trampolines and dual-starts.
     pyw = Path(r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\pythonw.exe")
     if not pyw.is_file():
         pyw = Path(r"D:\HermesData\hermes-agent\venv\Scripts\pythonw.exe")

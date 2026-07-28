@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Encrypted asset unlock assist — YOUR files, YOUR password candidates only.
+"""Encrypted asset unlock assist ? YOUR files, YOUR password candidates only.
 
 What this does (legitimate personal recovery):
   1) Detect encrypted zip/PDF
@@ -167,9 +167,9 @@ def main() -> int:
                 {
                     "how_to_grow_dictionary": [
                         "Add remembered passwords to archive_passwords.local.txt",
-                        "Export Bitwarden passwords YOU own → review → paste likely old ones into password_candidates.local.txt",
+                        "Export Bitwarden passwords YOU own ? review ? paste likely old ones into password_candidates.local.txt",
                         "Search email/silo for 'password is' near bank/NMCP/VA filenames (manual or later miner)",
-                        "SSN-last4 / DOB patterns only if YOU used them historically — add yourself, we won't invent",
+                        "SSN-last4 / DOB patterns only if YOU used them historically ? add yourself, we won't invent",
                     ],
                     "not_supported": [
                         "GPU brute force of strong random passwords",

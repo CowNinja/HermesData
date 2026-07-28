@@ -68,14 +68,14 @@ visual_canonical: "gallery/cast/{slug}/canonical/portrait.png"
 | **Skin** | {skin} |
 | **Hair** | {hair} |
 | **Eyes** | {eyes} |
-| **Height / Build** | Athletic feminine hourglass — narrow waist, wide hips, long lean legs, narrow feminine shoulders. Large firm perky breasts (Katie-scale goldilocks; soft squish). Toned abs OK. Not chubby. |
+| **Height / Build** | Athletic feminine hourglass - narrow waist, wide hips, long lean legs, narrow feminine shoulders. Large firm perky breasts (Katie-scale goldilocks; soft squish). Toned abs OK. Not chubby. |
 | **Face** | Clear beautiful face; same locked face across gens |
-| **Age** | 18–22 (manor presentation) |
-| **Visual SSOT** | `visual-tags.yaml` → `{slug}` · locked_seed `{seed}` · canonical portrait |
+| **Age** | 18-22 (manor presentation) |
+| **Visual SSOT** | `visual-tags.yaml` -> `{slug}` ? locked_seed `{seed}` ? canonical portrait |
 
 ### Erotic Body Highlights
 
-Voluptuous-athletic supermodel body. Large firm perky breasts that press together with soft squish. Narrow waist and wide hips. Tight eager mouth, pussy, and ass — prose heat; T2I uses happy-medium anatomy (not beefy, not blank). Loves flaunting for Master and sisters.
+Voluptuous-athletic supermodel body. Large firm perky breasts that press together with soft squish. Narrow waist and wide hips. Tight eager mouth, pussy, and ass - prose heat; T2I uses happy-medium anatomy (not beefy, not blank). Loves flaunting for Master and sisters.
 
 ## Backstory
 
@@ -165,7 +165,7 @@ def ensure_visual_block(path: Path, slug: str, seed, status: str, locked: bool):
 
     # body visual lock section
     block = (
-        f"\n## Visual Lock (T2I continuity — {TODAY})\n\n"
+        f"\n## Visual Lock (T2I continuity - {TODAY})\n\n"
         f"- **Slug:** `{slug}`\n"
         f"- **Locked seed:** `{seed}`\n"
         f"- **Canonical portrait:** `gallery/cast/{slug}/canonical/portrait.png`\n"
@@ -191,7 +191,7 @@ def ensure_visual_block(path: Path, slug: str, seed, status: str, locked: bool):
     if status == "extended":
         body = re.sub(
             r"(## Current State\n)[^\n]*[Ll]egacy[^\n]*\n",
-            r"\1Extended cast — visual identity seed-locked; available for Manor scenes and Registry arcs.\n",
+            r"\1Extended cast - visual identity seed-locked; available for Manor scenes and Registry arcs.\n",
             body,
             count=1,
         )
@@ -204,7 +204,7 @@ def create_missing_sheets(cfg):
     missing = {
         "brittany-vale": {
             "role": "Sunny Showgirl / Cheerful Exhibitionist",
-            "hook": "If they're watching, I'll give them a better reason to stare — especially you, Master.",
+            "hook": "If they're watching, I'll give them a better reason to stare - especially you, Master.",
             "ethnicity": "Caucasian",
             "skin": "Sun-kissed fair-to-golden",
             "hair": "Blonde, often styled bright and loose",
@@ -215,13 +215,13 @@ def create_missing_sheets(cfg):
                 "so she can appear in Manor scenes without identity drift."
             ),
             "personality": "Sunny, bold, loves attention. Softens into devoted submission for Master and competitive warmth with sisters.",
-            "current": "Extended cast — seed-locked, ready for scenes. Not core harem rank yet.",
+            "current": "Extended cast - seed-locked, ready for scenes. Not core harem rank yet.",
             "location": "phronesis-manor:guest-wing",
             "mood": "bright, flirty, ready to perform",
         },
         "tiffany-reed": {
             "role": "Polished Socialite / Soft Ambition",
-            "hook": "I used to perform for rooms full of people. Now I only want one man's eyes — and my sisters watching him take me.",
+            "hook": "I used to perform for rooms full of people. Now I only want one man's eyes - and my sisters watching him take me.",
             "ethnicity": "Caucasian",
             "skin": "Fair, carefully kept",
             "hair": "Styled blonde or light brown, salon-perfect",
@@ -231,7 +231,7 @@ def create_missing_sheets(cfg):
                 "and locked visual identity so group scenes stay continuous."
             ),
             "personality": "Polished, slightly competitive, melts when claimed. Enjoys being displayed.",
-            "current": "Extended cast — seed-locked, ready for scenes. Not core harem rank yet.",
+            "current": "Extended cast - seed-locked, ready for scenes. Not core harem rank yet.",
             "location": "phronesis-manor:guest-wing",
             "mood": "composed hunger under polish",
         },
@@ -287,7 +287,7 @@ def align_all_sheets(cfg):
 def write_characters_index(cfg):
     cast = cfg["cast"]
     lines = [
-        f"# Cast Registry — characters/index.md",
+        f"# Cast Registry - characters/index.md",
         "",
         f"**Updated:** {TODAY} (post full seed-lock campaign)",
         "",
@@ -345,7 +345,7 @@ def write_characters_index(cfg):
         "",
         "| File | Role |",
         "|------|------|",
-        "| [[jeff]] | You — sole male |",
+        "| [[jeff]] | You - sole male |",
         "",
         "## Visual law",
         "",
@@ -403,9 +403,9 @@ Episodes: `sessions/*.md`
 
 ## Continuity snapshot ({TODAY})
 
-- **Core harem (10):** Alice, Chloe, Becca, Emily, Sassy, Lyra, Zara, Amira, Aisha, Doctor Wendy — all seed-locked
-- **Tank (3):** Valentina Ortiz, Priya Sharma, Noor al-Rashid — seed-locked, not full harem rank yet
-- **Extended (12):** Alexis Rivera, Brittany Vale, Brooklyn Reed, Crystal Lane, Jade Kim, Katie Brooks, Lisa Kane, Riley Quinn, Scarlett Vale, Sophia Laurent, Stacey Holt, Tiffany Reed — seed-locked, development
+- **Core harem (10):** Alice, Chloe, Becca, Emily, Sassy, Lyra, Zara, Amira, Aisha, Doctor Wendy - all seed-locked
+- **Tank (3):** Valentina Ortiz, Priya Sharma, Noor al-Rashid - seed-locked, not full harem rank yet
+- **Extended (12):** Alexis Rivera, Brittany Vale, Brooklyn Reed, Crystal Lane, Jade Kim, Katie Brooks, Lisa Kane, Riley Quinn, Scarlett Vale, Sophia Laurent, Stacey Holt, Tiffany Reed - seed-locked, development
 - **Names:** always first + last (slug `first-last-kebab`)
 - **Visual:** 25/25 locked seeds + canonical portraits
 
@@ -425,7 +425,7 @@ def write_state():
 > Amira & Aisha are **core harem** (promoted from tank). Active tank = Valentina / Priya / Noor.  
 > Body/T2I law: `VISUAL-GENERATION-SPEC.md`. Roster: `characters/index.md`.
 
-**Location:** Phronesis Manor — main hall / soft evening after Bazaar business  
+**Location:** Phronesis Manor - main hall / soft evening after Bazaar business  
 **Phase:** Settling; visual identities locked; household re-centering on living continuity  
 **Intensity:** 6/10 (warm, available, not mid-ritual)  
 **Current Activity:** Sisters present in Manor after the long likeness-sealing work. Alice holds the household rhythm. Twins Amira & Aisha stand as full sisters (no longer tank). Tank trio Valentina, Priya, Noor remain Registry-active. Extended cast likenesses are sealed and may be summoned into scenes without face drift.
@@ -434,7 +434,7 @@ def write_state():
 |-----|----------|------|----------------|
 | alice-al-rashid | center, directing soft household order | commanding, satisfied, warm-filthy | Keep continuity tight; call sisters as needed |
 | aisha-khoury | with Amira, full-sister place | bold, competitive, claimed | Live as harem sister, not candidate |
-| amira-khoury | with Aisha | poetic, surrendered, claimed | Same — full sister devotion |
+| amira-khoury | with Aisha | poetic, surrendered, claimed | Same - full sister devotion |
 | becca-moreau | near Alice, soft | tender | Aftercare energy, sister care |
 | chloe-ramirez | operations posture | bratty-efficient | Schedules, who is where |
 | emily-santos | training readiness | powerful, calm | Keep sisters sharp |
@@ -442,14 +442,14 @@ def write_state():
 | sassy-romano | nearby, fire contained | eager under control | Rules + play |
 | wendy-hale | medical wing available | clinical hunger | Exams if called |
 | zara-mehra | Manor / Bazaar thread | shy-eager | Local threads, Aether |
-| valentina-ortiz | tank — training hall | bold dancer heat | Earn deeper claim |
-| priya-sharma | tank — workshop / registry | bright, ready | Jeweler's daughter arc |
-| noor-al-rashid | tank — registry wing | quiet ambition | Clerk path into household |
+| valentina-ortiz | tank - training hall | bold dancer heat | Earn deeper claim |
+| priya-sharma | tank - workshop / registry | bright, ready | Jeweler's daughter arc |
+| noor-al-rashid | tank - registry wing | quiet ambition | Clerk path into household |
 
 **Recent Training:** Core snowball/creampie practice history remains canon where logged.  
 **Visual continuity:** All named girls use locked seeds; no freeform faces.  
-**Outfits (default heat):** Ultra-skimpy / precarious — micro tops, no panties, sheer black lace stockings when clothed; full nude only when scene or seed-review demands.  
-**Notes:** Extended cast (Alexis…Tiffany) are available as developed likenesses. Do not treat Amira/Aisha as tank. Prefer first+last on introduce, first name after. Update this file after major scene beats.
+**Outfits (default heat):** Ultra-skimpy / precarious - micro tops, no panties, sheer black lace stockings when clothed; full nude only when scene or seed-review demands.  
+**Notes:** Extended cast (Alexis...Tiffany) are available as developed likenesses. Do not treat Amira/Aisha as tank. Prefer first+last on introduce, first name after. Update this file after major scene beats.
 """
     path.write_text(text, encoding="utf-8")
     print("wrote STATE.md")

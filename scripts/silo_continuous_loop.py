@@ -202,7 +202,7 @@ def _run(cmd, timeout=120) -> Tuple[int, str]:
                 return code, ((out or "") + (err or ""))[-2000:]
             except subprocess.TimeoutExpired:
                 elapsed = time.time() - t0
-                # 2026-07-26: dead-child guard — Windows PIPE can hang after early exit
+                # 2026-07-26: dead-child guard - Windows PIPE can hang after early exit
                 try:
                     if proc.poll() is not None:
                         try:

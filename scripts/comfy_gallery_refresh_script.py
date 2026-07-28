@@ -2,7 +2,7 @@
 """Pure-script ComfyUI gallery refresh for mobile UX (no LLM).
 
 Scans recent image outputs, writes a compact JSON manifest sorted by mtime desc.
-Then runs lightweight gallery.db ↔ FS reconcile (no purge, no orphan-sidecar moves).
+Then runs lightweight gallery.db ? FS reconcile (no purge, no orphan-sidecar moves).
 
 Safe while traveling: does not restart Comfy or Hermes. Never --apply purge.
 
@@ -66,7 +66,7 @@ def collect() -> List[Dict[str, Any]]:
 
 
 def run_reconcile() -> dict:
-    """DB↔FS + stable aliases + one FTS rebuild. No orphan-sidecar quarantine on hot path."""
+    """DB?FS + stable aliases + one FTS rebuild. No orphan-sidecar quarantine on hot path."""
     if not PURGE.is_file():
         return {"ok": False, "skip": True, "detail": f"missing {PURGE}"}
     cmd = [sys.executable, str(PURGE), "--reconcile-only"]
@@ -94,7 +94,7 @@ def run_reconcile() -> dict:
 
 
 def run_ingest_catchup() -> dict:
-    """Idempotent Forge/Comfy/Fooocus → album catch-up (hash anti-dupe). Soft-fail."""
+    """Idempotent Forge/Comfy/Fooocus ? album catch-up (hash anti-dupe). Soft-fail."""
     if not INGEST.is_file():
         return {"ok": False, "skip": True, "detail": f"missing {INGEST}"}
     # Prefer Comfy venv (Pillow) when present for PNG parameters parse

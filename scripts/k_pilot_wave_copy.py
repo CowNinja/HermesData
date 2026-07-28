@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""K silo pilot wave — COPY ONLY with provenance. No deletes.
+"""K silo pilot wave ? COPY ONLY with provenance. No deletes.
 
 Organization principle (Jeff 2026-07-10):
-  Broad Google Drive–style subsilos — NOT deep rabbit-hole pilot folders.
+  Broad Google Drive?style subsilos ? NOT deep rabbit-hole pilot folders.
   Prefer: Medical-Records/Diagnosis-History, Core-Personal/Finance/Navy-Cash
   Avoid: pilot-YYYY-MM-DD/ultra-specific-name nests as permanent homes.
 """
@@ -96,10 +96,10 @@ def main() -> int:
     RECEIPT_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     lines = [
-        f"# K Pilot Wave Receipt — {TS}",
+        f"# K Pilot Wave Receipt ? {TS}",
         "",
-        "**Mode:** COPY ONLY · provenance · **broad subsilos** (no rabbit holes)",
-        f"**Copied:** {copied} · **Skipped:** {skipped} · **Errors:** {len(errors)}",
+        "**Mode:** COPY ONLY ? provenance ? **broad subsilos** (no rabbit holes)",
+        f"**Copied:** {copied} ? **Skipped:** {skipped} ? **Errors:** {len(errors)}",
         "",
         "## Broad destinations",
     ]

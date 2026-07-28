@@ -45,7 +45,7 @@ def main() -> int:
     for d, names in samples.items():
         if d == "Core-Personal/_Inbox":
             continue
-        lines.append(f"## Would leave Inbox → `{d}`")
+        lines.append(f"## Would leave Inbox -> `{d}`")
         for name in names[:15]:
             lines.append(f"- {name}")
         lines.append("")
