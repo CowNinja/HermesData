@@ -56,6 +56,7 @@ Or double-click: **`D:\HermesData\scripts\START-PHRONESIS.bat`**
 | `Phronesis-OneButton-Stop.ps1` | Stack shutdown |
 | `Start-Sovereign-Proxy-8091.ps1` | Proxy launcher (venv only) |
 | `ops/02-08*.ps1` | Granular pieces called by `Phronesis.ps1` |
+| `local_llm_engine_decision.py` | **No-LLM** hardware→engine picker (`--detect`, `--profile phronesis-3060`, `--self-test`). Skill: `local-llm-engine-decision`. Does not start servers. |
 
 ---
 

@@ -14,11 +14,11 @@ Garden locks: Alice 778901 floor; Amira 818929. Pony VAE Auto; never restack gol
 §
 Gallery:8189 always-on; Comfy:8188 batch-only.
 §
-Expandability: runners/SSOT cast-agnostic; wardrobe/poses=curated named libs not freestyle one-offs.
+Expandability: cast-agnostic runners; curated wardrobe/poses.
 §
-Remote popups: focus_mode+popup_focus_enforce; STOP stops work not host flash.
+Remote popups: focus_mode+popup_focus_enforce.
 §
-Process chain: scripts/ops/process_chain_monitor_once.py; state/process_chain_monitor_latest.json.
+Process chain: scripts/ops/process_chain_monitor_once.py.
 §
 Silo: STOP via silo_ctl; focus_mode no freeze; VRAM critical=gentle land.
 §
@@ -33,3 +33,5 @@ Barney STANDING: TLDR bullets + one NEXT. Triggers: cognitive overload/Barney/Cl
 Script hygiene != VW. Crons: newline 30m, ascii/hygiene-autonomy 360m. VW clean_code_non_ascii off.
 §
 Discord 503s=:8091 compress when :8090 dual/loading. Heal discord_503_heal_once.py. ROCK/YELLOW/RED=gate grades not Grok STT. Grok B: local+free bulk; thrift Y5%/R20%. Canon Hybrid-Local-Grok-Token-Policy.
+§
+Engine pick: local-llm-engine-decision + scripts/local_llm_engine_decision.py (--profile phronesis-3060). Vault Local-LLM-Engine-Decision-Map-CANONICAL-2026-07-28. TGI maint-mode. Host llama.cpp 8090/8091.
