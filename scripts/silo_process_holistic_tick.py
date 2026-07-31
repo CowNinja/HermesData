@@ -153,6 +153,21 @@ def requeue_thin_ocr(limit: int = 40) -> int:
         return 0 if "locked" in str(e).lower() or "busy" in str(e).lower() else 0
 
 
+def _ocr_open_count() -> int:
+    if not OCR_DB.is_file():
+        return 0
+    try:
+        con = sqlite3.connect(str(OCR_DB), timeout=15)
+        con.execute("PRAGMA busy_timeout=15000")
+        n = con.execute(
+            "SELECT COUNT(*) FROM ocr_queue WHERE status IN ('needs_ocr','queued','error','empty')"
+        ).fetchone()[0]
+        con.close()
+        return int(n or 0)
+    except Exception:
+        return -1
+
+
 def main() -> int:
     import argparse
 
@@ -161,109 +176,142 @@ def main() -> int:
     ap.add_argument("--status-limit", type=int, default=400)
     ap.add_argument("--clean-limit", type=int, default=30)
     ap.add_argument("--skip-ocr", action="store_true")
+    # 2026-07-31: lean mode for orch ticks (avoid 124 wall-kill + dual STT/OCR)
+    ap.add_argument(
+        "--lean",
+        action="store_true",
+        help="Skip heavy STT/OCR/office already owned by sibling orch workers",
+    )
     args = ap.parse_args()
 
-    report: dict = {"at": utc(), "steps": {}}
+    lean = bool(args.lean)
+    ocr_open = _ocr_open_count()
+    report: dict = {
+        "at": utc(),
+        "steps": {},
+        "lean": lean,
+        "ocr_open_hint": ocr_open,
+    }
 
-    # 1 retire corrupt
+    # 1 retire corrupt (cheap, always)
     report["steps"]["retire_corrupt"] = retire_corrupt()
 
-    # 1b reacquire missing from source
+    # 1b reacquire missing from source (bounded; lean keeps short)
     report["steps"]["reacquire"] = run(
-        [PY, str(SCRIPTS / "silo_reacquire_missing.py"), "--limit", "30"],
-        timeout=180,
+        [PY, str(SCRIPTS / "silo_reacquire_missing.py"), "--limit", "12" if lean else "30"],
+        timeout=90 if lean else 180,
     )
 
     # 2 requeue thin medical/navy
-    report["steps"]["requeue_thin"] = requeue_thin_ocr(40)
+    report["steps"]["requeue_thin"] = requeue_thin_ocr(20 if lean else 40)
 
-    # 2b gold OCR residual: registry ocr_failed -> queue (false-clean fix)
-    gold_rq = SCRIPTS / "silo_ocr_gold_requeue.py"
-    if gold_rq.is_file():
-        report["steps"]["ocr_gold_requeue"] = run(
-            [PY, str(gold_rq), "--limit", "120", "--reset-attempts"],
-            timeout=120,
-        )
+    # Heavy sensory owned by dedicated orch workers in lean/post_ocr era.
+    # Research: Celery soft_time_limit + NiFi backpressure - partial progress OK.
+    if not lean:
+        gold_rq = SCRIPTS / "silo_ocr_gold_requeue.py"
+        if gold_rq.is_file():
+            report["steps"]["ocr_gold_requeue"] = run(
+                [PY, str(gold_rq), "--limit", "120", "--reset-attempts"],
+                timeout=120,
+            )
 
-    # 2c gold STT discover+process (CPU) - multimodal fabric; limit 3
-    # 2026-07-26: cap STT wall time ? 1800s was stalling holistic inside orch tick
-    stt_w = SCRIPTS / "silo_audio_stt_backlog_worker.py"
-    if stt_w.is_file():
-        report["steps"]["stt_discover"] = run(
-            [PY, str(stt_w), "--discover-only"],
-            timeout=180,
-        )
-        report["steps"]["stt_process"] = run(
-            [PY, str(stt_w), "--process-only", "--limit", "2"],
-            timeout=420,
-        )
+        stt_w = SCRIPTS / "silo_audio_stt_backlog_worker.py"
+        if stt_w.is_file():
+            report["steps"]["stt_discover"] = run(
+                [PY, str(stt_w), "--discover-only"],
+                timeout=180,
+            )
+            report["steps"]["stt_process"] = run(
+                [PY, str(stt_w), "--process-only", "--limit", "2"],
+                timeout=420,
+            )
 
-    # 2d office + email + html thin (gold-first) extract waves
-    for name, script, lim in (
-        ("office_extract", "silo_office_extract.py", "8"),
-        ("email_extract", "silo_email_extract.py", "8"),
-        ("html_thin_extract", "silo_html_thin_extract.py", "15"),
-    ):
-        sp = SCRIPTS / script
-        if sp.is_file():
-            report["steps"][name] = run([PY, str(sp), "--limit", lim], timeout=360)
+        for name, script, lim in (
+            ("office_extract", "silo_office_extract.py", "8"),
+            ("email_extract", "silo_email_extract.py", "8"),
+            ("html_thin_extract", "silo_html_thin_extract.py", "15"),
+        ):
+            sp = SCRIPTS / script
+            if sp.is_file():
+                report["steps"][name] = run([PY, str(sp), "--limit", lim], timeout=360)
 
-    # 3 OCR process-only
-    if not args.skip_ocr:
-        report["steps"]["ocr"] = run(
-            [
-                PY,
-                str(SCRIPTS / "silo_ocr_backlog_worker.py"),
-                "--limit",
-                str(args.ocr_limit),
-                "--process-only",
-            ],
-            timeout=600,
-        )
+        if not args.skip_ocr and ocr_open != 0:
+            report["steps"]["ocr"] = run(
+                [
+                    PY,
+                    str(SCRIPTS / "silo_ocr_backlog_worker.py"),
+                    "--limit",
+                    str(args.ocr_limit),
+                    "--process-only",
+                ],
+                timeout=600,
+            )
+        elif args.skip_ocr or ocr_open == 0:
+            report["steps"]["ocr"] = {"exit": 0, "out": "skipped_lean_or_post_ocr"}
+    else:
+        report["steps"]["heavy_skipped"] = {
+            "exit": 0,
+            "out": "lean: STT/OCR/office/html owned by sibling workers",
+        }
 
-    # 4 process status backfill + OCR/STT registry truth
+    # 4 process status backfill + OCR/STT registry truth (core of holistic)
     report["steps"]["process_status"] = run(
         [
             PY,
             str(SCRIPTS / "process_status_batch.py"),
             "--limit",
-            str(args.status_limit),
+            str(min(args.status_limit, 200) if lean else args.status_limit),
         ],
-        timeout=180,
+        timeout=120 if lean else 180,
     )
     report["steps"]["ocr_registry_sync"] = run(
-        [PY, str(SCRIPTS / "silo_sync_ocr_to_registry.py"), "--limit", str(args.status_limit)],
-        timeout=120,
+        [
+            PY,
+            str(SCRIPTS / "silo_sync_ocr_to_registry.py"),
+            "--limit",
+            str(min(args.status_limit, 200) if lean else args.status_limit),
+        ],
+        timeout=90 if lean else 120,
     )
     stt_sync = SCRIPTS / "silo_sync_stt_to_registry.py"
     if stt_sync.is_file():
         report["steps"]["stt_registry_sync"] = run(
-            [PY, str(stt_sync), "--limit", str(args.status_limit)],
-            timeout=120,
+            [
+                PY,
+                str(stt_sync),
+                "--limit",
+                str(min(args.status_limit, 200) if lean else args.status_limit),
+            ],
+            timeout=90 if lean else 120,
         )
     # train manifest refresh (side-project consumption)
-    # 2026-07-26: ALWAYS pass --limit ? unbounded rglob ran 5h+ and burned CPU
+    # 2026-07-26: ALWAYS pass --limit - unbounded rglob ran 5h+ and burned CPU
     man = SCRIPTS / "silo_train_manifest_builder.py"
-    if man.is_file():
+    if man.is_file() and not lean:
         report["steps"]["train_manifest"] = run(
             [PY, str(man), "--limit", "4000", "--budget-s", "90"],
             timeout=120,
         )
+    elif man.is_file() and lean:
+        report["steps"]["train_manifest"] = {
+            "exit": 0,
+            "out": "lean: train_manifest owned by sibling worker",
+        }
 
-    # 5 text clean ? train.md
+    # 5 text clean -> train.md
     clean = SCRIPTS / "silo_ocr_text_clean.py"
     if clean.is_file():
         report["steps"]["text_clean"] = run(
-            [PY, str(clean), "--limit", str(args.clean_limit)],
-            timeout=240,
+            [PY, str(clean), "--limit", str(min(args.clean_limit, 15) if lean else args.clean_limit)],
+            timeout=120 if lean else 240,
         )
 
-    # 6 medical navy index
+    # 6 medical navy index (sibling also runs; lean keeps tiny)
     mni = SCRIPTS / "silo_medical_navy_text_index.py"
     if mni.is_file():
         report["steps"]["medical_navy_index"] = run(
-            [PY, str(mni), "--limit", "40"],
-            timeout=120,
+            [PY, str(mni), "--limit", "15" if lean else "40"],
+            timeout=60 if lean else 120,
         )
 
     # snapshot counts

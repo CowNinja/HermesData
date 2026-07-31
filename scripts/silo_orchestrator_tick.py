@@ -731,13 +731,97 @@ def main() -> int:
             )
         )
 
-    workers.append(
-        (
-            "process_holistic",
-            [sys.executable, str(SCRIPTS / "silo_process_holistic_tick.py"), "--ocr-limit", "15", "--status-limit", "300", "--clean-limit", "25"],
-            600,
+    # 2026-07-31: lean holistic every tick (status/sync/clean only).
+    # Full heavy holistic every 4th cadence tick only - stops exit-124 wall-kills
+    # from dual-running STT/OCR/office already owned by sibling workers.
+    if n % 4 == 0:
+        workers.append(
+            (
+                "process_holistic",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "silo_process_holistic_tick.py"),
+                    "--ocr-limit",
+                    "10",
+                    "--status-limit",
+                    "250",
+                    "--clean-limit",
+                    "20",
+                ],
+                480,
+            )
         )
-    )
+    else:
+        workers.append(
+            (
+                "process_holistic",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "silo_process_holistic_tick.py"),
+                    "--lean",
+                    "--status-limit",
+                    "200",
+                    "--clean-limit",
+                    "12",
+                ],
+                240,
+            )
+        )
+    # Residual depth cooks (post_ocr): PDF digital text + office + DLQ triage
+    # Roots must exist on K: (no Finance-Legal shelf yet - use Core/Life/Digital-Footprint)
+    if not any(w[0] == "pdf_extract" for w in workers):
+        workers.append(
+            (
+                "pdf_extract",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "silo_pdf_extract_smoke.py"),
+                    "--limit",
+                    "20",
+                    "--roots",
+                    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Medical-Records",
+                    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Navy-Service",
+                    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal",
+                    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Life-Archive",
+                    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Digital-Footprint",
+                ],
+                300,
+            )
+        )
+    if not any(w[0] == "office_extract" for w in workers):
+        workers.append(
+            (
+                "office_extract",
+                [
+                    sys.executable,
+                    str(SCRIPTS / "silo_office_extract.py"),
+                    "--limit",
+                    "12",
+                    "--roots",
+                    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Medical-Records",
+                    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Core-Personal",
+                    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Life-Archive",
+                    r"K:\Phronesis-Sovereign\Personal-Digital-Silo\Digital-Footprint",
+                ],
+                300,
+            )
+        )
+    if not any(w[0] == "dlq_triage" for w in workers) and n % 3 == 0:
+        workers.append(
+            (
+                "dlq_triage",
+                [sys.executable, str(SCRIPTS / "silo_dlq_jsonl_triage.py"), "--limit", "200"],
+                60,
+            )
+        )
+    if not any(w[0] == "residual_board" for w in workers):
+        workers.append(
+            (
+                "residual_board",
+                [sys.executable, str(SCRIPTS / "silo_rock_solid_board.py"), "--json"],
+                90,
+            )
+        )
 
 
 
@@ -818,8 +902,12 @@ def main() -> int:
             "local_cook",
             "stt_backlog_worker",
             "html_thin_extract",
+            "pdf_extract",
+            "office_extract",
+            "dlq_triage",
+            "residual_board",
         ):
-            if code in (1, 124, -1) or "processed" in out or "queue_remaining" in out or "TIMEOUT" in out or "shelved" in out:
+            if code in (1, 124, -1) or "processed" in out or "queue_remaining" in out or "TIMEOUT" in out or "shelved" in out or "written" in out or "buckets" in out:
                 ok = True
         report["steps"].append(
             {
