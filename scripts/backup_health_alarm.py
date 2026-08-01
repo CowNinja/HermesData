@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""Backup health alarm — measure layers, color, optional Discord pulse.
+
+YELLOW/RED when:
+  - vault origin lag ahead > 0 on stable branch (and no clean mirror branch tip)
+  - last resilience job ok=False
+  - K latest-backup.json age > 48h
+  - K mirror age > 48h
+  - WhatsApp not considered here (separate)
+
+Default: write receipt + JSON state. --notify attempts local Discord webhook/file pulse
+only when color != GREEN (no spam on green).
+
+Usage:
+  python D:/HermesData/scripts/backup_health_alarm.py
+  python D:/HermesData/scripts/backup_health_alarm.py --json
+  python D:/HermesData/scripts/backup_health_alarm.py --notify
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+HERMES = Path(r"D:\HermesData")
+VAULT = Path(r"D:\PhronesisVault")
+STATE = HERMES / "state" / "backup_health_last.json"
+RECEIPT = VAULT / "Operations" / "logs" / "backup-health-alarm-latest.md"
+RESILIENCE = HERMES / "state" / "backup_resilience_last.json"
+K_MIRROR_STATE = HERMES / "state" / "backup_k_mirror_last.json"
+K_LATEST = Path(r"K:\Hermes-Resilience\manifests\latest-backup.json")
+K_MIRROR = Path(r"K:\Hermes-Resilience\mirrors\HermesData-Current")
+CLEAN_MIRROR_STATE = HERMES / "state" / "vault_github_clean_mirror_last.json"
+
+K_STALE_HOURS = 48.0
+
+
+def run_git(repo: Path, args: List[str], timeout: int = 20) -> str:
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(repo), *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        return ((r.stdout or "") + (r.stderr or "")).strip()
+    except Exception as e:
+        return f"err {e}"
+
+
+def age_hours(path: Path) -> Optional[float]:
+    if not path.exists():
+        return None
+    try:
+        return (datetime.now().timestamp() - path.stat().st_mtime) / 3600.0
+    except Exception:
+        return None
+
+
+def load_json(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"_parse_error": True}
+
+
+def origin_ahead(repo: Path, local_branch_hint: str, origin_branch: str) -> Tuple[Optional[int], str]:
+    # Prefer comparing origin/<origin_branch>..HEAD
+    for ref in (f"origin/{origin_branch}", "origin/HEAD"):
+        out = run_git(repo, ["rev-list", "--count", f"{ref}..HEAD"])
+        if out.isdigit():
+            return int(out), ref
+    return None, "n/a"
+
+
+def evaluate() -> Dict[str, Any]:
+    issues: List[str] = []
+    warns: List[str] = []
+    layers: Dict[str, Any] = {}
+
+    # HermesData github
+    hd_ahead, hd_ref = origin_ahead(Path(r"D:\HermesData"), "main", "main")
+    layers["hermesdata_github"] = {"ahead": hd_ahead, "ref": hd_ref}
+    if hd_ahead is not None and hd_ahead > 0:
+        issues.append(f"HermesData ahead of {hd_ref} by {hd_ahead}")
+    elif hd_ahead is None:
+        warns.append("HermesData origin lag n/a")
+
+    # Vault github lag vs master
+    v_ahead, v_ref = origin_ahead(VAULT, "master", "master")
+    layers["vault_github_master"] = {"ahead": v_ahead, "ref": v_ref}
+    clean = load_json(CLEAN_MIRROR_STATE)
+    clean_ok = bool(clean.get("ok")) and bool(clean.get("remote_branch"))
+    layers["vault_clean_mirror"] = {
+        "ok": clean_ok,
+        "branch": clean.get("remote_branch"),
+        "ts": clean.get("ts"),
+    }
+    if v_ahead is not None and v_ahead > 0:
+        if clean_ok:
+            warns.append(
+                f"vault master ahead={v_ahead} (history poison); clean mirror branch OK ({clean.get('remote_branch')})"
+            )
+        else:
+            issues.append(
+                f"PhronesisVault ahead of {v_ref} by {v_ahead} and no clean mirror push"
+            )
+
+    # Resilience job
+    res = load_json(RESILIENCE)
+    layers["resilience_job"] = {
+        "ok": res.get("ok"),
+        "ts": res.get("ts"),
+        "error_count": res.get("error_count"),
+        "errors": (res.get("errors") or [])[:5],
+    }
+    if res.get("_parse_error"):
+        warns.append("resilience state parse error")
+    elif not res:
+        warns.append("no resilience state yet")
+    elif res.get("ok") is False:
+        # vault push fail is expected until history rewrite — downgrade if clean mirror ok
+        errs = " ".join(res.get("errors") or [])
+        if "push" in errs.lower() and clean_ok:
+            warns.append(f"resilience soft push fail (expected until force-push): {errs[:120]}")
+        else:
+            issues.append(f"resilience job ok=False: {errs[:160]}")
+
+    # K manifest age
+    kh = age_hours(K_LATEST)
+    layers["k_manifest_age_h"] = kh
+    if kh is None:
+        issues.append("K latest-backup.json missing")
+    elif kh > K_STALE_HOURS:
+        issues.append(f"K manifest stale {kh:.1f}h > {K_STALE_HOURS}h")
+
+    km = age_hours(K_MIRROR)
+    layers["k_mirror_age_h"] = km
+    if km is None:
+        issues.append("K HermesData-Current mirror missing")
+    elif km > K_STALE_HOURS:
+        issues.append(f"K HermesData-Current stale {km:.1f}h > {K_STALE_HOURS}h")
+
+    kstate = load_json(K_MIRROR_STATE)
+    layers["k_mirror_job"] = {
+        "ok": kstate.get("ok"),
+        "ts": kstate.get("ts_utc") or kstate.get("last_backup"),
+        "errors": (kstate.get("errors") or [])[:5],
+    }
+
+    # Cloud recovery
+    od = Path.home() / "OneDrive" / "Phronesis-Recovery"
+    layers["onedrive_recovery"] = {"exists": od.exists()}
+    if not od.exists():
+        warns.append("OneDrive Phronesis-Recovery missing")
+
+    if issues:
+        color = "RED" if any("missing" in i or "stale" in i for i in issues) else "YELLOW"
+        # refine: any issue => YELLOW unless critical missing K
+        if any("K " in i and "missing" in i for i in issues):
+            color = "RED"
+        else:
+            color = "YELLOW"
+    elif warns:
+        color = "YELLOW"
+    else:
+        color = "GREEN"
+
+    return {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "color": color,
+        "issues": issues,
+        "warns": warns,
+        "layers": layers,
+        "thresholds": {"k_stale_hours": K_STALE_HOURS},
+    }
+
+
+def write_receipt(report: Dict[str, Any]) -> None:
+    RECEIPT.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        f"# Backup health alarm — {report['ts']}",
+        "",
+        f"**Color:** `{report['color']}`",
+        "",
+        "## Issues",
+    ]
+    if report["issues"]:
+        lines.extend(f"- {i}" for i in report["issues"])
+    else:
+        lines.append("- (none)")
+    lines += ["", "## Warns"]
+    if report["warns"]:
+        lines.extend(f"- {w}" for w in report["warns"])
+    else:
+        lines.append("- (none)")
+    lines += [
+        "",
+        "## Layers",
+        "```json",
+        json.dumps(report["layers"], indent=2)[:4000],
+        "```",
+        "",
+        "[[Operations/Backup-Architecture-Audit-2026-08-01]]",
+        "[[Operations/Catastrophe-Restore-and-Backup-Hardening-2026-07-10]]",
+        "",
+    ]
+    RECEIPT.write_text("\n".join(lines), encoding="utf-8")
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    STATE.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+
+def try_notify(report: Dict[str, Any]) -> str:
+    """Best-effort local pulse file; does not taskkill gateway or spam if GREEN."""
+    if report["color"] == "GREEN":
+        return "skip_green"
+    pulse_dir = HERMES / "state" / "pulses"
+    pulse_dir.mkdir(parents=True, exist_ok=True)
+    pulse = pulse_dir / "backup_health_pulse.json"
+    pulse.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    # Optional: delivery script if present
+    deliver = HERMES / "scripts" / "ops" / "discord_local_pulse.py"
+    if deliver.exists():
+        try:
+            r = subprocess.run(
+                [
+                    sys.executable,
+                    str(deliver),
+                    "--title",
+                    f"Backup {report['color']}",
+                    "--body",
+                    "; ".join(report["issues"] or report["warns"])[:500],
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            return f"deliver_rc={r.returncode}"
+        except Exception as e:
+            return f"deliver_err={e}"
+    return f"pulse_file={pulse}"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--notify", action="store_true")
+    args = ap.parse_args()
+    report = evaluate()
+    write_receipt(report)
+    notify_msg = try_notify(report) if args.notify else "no_notify"
+    report["notify"] = notify_msg
+    # refresh state with notify
+    STATE.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if args.json:
+        print(json.dumps(report, indent=2))
+    else:
+        print(
+            f"BACKUP_HEALTH color={report['color']} issues={len(report['issues'])} "
+            f"warns={len(report['warns'])} notify={notify_msg}"
+        )
+        for i in report["issues"]:
+            print(f"  ISSUE: {i}")
+        for w in report["warns"]:
+            print(f"  WARN: {w}")
+    return 0 if report["color"] == "GREEN" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

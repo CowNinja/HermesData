@@ -125,4 +125,14 @@ When user returns after ignoring the resilience thread and reports "I've been wo
 - Capture that the resilience layer must stay synchronized with live silo without blocking silo work.
 - See the 2026-06-26 session for the concrete five and execution (partial manifest due to ingest perms, safe mirrors of Goals/Digital-Twin docs + index/proof).
 
+**2026-08-01 post-crash backup hardening (codified)**:
+- **Poison blob:** never commit `*.sqlite*`. Vault `Operations/session_state.sqlite` (~174MB) in history blocks `origin/master` push (GitHub 100MB hard limit).
+- **Interim offsite (no force-push master):** `python D:/HermesData/scripts/vault_github_clean_mirror_push.py` → orphan single-commit branch `github-cns-mirror` via `git archive` filter (shallow clone push can fail with missing objects).
+- **Orchestrator v6:** `backup-resilience.py` runs (1) allowlist git + blocked-blob unstage (2) `backup_k_mirror_once.py` (3) `backup_health_alarm.py --notify`.
+- **K cadence:** Python owns K mirror (not only bash `.sh`) so 4h cron actually refreshes `K:/Hermes-Resilience/manifests/latest-backup.json`.
+- **Health color:** `backup_health_alarm.py` → YELLOW if K manifest >48h or vault lag without clean mirror; pulse under `state/pulses/`.
+- **History rewrite:** prepare-only `vault_history_sqlite_purge_prepare.py`; force-push requires `CONFIRM_VAULT_FORCE_PUSH=YES` (Jeff gate).
+- **Cloud pack:** `cloud_recovery_pack_sync.py` includes new scripts; live dest may be `D:/CloudSync/Google-My-Drive/Phronesis-Recovery` or OneDrive.
+- **Vault docs:** `Operations/Backup-Architecture-Cook-2026-08-01.md`, `Vault-GitHub-History-Purge-Runbook-2026-08-01.md`.
+
 This is the class-level technique for making Hermes tools portable while keeping heavy state on sovereign K:. Integrates with the hybrid backup layers above.
