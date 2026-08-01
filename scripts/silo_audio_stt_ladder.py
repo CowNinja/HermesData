@@ -101,31 +101,62 @@ def to_wav16k(path: Path, work: Path) -> tuple[Path | None, str]:
 
 
 def stt_whisper(path: Path) -> tuple[str, str]:
-    """Prefer isolated STT venv (numpy pin) ? research: Numba/whisper vs numpy 2.5 clash."""
+    """Prefer isolated STT venv (numpy pin). Device via SILO_STT_DEVICE=cpu|cuda."""
+    import os
+
     py = STT_PYTHON if STT_PYTHON.is_file() else Path(sys.executable)
+    device = (os.environ.get("SILO_STT_DEVICE") or "cpu").strip().lower()
+    if device not in ("cpu", "cuda"):
+        device = "cpu"
+    compute = (os.environ.get("SILO_STT_COMPUTE") or "").strip()
+    if not compute:
+        compute = "float16" if device == "cuda" else "int8"
+    # Ensure cublas/cudart on PATH (Ollama cuda_v12 bundle on this host)
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from silo_stt_cuda_env import apply_cuda_path
+
+        apply_cuda_path()
+    except Exception:
+        pass
+    # Helper picks cuda when borrow window frees VRAM; falls back to cpu on failure.
     helper = r"""
-import sys
+import os, sys
 from pathlib import Path
 path = Path(sys.argv[1])
+device = (os.environ.get("SILO_STT_DEVICE") or "cpu").strip().lower()
+compute = (os.environ.get("SILO_STT_COMPUTE") or ("float16" if device == "cuda" else "int8")).strip()
 try:
     from faster_whisper import WhisperModel
-    model = WhisperModel("base", device="cpu", compute_type="int8")
+    try:
+        model = WhisperModel("base", device=device, compute_type=compute)
+        eng = "faster-whisper-base-%s-%s" % (device, compute)
+    except Exception as e1:
+        if device != "cpu":
+            model = WhisperModel("base", device="cpu", compute_type="int8")
+            eng = "faster-whisper-base-cpu-fallback:%s" % (str(e1)[:80],)
+        else:
+            raise
     segments, _info = model.transcribe(str(path), beam_size=1)
     text = " ".join(s.text.strip() for s in segments)
     print(text)
-    print("ENGINE:faster-whisper-base", file=sys.stderr)
+    print("ENGINE:" + eng, file=sys.stderr)
 except Exception as e:
     print("", end="")
     print("ENGINE:fail:"+str(e)[:200], file=sys.stderr)
     sys.exit(2)
 """
     try:
+        env = os.environ.copy()
+        env["SILO_STT_DEVICE"] = device
+        env["SILO_STT_COMPUTE"] = compute
         r = subprocess.run(
             [str(py), "-c", helper, str(path)],
             capture_output=True,
             text=True,
             timeout=900,
             stdin=subprocess.DEVNULL,
+            env=env,
             creationflags=CREATE_NO_WINDOW,
         )
         text = (r.stdout or "").strip()
