@@ -2,32 +2,232 @@
 """Mark process_status on registry rows from sidecar presence.
 
 Statuses:
-  unprocessed | extracted | context_enriched | ocr_queued | derivative_ok | ghost_cleared
+  unprocessed | extracted | context_enriched | ocr_queued | derivative_ok
+  | ghost_cleared | catalog_only
 
 2026-07-26: honor .ocr.md / .stt.md twins; mark missing dest as ghost_cleared
 so unprocessed counters and html_thin pick stop thrashing missing Takeout paths.
+2026-08-01: .needs_ocr.json; catalog_only exts; --unprocessed-only fast path
+(closes residual extract loop without full-table thrash).
 """
 from __future__ import annotations
 
 import argparse
+import json
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 DB = Path(r"D:\HermesData\state\ingest_registry.sqlite3")
+OUT = Path(r"D:\HermesData\state\process_status_batch_latest.json")
+
+# Non-content / pointer / junk -> catalog_only (no OCR/STT thrash)
+CATALOG_EXT = {
+    ".gdoc",
+    ".gsheet",
+    ".gslides",
+    ".gdraw",
+    ".gform",
+    ".gtable",
+    ".url",
+    ".lnk",
+    ".bak",
+    ".tmp",
+    ".temp",
+    ".part",
+    ".crdownload",
+    ".ds_store",
+    ".db-journal",
+    ".db-wal",
+    ".db-shm",
+    ".lcp",
+    ".dcp",
+    ".apk",
+    ".so",
+    ".dll",
+    ".exe",
+    ".class",
+    ".pyc",
+    ".pyo",
+    ".o",
+    ".a",
+    ".lib",
+    ".pdb",
+    ".ilk",
+    ".svg",  # vector asset; catalog unless gold later
+    ".ico",
+    ".cur",
+    ".dat",
+    ".properties",
+    ".css",
+    ".map",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".softbank_392",
+}
+
+NATIVE_TEXT = {
+    ".txt",
+    ".md",
+    ".csv",
+    ".json",
+    ".html",
+    ".htm",
+    ".eml",
+    ".rtf",
+    ".xml",
+    ".log",
+    ".yaml",
+    ".yml",
+    ".vcf",
+    ".ics",
+    ".ini",
+    ".cfg",
+    ".conf",
+}
+
+# Images default catalog_only unless gold path (OCR gated elsewhere)
+IMAGE_EXT = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".tif",
+    ".tiff",
+    ".bmp",
+    ".heic",
+    ".heif",
+}
+
+GOLD_HINTS = (
+    "medical-records",
+    "navy-service",
+    "diagnosis",
+    "orders",
+    "awards",
+    "passport",
+    "visa",
+    "tax",
+    "irs",
+)
+
+
+def utc() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def is_gold(path: str) -> bool:
+    low = (path or "").lower().replace("/", "\\")
+    return any(h in low for h in GOLD_HINTS)
+
+
+def infer_status(p: Path, cur: str | None) -> str:
+    """Infer process_status from path + sidecars. Prefer stronger statuses."""
+    if not p.is_file():
+        return "ghost_cleared"
+
+    suf = p.suffix.lower()
+    train = Path(str(p) + ".train.md")
+    stt = Path(str(p) + ".stt.md")
+    ocr = Path(str(p) + ".ocr.md")
+    ctx_train = Path(str(p) + ".context.train.md")
+    needs = Path(str(p) + ".needs_ocr")
+    needs_json = Path(str(p) + ".needs_ocr.json")
+    meta = Path(str(p) + ".meta.json")
+    ctx = Path(str(p) + ".context.json")
+    extract_txt = Path(str(p) + ".extract.txt")
+    pdf_txt = Path(str(p) + ".txt")
+
+    # Strongest first
+    try:
+        if (
+            (train.is_file() and train.stat().st_size >= 40)
+            or (ctx_train.is_file() and ctx_train.stat().st_size >= 40)
+            or (stt.is_file() and stt.stat().st_size >= 40)
+        ):
+            return "derivative_ok"
+    except OSError:
+        pass
+
+    if ctx.is_file():
+        return "context_enriched"
+
+    try:
+        if ocr.is_file() and ocr.stat().st_size >= 40:
+            return "extracted"
+        if extract_txt.is_file() and extract_txt.stat().st_size >= 40:
+            return "extracted"
+        # pdf sidecar text written next to file
+        if suf == ".pdf" and pdf_txt.is_file() and pdf_txt.stat().st_size >= 40:
+            return "extracted"
+    except OSError:
+        pass
+
+    if needs.is_file() or needs_json.is_file():
+        return "ocr_queued"
+
+    # meta-only after extract attempt without text -> still ocr_queued if pdf/image
+    if meta.is_file() and suf in {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff"}:
+        # if meta says needs ocr / empty text, queue; else leave
+        try:
+            raw = meta.read_text(encoding="utf-8", errors="replace")[:2000]
+            if "needs_ocr" in raw.lower() or '"chars": 0' in raw or '"text_len": 0' in raw:
+                return "ocr_queued"
+        except OSError:
+            pass
+
+    if suf in CATALOG_EXT:
+        return "catalog_only"
+
+    if suf in IMAGE_EXT:
+        # gold images stay unprocessed for OCR gold path; others catalog
+        if is_gold(str(p)):
+            return cur if cur in ("ocr_queued", "extracted", "derivative_ok") else "unprocessed"
+        return "catalog_only"
+
+    if suf in NATIVE_TEXT:
+        try:
+            if p.stat().st_size > 0:
+                return "extracted"
+        except OSError:
+            return "ghost_cleared"
+
+    # no extension Google pointers often end with space + nothing useful
+    if suf == "" or suf == ".":
+        name = p.name.lower()
+        if name.endswith(".gdoc") or "navadmin" in name:
+            return "catalog_only"
+
+    return cur or "unprocessed"
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=500)
     ap.add_argument(
+        "--unprocessed-only",
+        action="store_true",
+        help="Only scan unprocessed/NULL rows (residual close-loop)",
+    )
+    ap.add_argument(
         "--prefer-twins",
         action="store_true",
         help="Bias gold silo roots first for twin promote",
     )
+    ap.add_argument(
+        "--catalog-other",
+        action="store_true",
+        help="Aggressively mark CATALOG_EXT + non-gold images as catalog_only",
+    )
+    ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     if not DB.is_file():
-        print("no db")
+        print(json.dumps({"ok": False, "error": "no db"}))
         return 2
+
     con = sqlite3.connect(str(DB), timeout=60)
     try:
         con.execute("PRAGMA busy_timeout=60000")
@@ -43,7 +243,13 @@ def main() -> int:
             )
             con.commit()
         except Exception as e:
-            print("alter fail", e)
+            print(json.dumps({"ok": False, "error": f"alter fail {e}"}))
+            return 2
+
+    where = "WHERE dest_path IS NOT NULL"
+    if args.unprocessed_only:
+        where += " AND (process_status IS NULL OR process_status='unprocessed')"
+
     order = """ORDER BY CASE WHEN process_status IS NULL OR process_status='unprocessed' THEN 0 ELSE 1 END"""
     if args.prefer_twins:
         order = """ORDER BY
@@ -56,76 +262,87 @@ def main() -> int:
           END,
           CASE WHEN process_status IS NULL OR process_status='unprocessed' THEN 0 ELSE 1 END
         """
+
+    pull = max(args.limit * 8, args.limit + 50)
     rows = con.execute(
-        f"""SELECT rowid, dest_path, process_status FROM ingest
-           WHERE dest_path IS NOT NULL
+        f"""SELECT rowid AS rid, dest_path, process_status FROM ingest
+           {where}
            {order}
            LIMIT ?""",
-        (args.limit * 12,),
+        (pull,),
     ).fetchall()
+
     updated = 0
     scanned = 0
     ghosts = 0
     derivatives = 0
+    cataloged = 0
+    ocr_q = 0
+    extracted_n = 0
+    by_new: dict[str, int] = {}
+    samples: list[dict] = []
+
     for r in rows:
-        dest = r["dest_path"] if "dest_path" in r.keys() else r[1]
+        dest = r["dest_path"]
         if not dest:
             continue
         p = Path(dest)
-        rid = r["rowid"] if "rowid" in r.keys() else r[0]
-        cur = r["process_status"] if "process_status" in r.keys() else None
-        if not p.is_file():
-            if cur != "ghost_cleared":
-                con.execute(
-                    "UPDATE ingest SET process_status=? WHERE rowid=?",
-                    ("ghost_cleared", rid),
-                )
-                updated += 1
-                ghosts += 1
-            scanned += 1
-            if updated >= args.limit:
-                break
-            continue
+        rid = r["rid"]
+        cur = r["process_status"]
         scanned += 1
-        status = "unprocessed"
-        train = Path(str(p) + ".train.md")
-        stt = Path(str(p) + ".stt.md")
-        ocr = Path(str(p) + ".ocr.md")
-        ctx_train = Path(str(p) + ".context.train.md")
-        if (
-            (train.is_file() and train.stat().st_size >= 40)
-            or (ctx_train.is_file() and ctx_train.stat().st_size >= 40)
-            or (stt.is_file() and stt.stat().st_size >= 40)
-        ):
-            status = "derivative_ok"
-        elif Path(str(p) + ".context.json").is_file():
-            status = "context_enriched"
-        elif Path(str(p) + ".needs_ocr").is_file():
-            status = "ocr_queued"
-        elif ocr.is_file() and ocr.stat().st_size >= 40:
-            status = "extracted"
-        elif p.suffix.lower() in {
-            ".txt",
-            ".md",
-            ".csv",
-            ".json",
-            ".html",
-            ".htm",
-            ".eml",
-            ".rtf",
-        } and p.stat().st_size > 0:
-            status = "extracted"
-        if cur != status:
-            con.execute(
-                "UPDATE ingest SET process_status=? WHERE rowid=?",
-                (status, rid),
-            )
+
+        status = infer_status(p, cur)
+        # catalog-other mode: force catalog on matching unprocessed
+        if args.catalog_other and (cur is None or cur == "unprocessed"):
+            suf = p.suffix.lower()
+            if suf in CATALOG_EXT or (suf in IMAGE_EXT and not is_gold(dest)):
+                status = "catalog_only"
+
+        if status != (cur or "unprocessed") and status != cur:
+            # don't downgrade strong statuses accidentally
+            rank = {
+                "derivative_ok": 50,
+                "context_enriched": 40,
+                "extracted": 30,
+                "ocr_queued": 20,
+                "stt_queued": 20,
+                "catalog_only": 15,
+                "ghost_cleared": 10,
+                "unprocessed": 0,
+                None: 0,
+            }
+            if rank.get(status, 0) < rank.get(cur, 0) and cur not in (
+                None,
+                "unprocessed",
+                "",
+            ):
+                continue
+            if not args.dry_run:
+                con.execute(
+                    "UPDATE ingest SET process_status=?, last_seen=? WHERE rowid=?",
+                    (status, utc(), rid),
+                )
             updated += 1
-            if status == "derivative_ok":
+            by_new[status] = by_new.get(status, 0) + 1
+            if status == "ghost_cleared":
+                ghosts += 1
+            elif status == "derivative_ok":
                 derivatives += 1
-        if updated >= args.limit and scanned > args.limit:
+            elif status == "catalog_only":
+                cataloged += 1
+            elif status == "ocr_queued":
+                ocr_q += 1
+            elif status == "extracted":
+                extracted_n += 1
+            if len(samples) < 12:
+                samples.append({"dest": dest[:120], "from": cur, "to": status})
+
+        if updated >= args.limit:
             break
-    con.commit()
+
+    if not args.dry_run:
+        con.commit()
+
     try:
         counts = con.execute(
             "SELECT process_status, COUNT(*) c FROM ingest GROUP BY process_status"
@@ -133,16 +350,31 @@ def main() -> int:
         by = {row[0]: row[1] for row in counts}
     except Exception:
         by = {}
+    unprocessed = int(by.get("unprocessed") or 0) + int(by.get(None) or 0)
     con.close()
-    print(
-        {
-            "scanned": scanned,
-            "updated": updated,
-            "ghosts": ghosts,
-            "derivatives": derivatives,
-            "by_process": by,
-        }
-    )
+
+    rep = {
+        "ts": utc(),
+        "ok": True,
+        "scanned": scanned,
+        "updated": updated,
+        "ghosts": ghosts,
+        "derivatives": derivatives,
+        "cataloged": cataloged,
+        "ocr_queued": ocr_q,
+        "extracted": extracted_n,
+        "by_new": by_new,
+        "unprocessed_now": unprocessed,
+        "by_process": by,
+        "unprocessed_only": bool(args.unprocessed_only),
+        "dry_run": bool(args.dry_run),
+        "samples": samples,
+    }
+    try:
+        OUT.write_text(json.dumps(rep, indent=2) + "\n", encoding="ascii")
+    except Exception:
+        pass
+    print(json.dumps(rep, indent=2)[:5000])
     return 0
 
 

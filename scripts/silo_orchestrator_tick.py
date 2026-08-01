@@ -90,15 +90,17 @@ def run(cmd: List[str], timeout: int = 600) -> Tuple[int, str]:
     children ? dual land writers every ~2h (overnight watchdog thrash).
     2026-07-19: do NOT force pythonw for silo_focus_land / g_to_k_safe_drain ?
     nested pythonw?pythonw under PIPEd stdio exits 1 silent (GB land stall).
+    2026-08-01: STT backlog forced CPU env - CUDA only via silo_gpu_borrow_window
+    (single GPU tenant; brain keeps VRAM).
     """
     try:
+        joined = " ".join(str(x) for x in cmd).lower()
         if (
             sys.platform == "win32"
             and cmd
             and str(cmd[0]).lower().endswith(("python.exe", "pythonw.exe"))
         ):
             cmd = list(cmd)
-            joined = " ".join(str(x) for x in cmd).lower()
             land_writer = (
                 "silo_focus_land.py" in joined
                 or "g_to_k_safe_drain.py" in joined
@@ -114,6 +116,15 @@ def run(cmd: List[str], timeout: int = 600) -> Tuple[int, str]:
                         cmd[0] = str(p.with_name("python.exe"))
             else:
                 cmd[0] = _worker_python()
+        # Force CPU STT in orch ticks - never steal VRAM from Qwythos
+        env = None
+        if "silo_audio_stt_backlog_worker.py" in joined or "silo_audio_stt_ladder.py" in joined:
+            import os as _os
+
+            env = _os.environ.copy()
+            env["SILO_STT_DEVICE"] = "cpu"
+            env["SILO_STT_COMPUTE"] = "int8"
+            env["SILO_STT_ORCH_CPU_GATE"] = "1"
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -121,6 +132,7 @@ def run(cmd: List[str], timeout: int = 600) -> Tuple[int, str]:
             text=True,
             cwd=str(SCRIPTS),
             creationflags=_NO_WINDOW,
+            env=env,
         )
         try:
             out, err = proc.communicate(timeout=timeout)
