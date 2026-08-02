@@ -135,4 +135,14 @@ When user returns after ignoring the resilience thread and reports "I've been wo
 - **Cloud pack:** `cloud_recovery_pack_sync.py` includes new scripts; live dest may be `D:/CloudSync/Google-My-Drive/Phronesis-Recovery` or OneDrive.
 - **Vault docs:** `Operations/Backup-Architecture-Cook-2026-08-01.md`, `Vault-GitHub-History-Purge-Runbook-2026-08-01.md`.
 
+**2026-08-02 five-primaries cadence (v7 LIVE)**:
+- Cron `Hermes-Resilience-Backup` (id 646449c250f1) every 240m, `no_agent: true`, `script: backup-resilience.py`.
+- `backup-resilience.sh` is a **thin exec → python** wrapper only (no MIR / no hermes --quick).
+- Phases: k_layout → critical_zip → k_mirror → silo_signal → HD git push → vault clean-mirror `--if-due --min-hours 12` → cloud pack → health alarm.
+- Vault **master push skipped** (history poison). Offsite vault = `github-cns-mirror` 1–2×/day.
+- Critical state = `backup_critical_state_zip.py` (~0.6MB allowlist) not hanging hermes-quick.
+- Fossils: mega `hermes-full-*.zip` → `K:/Hermes-Resilience/Quarantine/fossils/` (delete only with explicit Jeff flag).
+- Canon: `Operations/Backup-Five-Primaries-Cadence-2026-08-02.md`.
+- Health: clean_mirror stale >36h YELLOW; K >48h YELLOW/RED; pulse `state/pulses/backup_health_pulse.json`; until-home H9c + driver_judgment_pulse wired.
+
 This is the class-level technique for making Hermes tools portable while keeping heavy state on sovereign K:. Integrates with the hybrid backup layers above.

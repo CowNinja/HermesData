@@ -218,8 +218,23 @@ def main() -> int:
     backup_repo("PhronesisVault", r"D:\PhronesisVault", None, push=False)
     PHASES["git"] = {"ok": True, "errors_so_far": len(ERRORS)}
 
-    # B) K layout / fossil quarantine
-    _run_phase("k_layout", SCRIPTS / "k_resilience_layout_once.py", extra_args=["--json"], timeout=120)
+    # B) K layout / fossil quarantine (idempotent; was 120s — bump + one retry)
+    _run_phase(
+        "k_layout",
+        SCRIPTS / "k_resilience_layout_once.py",
+        extra_args=["--json"],
+        timeout=300,
+    )
+    if not (PHASES.get("k_layout") or {}).get("ok"):
+        log("RETRY k_layout once")
+        # clear sticky error label for clean receipt if retry works
+        ERRORS[:] = [e for e in ERRORS if not str(e).startswith("k_layout")]
+        _run_phase(
+            "k_layout",
+            SCRIPTS / "k_resilience_layout_once.py",
+            extra_args=["--json"],
+            timeout=300,
+        )
 
     # C) critical zip
     _run_phase("critical_zip", SCRIPTS / "backup_critical_state_zip.py", extra_args=["--json"], timeout=180)

@@ -2107,15 +2107,15 @@
       "schedule_display": "17,47 * * * *",
       "repeat": {
         "times": null,
-        "completed": 706
+        "completed": 707
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-21T09:03:09.549239-04:00",
-      "next_run_at": "2026-08-01T21:17:00-04:00",
-      "last_run_at": "2026-08-01T20:47:55.228877-04:00",
+      "next_run_at": "2026-08-01T21:47:00-04:00",
+      "last_run_at": "2026-08-01T21:17:56.372008-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2336,7 +2336,7 @@
       "schedule_display": "13,43 * * * *",
       "repeat": {
         "times": null,
-        "completed": 201
+        "completed": 202
       },
       "enabled": true,
       "state": "scheduled",
@@ -2344,9 +2344,9 @@
       "paused_reason": null,
       "created_at": "2026-07-26T14:31:04.320281-04:00",
       "next_run_at": "2026-08-01T21:43:00-04:00",
-      "last_run_at": "2026-08-01T20:45:17.592854-04:00",
+      "last_run_at": "2026-08-01T21:17:02.989808-04:00",
       "last_status": "error",
-      "last_error": "Script exited with code 1\nstdout:\nautonomy_cron overall=RED wall_s=28.225 8090=True 8091=GREEN q_wait=0 circ=closed/0 next=3 next_five_ok=True\n  - python D:/HermesData/scripts/sovereign_infra_solidity_gate.py\n  - python D:/HermesData/scripts/model_mgmt_light_cron.py\n  - python D:/HermesData/scripts/model_mgmt_full_cron.py",
+      "last_error": "Script exited with code 1\nstdout:\nautonomy_cron overall=RED wall_s=125.573 8090=False 8091=YELLOW q_wait=0 circ=closed/0 next=4 next_five_ok=True\n  - python D:/HermesData/scripts/ensure_qwythos_8090.py\n  - python D:/HermesData/scripts/sovereign_infra_solidity_gate.py\n  - python D:/HermesData/scripts/model_mgmt_light_cron.py\n  - python D:/HermesData/scripts/model_mgmt_full_cron.py",
       "last_delivery_error": null,
       "deliver": "local",
       "origin": {
@@ -2469,15 +2469,15 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 304
+        "completed": 305
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-27T13:41:50.608122+00:00",
-      "next_run_at": "2026-08-01T21:19:53.697310-04:00",
-      "last_run_at": "2026-08-01T21:04:53.697310-04:00",
+      "next_run_at": "2026-08-01T21:36:12.427743-04:00",
+      "last_run_at": "2026-08-01T21:21:12.427743-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2556,15 +2556,15 @@
       "schedule_display": "every 1m",
       "repeat": {
         "times": null,
-        "completed": 1918
+        "completed": 1921
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-27T11:50:31.211981-04:00",
-      "next_run_at": "2026-08-01T21:15:49.015157-04:00",
-      "last_run_at": "2026-08-01T21:13:03.437024-04:00",
+      "next_run_at": "2026-08-01T21:22:26.885392-04:00",
+      "last_run_at": "2026-08-01T21:21:26.885392-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2693,15 +2693,15 @@
       "schedule_display": "every 5m",
       "repeat": {
         "times": null,
-        "completed": 629
+        "completed": 630
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-28T17:01:21.191938-04:00",
-      "next_run_at": "2026-08-01T21:16:09.829377-04:00",
-      "last_run_at": "2026-08-01T21:11:09.829377-04:00",
+      "next_run_at": "2026-08-01T21:22:23.763112-04:00",
+      "last_run_at": "2026-08-01T21:17:23.763112-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2756,5 +2756,5 @@
       "pinned": true
     }
   ],
-  "updated_at": "2026-08-01T21:14:49.016165-04:00"
+  "updated_at": "2026-08-01T21:21:26.885940-04:00"
 }
