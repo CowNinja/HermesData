@@ -179,41 +179,80 @@ def evaluate() -> Dict[str, Any]:
     else:
         warns.append("critical zip missing or failed")
 
-    # Silo signal (soft)
+    # Silo signal (soft) — partial/budget_hit still ok if dest populated
     ss = load_json(SILO_SIGNAL_STATE)
     layers["silo_signal"] = {
         "ok": ss.get("ok"),
         "ts": ss.get("ts"),
         "copied": ss.get("copied"),
+        "partial": ss.get("partial") or ss.get("budget_hit"),
+        "dest_files": ss.get("dest_files"),
+        "elapsed_sec": ss.get("elapsed_sec"),
+        "version": ss.get("version"),
     }
     if ss and ss.get("ok") is False:
         warns.append("silo signal mirror last run failed")
+    elif ss.get("budget_hit") or ss.get("partial"):
+        warns.append(
+            f"silo signal partial/budget_hit elapsed={ss.get('elapsed_sec')} "
+            f"dest_files={ss.get('dest_files')}"
+        )
 
-    # Resilience job
+    # Fossil reappearance (soft unless RED)
+    fossil = load_json(HERMES / "state" / "k_fossil_scan_last.json")
+    if fossil:
+        layers["fossil_scan"] = {
+            "color": fossil.get("color"),
+            "live_count": fossil.get("live_count"),
+            "live_gb": fossil.get("live_gb"),
+        }
+        if fossil.get("color") == "RED":
+            issues.append(f"fossil scan RED live_gb={fossil.get('live_gb')}")
+        elif fossil.get("color") == "YELLOW" and (fossil.get("live_count") or 0) > 0:
+            warns.append(
+                f"fossil scan YELLOW live={fossil.get('live_count')} gb={fossil.get('live_gb')}"
+            )
+
+    # Resilience job (v9: hard vs soft_errors; silo timeout soft when prior fresh)
     res = load_json(RESILIENCE)
+    soft_errs = list(res.get("soft_errors") or [])
+    hard_errs = list(res.get("errors") or [])
     layers["resilience_job"] = {
         "ok": res.get("ok"),
         "ts": res.get("ts"),
         "error_count": res.get("error_count"),
-        "errors": (res.get("errors") or [])[:5],
+        "soft_error_count": res.get("soft_error_count") or len(soft_errs),
+        "errors": hard_errs[:5],
+        "soft_errors": soft_errs[:5],
+        "version": res.get("version"),
     }
     if res.get("_parse_error"):
         warns.append("resilience state parse error")
     elif not res:
         warns.append("no resilience state yet")
-    elif res.get("ok") is False:
-        # vault push fail is expected until history rewrite — downgrade if clean mirror ok
-        errs = " ".join(res.get("errors") or [])
-        err_l = errs.lower()
-        if clean_ok and (
-            "push" in err_l
-            or "vault_clean_mirror" in err_l
-            or "master" in err_l
-        ):
-            # stale resilience soft fail while live clean mirror is green
-            warns.append(f"resilience soft fail (clean mirror OK): {errs[:120]}")
-        else:
-            issues.append(f"resilience job ok=False: {errs[:160]}")
+    else:
+        # soft errors always warn-only
+        for se in soft_errs[:5]:
+            warns.append(f"resilience soft: {se[:140]}")
+        if res.get("ok") is False or hard_errs:
+            errs = " ".join(hard_errs) if hard_errs else " ".join(res.get("errors") or [])
+            err_l = errs.lower()
+            # silo-only hard label with fresh silo state → warn
+            silo_only = hard_errs and all("silo_signal" in h.lower() for h in hard_errs)
+            ss_ok = bool(ss.get("ok")) if ss else False
+            if silo_only and ss_ok:
+                warns.append(f"resilience silo soft-demoted: {errs[:120]}")
+            elif clean_ok and (
+                "push" in err_l
+                or "vault_clean_mirror" in err_l
+                or "master" in err_l
+            ) and not any(
+                x in err_l for x in ("k_mirror", "critical_zip", "poison", "k_layout")
+            ):
+                warns.append(f"resilience soft fail (clean mirror OK): {errs[:120]}")
+            elif hard_errs or res.get("ok") is False:
+                issues.append(f"resilience job ok=False: {errs[:160]}")
+        # fossil scan / governor already layered above
 
     # K manifest age
     kh = age_hours(K_LATEST)
