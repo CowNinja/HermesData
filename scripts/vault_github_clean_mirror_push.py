@@ -139,15 +139,43 @@ def export_tree(dest: Path) -> Tuple[int, int]:
 
 def _wipe(path: Path) -> None:
     try:
+        if not path.exists() and not path.is_symlink():
+            return
+    except OSError:
+        return
+    try:
         if path.is_symlink() or path.is_file():
             path.unlink(missing_ok=True)
-        elif path.is_dir():
-            shutil.rmtree(path, ignore_errors=True)
-            # Windows race: retry if residue
-            if path.exists():
-                shutil.rmtree(path, ignore_errors=True)
+            return
     except OSError:
         pass
+    try:
+        shutil.rmtree(path, ignore_errors=True)
+    except OSError:
+        pass
+    # Windows stubborn residue
+    if path.exists():
+        try:
+            subprocess.run(
+                ["cmd", "/c", "rmdir", "/s", "/q", str(path)],
+                capture_output=True,
+                timeout=60,
+            )
+        except Exception:
+            pass
+        try:
+            if path.is_file():
+                path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _sha_match(a: str, b: str) -> bool:
+    if not a or not b:
+        return False
+    a = a.strip().lower()
+    b = b.strip().lower()
+    return a == b or a.startswith(b) or b.startswith(a)
 
 
 def largest(root: Path, n: int = 12) -> List[str]:
@@ -217,17 +245,18 @@ def main() -> int:
                 age_h = (datetime.now(timezone.utc) - dt).total_seconds() / 3600.0
         except Exception:
             age_h = None
-        if prev_ok and prev_sha and prev_sha == sha and age_h is not None and age_h < args.min_hours:
+        if prev_ok and prev_sha and _sha_match(prev_sha, sha) and age_h is not None and age_h < args.min_hours:
             notes.append(f"skip_not_due age_h={age_h:.2f} min={args.min_hours} sha={sha_short}")
             log(f"SKIP not due (same sha, age {age_h:.1f}h < {args.min_hours}h)")
             _write(True, ts, args.branch, errors, notes, prev.get("remote_url"), source_sha=sha, skipped=True)
             print(json.dumps({"ok": True, "skipped": True, "reason": "not_due", "age_h": age_h, "sha": sha_short}, indent=2))
             return 0
 
-    if TMP_ROOT.exists():
-        _wipe(TMP_ROOT)
-    work = TMP_ROOT / "tree"
-    repo = TMP_ROOT / "repo"
+    # Unique workdir every run — avoids Windows file/dir residue collisions
+    run_root = TMP_ROOT.parent / f"vault-gh-orphan-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    _wipe(run_root)
+    work = run_root / "tree"
+    repo = run_root / "repo"
     work.mkdir(parents=True)
 
     log("## git archive + filter extract")
@@ -276,9 +305,13 @@ Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
         _write(False, ts, args.branch, errors, notes, None, source_sha=sha)
         return 2
 
-    # Fresh repo
+    # Fresh repo dir
     _wipe(repo)
-    repo.mkdir(parents=True)
+    try:
+        repo.mkdir(parents=True)
+    except FileExistsError:
+        _wipe(repo)
+        repo.mkdir(parents=True)
     # move tree into repo
     for item in list(work.iterdir()):
         dest_item = repo / item.name
@@ -341,7 +374,9 @@ Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
     notes.append("push_ok")
     _write(True, ts, args.branch, errors, notes, args.remote_url, source_sha=sha)
     if not args.keep:
-        shutil.rmtree(TMP_ROOT, ignore_errors=True)
+        _wipe(run_root)
+        # also clear legacy fixed path
+        _wipe(TMP_ROOT)
     print(
         json.dumps(
             {

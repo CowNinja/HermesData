@@ -1009,15 +1009,15 @@
       "schedule_display": "11,41 * * * *",
       "repeat": {
         "times": null,
-        "completed": 5965
+        "completed": 5966
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-04T11:35:00-04:00",
-      "next_run_at": "2026-08-01T21:11:00-04:00",
-      "last_run_at": "2026-08-01T20:41:52.436735-04:00",
+      "next_run_at": "2026-08-01T21:41:00-04:00",
+      "last_run_at": "2026-08-01T21:11:54.491156-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2343,7 +2343,7 @@
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-26T14:31:04.320281-04:00",
-      "next_run_at": "2026-08-01T21:13:00-04:00",
+      "next_run_at": "2026-08-01T21:43:00-04:00",
       "last_run_at": "2026-08-01T20:45:17.592854-04:00",
       "last_status": "error",
       "last_error": "Script exited with code 1\nstdout:\nautonomy_cron overall=RED wall_s=28.225 8090=True 8091=GREEN q_wait=0 circ=closed/0 next=3 next_five_ok=True\n  - python D:/HermesData/scripts/sovereign_infra_solidity_gate.py\n  - python D:/HermesData/scripts/model_mgmt_light_cron.py\n  - python D:/HermesData/scripts/model_mgmt_full_cron.py",
@@ -2556,15 +2556,15 @@
       "schedule_display": "every 1m",
       "repeat": {
         "times": null,
-        "completed": 1917
+        "completed": 1918
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-27T11:50:31.211981-04:00",
-      "next_run_at": "2026-08-01T21:12:03.509659-04:00",
-      "last_run_at": "2026-08-01T21:11:03.509659-04:00",
+      "next_run_at": "2026-08-01T21:15:49.015157-04:00",
+      "last_run_at": "2026-08-01T21:13:03.437024-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2756,5 +2756,5 @@
       "pinned": true
     }
   ],
-  "updated_at": "2026-08-01T21:11:09.830383-04:00"
+  "updated_at": "2026-08-01T21:14:49.016165-04:00"
 }
