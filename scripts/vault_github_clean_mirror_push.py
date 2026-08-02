@@ -58,6 +58,20 @@ EXCLUDE_SUFFIXES = (
     ".zip",
     ".7z",
     ".bak",
+    ".vrm",
+    ".glb",
+    ".gltf",
+    ".fbx",
+    ".obj",
+    ".safetensors",
+    ".gguf",
+    ".pt",
+    ".pth",
+    ".onnx",
+    ".bin",
+    ".whl",
+    ".dll",
+    ".exe",
 )
 
 MAX_FILE_BYTES = 40 * 1024 * 1024  # hard skip single files >40MB in mirror
@@ -245,11 +259,71 @@ def main() -> int:
                 age_h = (datetime.now(timezone.utc) - dt).total_seconds() / 3600.0
         except Exception:
             age_h = None
-        if prev_ok and prev_sha and _sha_match(prev_sha, sha) and age_h is not None and age_h < args.min_hours:
-            notes.append(f"skip_not_due age_h={age_h:.2f} min={args.min_hours} sha={sha_short}")
-            log(f"SKIP not due (same sha, age {age_h:.1f}h < {args.min_hours}h)")
-            _write(True, ts, args.branch, errors, notes, prev.get("remote_url"), source_sha=sha, skipped=True)
-            print(json.dumps({"ok": True, "skipped": True, "reason": "not_due", "age_h": age_h, "sha": sha_short}, indent=2))
+
+        # Prefer last *successful* mirror age for rate-limit (not failed attempts)
+        last_ok_age = age_h if prev_ok else None
+        try:
+            # if last state failed, look for remote tip age via notes is hard; use min_hours only on ok
+            pass
+        except Exception:
+            pass
+
+        # Rate limit: if last attempt was OK and young, skip even if vault HEAD moved
+        if prev_ok and age_h is not None and age_h < float(args.min_hours):
+            notes.append(
+                f"skip_rate_limit age_h={age_h:.2f} min={args.min_hours} sha={sha_short}"
+            )
+            log(f"SKIP rate-limit (last ok age {age_h:.1f}h < {args.min_hours}h)")
+            _write(
+                True,
+                ts,
+                args.branch,
+                errors,
+                notes,
+                prev.get("remote_url"),
+                source_sha=prev_sha or sha,
+                skipped=True,
+            )
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "skipped": True,
+                        "reason": "rate_limit",
+                        "age_h": age_h,
+                        "sha": sha_short,
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+
+        # After window: skip rebuild if source tip unchanged
+        if prev_ok and prev_sha and _sha_match(prev_sha, sha):
+            notes.append(f"skip_same_sha age_h={age_h} sha={sha_short}")
+            log(f"SKIP same source sha ({sha_short})")
+            _write(
+                True,
+                ts,
+                args.branch,
+                errors,
+                notes,
+                prev.get("remote_url"),
+                source_sha=sha,
+                skipped=True,
+            )
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "skipped": True,
+                        "reason": "same_sha",
+                        "age_h": age_h,
+                        "sha": sha_short,
+                    },
+                    indent=2,
+                )
+            )
             return 0
 
     # Unique workdir every run — avoids Windows file/dir residue collisions
@@ -357,19 +431,28 @@ Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
         return 0
 
     log(f"## push -u origin {args.branch} (force tip of mirror branch only)")
-    c, so, se = run(
-        ["git", "push", "-u", "origin", f"HEAD:{args.branch}", "--force"],
-        cwd=repo,
-        timeout=300,
-    )
-    if c != 0:
-        errors.append(f"push: {(se or so)[:300]}")
-        log(f"FAIL {(se or so)[:400]}")
+    push_ok = False
+    push_err = ""
+    for attempt in range(1, 4):
+        c, so, se = run(
+            ["git", "push", "-u", "origin", f"HEAD:{args.branch}", "--force"],
+            cwd=repo,
+            timeout=240,
+        )
+        if c == 0:
+            push_ok = True
+            break
+        push_err = (se or so)[:300]
+        log(f"WARN push attempt {attempt}/3: {push_err[:200]}")
+        notes.append(f"push_retry_{attempt}")
+    if not push_ok:
+        errors.append(f"push: {push_err}")
+        log(f"FAIL {push_err[:400]}")
         _write(False, ts, args.branch, errors, notes, None, source_sha=sha)
         if not args.keep:
-            shutil.rmtree(TMP_ROOT, ignore_errors=True)
+            _wipe(run_root)
+            _wipe(TMP_ROOT)
         return 3
-
     log(f"OK pushed {args.remote_url} {args.branch} @ {tip}")
     notes.append("push_ok")
     _write(True, ts, args.branch, errors, notes, args.remote_url, source_sha=sha)
