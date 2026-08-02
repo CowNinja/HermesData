@@ -193,10 +193,14 @@ def evaluate() -> Dict[str, Any]:
     if ss and ss.get("ok") is False:
         warns.append("silo signal mirror last run failed")
     elif ss.get("budget_hit") or ss.get("partial"):
-        warns.append(
-            f"silo signal partial/budget_hit elapsed={ss.get('elapsed_sec')} "
-            f"dest_files={ss.get('dest_files')}"
-        )
+        # Healthy dest + ok run: budget_hit is expected on multi-TB silo — not a YELLOW.
+        dest_n = int(ss.get("dest_files") or 0)
+        if dest_n < 100:
+            warns.append(
+                f"silo signal thin dest after partial: dest_files={dest_n} "
+                f"elapsed={ss.get('elapsed_sec')}"
+            )
+        # else: informational only (layers already carry partial=true)
 
     # Fossil reappearance (soft unless RED)
     fossil = load_json(HERMES / "state" / "k_fossil_scan_last.json")
