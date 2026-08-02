@@ -37,6 +37,10 @@ K_MIRROR = Path(r"K:\Hermes-Resilience\mirrors\HermesData-Current")
 CLEAN_MIRROR_STATE = HERMES / "state" / "vault_github_clean_mirror_last.json"
 
 K_STALE_HOURS = 48.0
+CLEAN_MIRROR_STALE_HOURS = 36.0  # 2x/day target; warn after 36h
+CRITICAL_ZIP_STALE_HOURS = 48.0
+CRITICAL_ZIP_STATE = HERMES / "state" / "backup_critical_zip_last.json"
+SILO_SIGNAL_STATE = HERMES / "state" / "backup_k_silo_life_mirror_last.json"
 
 
 def run_git(repo: Path, args: List[str], timeout: int = 20) -> str:
@@ -97,10 +101,21 @@ def evaluate() -> Dict[str, Any]:
     layers["vault_github_master"] = {"ahead": v_ahead, "ref": v_ref}
     clean = load_json(CLEAN_MIRROR_STATE)
     clean_ok = bool(clean.get("ok")) and bool(clean.get("remote_branch"))
+    clean_age = None
+    try:
+        cts = clean.get("ts") or ""
+        if cts:
+            cdt = datetime.fromisoformat(cts.replace("Z", "+00:00"))
+            clean_age = (datetime.now(timezone.utc) - cdt).total_seconds() / 3600.0
+    except Exception:
+        clean_age = None
     layers["vault_clean_mirror"] = {
         "ok": clean_ok,
         "branch": clean.get("remote_branch"),
         "ts": clean.get("ts"),
+        "age_h": clean_age,
+        "source_sha": (clean.get("source_sha") or "")[:12] or None,
+        "skipped": clean.get("skipped"),
     }
     if v_ahead is not None and v_ahead > 0:
         if clean_ok:
@@ -111,6 +126,44 @@ def evaluate() -> Dict[str, Any]:
             issues.append(
                 f"PhronesisVault ahead of {v_ref} by {v_ahead} and no clean mirror push"
             )
+    if clean_ok and clean_age is not None and clean_age > CLEAN_MIRROR_STALE_HOURS:
+        issues.append(
+            f"vault clean mirror stale {clean_age:.1f}h > {CLEAN_MIRROR_STALE_HOURS}h"
+        )
+    elif not clean_ok and not clean:
+        warns.append("vault clean mirror never ran")
+
+    # Critical zip
+    cz = load_json(CRITICAL_ZIP_STATE)
+    layers["critical_zip"] = {
+        "ok": cz.get("ok"),
+        "ts": cz.get("ts"),
+        "bytes": cz.get("bytes"),
+        "path": cz.get("path"),
+    }
+    if cz.get("ok"):
+        try:
+            zts = cz.get("ts") or ""
+            if zts:
+                zdt = datetime.fromisoformat(zts.replace("Z", "+00:00"))
+                zage = (datetime.now(timezone.utc) - zdt).total_seconds() / 3600.0
+                layers["critical_zip"]["age_h"] = zage
+                if zage > CRITICAL_ZIP_STALE_HOURS:
+                    warns.append(f"critical zip stale {zage:.1f}h")
+        except Exception:
+            pass
+    else:
+        warns.append("critical zip missing or failed")
+
+    # Silo signal (soft)
+    ss = load_json(SILO_SIGNAL_STATE)
+    layers["silo_signal"] = {
+        "ok": ss.get("ok"),
+        "ts": ss.get("ts"),
+        "copied": ss.get("copied"),
+    }
+    if ss and ss.get("ok") is False:
+        warns.append("silo signal mirror last run failed")
 
     # Resilience job
     res = load_json(RESILIENCE)
@@ -127,8 +180,14 @@ def evaluate() -> Dict[str, Any]:
     elif res.get("ok") is False:
         # vault push fail is expected until history rewrite — downgrade if clean mirror ok
         errs = " ".join(res.get("errors") or [])
-        if "push" in errs.lower() and clean_ok:
-            warns.append(f"resilience soft push fail (expected until force-push): {errs[:120]}")
+        err_l = errs.lower()
+        if clean_ok and (
+            "push" in err_l
+            or "vault_clean_mirror" in err_l
+            or "master" in err_l
+        ):
+            # stale resilience soft fail while live clean mirror is green
+            warns.append(f"resilience soft fail (clean mirror OK): {errs[:120]}")
         else:
             issues.append(f"resilience job ok=False: {errs[:160]}")
 
@@ -178,7 +237,11 @@ def evaluate() -> Dict[str, Any]:
         "issues": issues,
         "warns": warns,
         "layers": layers,
-        "thresholds": {"k_stale_hours": K_STALE_HOURS},
+        "thresholds": {
+            "k_stale_hours": K_STALE_HOURS,
+            "clean_mirror_stale_hours": CLEAN_MIRROR_STALE_HOURS,
+            "critical_zip_stale_hours": CRITICAL_ZIP_STALE_HOURS,
+        },
     }
 
 

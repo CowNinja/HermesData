@@ -1036,52 +1036,6 @@
       "description": "cadence-cook-2026-07-26 spaced to 30m (was */5; 30m stagger)"
     },
     {
-      "id": "7a88f3b80c33",
-      "name": "Stack-Healing-30m",
-      "prompt": "ONE stack healer only. Script stack_healing_once.py: restore gateway :8642 if down (Phronesis.ps1 gateway start / ForkGuard, clear stale restart_loop) then sovereign_stack_watchdog --once. Never daemonize. Silent when green. Local deliver only. Do not create extra healers.",
-      "skills": [],
-      "skill": null,
-      "model": null,
-      "provider": null,
-      "provider_snapshot": null,
-      "model_snapshot": null,
-      "base_url": null,
-      "script": "stack_healing_once.py",
-      "no_agent": true,
-      "context_from": null,
-      "schedule": {
-        "kind": "interval",
-        "minutes": 30,
-        "display": "every 30m"
-      },
-      "schedule_display": "every 30m",
-      "repeat": {
-        "times": 999,
-        "completed": 998
-      },
-      "enabled": true,
-      "state": "scheduled",
-      "paused_at": null,
-      "paused_reason": null,
-      "created_at": "2026-07-08T16:36:36.708213-04:00",
-      "next_run_at": "2026-08-01T21:30:48.295532-04:00",
-      "last_run_at": "2026-08-01T20:30:11.159493-04:00",
-      "last_status": "ok",
-      "last_error": null,
-      "last_delivery_error": null,
-      "deliver": "local",
-      "origin": {
-        "platform": "discord",
-        "chat_id": "1523740118370881546",
-        "chat_name": "Phronesis Citadel / #hermes / Reoccurring errors",
-        "thread_id": "1523740118370881546",
-        "user_id": "1302338152396230750"
-      },
-      "enabled_toolsets": null,
-      "workdir": "D:\\HermesData",
-      "fire_claim": null
-    },
-    {
       "id": "script-newline-integrity-gate",
       "name": "Script-Newline-Integrity-Gate",
       "prompt": "Script-only zero-newline integrity gate. Silent if clean.",
@@ -1101,15 +1055,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 931
+        "completed": 932
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-10T14:52:28.611336+00:00",
-      "next_run_at": "2026-08-01T21:30:48.323498-04:00",
-      "last_run_at": "2026-08-01T20:30:11.491722-04:00",
+      "next_run_at": "2026-08-01T21:31:18.054072-04:00",
+      "last_run_at": "2026-08-01T21:01:18.054072-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1733,15 +1687,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 894
+        "completed": 895
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T18:14:58.028551-04:00",
-      "next_run_at": "2026-08-01T21:30:48.351107-04:00",
-      "last_run_at": "2026-08-01T20:30:12.007941-04:00",
+      "next_run_at": "2026-08-01T21:31:18.845813-04:00",
+      "last_run_at": "2026-08-01T21:01:18.845813-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1784,15 +1738,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 546
+        "completed": 547
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T19:44:20.763999-04:00",
-      "next_run_at": "2026-08-01T21:30:48.379405-04:00",
-      "last_run_at": "2026-08-01T20:30:19.935342-04:00",
+      "next_run_at": "2026-08-01T21:31:26.860889-04:00",
+      "last_run_at": "2026-08-01T21:01:26.860889-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2054,15 +2008,15 @@
       "schedule_display": "3,33 * * * *",
       "repeat": {
         "times": null,
-        "completed": 3716
+        "completed": 3717
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-21T00:14:10.809092-04:00",
-      "next_run_at": "2026-08-01T21:03:00-04:00",
-      "last_run_at": "2026-08-01T20:33:52.584504-04:00",
+      "next_run_at": "2026-08-01T21:33:00-04:00",
+      "last_run_at": "2026-08-01T21:03:54.149626-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2515,15 +2469,15 @@
       "schedule_display": "every 15m",
       "repeat": {
         "times": null,
-        "completed": 303
+        "completed": 304
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-27T13:41:50.608122+00:00",
-      "next_run_at": "2026-08-01T21:04:08.223629-04:00",
-      "last_run_at": "2026-08-01T20:49:08.223629-04:00",
+      "next_run_at": "2026-08-01T21:19:53.697310-04:00",
+      "last_run_at": "2026-08-01T21:04:53.697310-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2602,15 +2556,15 @@
       "schedule_display": "every 1m",
       "repeat": {
         "times": null,
-        "completed": 1911
+        "completed": 1917
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-27T11:50:31.211981-04:00",
-      "next_run_at": "2026-08-01T21:01:48.404139-04:00",
-      "last_run_at": "2026-08-01T20:59:02.776518-04:00",
+      "next_run_at": "2026-08-01T21:12:03.509659-04:00",
+      "last_run_at": "2026-08-01T21:11:03.509659-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2642,8 +2596,8 @@
       "enabled": true,
       "deliver": "local",
       "description": "2026-07-27 standing G1-G5 cook muscle; zero Grok; measure/apply via script defaults",
-      "next_run_at": "2026-08-01T21:07:00-04:00",
-      "last_run_at": "2026-08-01T20:38:02.533400-04:00",
+      "next_run_at": "2026-08-01T21:37:00-04:00",
+      "last_run_at": "2026-08-01T21:08:04.282098-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2739,15 +2693,15 @@
       "schedule_display": "every 5m",
       "repeat": {
         "times": null,
-        "completed": 627
+        "completed": 629
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-28T17:01:21.191938-04:00",
-      "next_run_at": "2026-08-01T21:04:09.033748-04:00",
-      "last_run_at": "2026-08-01T20:59:09.033748-04:00",
+      "next_run_at": "2026-08-01T21:16:09.829377-04:00",
+      "last_run_at": "2026-08-01T21:11:09.829377-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2802,5 +2756,5 @@
       "pinned": true
     }
   ],
-  "updated_at": "2026-08-01T21:00:48.405130-04:00"
+  "updated_at": "2026-08-01T21:11:09.830383-04:00"
 }

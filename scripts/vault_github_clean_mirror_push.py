@@ -100,8 +100,7 @@ def should_skip(rel: str, size: int) -> bool:
 def export_tree(dest: Path) -> Tuple[int, int]:
     """Archive HEAD and extract filtered tree into dest. Returns (kept, skipped)."""
     dest.mkdir(parents=True, exist_ok=True)
-    code, _, err = run(["git", "-C", str(VAULT), "archive", "--format=tar", "HEAD"], timeout=180)
-    # git archive writes to stdout - need binary
+    # git archive must be binary (never text=True)
     try:
         r = subprocess.run(
             ["git", "-C", str(VAULT), "archive", "--format=tar", "HEAD"],
@@ -110,7 +109,9 @@ def export_tree(dest: Path) -> Tuple[int, int]:
         )
         if r.returncode != 0:
             raise RuntimeError((r.stderr or b"").decode("utf-8", "replace")[:300])
-        tar_bytes = r.stdout
+        tar_bytes = r.stdout or b""
+        if len(tar_bytes) < 100:
+            raise RuntimeError("git archive empty")
     except Exception as e:
         raise RuntimeError(f"git archive failed: {e}") from e
 
@@ -119,7 +120,6 @@ def export_tree(dest: Path) -> Tuple[int, int]:
     with tarfile.open(fileobj=BytesIO(tar_bytes), mode="r:") as tar:
         for m in tar.getmembers():
             if not m.isfile():
-                # still create dirs for kept structure via files
                 continue
             rel = m.name
             if should_skip(rel, m.size or 0):
@@ -135,6 +135,19 @@ def export_tree(dest: Path) -> Tuple[int, int]:
                 shutil.copyfileobj(src, fh)
             kept += 1
     return kept, skipped
+
+
+def _wipe(path: Path) -> None:
+    try:
+        if path.is_symlink() or path.is_file():
+            path.unlink(missing_ok=True)
+        elif path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+            # Windows race: retry if residue
+            if path.exists():
+                shutil.rmtree(path, ignore_errors=True)
+    except OSError:
+        pass
 
 
 def largest(root: Path, n: int = 12) -> List[str]:
@@ -157,6 +170,18 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--remote-url", default=REMOTE_URL)
+    ap.add_argument(
+        "--if-due",
+        action="store_true",
+        help="Skip push if same vault SHA already mirrored and age < --min-hours",
+    )
+    ap.add_argument(
+        "--min-hours",
+        type=float,
+        default=12.0,
+        help="With --if-due: minimum hours between pushes (default 12 => ~2x/day)",
+    )
+    ap.add_argument("--force", action="store_true", help="Ignore --if-due short-circuit")
     args = ap.parse_args()
 
     ts = datetime.now(timezone.utc).isoformat()
@@ -169,12 +194,38 @@ def main() -> int:
         return 1
 
     head = run(["git", "-C", str(VAULT), "rev-parse", "--abbrev-ref", "HEAD"])[1]
-    sha = run(["git", "-C", str(VAULT), "rev-parse", "--short", "HEAD"])[1]
-    notes.append(f"source_head={head}@{sha}")
+    sha = run(["git", "-C", str(VAULT), "rev-parse", "HEAD"])[1]
+    sha_short = sha[:12] if sha else ""
+    notes.append(f"source_head={head}@{sha_short}")
     notes.append("method=orphan_archive_v2")
 
+    # Change-detect / cadence gate (1-2x/day default when --if-due)
+    if args.if_due and not args.force:
+        prev = {}
+        try:
+            if STATE.is_file():
+                prev = json.loads(STATE.read_text(encoding="utf-8"))
+        except Exception:
+            prev = {}
+        prev_sha = str(prev.get("source_sha") or "")
+        prev_ok = bool(prev.get("ok"))
+        age_h = None
+        try:
+            prev_ts = prev.get("ts") or ""
+            if prev_ts:
+                dt = datetime.fromisoformat(prev_ts.replace("Z", "+00:00"))
+                age_h = (datetime.now(timezone.utc) - dt).total_seconds() / 3600.0
+        except Exception:
+            age_h = None
+        if prev_ok and prev_sha and prev_sha == sha and age_h is not None and age_h < args.min_hours:
+            notes.append(f"skip_not_due age_h={age_h:.2f} min={args.min_hours} sha={sha_short}")
+            log(f"SKIP not due (same sha, age {age_h:.1f}h < {args.min_hours}h)")
+            _write(True, ts, args.branch, errors, notes, prev.get("remote_url"), source_sha=sha, skipped=True)
+            print(json.dumps({"ok": True, "skipped": True, "reason": "not_due", "age_h": age_h, "sha": sha_short}, indent=2))
+            return 0
+
     if TMP_ROOT.exists():
-        shutil.rmtree(TMP_ROOT, ignore_errors=True)
+        _wipe(TMP_ROOT)
     work = TMP_ROOT / "tree"
     repo = TMP_ROOT / "repo"
     work.mkdir(parents=True)
@@ -187,7 +238,7 @@ def main() -> int:
         log(f"OK kept={kept} skipped={skipped}")
     except Exception as e:
         errors.append(str(e)[:240])
-        _write(False, ts, args.branch, errors, notes, None)
+        _write(False, ts, args.branch, errors, notes, None, source_sha=sha)
         return 1
 
     # Seed README for mirror branch clarity
@@ -198,8 +249,9 @@ def main() -> int:
 This branch is a **clean orphan tip** for offsite recovery of vault CNS markdown.
 It is NOT full git history (history on master is blocked by large sqlite blobs).
 
-- Source: `{head}@{sha}`
+- Source: `{head}@{sha_short}`
 - Generated: {ts}
+- Cadence target: 1-2x/day via --if-due --min-hours 12
 - Script: `D:/HermesData/scripts/vault_github_clean_mirror_push.py`
 
 Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
@@ -221,16 +273,17 @@ Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
         if float(row.split("MB")[0]) > 95:
             errors.append(f"file still >95MB: {row}")
     if errors:
-        _write(False, ts, args.branch, errors, notes, None)
+        _write(False, ts, args.branch, errors, notes, None, source_sha=sha)
         return 2
 
     # Fresh repo
-    if repo.exists():
-        shutil.rmtree(repo, ignore_errors=True)
+    _wipe(repo)
     repo.mkdir(parents=True)
     # move tree into repo
-    for item in work.iterdir():
-        shutil.move(str(item), str(repo / item.name))
+    for item in list(work.iterdir()):
+        dest_item = repo / item.name
+        _wipe(dest_item)
+        shutil.move(str(item), str(dest_item))
 
     log("## git init orphan commit")
     for cmd in (
@@ -241,20 +294,20 @@ Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
         c, so, se = run(cmd, cwd=repo, timeout=30)
         if c != 0 and cmd[1] == "init":
             errors.append(f"git init: {se or so}")
-            _write(False, ts, args.branch, errors, notes, None)
+            _write(False, ts, args.branch, errors, notes, None, source_sha=sha)
             return 1
 
     c, so, se = run(["git", "add", "-A"], cwd=repo, timeout=180)
     if c != 0:
         errors.append(f"git add: {se or so}")
-        _write(False, ts, args.branch, errors, notes, None)
+        _write(False, ts, args.branch, errors, notes, None, source_sha=sha)
         return 1
 
-    msg = f"github-cns-mirror clean orphan tip {datetime.now().strftime('%Y%m%d-%H%M%S')} from {sha}"
+    msg = f"github-cns-mirror clean orphan tip {datetime.now().strftime('%Y%m%d-%H%M%S')} from {sha_short}"
     c, so, se = run(["git", "commit", "-m", msg], cwd=repo, timeout=120)
     if c != 0:
         errors.append(f"commit: {se or so}")
-        _write(False, ts, args.branch, errors, notes, None)
+        _write(False, ts, args.branch, errors, notes, None, source_sha=sha)
         return 1
 
     c, tip, _ = run(["git", "rev-parse", "--short", "HEAD"], cwd=repo, timeout=15)
@@ -264,7 +317,7 @@ Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
 
     if args.dry_run:
         notes.append("dry_run_no_push")
-        _write(True, ts, args.branch, errors, notes, None)
+        _write(True, ts, args.branch, errors, notes, None, source_sha=sha)
         print(json.dumps({"ok": True, "dry_run": True, "notes": notes}, indent=2))
         if not args.keep:
             shutil.rmtree(TMP_ROOT, ignore_errors=True)
@@ -279,14 +332,14 @@ Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
     if c != 0:
         errors.append(f"push: {(se or so)[:300]}")
         log(f"FAIL {(se or so)[:400]}")
-        _write(False, ts, args.branch, errors, notes, None)
+        _write(False, ts, args.branch, errors, notes, None, source_sha=sha)
         if not args.keep:
             shutil.rmtree(TMP_ROOT, ignore_errors=True)
         return 3
 
     log(f"OK pushed {args.remote_url} {args.branch} @ {tip}")
     notes.append("push_ok")
-    _write(True, ts, args.branch, errors, notes, args.remote_url)
+    _write(True, ts, args.branch, errors, notes, args.remote_url, source_sha=sha)
     if not args.keep:
         shutil.rmtree(TMP_ROOT, ignore_errors=True)
     print(
@@ -297,6 +350,7 @@ Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
                 "orphan_tip": tip,
                 "kept": kept,
                 "skipped": skipped,
+                "source_sha": sha_short,
                 "notes": notes,
             },
             indent=2,
@@ -305,8 +359,24 @@ Do not commit `*.sqlite`. Full history rewrite requires Jeff-gated force-push
     return 0
 
 
-def _write(ok: bool, ts: str, branch: str, errors: List[str], notes: List[str], url: str | None) -> None:
+def _write(
+    ok: bool,
+    ts: str,
+    branch: str,
+    errors: List[str],
+    notes: List[str],
+    url: str | None,
+    source_sha: str | None = None,
+    skipped: bool = False,
+) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
+    # preserve prior source_sha on skip if not provided
+    prev_sha = None
+    try:
+        if STATE.is_file() and not source_sha:
+            prev_sha = json.loads(STATE.read_text(encoding="utf-8")).get("source_sha")
+    except Exception:
+        prev_sha = None
     STATE.write_text(
         json.dumps(
             {
@@ -314,6 +384,8 @@ def _write(ok: bool, ts: str, branch: str, errors: List[str], notes: List[str], 
                 "ok": ok,
                 "remote_branch": branch,
                 "remote_url": url or REMOTE_URL,
+                "source_sha": source_sha or prev_sha,
+                "skipped": skipped,
                 "errors": errors[:20],
                 "notes": notes[:40],
                 "force_push_master": False,

@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
-"""Resilience backup orchestrator — runs via no_agent cron every 4h.
+"""Resilience backup orchestrator — no_agent cron every 4h.
 
-v6 - git allowlist backup (HermesData + PhronesisVault) + optional K mirror
-+ health alarm receipt. Never commits .env/secrets/sqlite.
-
-Phases:
-  A) git commit/push allowlisted paths (HEAD + stable branch)
-  B) backup_k_mirror_once (selective K: mirror + hermes --quick)
-  C) backup_health_alarm (color + receipt; --notify if not GREEN)
+v7 cadence (Jeff 2026-08-01):
+  A) git allowlist commit+push HermesData only (vault master push skipped — poison history)
+  B) k_resilience_layout_once (dirs + fossil quarantine)
+  C) backup_critical_state_zip (replaces hanging hermes --quick)
+  D) backup_k_mirror_once (D->K selective slices)
+  E) backup_k_silo_life_mirror_once (budgeted silo signal)
+  F) vault_github_clean_mirror_push --if-due --min-hours 12  (~2x/day when dirty)
+  G) cloud_recovery_pack_sync (best-effort)
+  H) backup_health_alarm --notify
 
 Env:
-  BACKUP_SKIP_K=1       skip K mirror phase
-  BACKUP_SKIP_ALARM=1   skip health alarm
-  BACKUP_K_TIMEOUT=900  seconds for K phase subprocess
+  BACKUP_SKIP_K=1
+  BACKUP_SKIP_ALARM=1
+  BACKUP_SKIP_VAULT_MIRROR=1
+  BACKUP_SKIP_SILO=1
+  BACKUP_SKIP_CLOUD=1
+  BACKUP_K_TIMEOUT=900
+  BACKUP_VAULT_MIRROR_MIN_HOURS=12
 """
 from __future__ import annotations
 
@@ -22,7 +28,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 TS = datetime.now().strftime("%Y%m%d-%H%M%S")
 ERRORS: List[str] = []
@@ -36,41 +42,34 @@ ALLOWLIST: Dict[str, List[str]] = {
         "scripts/",
         "skills/software-development/github-autobackup/",
         "skills/devops/backup-restore-mechanism/",
-        "hermes-workspace/src/screens/dashboard/components/",
-        "hermes-workspace/src/routes/api/sovereign-stack/",
-        "hermes-workspace/src/status/model-manager-strip.ts",
         "config.yaml",
         "gateway/",
         "mcps/",
         "cron/jobs.json",
         "memories/MEMORY.md",
         "memories/USER.md",
-        "hermes-agent/agent/chat_completion_helpers.py",
-        "plugins/image_gen/comfyui_local/",
         "live_cron_hook.py",
+        "plugins/image_gen/comfyui_local/",
     ],
     r"D:\PhronesisVault": [
         "Operations/",
         "scripts/",
         "MOCs/",
         "Housekeeping.md",
-        "docs/agent-coordination/sovereign-stack-performance.md",
-        "docs/agent-coordination/sovereign-router-t2-t3.md",
-        "docs/agent-coordination/GROK-HERMES-MASTER-PLAN.md",
-        "Session-Health-Log.md",
         "INDEX.md",
         "00-INDEX.md",
+        "Session-Health-Log.md",
     ],
 }
 
 SECRET_GLOBS = {".env", ".env.local", "secrets/", "auth.json"}
-BLOCK_SUFFIXES = (
-    ".sqlite",
-    ".sqlite-wal",
-    ".sqlite-shm",
-    ".db-wal",
-    ".db-shm",
-)
+BLOCK_SUFFIXES = (".sqlite", ".sqlite-wal", ".sqlite-shm", ".db-wal", ".db-shm")
+
+GIT_ADD_U_TIMEOUT = 25
+GIT_ADD_PATH_TIMEOUT = 20
+GIT_STATUS_TIMEOUT = 20
+GIT_COMMIT_TIMEOUT = 25
+GIT_PUSH_TIMEOUT_DEFAULT = 50
 
 
 def log(msg: str) -> None:
@@ -93,123 +92,64 @@ def run_git(args: List[str], cwd: str, timeout: int = 30) -> Tuple[int, str, str
         return 1, "", str(exc)
 
 
-GIT_ADD_U_TIMEOUT = 25
-GIT_ADD_PATH_TIMEOUT = 20
-GIT_STATUS_TIMEOUT = 20
-GIT_COMMIT_TIMEOUT = 25
-GIT_PUSH_TIMEOUT_DEFAULT = 50
-GIT_PUSH_TIMEOUT_VAULT = 110
-
-
-def _is_secret_path(rel: str) -> bool:
-    low = rel.replace("\\", "/").lower()
-    for pat in SECRET_GLOBS:
-        if pat.endswith("/"):
-            if f"/{pat}" in f"/{low}/" or low.startswith(pat):
-                return True
-        elif low.endswith(pat) or low == pat:
-            return True
-    return False
-
-
-def _is_blocked_blob(rel: str) -> bool:
-    low = rel.replace("\\", "/").lower()
+def _blocked(path: str) -> bool:
+    low = path.replace("\\", "/").lower()
+    if any(s in low for s in SECRET_GLOBS):
+        return True
     return any(low.endswith(suf) for suf in BLOCK_SUFFIXES)
-
-
-def _current_branch(repo_dir: str) -> Optional[str]:
-    code, out, err = run_git(["rev-parse", "--abbrev-ref", "HEAD"], repo_dir, timeout=15)
-    if code != 0 or not out or out == "HEAD":
-        return None
-    return out.strip()
 
 
 def _push(repo_dir: str, branch: str, timeout: int) -> None:
     code, out, err = run_git(["push", "origin", branch], repo_dir, timeout=timeout)
-    if code == 0:
-        log(f"OK push origin/{branch}: {(out or 'ok')[:120]}")
-        return
-    msg = err or out or f"code={code}"
-    log(f"WARN push origin/{branch} soft-fail: {msg[:220]}")
-    ERRORS.append(f"push {branch}: {msg[:80]}")
+    if code != 0:
+        msg = (err or out or f"rc={code}")[:180]
+        ERRORS.append(f"push {branch}: {msg}")
+        log(f"WARN push {branch}: {msg}")
+    else:
+        log(f"OK pushed origin/{branch}")
 
 
-def backup_repo(name: str, repo_dir: str, stable_branch: str) -> None:
+def backup_repo(name: str, repo_dir: str, stable_branch: str | None, push: bool = True) -> None:
     log(f"\n## {name} Backup")
-    root = Path(repo_dir)
-    if not root.is_dir():
-        log(f"SKIP {name}: directory missing")
-        if name != "PhronesisSilo":
-            ERRORS.append(f"{name} dir missing")
+    if not os.path.isdir(os.path.join(repo_dir, ".git")):
+        log(f"SKIP {name}: not a git repo")
         return
+    paths = ALLOWLIST.get(repo_dir, [])
+    run_git(["add", "-u"], repo_dir, timeout=GIT_ADD_U_TIMEOUT)
+    for p in paths:
+        run_git(["add", "--", p], repo_dir, timeout=GIT_ADD_PATH_TIMEOUT)
 
-    cur = _current_branch(repo_dir)
-    log(f"branch HEAD={cur or '?'} stable={stable_branch}")
-
-    code, _, err = run_git(["add", "-u"], repo_dir, timeout=GIT_ADD_U_TIMEOUT)
-    if code == 124:
-        log(f"WARN {name}: git add -u timeout - skip repo to stay under cron cap")
-        ERRORS.append(f"{name} add -u timeout")
-        return
-
-    # Unstage blocked blobs if add -u picked them up
-    code, staged, _ = run_git(["diff", "--cached", "--name-only"], repo_dir, timeout=GIT_STATUS_TIMEOUT)
+    # unstage blocked
+    code, staged, _ = run_git(["diff", "--cached", "--name-only"], repo_dir, timeout=15)
     if code == 0 and staged:
-        for rel in staged.splitlines():
-            if _is_blocked_blob(rel) or _is_secret_path(rel):
-                run_git(["reset", "-q", "HEAD", "--", rel], repo_dir, timeout=15)
-                log(f"  unstaged blocked {rel}")
+        for line in staged.splitlines():
+            if _blocked(line):
+                run_git(["reset", "-q", "HEAD", "--", line], repo_dir, timeout=10)
+                log(f"  unstage blocked {line}")
 
-    for rel in ALLOWLIST.get(repo_dir, [])[:40]:
-        target = root / rel
-        if not target.exists():
-            continue
-        if _is_secret_path(rel) or _is_blocked_blob(rel):
-            continue
-        code, out, err = run_git(["add", "--", rel], repo_dir, timeout=GIT_ADD_PATH_TIMEOUT)
-        if code != 0 and err and code != 124:
-            log(f"  allowlist add warn {rel}: {err[:120]}")
+    code, status, _ = run_git(["status", "--porcelain"], repo_dir, timeout=GIT_STATUS_TIMEOUT)
+    code2, cur, _ = run_git(["rev-parse", "--abbrev-ref", "HEAD"], repo_dir, timeout=10)
+    cur = cur if code2 == 0 else ""
 
-    # Second pass unstage blocked under allowlisted dirs (e.g. Operations/*.sqlite)
-    code, staged, _ = run_git(["diff", "--cached", "--name-only"], repo_dir, timeout=GIT_STATUS_TIMEOUT)
-    if code == 0 and staged:
-        for rel in staged.splitlines():
-            if _is_blocked_blob(rel) or _is_secret_path(rel):
-                run_git(["reset", "-q", "HEAD", "--", rel], repo_dir, timeout=15)
-                log(f"  unstaged blocked {rel}")
-
-    code, status_out, err = run_git(
-        ["diff", "--cached", "--name-only"], repo_dir, timeout=GIT_STATUS_TIMEOUT
-    )
-    if code == 124:
-        log(f"WARN {name}: status timeout")
-        ERRORS.append(f"{name} status timeout")
-        return
-    if (status_out or "").strip():
-        code, _, err = run_git(
-            ["commit", "-m", f"auto-backup {TS}"],
-            repo_dir,
-            timeout=GIT_COMMIT_TIMEOUT,
-        )
-        if code != 0:
-            if "nothing to commit" in (err or "").lower():
-                log(f"OK {name}: nothing to commit")
-            else:
-                log(f"WARN {name} commit: {err[:200]}")
-                ERRORS.append(f"{name} commit: {err[:80]}")
+    code3, diff_c, _ = run_git(["diff", "--cached", "--name-only"], repo_dir, timeout=15)
+    if code3 == 0 and diff_c.strip():
+        msg = f"resilience-backup {TS} {name}"
+        c, so, se = run_git(["commit", "-m", msg], repo_dir, timeout=GIT_COMMIT_TIMEOUT)
+        if c != 0:
+            if "nothing to commit" not in (so + se).lower():
+                ERRORS.append(f"{name} commit: {(se or so)[:120]}")
                 return
         else:
             log(f"OK {name} committed on {cur or 'HEAD'}")
     else:
         log(f"OK {name}: nothing staged to commit")
 
-    push_timeout = (
-        GIT_PUSH_TIMEOUT_VAULT if "PhronesisVault" in name else GIT_PUSH_TIMEOUT_DEFAULT
-    )
+    if not push:
+        log(f"OK {name}: local commit only (push disabled — use clean mirror for offsite)")
+        return
 
     if cur:
-        _push(repo_dir, cur, push_timeout)
-
+        _push(repo_dir, cur, GIT_PUSH_TIMEOUT_DEFAULT)
     if stable_branch and stable_branch != cur:
         code, _, _ = run_git(
             ["show-ref", "--verify", "--quiet", f"refs/heads/{stable_branch}"],
@@ -217,9 +157,7 @@ def backup_repo(name: str, repo_dir: str, stable_branch: str) -> None:
             timeout=10,
         )
         if code == 0:
-            _push(repo_dir, stable_branch, push_timeout)
-        else:
-            log(f"OK {name}: no local branch {stable_branch} (skip stable push)")
+            _push(repo_dir, stable_branch, GIT_PUSH_TIMEOUT_DEFAULT)
 
 
 def _run_phase(label: str, script: Path, extra_args: List[str] | None = None, timeout: int = 600) -> None:
@@ -228,14 +166,14 @@ def _run_phase(label: str, script: Path, extra_args: List[str] | None = None, ti
         PHASES[label] = {"ok": False, "error": "missing"}
         return
     cmd = [sys.executable, str(script), *(extra_args or [])]
-    log(f"\n## Phase {label}: {script.name}")
+    log(f"\n## Phase {label}: {script.name} {' '.join(extra_args or [])}")
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(HERMES))
         out = ((r.stdout or "") + "\n" + (r.stderr or "")).strip()
         if out:
-            # tail for cron logs
             for line in out.splitlines()[-40:]:
                 log(f"  {line}")
+        # rc 0 or 2 (skipped/advisory) ok
         PHASES[label] = {"ok": r.returncode in (0, 2), "rc": r.returncode}
         if r.returncode not in (0, 2):
             ERRORS.append(f"{label} rc={r.returncode}")
@@ -256,7 +194,14 @@ def _write_receipt(ok: bool) -> None:
         "errors": ERRORS[:20],
         "error_count": len(ERRORS),
         "phases": PHASES,
-        "version": 6,
+        "version": 7,
+        "cadence": {
+            "k_hours": 4,
+            "hermesdata_git_hours": 4,
+            "vault_clean_mirror_min_hours": float(
+                os.environ.get("BACKUP_VAULT_MIRROR_MIN_HOURS", "12")
+            ),
+        },
     }
     try:
         STATE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -265,27 +210,63 @@ def _write_receipt(ok: bool) -> None:
 
 
 def main() -> int:
-    log(f"## Resilience Backup v6 {TS}")
+    log(f"## Resilience Backup v7 {TS}")
+
+    # A) git — HermesData pushes; vault local-only (offsite = clean mirror)
     PHASES["git"] = {"started": True}
-    backup_repo("PhronesisVault", r"D:\PhronesisVault", "master")
-    backup_repo("HermesData", r"D:\HermesData", "main")
-    silo_candidate = r"K:\Phronesis-Sovereign\Personal-Digital-Silo"
-    if os.path.isdir(silo_candidate) and os.path.isdir(os.path.join(silo_candidate, ".git")):
-        backup_repo("PhronesisSilo", silo_candidate, "main")
-    else:
-        log("\n## PhronesisSilo Backup")
-        log("OK PhronesisSilo: skip git (bulk silo - K mirror + cloud recovery pack)")
+    backup_repo("HermesData", r"D:\HermesData", "main", push=True)
+    backup_repo("PhronesisVault", r"D:\PhronesisVault", None, push=False)
     PHASES["git"] = {"ok": True, "errors_so_far": len(ERRORS)}
 
+    # B) K layout / fossil quarantine
+    _run_phase("k_layout", SCRIPTS / "k_resilience_layout_once.py", extra_args=["--json"], timeout=120)
+
+    # C) critical zip
+    _run_phase("critical_zip", SCRIPTS / "backup_critical_state_zip.py", extra_args=["--json"], timeout=180)
+
+    # D) K hermes/vault slices
     if os.environ.get("BACKUP_SKIP_K") == "1":
-        log("\n## Phase K: skipped (BACKUP_SKIP_K=1)")
+        log("\n## Phase K: skipped")
         PHASES["k_mirror"] = {"ok": True, "skipped": True}
     else:
         k_timeout = int(os.environ.get("BACKUP_K_TIMEOUT", "900"))
         _run_phase("k_mirror", SCRIPTS / "backup_k_mirror_once.py", timeout=k_timeout)
 
+    # E) silo signal
+    if os.environ.get("BACKUP_SKIP_SILO") == "1":
+        PHASES["silo_signal"] = {"ok": True, "skipped": True}
+    else:
+        _run_phase(
+            "silo_signal",
+            SCRIPTS / "backup_k_silo_life_mirror_once.py",
+            extra_args=["--json"],
+            timeout=600,
+        )
+
+    # F) vault GitHub clean mirror ~2x/day
+    if os.environ.get("BACKUP_SKIP_VAULT_MIRROR") == "1":
+        PHASES["vault_clean_mirror"] = {"ok": True, "skipped": True}
+    else:
+        min_h = os.environ.get("BACKUP_VAULT_MIRROR_MIN_HOURS", "12")
+        _run_phase(
+            "vault_clean_mirror",
+            SCRIPTS / "vault_github_clean_mirror_push.py",
+            extra_args=["--if-due", "--min-hours", str(min_h)],
+            timeout=600,
+        )
+
+    # G) cloud pack
+    if os.environ.get("BACKUP_SKIP_CLOUD") != "1":
+        _run_phase(
+            "cloud_pack",
+            SCRIPTS / "cloud_recovery_pack_sync.py",
+            timeout=180,
+        )
+    else:
+        PHASES["cloud_pack"] = {"ok": True, "skipped": True}
+
+    # H) health
     if os.environ.get("BACKUP_SKIP_ALARM") == "1":
-        log("\n## Phase alarm: skipped")
         PHASES["alarm"] = {"ok": True, "skipped": True}
     else:
         _run_phase(
@@ -298,7 +279,7 @@ def main() -> int:
     log("\n## Summary")
     ok = len(ERRORS) == 0
     if ERRORS:
-        log(f"SOFT_ISSUES: {len(ERRORS)} (exit 0 - cron stays green; alarm carries color)")
+        log(f"SOFT_ISSUES: {len(ERRORS)} (exit 0; alarm carries color)")
         for e in ERRORS:
             log(f"  - {e}")
         print(f"\n[SOFT_ISSUES: {len(ERRORS)}]")
