@@ -32,7 +32,7 @@ K_ROOT = Path(r"K:\Hermes-Resilience")
 STATE = HERMES / "state" / "k_fossil_scan_last.json"
 MAN = K_ROOT / "manifests" / "fossil-scan-last.json"
 
-# 5 GB default — critical zips are KB-MB; full hermes dumps are 100GB+
+# 5 GB default - critical zips are KB-MB; full hermes dumps are 100GB+
 DEFAULT_MIN_GB = 5.0
 FOSSIL_SUFFIXES = {".zip", ".7z", ".vhd", ".vhdx", ".iso", ".wim", ".rar", ".bak"}
 # roots to scan (shallow-to-medium). Skip live silo bulk.

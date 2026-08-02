@@ -173,11 +173,11 @@ def main() -> int:
                             if c3 != 0:
                                 errors.append(f"force_push: {(se3 or so3)[:300]}")
 
-    runbook = f"""# Vault GitHub History Purge Runbook — 2026-08-01
+    runbook = f"""# Vault GitHub History Purge Runbook - 2026-08-01
 
 **Status:** prepare-only unless Jeff sets `CONFIRM_VAULT_FORCE_PUSH=YES`  
 **Poison path:** `{POISON}` (multiple 100MB+ blobs in history)  
-**Measured:** commits_touching_poison≈{poison_commits} · origin/master vs master: `{o3}`  
+**Measured:** commits_touching_poison{poison_commits}  origin/master vs master: `{o3}`  
 **Prepared:** {ts}
 
 ## Research basis
@@ -187,7 +187,7 @@ def main() -> int:
 - Always rewrite a **fresh clone**, verify, then force-push; notify any other clones.
 - Prefer **not** committing runtime DBs; gitignore `*.sqlite*` (already done on tip).
 
-## Interim (already automated — no force-push)
+## Interim (already automated - no force-push)
 
 ```text
 python D:/HermesData/scripts/vault_github_clean_mirror_push.py

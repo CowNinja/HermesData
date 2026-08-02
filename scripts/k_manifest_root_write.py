@@ -117,9 +117,9 @@ def main() -> int:
         ],
     }
 
-    md = f"""# K: Hermes-Resilience — MANIFEST ROOT
+    md = f"""# K: Hermes-Resilience - MANIFEST ROOT
 
-**Owner:** Hermes (5TB baby — Jeff never manages)  
+**Owner:** Hermes (5TB baby - Jeff never manages)  
 **Updated:** {ts}  
 **Free:** {usage['free_tb']} TB ({usage['used_pct']}% used)
 
@@ -139,14 +139,14 @@ def main() -> int:
 
 ## SLO
 
-- K mirror / critical zip / manifest age **≤ {slo['k_mirror_max_age_h']}h**
-- Clean GitHub mirror **≤ {slo['clean_mirror_max_age_h']}h**
-- Free space **≥ {slo['min_free_tb']} TB**
+- K mirror / critical zip / manifest age ** {slo['k_mirror_max_age_h']}h**
+- Clean GitHub mirror ** {slo['clean_mirror_max_age_h']}h**
+- Free space ** {slo['min_free_tb']} TB**
 
 ## Recovery order (D: dies)
 
 1. Read this file on K:
-2. Expand latest critical zip → new HermesData skeleton  
+2. Expand latest critical zip -> new HermesData skeleton  
 3. Overlay `mirrors/HermesData-Current`  
 4. `git clone --branch github-cns-mirror --single-branch https://github.com/CowNinja/PhronesisVault.git`  
 5. Silo already on K live tree; signal mirror = indexes only  

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restore drill — prove D: death recovery path from K + GitHub clean tip.
+"""Restore drill - prove D: death recovery path from K + GitHub clean tip.
 
 Default: READ-ONLY checks (no writes to D: live trees).
   --stage  writes a staged restore pack under K:/Hermes-Resilience/restore/drill-<ts>/

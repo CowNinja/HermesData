@@ -326,7 +326,7 @@ def main() -> int:
             )
             return 0
 
-    # Unique workdir every run — avoids Windows file/dir residue collisions
+    # Unique workdir every run - avoids Windows file/dir residue collisions
     run_root = TMP_ROOT.parent / f"vault-gh-orphan-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     _wipe(run_root)
     work = run_root / "tree"

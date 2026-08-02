@@ -215,7 +215,7 @@ def classify(checks: Dict[str, Dict[str, Any]]) -> Tuple[str, str, List[str]]:
         # default exit 1 on conflicts ? if no receipt counts, yellow
         yellows.append(f"canon_conflict rc={canons.get('rc')}")
 
-    # single-stack permanence (2026-07-22 P2) — measure only
+    # single-stack permanence (2026-07-22 P2) - measure only
     # Admin schtask residual = advisory only; TRUE_DUAL = red; health flaps -> dual
     ss = load_json(Path(r"D:\HermesData\logs\stack_single_instance_audit_latest.json"))
     if not ss:
@@ -243,11 +243,11 @@ def classify(checks: Dict[str, Dict[str, Any]]) -> Tuple[str, str, List[str]]:
             yellows.append(f"single_stack not_single:{','.join(not_single)}")
         elif down:
             yellows.append(f"single_stack_core_down:{','.join(down)}")
-        # Jeff-Admin residuals (Grok-Hermes-Loop Ready) — do not yellow pulse
+        # Jeff-Admin residuals (Grok-Hermes-Loop Ready) - do not yellow pulse
     else:
         yellows.append("single_stack_audit_missing")
 
-    # backup health (2026-08-01) — measure only; RED escalates, YELLOW advisory
+    # backup health (2026-08-01) - measure only; RED escalates, YELLOW advisory
     bh = load_json(Path(r"D:\HermesData\state\backup_health_last.json"))
     if bh:
         bcolor = str(bh.get("color") or "").upper()

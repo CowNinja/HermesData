@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""K: free-space governor — Hermes owns the 5TB baby.
+"""K: free-space governor - Hermes owns the 5TB baby.
 
 Budgets (soft targets, not hard partitions):
   silo live tree     keep working headroom
   Hermes-Resilience  mirrors + critical zips + manifests
-  Quarantine         fossils/scratch — alarm if refilled
+  Quarantine         fossils/scratch - alarm if refilled
 
 Writes:
   K:/Hermes-Resilience/manifests/free-space-governor.json

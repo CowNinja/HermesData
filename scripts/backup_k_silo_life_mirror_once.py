@@ -2,8 +2,8 @@
 """Selective Personal-Digital-Silo signal mirror -> K: (budgeted, wall-clocked).
 
 v3 (2026-08-02 cook):
-  - HARD wall-clock budget (default 240s) — never hang the 4h spine.
-  - Single-instance lock — kill/refuse concurrent runs (PID 7892 hung K: I/O).
+  - HARD wall-clock budget (default 240s) - never hang the 4h spine.
+  - Single-instance lock - kill/refuse concurrent runs (PID 7892 hung K: I/O).
   - Robocopy-first on known shallow hot paths; no full os.walk of pathological trees.
   - Partial success OK if dest has prior signal + this run copied or skipped cleanly.
   - Research: MS robocopy /MAX /XD /XF /MT /R:1 /W:1 /LEV; never MIR whole silo.
@@ -39,7 +39,7 @@ MAX_FILE_BYTES = 12 * 1024 * 1024  # 12MB
 DEFAULT_BUDGET_SEC = 240
 MAX_FILES = 8000
 
-# Priority relative paths (files or dirs). Shallow first — indexes matter most.
+# Priority relative paths (files or dirs). Shallow first - indexes matter most.
 PRIORITY_PATHS: List[str] = [
     "00-INDEX.md",
     "00-WORLD-INDEX.md",
@@ -267,7 +267,7 @@ def main() -> int:
             "error": f"lock_busy: {lock_msg}",
             "partial": True,
         }
-        # Do not overwrite last good receipt aggressively — sidecar only
+        # Do not overwrite last good receipt aggressively - sidecar only
         busy_state = HERMES / "state" / "backup_k_silo_life_mirror_busy.json"
         busy_state.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         log(f"FAIL {payload['error']}")
@@ -337,7 +337,7 @@ def main() -> int:
                 phases.append({"phase": rel, "kind": "file", "st": st})
                 continue
 
-            # directory — robocopy with short slice of remaining budget
+            # directory - robocopy with short slice of remaining budget
             slice_t = max(15, min(90, int(remaining() - 5)))
             # shallower for broad trees
             lev = 3 if rel in {"Core-Personal", "Archive", "Life-Archive", "Extended"} else 5
@@ -362,7 +362,7 @@ def main() -> int:
         # success criteria: no hard errors flood + (work done OR dest already populated)
         hard_fail = len(errors) >= 10 or dest_n == 0
         ok = not hard_fail and (copied > 0 or skipped > 0 or dest_n > 0)
-        # If budget hit but dest healthy → still ok (partial)
+        # If budget hit but dest healthy -> still ok (partial)
         partial = budget_hit
 
         idx = {

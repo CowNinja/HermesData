@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Poison recurrence guard — keep vault git free of runtime DBs / huge blobs.
+"""Poison recurrence guard - keep vault git free of runtime DBs / huge blobs.
 
 Checks (read-only by default):
   - working tree / index tracked *.sqlite*
@@ -30,7 +30,7 @@ STATE = HERMES / "state" / "vault_poison_guard_last.json"
 BLOCK_SUFFIXES = (".sqlite", ".sqlite-wal", ".sqlite-shm", ".db-wal", ".db-shm")
 MAX_BLOB = 50 * 1024 * 1024
 GITIGNORE_SNIP = """
-# Hermes poison guard — runtime DBs never in git
+# Hermes poison guard - runtime DBs never in git
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

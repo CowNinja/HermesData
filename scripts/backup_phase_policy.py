@@ -2,10 +2,10 @@
 """Classify resilience phase errors as soft vs hard (token-free policy).
 
 Used by backup-resilience.py and backup_health_alarm.py so Grok never re-litigates:
-  - silo_signal timeout with fresh prior receipt → soft
-  - cloud_pack best-effort fail → soft
-  - vault clean mirror rate-limit skip → soft
-  - K missing / git push HermesData fail / poison reintroduced → hard
+  - silo_signal timeout with fresh prior receipt -> soft
+  - cloud_pack best-effort fail -> soft
+  - vault clean mirror rate-limit skip -> soft
+  - K missing / git push HermesData fail / poison reintroduced -> hard
 
 Usage:
   python D:/HermesData/scripts/backup_phase_policy.py --errors-json '["silo_signal timeout"]'

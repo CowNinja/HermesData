@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Backup health alarm — measure layers, color, optional Discord pulse.
+"""Backup health alarm - measure layers, color, optional Discord pulse.
 
 YELLOW/RED when:
   - vault origin lag ahead > 0 on stable branch (and no clean mirror branch tip)
@@ -179,7 +179,7 @@ def evaluate() -> Dict[str, Any]:
     else:
         warns.append("critical zip missing or failed")
 
-    # Silo signal (soft) — partial/budget_hit still ok if dest populated
+    # Silo signal (soft) - partial/budget_hit still ok if dest populated
     ss = load_json(SILO_SIGNAL_STATE)
     layers["silo_signal"] = {
         "ok": ss.get("ok"),
@@ -193,7 +193,7 @@ def evaluate() -> Dict[str, Any]:
     if ss and ss.get("ok") is False:
         warns.append("silo signal mirror last run failed")
     elif ss.get("budget_hit") or ss.get("partial"):
-        # Healthy dest + ok run: budget_hit is expected on multi-TB silo — not a YELLOW.
+        # Healthy dest + ok run: budget_hit is expected on multi-TB silo - not a YELLOW.
         dest_n = int(ss.get("dest_files") or 0)
         if dest_n < 100:
             warns.append(
@@ -241,7 +241,7 @@ def evaluate() -> Dict[str, Any]:
         if res.get("ok") is False or hard_errs:
             errs = " ".join(hard_errs) if hard_errs else " ".join(res.get("errors") or [])
             err_l = errs.lower()
-            # silo-only hard label with fresh silo state → warn
+            # silo-only hard label with fresh silo state -> warn
             silo_only = hard_errs and all("silo_signal" in h.lower() for h in hard_errs)
             ss_ok = bool(ss.get("ok")) if ss else False
             if silo_only and ss_ok:
@@ -315,7 +315,7 @@ def evaluate() -> Dict[str, Any]:
 def write_receipt(report: Dict[str, Any]) -> None:
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"# Backup health alarm — {report['ts']}",
+        f"# Backup health alarm - {report['ts']}",
         "",
         f"**Color:** `{report['color']}`",
         "",

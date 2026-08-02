@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Resilience backup orchestrator — no_agent cron every 4h.
+"""Resilience backup orchestrator - no_agent cron every 4h.
 
-v9 cadence (2026-08-02 cook — silo hang fix + soft phase policy + K baby automations):
+v9 cadence (2026-08-02 cook - silo hang fix + soft phase policy + K baby automations):
   A) git allowlist commit+push HermesData only (vault master local-only; offsite=cns-mirror)
   B) k_resilience_layout_once (dirs + fossil quarantine)
   C) backup_critical_state_zip (replaces hanging hermes --quick)
@@ -171,7 +171,7 @@ def backup_repo(name: str, repo_dir: str, stable_branch: str | None, push: bool 
         log(f"OK {name}: nothing staged to commit")
 
     if not push:
-        log(f"OK {name}: local commit only (push disabled — use clean mirror for offsite)")
+        log(f"OK {name}: local commit only (push disabled - use clean mirror for offsite)")
         return
 
     if cur:

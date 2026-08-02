@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fast K: inventory snapshot — no deep du of silo trees.
+"""Fast K: inventory snapshot - no deep du of silo trees.
 
 Top-level + Hermes-Resilience first-level sizes only (Windows dir /s would hang).
 Uses shutil.disk_usage + bounded os.scandir.
@@ -9,7 +9,7 @@ Writes:
   D:/HermesData/state/k_inventory_last.json
 
 Research: capacity planning without full tree walk; Microsoft Get-PSDrive pattern
-≈ shutil.disk_usage; avoid recursive du on multi-TB silo (pitfall: 180s+ hangs).
+ shutil.disk_usage; avoid recursive du on multi-TB silo (pitfall: 180s+ hangs).
 """
 from __future__ import annotations
 

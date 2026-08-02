@@ -2,9 +2,9 @@
 """K: Hermes-Resilience local mirror once (time-boxed).
 
 v2 notes (2026-08-01):
-  - hermes backup --quick currently HANGS on this host (45s+ no zip) — default SKIP.
+  - hermes backup --quick currently HANGS on this host (45s+ no zip) - default SKIP.
   - Use --with-hermes-quick only after hermes CLI is fixed; still hard-killed on timeout.
-  - Selective robocopy only (never MIR whole HermesData — old mirror has 195GB+ fossils).
+  - Selective robocopy only (never MIR whole HermesData - old mirror has 195GB+ fossils).
   - Refreshes K:/Hermes-Resilience/manifests/latest-backup.json for health alarm age.
 
 Usage:
@@ -35,7 +35,7 @@ K_MANIFESTS = K_ROOT / "manifests"
 K_LOGS = K_ROOT / "logs"
 STATE = HERMES / "state" / "backup_k_mirror_last.json"
 
-# Keep lean — exclude media/venvs/caches/node_modules
+# Keep lean - exclude media/venvs/caches/node_modules
 ROBO_XD = [
     "node_modules",
     ".git",
@@ -175,7 +175,7 @@ def robocopy(
 
 
 def hermes_quick(timeout: int = 60) -> Dict[str, Any]:
-    """Optional. Known hang on 2026-08-01 — keep timeout low."""
+    """Optional. Known hang on 2026-08-01 - keep timeout low."""
     K_BACKUPS.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     # write to D: first (K: large fossil zips nearby can stress explorer)

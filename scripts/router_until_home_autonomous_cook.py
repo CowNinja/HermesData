@@ -692,7 +692,7 @@ def main() -> int:
     ):
         run_py("ops/whatsapp_heal_once.py", ["--ensure-node-path", "--json"], timeout=45)
 
-    # H9c backup health (measure; soft-pass — RED surfaces in summary only)
+    # H9c backup health (measure; soft-pass - RED surfaces in summary only)
     r = run_py("backup_health_alarm.py", ["--json"], timeout=90)
     p = r.get("parsed") or {}
     bcolor = str(p.get("color") or "").upper()

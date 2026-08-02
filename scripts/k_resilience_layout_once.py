@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""K: resilience layout once — dirs, index, quarantine mega fossils.
+"""K: resilience layout once - dirs, index, quarantine mega fossils.
 
 Owns K:/Hermes-Resilience structure. Safe defaults:
   - Move hermes-full-*.zip > 10GB into Quarantine/fossils/ (same-volume rename)

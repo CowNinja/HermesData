@@ -70,7 +70,7 @@ def main() -> int:
         lag = origin_lag(path, stable)
         remote = run_git(path, ["remote", "get-url", "origin"])[:60]
         rows.append(
-            f"| GitHub {name} | `{remote}` HEAD=`{br}` | `{head}` · {lag} |"
+            f"| GitHub {name} | `{remote}` HEAD=`{br}` | `{head}`  {lag} |"
         )
 
     k = Path(r"K:\Hermes-Resilience")

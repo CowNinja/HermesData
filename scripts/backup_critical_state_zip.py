@@ -28,7 +28,7 @@ K_DIR = Path(r"K:\Hermes-Resilience\backups\hermes\critical")
 STATE = HERMES / "state" / "backup_critical_zip_last.json"
 KEEP = 8  # retain last N zips on D:
 
-# (src_root, relative patterns — files only)
+# (src_root, relative patterns - files only)
 INCLUDE: List[Tuple[Path, Tuple[str, ...]]] = [
     (HERMES, (
         "config.yaml",
