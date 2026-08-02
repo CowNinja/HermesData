@@ -46,6 +46,24 @@ See references/sovereign-resilience-backup-patterns.md (in github-autobackup) an
 
 **2026-06-27 12:07 additional re-validation (this cycle)**: Recurring trigger identical. Executed bash /d/HermesData/scripts/backup-resilience.sh (with notify_on_complete for long run). hermes --quick snapshot + robocopy + vault git push succeeded (CRLF warnings tolerated). Manifest updated to 20260627-120723. Appended fresh structured entry to K:/Hermes-Resilience/logs/resilience-cron.log (exact "Triggering error" + "Actions taken:" + "Backup cycle complete. No new issues. Worst-case restore path fully supported" format). Post-run probes confirmed state-snapshots in mirror, restore scripts, healthy K: structure. Followed job rules precisely: efficient, logged to manifests, reported only because of trigger issue (structured failure + recovery + restore confirmation). Patterns 100% stable; no protocol changes. Reconfirms "be efficient, log to K: manifests, only report if issues, support the worst-case restore path" as core for this class. Cross-ref autonomous-execution-protocol (cron discipline) and github-autobackup evidence.md.
 
+## 2026-08-02 v9 cook (K baby + hang fix)
+
+**Research applied**: MS robocopy `/MAX` `/LEV` `/MT` `/R:1`; single-instance locks; soft vs hard phase policy; no full-tree `du` on multi-TB silo.
+
+**Spine**: `scripts/backup-resilience.py` v9 (4h cron) phases:
+git HermesData | vault local | k_layout | critical_zip | k_mirror | silo_signal v3 (wall-clock+lock, soft) | vault clean-mirror --if-due | cloud_pack soft | governor | poison_guard | k_inventory soft | fossil_scan soft | manifest_root | phase_policy | health_alarm | restore_drill auto >7d.
+
+**New/updated scripts (token-free)**:
+- `backup_k_silo_life_mirror_once.py` v3 — budgeted silo signal; kills hang class (PID 7892)
+- `backup_phase_policy.py` — hard/soft classification
+- `k_inventory_snapshot.py` — fast K capacity receipt
+- `k_fossil_reappearance_scan.py` — giants >5GB live danger
+- `backup_health_alarm.py` — soft-aware; healthy silo budget_hit does not YELLOW
+
+**Health target**: GREEN hard=0. Soft never fails receipt alone. K: exclusive Hermes baby (5TB).
+
+**Docs**: `Operations/Backup-Architecture-Cook-2026-08-02-v9.md`, `Operations/Backup-Five-Primaries-Cadence-2026-08-02.md`.
+
 ## Future Expansion
 - Automated backup scheduling (already via cron-scheduling).
 - Remote/encrypted targets.
