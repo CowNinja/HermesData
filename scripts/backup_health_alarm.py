@@ -157,6 +157,50 @@ def evaluate() -> Dict[str, Any]:
     elif gov.get("color") == "YELLOW":
         warns.append("K free-space governor YELLOW")
 
+    # K capacity trend (rolling free-TB slope + days-to-80%) — soft unless RED
+    cap = load_json(HERMES / "state" / "k_capacity_trend_last.json")
+    if cap:
+        layers["k_capacity_trend"] = {
+            "level": cap.get("level") or cap.get("color"),
+            "ok": cap.get("ok"),
+            "free_tb": (cap.get("usage") or {}).get("free_tb"),
+            "used_pct": (cap.get("usage") or {}).get("used_pct"),
+            "slope_free_tb_per_day": cap.get("slope_free_tb_per_day"),
+            "days_to_80_used_pct": cap.get("days_to_80_used_pct"),
+            "samples": cap.get("samples"),
+            "reasons": (cap.get("reasons") or [])[:4],
+        }
+        cap_level = (cap.get("level") or cap.get("color") or "").upper()
+        if cap_level == "RED":
+            issues.append(
+                "K capacity trend RED free_tb=%s days_to_80=%s reasons=%s"
+                % (
+                    (cap.get("usage") or {}).get("free_tb"),
+                    cap.get("days_to_80_used_pct"),
+                    ",".join(cap.get("reasons") or [])[:80],
+                )
+            )
+        elif cap_level == "YELLOW":
+            warns.append(
+                "K capacity trend YELLOW days_to_80=%s slope=%s"
+                % (
+                    cap.get("days_to_80_used_pct"),
+                    cap.get("slope_free_tb_per_day"),
+                )
+            )
+
+    # Hung-backup watchdog last action (informational; acted=True is healthy)
+    hung = load_json(HERMES / "state" / "backup_hung_watchdog_last.json")
+    if hung:
+        layers["hung_watchdog"] = {
+            "ok": hung.get("ok"),
+            "acted": hung.get("acted"),
+            "action_count": hung.get("action_count"),
+            "ts": hung.get("ts"),
+        }
+        if hung.get("ok") is False:
+            warns.append("hung watchdog last run ok=False")
+
     # Critical zip
     cz = load_json(CRITICAL_ZIP_STATE)
     layers["critical_zip"] = {

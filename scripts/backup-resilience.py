@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Resilience backup orchestrator - no_agent cron every 4h.
 
-v9 cadence (2026-08-02 cook - silo hang fix + soft phase policy + K baby automations):
+v10 cadence (2026-08-02 five-primaries cook - deepen/off-spine + hung watchdog + capacity trend):
   A) git allowlist commit+push HermesData only (vault master local-only; offsite=cns-mirror)
   B) k_resilience_layout_once (dirs + fossil quarantine)
   C) backup_critical_state_zip (replaces hanging hermes --quick)
@@ -13,10 +13,16 @@ v9 cadence (2026-08-02 cook - silo hang fix + soft phase policy + K baby automat
   I) vault_poison_recurrence_guard
   J) k_inventory_snapshot (fast top-level)
   K) k_fossil_reappearance_scan (no delete)
-  L) k_manifest_root_write
-  M) backup_phase_policy + receipt
-  N) backup_health_alarm --notify
-  O) backup_restore_drill auto if last >7d OR BACKUP_RUN_DRILL=1
+  L) k_capacity_trend (rolling free-TB slope; soft)
+  M) backup_hung_watchdog --kill (clear stale locks; soft)
+  N) k_manifest_root_write
+  O) backup_phase_policy + receipt
+  P) backup_health_alarm --notify
+  Q) backup_restore_drill auto if last >7d OR BACKUP_RUN_DRILL=1
+
+Off-spine (separate cron, NOT in this spine):
+  backup_k_silo_deepen_cron.py -> spawns 30-60m deepen worker
+  restore_from_k_once.py -> catastrophe stage (manual / weekly optional)
 
 Env:
   BACKUP_SKIP_K=1
@@ -29,6 +35,8 @@ Env:
   BACKUP_SKIP_DRILL=1
   BACKUP_SKIP_INVENTORY=1
   BACKUP_SKIP_FOSSIL_SCAN=1
+  BACKUP_SKIP_CAPACITY_TREND=1
+  BACKUP_SKIP_HUNG_WATCHDOG=1
   BACKUP_K_TIMEOUT=900
   BACKUP_SILO_TIMEOUT=300
   BACKUP_SILO_BUDGET_SEC=240
@@ -96,6 +104,8 @@ DEFAULT_SOFT_PHASES = {
     "cloud_pack",
     "k_inventory",
     "fossil_scan",
+    "capacity_trend",
+    "hung_watchdog",
     "restore_drill",
 }
 
@@ -275,7 +285,7 @@ def _write_receipt(ok: bool, policy: Dict[str, object] | None = None) -> None:
         "soft_error_count": len(SOFT_ERRORS),
         "phases": PHASES,
         "policy": policy or {},
-        "version": 9,
+        "version": 10,
         "cadence": {
             "k_hours": 4,
             "hermesdata_git_hours": 4,
@@ -284,6 +294,7 @@ def _write_receipt(ok: bool, policy: Dict[str, object] | None = None) -> None:
             ),
             "silo_budget_sec": int(os.environ.get("BACKUP_SILO_BUDGET_SEC", "240")),
             "drill_max_age_days": float(os.environ.get("BACKUP_DRILL_MAX_AGE_DAYS", "7")),
+            "offspine_silo_deepen": "nightly_detached",
         },
     }
     try:
@@ -360,7 +371,7 @@ def _release_resilience_lock() -> None:
 
 
 def main() -> int:
-    log(f"## Resilience Backup v9 {TS}")
+    log(f"## Resilience Backup v10 {TS}")
     if not _acquire_resilience_lock():
         # write busy receipt without clobbering last good ok if possible
         busy = {
@@ -368,7 +379,7 @@ def main() -> int:
             "ok": True,
             "skipped": True,
             "reason": "lock_busy",
-            "version": 9,
+            "version": 10,
         }
         try:
             prev = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
@@ -512,15 +523,39 @@ def main() -> int:
                 soft=True,
             )
 
-        # L) manifest root
+        # L) capacity trend (rolling free-TB slope)
+        if os.environ.get("BACKUP_SKIP_CAPACITY_TREND") == "1":
+            PHASES["capacity_trend"] = {"ok": True, "skipped": True}
+        else:
+            _run_phase(
+                "capacity_trend",
+                SCRIPTS / "k_capacity_trend.py",
+                extra_args=["--json"],
+                timeout=60,
+                soft=True,
+            )
+
+        # M) hung backup watchdog (clear stale locks; kill only via --kill)
+        if os.environ.get("BACKUP_SKIP_HUNG_WATCHDOG") == "1":
+            PHASES["hung_watchdog"] = {"ok": True, "skipped": True}
+        else:
+            _run_phase(
+                "hung_watchdog",
+                SCRIPTS / "backup_hung_watchdog.py",
+                extra_args=["--kill", "--json"],
+                timeout=90,
+                soft=True,
+            )
+
+        # N) manifest root
         _run_phase("manifest_root", SCRIPTS / "k_manifest_root_write.py", timeout=60, soft=False)
 
-        # M) policy + receipt before alarm
+        # O) policy + receipt before alarm
         policy = _apply_phase_policy()
         ok = bool(policy.get("ok_for_receipt", len(ERRORS) == 0))
         _write_receipt(ok=ok, policy=policy)
 
-        # N) health
+        # P) health
         if os.environ.get("BACKUP_SKIP_ALARM") == "1":
             PHASES["alarm"] = {"ok": True, "skipped": True}
         else:
@@ -535,7 +570,7 @@ def main() -> int:
             ok = bool(policy.get("ok_for_receipt", len(ERRORS) == 0))
             _write_receipt(ok=ok, policy=policy)
 
-        # O) restore drill weekly auto
+        # Q) restore drill weekly auto
         if os.environ.get("BACKUP_SKIP_DRILL") == "1":
             PHASES["restore_drill"] = {"ok": True, "skipped": True}
         elif _drill_due():

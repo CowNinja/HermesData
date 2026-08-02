@@ -150,6 +150,27 @@ def check_cache() -> List[Tuple[str, str]]:
     return issues
 
 
+def check_must_grok_pins() -> List[Tuple[str, str]]:
+    """Fail if identity/judgment/RP must-Grok threads fall through to local 9B."""
+    issues: List[Tuple[str, str]] = []
+    try:
+        sys.path.insert(0, str(Path(r"D:\HermesData\scripts")))
+        from audit_discord_channel_pins import audit  # type: ignore
+
+        path = HERMES_DATA if HERMES_DATA.is_file() else HERMES_USER
+        rep = audit(path)
+        for item in rep.get("issues") or []:
+            sev = str(item.get("severity") or "warn")
+            msg = (
+                f"must-grok {item.get('channel_id')}: {item.get('name')}: "
+                f"{item.get('problem')} ({item.get('fix')})"
+            )
+            issues.append((sev, msg))
+    except Exception as exc:
+        issues.append(("warn", f"must-grok pin audit skipped: {type(exc).__name__}: {exc}"))
+    return issues
+
+
 def main() -> int:
     as_json = "--json" in sys.argv
     all_issues: List[Dict[str, str]] = []
@@ -160,6 +181,9 @@ def main() -> int:
 
     for sev, msg in check_cache():
         all_issues.append({"severity": sev, "check": "cache", "message": msg})
+
+    for sev, msg in check_must_grok_pins():
+        all_issues.append({"severity": sev, "check": "must_grok_pins", "message": msg})
 
     fails = [i for i in all_issues if i["severity"] == "fail"]
     warns = [i for i in all_issues if i["severity"] == "warn"]

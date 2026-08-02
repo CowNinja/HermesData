@@ -139,7 +139,29 @@ def infer_status(p: Path, cur: str | None) -> str:
     meta = Path(str(p) + ".meta.json")
     ctx = Path(str(p) + ".context.json")
     extract_txt = Path(str(p) + ".extract.txt")
+    extract_json = Path(str(p) + ".extract.json")
     pdf_txt = Path(str(p) + ".txt")
+    office_md = Path(str(p) + ".office.md")
+    office_json = Path(str(p) + ".office.json")
+    html_md = Path(str(p) + ".html.md")
+    email_md = Path(str(p) + ".email.md")
+    AUDIO_EXT = {
+        ".wav",
+        ".mp3",
+        ".m4a",
+        ".aac",
+        ".flac",
+        ".ogg",
+        ".wma",
+        ".amr",
+        ".3gp",
+        ".webm",
+        ".mp4",
+        ".mov",
+        ".mkv",
+        ".avi",
+        ".m4v",
+    }
 
     # Strongest first
     try:
@@ -148,6 +170,32 @@ def infer_status(p: Path, cur: str | None) -> str:
             or (ctx_train.is_file() and ctx_train.stat().st_size >= 40)
             or (stt.is_file() and stt.stat().st_size >= 40)
         ):
+            return "derivative_ok"
+        if office_md.is_file() and office_md.stat().st_size >= 40:
+            return "derivative_ok"
+        # silo_office_extract writes .office.json (not always .office.md)
+        if office_json.is_file() and office_json.stat().st_size >= 20:
+            try:
+                import json as _json
+
+                oj = _json.loads(
+                    office_json.read_text(encoding="utf-8", errors="replace")
+                )
+                if isinstance(oj, dict):
+                    text = oj.get("text") or oj.get("body") or ""
+                    chars = int(oj.get("chars") or oj.get("text_len") or len(str(text)))
+                    ok_flag = oj.get("ok")
+                    if ok_flag is False:
+                        pass  # fall through
+                    elif chars >= 40 or (ok_flag is True and chars >= 1):
+                        return "derivative_ok"
+                    elif ok_flag is True:
+                        return "extracted"
+            except Exception:
+                return "extracted"
+        if html_md.is_file() and html_md.stat().st_size >= 40:
+            return "derivative_ok"
+        if email_md.is_file() and email_md.stat().st_size >= 40:
             return "derivative_ok"
     except OSError:
         pass
@@ -163,6 +211,26 @@ def infer_status(p: Path, cur: str | None) -> str:
         # pdf sidecar text written next to file
         if suf == ".pdf" and pdf_txt.is_file() and pdf_txt.stat().st_size >= 40:
             return "extracted"
+        # OCR ladder / residual extract.json
+        if extract_json.is_file() and extract_json.stat().st_size >= 20:
+            try:
+                import json as _json
+
+                ej = _json.loads(
+                    extract_json.read_text(encoding="utf-8", errors="replace")
+                )
+                q = (ej.get("quality") or {}) if isinstance(ej, dict) else {}
+                if (
+                    q.get("twin_useful")
+                    or q.get("status") == "ok_text"
+                    or int(q.get("chars") or 0) >= 80
+                ):
+                    return "derivative_ok"
+                if q.get("status") in ("needs_ocr", "thin", "empty"):
+                    return "ocr_queued"
+                return "extracted"
+            except Exception:
+                return "extracted"
     except OSError:
         pass
 
@@ -178,6 +246,18 @@ def infer_status(p: Path, cur: str | None) -> str:
                 return "ocr_queued"
         except OSError:
             pass
+
+    # Audio without STT twin belongs on stt lane, not eternal unprocessed
+    if suf in AUDIO_EXT:
+        return "stt_queued"
+
+    # Tiny office stubs are catalog noise
+    try:
+        if suf in {".xls", ".xlsx", ".doc", ".docx", ".ppt", ".pptx", ".rtf", ".csv"}:
+            if p.stat().st_size < 200:
+                return "catalog_only"
+    except OSError:
+        pass
 
     if suf in CATALOG_EXT:
         return "catalog_only"

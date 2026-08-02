@@ -101,22 +101,42 @@ def to_wav16k(path: Path, work: Path) -> tuple[Path | None, str]:
 
 
 def stt_whisper(path: Path) -> tuple[str, str]:
-    """Prefer isolated STT venv (numpy pin). Device via SILO_STT_DEVICE=cpu|cuda."""
+    """Prefer isolated STT venv (numpy pin). Device via SILO_STT_DEVICE=cpu|cuda.
+
+    CUDA path is gated by gpu_tenant_registry.resolve_stt_device (2026-08-02).
+    Never starts CUDA while brain owns VRAM unless silo lock already held /
+    dual-edge free. Does not park here - borrow window owns park.
+    """
     import os
 
     py = STT_PYTHON if STT_PYTHON.is_file() else Path(sys.executable)
-    device = (os.environ.get("SILO_STT_DEVICE") or "cpu").strip().lower()
-    if device not in ("cpu", "cuda"):
-        device = "cpu"
+    requested = (os.environ.get("SILO_STT_DEVICE") or "cpu").strip().lower()
+    if requested not in ("cpu", "cuda"):
+        requested = "cpu"
+    device = requested
     compute = (os.environ.get("SILO_STT_COMPUTE") or "").strip()
     if not compute:
         compute = "float16" if device == "cuda" else "int8"
+    # Registry gate: refuse silent CUDA under brain owner
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import gpu_tenant_registry as gtr  # type: ignore
+
+        gate = gtr.resolve_stt_device(requested)
+        device = str(gate.get("device") or "cpu")
+        compute = str(gate.get("compute") or ("float16" if device == "cuda" else "int8"))
+    except Exception:
+        # Fail closed to CPU if registry missing
+        if requested == "cuda":
+            device = "cpu"
+            compute = "int8"
     # Ensure cublas/cudart on PATH (Ollama cuda_v12 bundle on this host)
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from silo_stt_cuda_env import apply_cuda_path
 
-        apply_cuda_path()
+        if device == "cuda":
+            apply_cuda_path()
     except Exception:
         pass
     # Helper picks cuda when borrow window frees VRAM; falls back to cpu on failure.
