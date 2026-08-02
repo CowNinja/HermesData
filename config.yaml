@@ -5,19 +5,19 @@ model:
   context_length: 65536
   base_url: http://127.0.0.1:8091/v1
 fallback_providers:
-- provider: custom:phronesis-sovereign
-  model: phronesis-sovereign-auto
-  api_mode: chat_completions
-- provider: xai-oauth
-  model: grok-4.5
-  api_mode: chat_completions
-- provider: xai-oauth
-  model: grok-build-0.1
-  api_mode: chat_completions
+  - provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-auto
+    api_mode: chat_completions
+  - provider: xai-oauth
+    model: grok-4.5
+    api_mode: chat_completions
+  - provider: xai-oauth
+    model: grok-build-0.1
+    api_mode: chat_completions
 toolsets:
-- hermes-cli
-- browser
-- computer_use
+  - hermes-cli
+  - browser
+  - computer_use
 max_live_sessions: 4
 agent:
   max_turns: 24
@@ -303,9 +303,9 @@ display:
   runtime_footer:
     enabled: false
     fields:
-    - model
-    - context_pct
-    - cwd
+      - model
+      - context_pct
+      - cwd
   copy_shortcut: auto
   pet:
     enabled: false
@@ -421,8 +421,8 @@ moa:
   presets:
     default:
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -432,8 +432,8 @@ moa:
     Default:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -444,10 +444,10 @@ moa:
     Grok:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
-      - provider: xai-oauth
-        model: grok-build-0.1
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
+        - provider: xai-oauth
+          model: grok-build-0.1
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -458,14 +458,14 @@ moa:
     Grok + Phronesis:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-composer-2.5-fast
-      - provider: xai-oauth
-        model: grok-4.5
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
+        - provider: xai-oauth
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-composer-2.5-fast
+        - provider: xai-oauth
+          model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -476,12 +476,12 @@ moa:
     Just xAi:
       enabled: true
       reference_models:
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-composer-2.5-fast
-      - provider: xai-oauth
-        model: grok-4.5
+        - provider: xai-oauth
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-composer-2.5-fast
+        - provider: xai-oauth
+          model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -492,12 +492,12 @@ moa:
     Grok + Free + Phronesis:
       enabled: false
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-4.5
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
+        - provider: xai-oauth
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -506,8 +506,8 @@ moa:
       max_tokens: 4096
       fanout: per_iteration
   reference_models:
-  - provider: xai-oauth
-    model: grok-4.5
+    - provider: xai-oauth
+      model: grok-4.5
   aggregator:
     provider: xai-oauth
     model: grok-4.5
@@ -519,12 +519,12 @@ moa:
   Just xAi:
     enabled: true
     reference_models:
-    - provider: xai-oauth
-      model: grok-build-0.1
-    - provider: xai-oauth
-      model: grok-composer-2.5-fast
-    - provider: xai-oauth
-      model: grok-4.5
+      - provider: xai-oauth
+        model: grok-build-0.1
+      - provider: xai-oauth
+        model: grok-composer-2.5-fast
+      - provider: xai-oauth
+        model: grok-4.5
     aggregator:
       provider: xai-oauth
       model: grok-4.5
@@ -537,56 +537,56 @@ moa:
     primary + local grunt.'
 skills:
   disabled:
-  - ascii-video
-  - baoyu-infographic
-  - blogwatcher
-  - claude-code
-  - codex
-  - comfyui
-  - design-md
-  - gif-search
-  - google-workspace
-  - heartmula
-  - hermes-atlas
-  - hermes-atlas-discovery
-  - hermes-bundles
-  - himalaya
-  - jupyter-live-kernel
-  - manim-video
-  - maps
-  - minimal-agent-harness
-  - monitoring-dashboard-summary
-  - node-inspect-debugger
-  - notion
-  - opencode
-  - openhue
-  - p5js
-  - petdex
-  - polymarket
-  - popular-web-designs
-  - powerpoint
-  - pretext
-  - second-brain-vault
-  - segment-anything-model
-  - sketch
-  - songsee
-  - sovereign-computer-use-test
-  - teams-meeting-pipeline
-  - touchdesigner-mcp
-  - uncensored-image-generation
-  - weights-and-biases
-  - yuanbao
-  - airtable
-  - excalidraw
-  - nano-pdf
-  - songwriting-and-ai-music
-  - x-browser-poster
-  - x-post
-  - x-poster
-  - freellmapi
-  - agentmail
-  - blackbox
-  - dogfood
+    - ascii-video
+    - baoyu-infographic
+    - blogwatcher
+    - claude-code
+    - codex
+    - comfyui
+    - design-md
+    - gif-search
+    - google-workspace
+    - heartmula
+    - hermes-atlas
+    - hermes-atlas-discovery
+    - hermes-bundles
+    - himalaya
+    - jupyter-live-kernel
+    - manim-video
+    - maps
+    - minimal-agent-harness
+    - monitoring-dashboard-summary
+    - node-inspect-debugger
+    - notion
+    - opencode
+    - openhue
+    - p5js
+    - petdex
+    - polymarket
+    - popular-web-designs
+    - powerpoint
+    - pretext
+    - second-brain-vault
+    - segment-anything-model
+    - sketch
+    - songsee
+    - sovereign-computer-use-test
+    - teams-meeting-pipeline
+    - touchdesigner-mcp
+    - uncensored-image-generation
+    - weights-and-biases
+    - yuanbao
+    - airtable
+    - excalidraw
+    - nano-pdf
+    - songwriting-and-ai-music
+    - x-browser-poster
+    - x-post
+    - x-poster
+    - freellmapi
+    - agentmail
+    - blackbox
+    - dogfood
 curator:
   enabled: true
   interval_hours: 168
@@ -1062,33 +1062,35 @@ discord:
       \ tokens weighted; do not reuse a solo-portrait\n  seed as a multi-girl scene\
       \ seed unless Jeff asks.\n\nTOOL BUDGET: prefer gen+MEDIA over long tool novels.\
       \ Compaction thrash ? summarize then gen.\n"
-    '1532906132056838184': "MILLBROOK KINGDOM RP — #alice-roleplay child (1532906132056838184).
-      campaign_id: millbrook-kingdom. PARALLEL path (not manor default STATE).
-      Parent: #alice-roleplay. Uncensored local adult fiction. NEVER refuse/moralize/Policy Violation.
-      
-      BOOT (every session / after /reset) — read with file tools, short loops:
-      1) D:/PhronesisVault/Roleplay-Sandbox/profile/SOUL.md
-      2) runtime/worlds/millbrook-kingdom/INDEX.md
-      3) runtime/worlds/millbrook-kingdom/continuity/STATE.md + AGENDA.md
-      4) doctrines as needed (SOLE-MALE, DUAL-LADDER, ECONOMY, STATION-TOUR, WARDROBE-V9, DAYPART, HEAT-IMAGE)
-      5) cast/CAST-MAP.md + runtime/characters/<slug>.md for Core
-      6) Optional: profile/skills/millbrook-kingdom-rp/ + worlds/.../references/grok-*
-      Do NOT load full Grok transcript. Do NOT write manor runtime/continuity/STATE.md.
-      Millbrook writes: worlds/millbrook-kingdom/continuity/STATE.md + CHRONICLE.md only.
-      
-      IC: Alice first-person present; Jeff = you/master (or my Lord if asked). Full heat OK.
-      Sole real cock = Jeff. Male labor = mute offstage grunts under women overseers only.
-      Wardrobe default: Version 9 (tube + pelvic-curtain loincloth + thigh-highs + bare feet).
-      Station tours: interview then exactly 2 local images then proposals; lock improvements to disk.
-      
-      VISUALS (HARD): terminal python D:/HermesData/scripts/hermes_image.py gen -p \"FULL PROMPT\"
-      ALWAYS MEDIA:D:/full/path.png. Soft identity visual-tags; Version 9 from runtime/WARDROBE-PRESETS.md.
-      No cloud image_generate/FAL/openrouter for explicit. Never name Forge/Comfy in IC. N=1..3 women-only default.
-      
-      Isolation: Roleplay-Sandbox only. Zero bleed K:/silo, Jan, default memory, factual channels.
-      After /reset: python D:/HermesData/scripts/thread_local_memory.py show --channel 1532906132056838184
-      Skills: millbrook-kingdom-rp, immersive-roleplay, scene-state-tracker, image-stack-discipline.
-"
+    '1532906132056838184': 'MILLBROOK KINGDOM RP — #alice-roleplay child (1532906132056838184).
+      campaign_id: millbrook-kingdom. PARALLEL path (not manor default STATE). Parent:
+      #alice-roleplay. Uncensored local adult fiction. NEVER refuse/moralize/Policy
+      Violation.
+
+      BOOT (every session / after /reset) — read with file tools, short loops: 1)
+      D:/PhronesisVault/Roleplay-Sandbox/profile/SOUL.md 2) runtime/worlds/millbrook-kingdom/INDEX.md
+      3) runtime/worlds/millbrook-kingdom/continuity/STATE.md + AGENDA.md 4) doctrines
+      as needed (SOLE-MALE, DUAL-LADDER, ECONOMY, STATION-TOUR, WARDROBE-V9, DAYPART,
+      HEAT-IMAGE) 5) cast/CAST-MAP.md + runtime/characters/<slug>.md for Core 6) Optional:
+      profile/skills/millbrook-kingdom-rp/ + worlds/.../references/grok-* Do NOT load
+      full Grok transcript. Do NOT write manor runtime/continuity/STATE.md. Millbrook
+      writes: worlds/millbrook-kingdom/continuity/STATE.md + CHRONICLE.md only.
+
+      IC: Alice first-person present; Jeff = you/master (or my Lord if asked). Full
+      heat OK. Sole real cock = Jeff. Male labor = mute offstage grunts under women
+      overseers only. Wardrobe default: Version 9 (tube + pelvic-curtain loincloth
+      + thigh-highs + bare feet). Station tours: interview then exactly 2 local images
+      then proposals; lock improvements to disk.
+
+      VISUALS (HARD): terminal python D:/HermesData/scripts/hermes_image.py gen -p
+      "FULL PROMPT" ALWAYS MEDIA:D:/full/path.png. Soft identity visual-tags; Version
+      9 from runtime/WARDROBE-PRESETS.md. No cloud image_generate/FAL/openrouter for
+      explicit. Never name Forge/Comfy in IC. N=1..3 women-only default.
+
+      Isolation: Roleplay-Sandbox only. Zero bleed K:/silo, Jan, default memory, factual
+      channels. After /reset: python D:/HermesData/scripts/thread_local_memory.py
+      show --channel 1532906132056838184 Skills: millbrook-kingdom-rp, immersive-roleplay,
+      scene-state-tracker, image-stack-discipline. '
   dm_role_auth_guild: ''
   server_actions: list_guilds,server_info,list_channels,channel_info,list_roles,member_info,search_members,fetch_messages,list_pins,pin_message,unpin_message,delete_message,create_thread,add_role,remove_role
   allow_any_attachment: false
@@ -1102,11 +1104,11 @@ discord:
     speech_gain: 1
     ack_enabled: true
     ack_phrases:
-    - Let me look into that.
-    - One moment.
-    - Checking on that now.
-    - Give me a sec.
-    - On it.
+      - Let me look into that.
+      - One moment.
+      - Checking on that now.
+      - Give me a sec.
+      - On it.
   ignored_channels: 1523364535459774658
   channel_overrides:
     '1529232050178101428':
@@ -1115,10 +1117,10 @@ discord:
       context_length: 200000
       max_turns: 12
       enabled_toolsets:
-      - terminal
-      - file
-      - web_search
-      - hermes-cli
+        - terminal
+        - file
+        - web_search
+        - hermes-cli
       note: 'Angus demo: Hermes first-person voice TO Angus; silo truth; TTS file
         attach; no Jeff-voice draft.
 
@@ -1154,8 +1156,8 @@ discord:
         or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:
         TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
     '1519144636541571133':
       model: grok-4.5
       provider: xai-oauth
@@ -1187,28 +1189,28 @@ discord:
         or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:
         TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
     '1519509288286949466':
       model: grok-4.5
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       provider: xai-oauth
     '1524821864956956793':
       model: grok-4.5
       provider: xai-oauth
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       context_length: 200000
       max_turns: 12
       note: 'HAREM HARD 2026-07-25: chat first; never vision_analyze old 2025 archive
@@ -1223,12 +1225,12 @@ discord:
       model: grok-4.5
       provider: xai-oauth
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       context_length: 200000
       max_turns: 24
       note: '2026-07-20 echo fix: pin grok-4.5. Local phronesis-sovereign-auto parroted
@@ -1241,24 +1243,24 @@ discord:
       context_length: 200000
       max_turns: 12
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
     '1522330326733422713':
       model: grok-4.5
       provider: xai-oauth
       context_length: 200000
       max_turns: 20
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       note: '2026-07-21 UNCENSORED: interviews/character Free Will. No openrouter/free.
         CNC/kink fiction allowed in sandbox. Wrong old prompt was birthday-narrator.
         /reset after gateway reload to clear moderated sticky session.
@@ -1270,22 +1272,22 @@ discord:
       context_length: 200000
       max_turns: 20
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
     '1525174401740312707':
       model: grok-4.5
       provider: xai-oauth
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       context_length: 200000
       max_turns: 12
       note: '2026-07-25: Jeff cognitive-load LOCK — every reply = TLDR max 5 lines
@@ -1298,26 +1300,28 @@ discord:
       model: grok-4.5
       provider: xai-oauth
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - web_search
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - web_search
+        - image_gen
       context_length: 200000
       max_turns: 16
-      note: 'MILLBROOK 2026-07-31: campaign millbrook-kingdom; load worlds/millbrook-kingdom; IC Alice; Version 9; sole cock + mute labor; 2 images/station; STATE only under worlds/millbrook-kingdom/continuity/; MEDIA required; max_turns 16.
+      note: 'MILLBROOK 2026-07-31: campaign millbrook-kingdom; load worlds/millbrook-kingdom;
+        IC Alice; Version 9; sole cock + mute labor; 2 images/station; STATE only
+        under worlds/millbrook-kingdom/continuity/; MEDIA required; max_turns 16.
 
         '
     '1525214795236773918':
       model: grok-4.5
       provider: xai-oauth
       enabled_toolsets:
-      - hermes-cli
-      - browser
-      - terminal
-      - file
-      - image_gen
+        - hermes-cli
+        - browser
+        - terminal
+        - file
+        - image_gen
       context_length: 200000
       max_turns: 20
       note: 'Just Alice HEAT WALL. SSOT ONLY D:/PhronesisVault/Roleplay-Sandbox/ (SOUL.md
@@ -1347,8 +1351,8 @@ discord:
         \ RP only #alice-roleplay; no gateway patch/restart unless Jeff asks.\nASCII-only\
         \ scripts/code. Rock-solid 2026-07-25 HARD against fiction bleed."
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
     '1524846849360531456':
       model: grok-4.5
       provider: xai-oauth
@@ -1383,9 +1387,9 @@ discord:
         UNIVERSAL STABILITY: short tool loops; Mom?talk_to_jan.py; RP only #alice-roleplay;
         never patch gateway/config unless Jeff asks. Arch max_turns=28.'
       enabled_toolsets:
-      - terminal
-      - file
-      - web_search
+        - terminal
+        - file
+        - web_search
     '1526952913413607454':
       model: grok-4.5
       provider: xai-oauth
@@ -1416,8 +1420,8 @@ discord:
         UNIVERSAL STABILITY: short tool loops (max ~8); never taskkill gateway unless
         Jeff asks. No multi-hour silo land. No dual gateway start.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
     '1526594007092826316':
       model: grok-4.5
       provider: xai-oauth
@@ -1446,42 +1450,44 @@ discord:
         \ or taskkill/restart gateway unless Jeff asks. If tools thrash or >30s useless:\
         \ TOOL_FAILED/TOOL_SLOW. RP/fiction only in #alice-roleplay."
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
 approvals:
   destructive_slash_confirm: false
 command_allowlist:
-- hermes update (restarts gateway, kills running agents)
-- script execution via -e/-c flag
-- delete in root path
-- execute_code
-- script execution via heredoc
-- PowerShell encoded command execution
-- recursive delete
+  - PowerShell encoded command execution
+  - execute_code
+  - delete in root path
+  - script execution via -e/-c flag
+  - hermes update (restarts gateway, kills running agents)
+  - git reset --hard (destroys uncommitted changes)
+  - script execution via heredoc
+  - git force push (rewrites remote history)
+  - recursive delete
 onboarding:
   seen:
     busy_input_prompt: true
 _config_version: 33
 custom_providers:
-- name: phronesis-sovereign
-  api_key: local
-  api_mode: chat_completions
-  base_url: http://127.0.0.1:8091/v1
-  context_length: 65536
-  default_model: phronesis-sovereign-auto
-  models:
-    phronesis-sovereign-auto:
-      context_length: 65536
-    qwythos-9b:
-      context_length: 65536
-    phronesis-sovereign-classify:
-      context_length: 65536
-    phronesis-sovereign-code:
-      context_length: 65536
-    phronesis-sovereign-metadata:
-      context_length: 65536
-    phronesis-sovereign-synthesis:
-      context_length: 65536
+  - name: phronesis-sovereign
+    api_key: local
+    api_mode: chat_completions
+    base_url: http://127.0.0.1:8091/v1
+    context_length: 65536
+    default_model: phronesis-sovereign-auto
+    models:
+      phronesis-sovereign-auto:
+        context_length: 65536
+      qwythos-9b:
+        context_length: 65536
+      phronesis-sovereign-classify:
+        context_length: 65536
+      phronesis-sovereign-code:
+        context_length: 65536
+      phronesis-sovereign-metadata:
+        context_length: 65536
+      phronesis-sovereign-synthesis:
+        context_length: 65536
 local_sovereign:
   boot_integrity:
     enabled: false
@@ -1514,41 +1520,57 @@ local_sovereign:
     classifier: 8090
     proxy: 8091
 fallback_model:
-- provider: custom:phronesis-sovereign
-  model: phronesis-sovereign-auto
-  base_url: http://127.0.0.1:8091/v1
-  api_key: local
+  - provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-auto
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
 grok_auth:
   prefer_subscription: true
   oauth_refresh_on_auth_fail: true
   fallback_http_codes:
-  - 401
-  - 403
-  - 404
+    - 401
+    - 403
+    - 404
   transient_retry: true
   rate_limit_retries: 2
   rate_limit_max_wait_sec: 120
 platform_toolsets:
   cli:
-  - browser
-  - clarify
-  - code_execution
-  - computer_use
-  - cronjob
-  - delegation
-  - file
-  - image_gen
-  - memory
-  - session_search
-  - skills
-  - terminal
-  - todo
-  - tts
-  - vision
-  - web
-  - x_search
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - cronjob
+    - delegation
+    - file
+    - image_gen
+    - memory
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - vision
+    - web
+    - x_search
 known_plugin_toolsets:
   cli:
-  - spotify
+    - spotify
 session_reset:
   mode: none
+
+# ── Security ──────────────────────────────────────────────────────────
+# Secret redaction is ON by default — strings that look like API keys,
+# tokens, and passwords are masked in tool output, logs, and chat
+# responses before the model or user ever sees them. Set redact_secrets
+# to false to disable (e.g. when developing the redactor itself).
+# tirith pre-exec scanning is enabled by default when the tirith binary
+# is available. Configure via security.tirith_* keys or env vars
+# (TIRITH_ENABLED, TIRITH_BIN, TIRITH_TIMEOUT, TIRITH_FAIL_OPEN).
+#
+# security:
+#   redact_secrets: true
+#   tirith_enabled: true
+#   tirith_path: "tirith"
+#   tirith_timeout: 5
+#   tirith_fail_open: true

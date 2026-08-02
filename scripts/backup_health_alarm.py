@@ -96,9 +96,20 @@ def evaluate() -> Dict[str, Any]:
     elif hd_ahead is None:
         warns.append("HermesData origin lag n/a")
 
-    # Vault github lag vs master
+    # Vault github lag vs master (post-purge 2026-08-02: poison removed from origin/master)
     v_ahead, v_ref = origin_ahead(VAULT, "master", "master")
-    layers["vault_github_master"] = {"ahead": v_ahead, "ref": v_ref}
+    # Explicit master tip lag (not working-tree HEAD which may be overhaul/*)
+    master_ahead_out = run_git(VAULT, ["rev-list", "--count", "origin/master..master"])
+    master_ahead = int(master_ahead_out) if master_ahead_out.isdigit() else None
+    poison_state = load_json(HERMES / "state" / "vault_poison_guard_last.json")
+    origin_big = int(poison_state.get("origin_big_count") or 0) if poison_state else None
+    layers["vault_github_master"] = {
+        "ahead_head": v_ahead,
+        "ahead_master_branch": master_ahead,
+        "ref": v_ref,
+        "origin_big_blobs": origin_big,
+        "poison_guard_ok": poison_state.get("ok") if poison_state else None,
+    }
     clean = load_json(CLEAN_MIRROR_STATE)
     clean_ok = bool(clean.get("ok")) and bool(clean.get("remote_branch"))
     clean_age = None
@@ -117,21 +128,34 @@ def evaluate() -> Dict[str, Any]:
         "source_sha": (clean.get("source_sha") or "")[:12] or None,
         "skipped": clean.get("skipped"),
     }
-    if v_ahead is not None and v_ahead > 0:
+    # History poison only if origin still has huge blobs
+    if origin_big is not None and origin_big > 0:
         if clean_ok:
             warns.append(
-                f"vault master ahead={v_ahead} (history poison); clean mirror branch OK ({clean.get('remote_branch')})"
+                f"origin/master still has {origin_big} >50MB blobs; clean mirror OK ({clean.get('remote_branch')})"
             )
         else:
-            issues.append(
-                f"PhronesisVault ahead of {v_ref} by {v_ahead} and no clean mirror push"
-            )
+            issues.append(f"origin/master has {origin_big} >50MB blobs and no clean mirror")
+    elif master_ahead is not None and master_ahead > 20:
+        warns.append(f"local master ahead of origin/master by {master_ahead} (push/align when ready)")
     if clean_ok and clean_age is not None and clean_age > CLEAN_MIRROR_STALE_HOURS:
         issues.append(
             f"vault clean mirror stale {clean_age:.1f}h > {CLEAN_MIRROR_STALE_HOURS}h"
         )
     elif not clean_ok and not clean:
         warns.append("vault clean mirror never ran")
+
+    # K free-space governor (soft)
+    gov = load_json(HERMES / "state" / "k_free_space_governor_last.json")
+    layers["k_governor"] = {
+        "color": gov.get("color"),
+        "free_tb": (gov.get("usage") or {}).get("free_tb"),
+        "ok": gov.get("ok"),
+    }
+    if gov.get("color") == "RED":
+        issues.append("K free-space governor RED")
+    elif gov.get("color") == "YELLOW":
+        warns.append("K free-space governor YELLOW")
 
     # Critical zip
     cz = load_json(CRITICAL_ZIP_STATE)

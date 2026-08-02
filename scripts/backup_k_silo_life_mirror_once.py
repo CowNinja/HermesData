@@ -34,6 +34,11 @@ SIGNAL_DIRS = [
     "Goals",
     "Extended",
     "Archive",
+    "Life-Archive",
+    "Medical",
+    "Medical-Records",
+    "Navy-Service",
+    "Digital-Footprint",
 ]
 
 SIGNAL_NAME_PREFIXES = (
@@ -41,11 +46,13 @@ SIGNAL_NAME_PREFIXES = (
     "Goals-",
     "HERMES_",
     "INDEX",
+    "Digital-Twin",
 )
-SIGNAL_SUFFIXES = (".md", ".json", ".txt")
-MAX_FILE_BYTES = 8 * 1024 * 1024  # 8MB per file
-MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024  # 2GB budget per run
-MAX_FILES = 4000
+SIGNAL_SUFFIXES = (".md", ".json", ".txt", ".csv", ".yaml", ".yml")
+MAX_FILE_BYTES = 12 * 1024 * 1024  # 12MB per file
+MAX_TOTAL_BYTES = 4 * 1024 * 1024 * 1024  # 4GB budget per run (deepened 2026-08-02)
+MAX_FILES = 8000
+MAX_DEPTH = 6
 SKIP_DIR_NAMES = {
     "node_modules",
     ".git",
@@ -63,6 +70,10 @@ SKIP_DIR_NAMES = {
     "test-ingest",
     "test-ingest-2026-06-25",
     "test-ingest-2026-06-26-medical-comms-tranche",
+    "embeddings",
+    "vectors",
+    "models",
+    "weights",
 }
 
 
@@ -111,15 +122,26 @@ def main() -> int:
                     continue
                 candidates.append(p)
 
-    for sub in ("Core-Personal", "Extended", "Life-Archive", "Medical", "Navy-Service", "Digital-Footprint"):
+    walk_subs = (
+        "Core-Personal",
+        "Extended",
+        "Life-Archive",
+        "Medical",
+        "Medical-Records",
+        "Navy-Service",
+        "Digital-Footprint",
+        "Archive",
+        "Goals",
+    )
+    for sub in walk_subs:
         d = root / sub
         if not d.is_dir():
             continue
         for dirpath, dirnames, filenames in os.walk(d):
             dirnames[:] = [x for x in dirnames if not should_skip_dir(x)]
-            # depth limit ~4
+            # depth limit (deepened 4 -> MAX_DEPTH)
             rel_depth = Path(dirpath).relative_to(root).parts
-            if len(rel_depth) > 4:
+            if len(rel_depth) > MAX_DEPTH:
                 dirnames[:] = []
                 continue
             for fn in filenames:

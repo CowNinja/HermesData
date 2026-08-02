@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """Resilience backup orchestrator — no_agent cron every 4h.
 
-v7 cadence (Jeff 2026-08-01):
-  A) git allowlist commit+push HermesData only (vault master push skipped — poison history)
+v8 cadence (Jeff green light 2026-08-02 — master purged, fossil deleted):
+  A) git allowlist commit+push HermesData only (vault master still local-only; offsite=cns-mirror)
   B) k_resilience_layout_once (dirs + fossil quarantine)
   C) backup_critical_state_zip (replaces hanging hermes --quick)
   D) backup_k_mirror_once (D->K selective slices)
-  E) backup_k_silo_life_mirror_once (budgeted silo signal)
+  E) backup_k_silo_life_mirror_once (deepened budgeted silo signal)
   F) vault_github_clean_mirror_push --if-due --min-hours 12  (~2x/day when dirty)
   G) cloud_recovery_pack_sync (best-effort)
-  H) backup_health_alarm --notify
+  H) k_free_space_governor
+  I) vault_poison_recurrence_guard
+  J) k_manifest_root_write
+  K) backup_health_alarm --notify
+  L) backup_restore_drill (read-only; weekly-ish via env)
 
 Env:
   BACKUP_SKIP_K=1
@@ -17,8 +21,12 @@ Env:
   BACKUP_SKIP_VAULT_MIRROR=1
   BACKUP_SKIP_SILO=1
   BACKUP_SKIP_CLOUD=1
+  BACKUP_SKIP_GOVERNOR=1
+  BACKUP_SKIP_POISON_GUARD=1
+  BACKUP_SKIP_DRILL=1
   BACKUP_K_TIMEOUT=900
   BACKUP_VAULT_MIRROR_MIN_HOURS=12
+  BACKUP_RUN_DRILL=1          # force restore drill this cycle
 """
 from __future__ import annotations
 
@@ -194,7 +202,7 @@ def _write_receipt(ok: bool) -> None:
         "errors": ERRORS[:20],
         "error_count": len(ERRORS),
         "phases": PHASES,
-        "version": 7,
+        "version": 8,
         "cadence": {
             "k_hours": 4,
             "hermesdata_git_hours": 4,
@@ -210,7 +218,7 @@ def _write_receipt(ok: bool) -> None:
 
 
 def main() -> int:
-    log(f"## Resilience Backup v7 {TS}")
+    log(f"## Resilience Backup v8 {TS}")
 
     # A) git — HermesData pushes; vault local-only (offsite = clean mirror)
     PHASES["git"] = {"started": True}
@@ -247,7 +255,7 @@ def main() -> int:
         k_timeout = int(os.environ.get("BACKUP_K_TIMEOUT", "900"))
         _run_phase("k_mirror", SCRIPTS / "backup_k_mirror_once.py", timeout=k_timeout)
 
-    # E) silo signal
+    # E) silo signal (deepened)
     if os.environ.get("BACKUP_SKIP_SILO") == "1":
         PHASES["silo_signal"] = {"ok": True, "skipped": True}
     else:
@@ -255,7 +263,7 @@ def main() -> int:
             "silo_signal",
             SCRIPTS / "backup_k_silo_life_mirror_once.py",
             extra_args=["--json"],
-            timeout=600,
+            timeout=900,
         )
 
     # F) vault GitHub clean mirror ~2x/day
@@ -280,11 +288,36 @@ def main() -> int:
     else:
         PHASES["cloud_pack"] = {"ok": True, "skipped": True}
 
-    # H) write receipt BEFORE alarm so health sees this cycle
+    # H) K free-space governor
+    if os.environ.get("BACKUP_SKIP_GOVERNOR") == "1":
+        PHASES["k_governor"] = {"ok": True, "skipped": True}
+    else:
+        _run_phase(
+            "k_governor",
+            SCRIPTS / "k_free_space_governor.py",
+            extra_args=["--json"],
+            timeout=180,
+        )
+
+    # I) poison recurrence guard (fix gitignore quietly)
+    if os.environ.get("BACKUP_SKIP_POISON_GUARD") == "1":
+        PHASES["poison_guard"] = {"ok": True, "skipped": True}
+    else:
+        _run_phase(
+            "poison_guard",
+            SCRIPTS / "vault_poison_recurrence_guard.py",
+            extra_args=["--json", "--fix-gitignore", "--unstage-blocked"],
+            timeout=300,
+        )
+
+    # J) single recovery index on K
+    _run_phase("manifest_root", SCRIPTS / "k_manifest_root_write.py", timeout=60)
+
+    # K) write receipt BEFORE alarm so health sees this cycle
     soft = len(ERRORS) > 0
     _write_receipt(ok=not soft)
 
-    # I) health (reads receipt)
+    # L) health (reads receipt)
     if os.environ.get("BACKUP_SKIP_ALARM") == "1":
         PHASES["alarm"] = {"ok": True, "skipped": True}
     else:
@@ -296,6 +329,20 @@ def main() -> int:
         )
         # refresh receipt with alarm phase
         _write_receipt(ok=(len(ERRORS) == 0))
+
+    # M) restore drill — every cycle if BACKUP_RUN_DRILL=1, else skip (manual/weekly)
+    if os.environ.get("BACKUP_SKIP_DRILL") == "1":
+        PHASES["restore_drill"] = {"ok": True, "skipped": True}
+    elif os.environ.get("BACKUP_RUN_DRILL") == "1":
+        _run_phase(
+            "restore_drill",
+            SCRIPTS / "backup_restore_drill.py",
+            extra_args=["--json", "--stage"],
+            timeout=180,
+        )
+        _write_receipt(ok=(len(ERRORS) == 0))
+    else:
+        PHASES["restore_drill"] = {"ok": True, "skipped": True, "reason": "set BACKUP_RUN_DRILL=1"}
 
     log("\n## Summary")
     if ERRORS:
