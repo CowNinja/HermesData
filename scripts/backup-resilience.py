@@ -280,7 +280,11 @@ def main() -> int:
     else:
         PHASES["cloud_pack"] = {"ok": True, "skipped": True}
 
-    # H) health
+    # H) write receipt BEFORE alarm so health sees this cycle
+    soft = len(ERRORS) > 0
+    _write_receipt(ok=not soft)
+
+    # I) health (reads receipt)
     if os.environ.get("BACKUP_SKIP_ALARM") == "1":
         PHASES["alarm"] = {"ok": True, "skipped": True}
     else:
@@ -290,21 +294,19 @@ def main() -> int:
             extra_args=["--notify", "--json"],
             timeout=120,
         )
+        # refresh receipt with alarm phase
+        _write_receipt(ok=(len(ERRORS) == 0))
 
     log("\n## Summary")
-    ok = len(ERRORS) == 0
     if ERRORS:
         log(f"SOFT_ISSUES: {len(ERRORS)} (exit 0; alarm carries color)")
         for e in ERRORS:
             log(f"  - {e}")
         print(f"\n[SOFT_ISSUES: {len(ERRORS)}]")
-        _write_receipt(False)
     else:
         log("All phases completed without errors")
         print("\n[OK]")
-        _write_receipt(True)
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
