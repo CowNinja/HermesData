@@ -696,14 +696,16 @@ def resurface_forgotten_ideas(root: Path, silo_name: str, state: Dict[str, Any])
             f"Living CNS focus: D:\\PhronesisVault only by default.\n\n"
         )
         body = header + "\n".join(entries[:max_surface]) + "\n"
-        if DRY_RUN:
-            print(f"[VAULTWALKER] resurface dry-run candidates={len(entries)} (no write)")
-        else:
-            try:
-                resurf_log.parent.mkdir(parents=True, exist_ok=True)
-                resurf_log.write_text(body, encoding="utf-8")
-            except OSError as e:
-                print(f"[VAULTWALKER] resurface log write fail: {e}")
+        # Dry-safe: always write resurface/harvest LOG only (no file moves).
+        try:
+            resurf_log.parent.mkdir(parents=True, exist_ok=True)
+            resurf_log.write_text(body, encoding="utf-8")
+            print(
+                f"[VAULTWALKER] resurface log candidates={len(entries)} "
+                f"dry={DRY_RUN} path={resurf_log}"
+            )
+        except OSError as e:
+            print(f"[VAULTWALKER] resurface log write fail: {e}")
     return stats
 
 def evaluate_and_relocate_misplaced(root: Path, silo_name: str, dry_run: bool = False) -> Dict:

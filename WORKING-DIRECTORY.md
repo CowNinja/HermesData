@@ -16,8 +16,25 @@
 - Run all ingestion, tagging, classification, and automation from this location.
 - Use `D:\HermesData\scripts\` for runtime Python (classify_ingest.py, content_extraction_helper.py, discovery_walker.py, crons).
 - Operational state: `D:\HermesData\data\` (sync to vault manifests after each tranche).
-- Staging: `D:\HermesData\tmp\` relays and batch manifests → promote receipts to vault.
+- Staging: `D:\HermesData\tmp\` relays and batch manifests -> promote receipts to vault.
 - Never run live ingest execution from the Obsidian vault (`D:\PhronesisVault\scripts` = router + hygiene only).
+- **ASCII-only** executable scripts (`.py` `.ps1` `.cmd` `.bat` `.vbs`); preserve newlines. Policy: `PhronesisVault/Operations/Code-Scripts-ASCII-Policy.md`.
+
+### Connectivity SSOT (2026-08-02) - prevent Discord/WA thrash
+
+| Need | Command / path |
+|------|----------------|
+| Start/recycle gateway (WhatsApp-safe) | `scripts/Start-HermesGateway-Reliable.ps1` (`-Force` to recycle) |
+| Stack board | `python scripts/stack_snapshot.py` |
+| Compaction posture | `python scripts/compaction_diagnose.py` |
+| Popup/UAC storm | `scripts/ops/Steer-UAC.ps1 -Quiet` / `-Status` |
+| Connectivity canon | `PhronesisVault/Operations/Hermes-Connectivity-Discord-WhatsApp-CANONICAL-2026-08-02.md` |
+| Popup spawn canon | `PhronesisVault/Operations/Popup-Spawn-Trace-and-Suppress-CANONICAL-2026-08-02.md` |
+| Single gateway policy | `PhronesisVault/Operations/SINGLE-GATEWAY-RESTORE.md` |
+| Secrets env | `ENV-LOCATION.txt` -> only `D:\HermesData\.env` |
+
+**Never** start gateway with bare schtask pythonw missing `HERMES_HOME` (WhatsApp dies).  
+**Never** trust stale `gateway_state.json` alone for WhatsApp.
 
 **Companion location:**  
 `D:\PhronesisVault` = Brain / Obsidian vault (plans, canonical manifests, receipts, MOCs).

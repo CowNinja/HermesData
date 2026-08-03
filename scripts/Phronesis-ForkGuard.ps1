@@ -263,6 +263,21 @@ function Set-HermesGatewayEnv {
     # Never let boot integrity BLOCK Discord (timeout under concurrent restarts -> mute).
     $env:PHRONESIS_BOOT_INTEGRITY_MODE = "fast"
     $env:PHRONESIS_BOOT_INTEGRITY_FAIL = "warn"
+    # WhatsApp check_whatsapp_requirements() needs node on PATH. Task Scheduler /
+    # limited shells often omit it; without this WA adapter fails intermittently.
+    $nodeDirs = @(
+        'D:\Program Files\nodejs',
+        (Join-Path ${env:ProgramFiles} 'nodejs')
+    ) | Where-Object { $_ -and (Test-Path (Join-Path $_ 'node.exe')) }
+    foreach ($nd in $nodeDirs) {
+        if ($env:Path -notlike "*$nd*") {
+            $env:Path = "$nd;$env:Path"
+        }
+    }
+    # Fast local compaction (prune-first + short summarizer prompts). See
+    # agent/context_compressor.py and Operations/Fast-Compaction-CANONICAL-2026-08-02.md
+    if (-not $env:HERMES_COMPRESS_FAST) { $env:HERMES_COMPRESS_FAST = '1' }
+    if (-not $env:PHRONESIS_COMPRESS_FAST) { $env:PHRONESIS_COMPRESS_FAST = '1' }
 }
 
 function Clear-StaleGatewayMarkers {
@@ -406,26 +421,39 @@ function Start-VenvGateway {
     if ((Test-VenvOwnsGateway) -and (Test-GatewayHealth)) {
         return
     }
-    # SSOT 2026-07-21: sole durable owner is schtask Hermes_Gateway
-    # (argv: -m hermes_cli.main gateway run). Never dual-boot via -m gateway.run
-    # while that task exists - dual argv was the recurring multi-gateway root.
+    # Prefer Start-HermesGateway-Reliable.ps1 (sets HERMES_HOME + Node PATH).
+    # Bare schtask/pythonw often lacks HERMES_HOME and WhatsApp fails.
+    # 2026-08-02: reliable start path verified with 3 platforms incl. whatsapp.
+    $rel = Join-Path $PSScriptRoot "Start-HermesGateway-Reliable.ps1"
+    if (Test-Path $rel) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $rel
+        if ((Get-PortListenerPid -Port $gwPort) -and (Test-GatewayHealth)) { return }
+    }
+    $gwCmd = Join-Path $HermesRoot "gateway-service\Start-Gateway-WhatsApp.cmd"
+    if (-not (Test-Path $gwCmd)) { $gwCmd = Join-Path $HermesRoot "gateway-service\Hermes_Gateway.cmd" }
+    if (Test-Path $gwCmd) {
+        Start-Process -FilePath $gwCmd -WorkingDirectory $HermesRoot -WindowStyle Hidden | Out-Null
+        for ($i = 1; $i -le 40; $i++) {
+            Start-Sleep -Milliseconds 500
+            if ((Get-PortListenerPid -Port $gwPort) -and (Test-GatewayHealth)) { return }
+        }
+    }
+    # Fallback: schtask Hermes_Gateway (may lack env - WA can fail)
     $task = Get-ScheduledTask -TaskName "Hermes_Gateway" -ErrorAction SilentlyContinue
     if ($task) {
         try {
             if ($task.State -ne "Running") {
                 Start-ScheduledTask -TaskName "Hermes_Gateway" -ErrorAction Stop
             }
-            # Give task a moment to bind; if health comes up, done.
             for ($i = 1; $i -le 20; $i++) {
                 Start-Sleep -Milliseconds 500
                 if ((Get-PortListenerPid -Port $gwPort) -and (Test-GatewayHealth)) { return }
             }
         } catch {
-            # fall through to direct start with SAME argv as the task
+            # fall through
         }
     }
     $pyw = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
-    # Match Hermes_Gateway task argv exactly (not -m gateway.run).
     Start-HiddenProcess -FilePath $pyw `
         -ArgumentList @("-m", "hermes_cli.main", "gateway", "run") `
         -WorkingDirectory $HermesRoot | Out-Null
@@ -465,12 +493,28 @@ sh.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -F
 }
 
 function Restart-VenvGateway {
-    # Uses Hermes planned-stop markers - avoids ForkGuard/gateway startup races.
+    # Planned stop then start via Hermes_Gateway.cmd so HERMES_HOME + Node PATH
+    # are set (required for WhatsApp). In-process `gateway restart` re-execs the
+    # same bare argv and keeps a missing HERMES_HOME, so WA stays dead.
     Set-HermesGatewayEnv
+    $gwPort = Get-GatewayPort
     $pyw = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
-    Start-HiddenProcess -FilePath $pyw `
-        -ArgumentList @("-m", "hermes_cli.main", "gateway", "restart") `
-        -WorkingDirectory $HermesRoot | Out-Null
+    if ((Get-PortListenerPid -Port $gwPort) -or (Test-VenvOwnsGateway)) {
+        try {
+            Push-Location $HermesRoot
+            $job = Start-Job { param($p) & $p -m hermes_cli.main gateway stop 2>&1 } -ArgumentList $pyw
+            $null = Wait-Job $job -Timeout 30
+            if ((Get-Job $job.Id).State -eq 'Running') { Stop-Job $job; Remove-Job $job -Force }
+            else { Receive-Job $job | Out-Null; Remove-Job $job -Force }
+        } catch {
+            # fall through to zombie cleanup
+        } finally {
+            Pop-Location
+        }
+        Start-Sleep -Seconds 2
+        @(Remove-StaleGatewayZombies) | Out-Null
+    }
+    Start-VenvGateway
 }
 
 function Start-VenvDashboard {

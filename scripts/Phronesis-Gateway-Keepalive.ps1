@@ -62,11 +62,39 @@ try {
                     $metaAlive = [bool](Get-Process -Id $mpid -ErrorAction SilentlyContinue)
                 } catch {}
             }
+            # Cadence floor for any Ensure call (anti thrash vs ops scripts).
+            $ensureStamp = Join-Path $hermesRoot "state\keepalive_ensure_last.txt"
+            $ensureMinSec = 300
+            $mayEnsure = $true
+            try {
+                if (Test-Path $ensureStamp) {
+                    $last = 0L
+                    $raw = (Get-Content $ensureStamp -Raw -ErrorAction SilentlyContinue).Trim()
+                    if ([int64]::TryParse($raw, [ref]$last)) {
+                        $now = [int64]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+                        if (($now - $last) -lt $ensureMinSec) { $mayEnsure = $false }
+                    }
+                }
+            } catch {}
+
             if (-not $svcAlive) {
-                Write-Keepalive "gateway-service DEAD -> Start-Gateway-Service-Hidden.vbs"
-                $vbs = Join-Path $root "Start-Gateway-Service-Hidden.vbs"
-                if (Test-Path $vbs) {
-                    Start-Process -FilePath "wscript.exe" -ArgumentList @("//B", $vbs) -WindowStyle Hidden | Out-Null
+                if ($mayEnsure) {
+                    Write-Keepalive "gateway-service DEAD -> Ensure-HermesStack-Single (no Force)"
+                    $ensure = Join-Path $root "Ensure-HermesStack-Single.ps1"
+                    if (Test-Path $ensure) {
+                        try {
+                            $nowW = [int64]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+                            Set-Content -Path $ensureStamp -Value "$nowW" -Encoding ascii -NoNewline
+                        } catch {}
+                        & powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $ensure | Out-Null
+                    } else {
+                        $vbs = Join-Path $root "Start-Gateway-Service-Hidden.vbs"
+                        if (Test-Path $vbs) {
+                            Start-Process -FilePath "wscript.exe" -ArgumentList @("//B", $vbs) -WindowStyle Hidden | Out-Null
+                        }
+                    }
+                } else {
+                    Write-Keepalive "gateway-service DEAD but Ensure cadence hold (${ensureMinSec}s)"
                 }
             }
             if (-not $metaAlive) {
@@ -80,6 +108,12 @@ try {
             $listen = [bool](Get-PortListenerPid -Port $port)
             $health = $false
             try { $health = [bool](Test-GatewayHealth) } catch { $health = $false }
+            # Do NOT call Ensure -Force from keepalive on every blip - that
+            # races Reliable/service and was a restart storm source (2026-08-02).
+            # Log only; manual Ensure -Force or service outer loop handles recovery.
+            if ($svcAlive -and -not $health -and -not $listen) {
+                Write-Keepalive "WARN service alive but :8642 down (no Force; wait for service loop)"
+            }
             Write-Keepalive "OK service=$svcAlive meta=$metaAlive listen=$listen health=$health"
             try {
                 $hb = Join-Path $hermesRoot "state\gateway-keepalive-heartbeat.json"

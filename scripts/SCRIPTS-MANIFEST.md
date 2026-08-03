@@ -81,3 +81,23 @@ Retired scripts: `D:\HermesData\scripts\archive\` (see `archive/README.md`)
 ## Ports
 
 8090 brain · 8091 proxy · 8642 gateway/Discord · 9119 dashboard · 3001 workspace
+
+---
+
+## Partner / continuity (Alice day-to-day)
+
+Stack boot stays above. Partner glue lives here and in  
+`D:\PhronesisVault\Operations\identity\Partner-Daily-Ops-MAP-2026-08-02.md`.
+
+| You want… | Run |
+|-----------|-----|
+| After `/reset` or gateway restart | `python D:\HermesData\scripts\alice_open_loops.py continuity` |
+| Partner decision card | `python D:\HermesData\scripts\alice_open_loops.py card` |
+| System pulse (us_now + stack/silo files, no probe) | `python D:\HermesData\scripts\alice_open_loops.py glance` |
+| Set emotional handoff field | `python D:\HermesData\scripts\alice_open_loops.py us-now --beat "..." --mood "..." --decided "..." --next "..." --avoid "..."` |
+| Soul-forge thread seed | `python D:\HermesData\scripts\thread_local_memory.py show --channel 1533447417524125796` |
+| Fullstack health probe | `python D:\HermesData\scripts\phronesis_fullstack_health.py` |
+| Silo autonomous status | `python D:\HermesData\scripts\silo_autonomous_status.py` |
+| Session hygiene prove | `python D:\HermesData\scripts\session_hygiene_sop.py --json` |
+
+Identity LIVE map: `D:\PhronesisVault\Operations\identity\00-INDEX.md`

@@ -157,7 +157,7 @@ def evaluate() -> Dict[str, Any]:
     elif gov.get("color") == "YELLOW":
         warns.append("K free-space governor YELLOW")
 
-    # K capacity trend (rolling free-TB slope + days-to-80%) — soft unless RED
+    # K capacity trend (rolling free-TB slope + days-to-80%) - soft unless RED
     cap = load_json(HERMES / "state" / "k_capacity_trend_last.json")
     if cap:
         layers["k_capacity_trend"] = {

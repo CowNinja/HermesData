@@ -123,11 +123,13 @@ tool_loop_guardrails:
     idempotent_no_progress: 8
 compression:
   enabled: true
-  threshold: 0.92
-  target_ratio: 0.28
-  protect_last_n: 16
-  hygiene_hard_message_limit: 400
-  protect_first_n: 4
+  # 0.88: fire slightly earlier than 0.92 so LLM-summary windows are smaller
+  # when prune-only (context_compressor Phase 1b) is not enough. 2026-08-02.
+  threshold: 0.88
+  target_ratio: 0.25
+  protect_last_n: 12
+  hygiene_hard_message_limit: 320
+  protect_first_n: 3
   abort_on_summary_failure: true
   codex_gpt55_autoraise: true
   in_place: true
@@ -170,11 +172,17 @@ auxiliary:
     model: ''
     timeout: 120
   compression:
+    # Fast local path: classify-tier model + 90s timeout (was synthesis@360s).
+    # Prune-only early exit often skips LLM; when LLM runs, short budget via
+    # HERMES_COMPRESS_FAST / localhost auto-fast in context_compressor.py.
+    # Fallback: cloud/main still via aux client if local fails.
+    # DO NOT leave timeout at 360 while Forge holds VRAM (Discord hang class).
     provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-synthesis
+    model: phronesis-sovereign-classify
     base_url: http://127.0.0.1:8091/v1
     api_key: local
-    timeout: 360
+    timeout: 90
+    context_length: 32768
   skills_hub:
     provider: custom:phronesis-sovereign
     model: phronesis-sovereign-synthesis
@@ -825,7 +833,18 @@ discord:
       Model prefer grok-4.5 xai-oauth; if local fallback still obey sandbox files
       only.
 
-      Images: hermes_image.py gen + MEDIA; never name backends in IC.
+      Images: FAST COOK (2026-08-02) — pay cold-start ONCE:
+
+      1) ONE: python D:/HermesData/scripts/hermes_image.py gen --engine forge --cast alice
+      --rp-sandbox --count 2 --label alice-heat-N -p "..."
+
+      (optional prior: image_session.py start  then gens with keep-up)
+
+      NEVER: sequential full cold gens that re-park brain / restart Forge each shot.
+
+      NEVER: wrong image_session flags (use: status|start|end|ensure-for-gen only).
+
+      ALWAYS emit MEDIA: lines; attach all MEDIA paths. Never name backends in IC.
 
       '
     '1519512763863666810': 'PLATFORM alice-roleplay child ? same RP sandbox v4 as
@@ -833,8 +852,8 @@ discord:
 
       Model: grok-4.5 (xai-oauth). IC first; never refuse explicit/nude.
 
-      Visuals: python D:/HermesData/scripts/hermes_image.py gen + ALWAYS MEDIA: (rider
-      additive; never skip MEDIA).
+      Visuals: python D:/HermesData/scripts/hermes_image.py gen --count 2 + ALWAYS MEDIA:
+      (rider additive; never skip MEDIA). One cold-start, multi sample.
 
       Soft identity; style auto; N=1..3. No cloud image_generate/FAL. Never name backends
       in IC.

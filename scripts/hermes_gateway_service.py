@@ -245,9 +245,21 @@ def run_gateway_once() -> int:
     env["HERMES_CONFIG_PATH"] = str(ROOT / "config.yaml")
     env["PYTHONIOENCODING"] = "utf-8"
     env["HERMES_GATEWAY_DETACHED"] = "1"
+    env["HERMES_COMPRESS_FAST"] = "1"
+    env["PHRONESIS_COMPRESS_FAST"] = "1"
     env["PHRONESIS_BOOT_INTEGRITY"] = "0"
     env["PHRONESIS_BOOT_INTEGRITY_FAIL"] = "warn"
     env["PHRONESIS_BOOT_INTEGRITY_MODE"] = "fast"
+    # WhatsApp Baileys bridge requires Node on PATH (2026-08-02: service spawn
+    # without Node => "requirements not met" and only 2 platforms).
+    _node_dirs = [
+        ROOT / "node",
+        Path(r"D:\Program Files\nodejs"),
+        Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / "node",
+    ]
+    _path_bits = [str(p) for p in _node_dirs if p.is_dir() and (p / "node.exe").is_file()]
+    if _path_bits:
+        env["PATH"] = os.pathsep.join(_path_bits + [env.get("PATH", "")])
     # Crash dumps for silent pythonw deaths (research: discord bots die without traceback on Windows).
     # PYTHONFAULTHANDLER dumps go to stderr ? this child log (see log_path below).
     env["PYTHONFAULTHANDLER"] = "1"

@@ -34,6 +34,12 @@ LIVING_ROOTS = {
     "Meta",
     "Diagnostics",
     "AI-Zone",
+    # real tops that census flagged missing (Jeff harvest / CNS walk)
+    "Creative",
+    "Actions",
+    "Workflows",
+    "Catalog",
+    "checkpoints",
 }
 
 SKIP = {
@@ -52,6 +58,9 @@ SKIP = {
     "temp",
     "temp_sources",
     "scripts",
+    "logs",
+    "backups",
+    "_archive",
 }
 
 

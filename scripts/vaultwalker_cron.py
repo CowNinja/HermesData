@@ -366,9 +366,27 @@ def main() -> int:
         f"moved={feedback.get('totals', {}).get('moved')} exit={rc}"
     )
     _refresh_indexes()
+    _write_harvest_digest()
     return 0 if rc == 0 else rc
 
 
+
+
+
+def _write_harvest_digest() -> None:
+    """Dry-safe idea harvest for Jeff (no LIVE). Best-effort after each cron run."""
+    try:
+        h = ROOT / "scripts" / "vaultwalker_harvest_digest.py"
+        if h.is_file():
+            subprocess.run(
+                [sys.executable, str(h)],
+                capture_output=True,
+                text=True,
+                timeout=180,
+                cwd=str(ROOT),
+            )
+    except Exception:
+        pass
 
 
 def _refresh_indexes() -> None:
