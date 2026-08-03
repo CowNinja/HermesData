@@ -1,7 +1,7 @@
 {
   "name": "qwythos-9b-3060-12gb",
   "phase": 3,
-  "as_of": "2026-07-25",
+  "as_of": "2026-08-03",
   "hardware": {
     "gpu": "NVIDIA RTX 3060 12GB GDDR6",
     "system_ram_gb": 128,
@@ -15,7 +15,7 @@
   },
   "launch_entry": "D:\\HermesData\\scripts\\start_qwythos_8090_hidden.vbs",
   "args": {
-    "ctx_size": 65536,
+    "ctx_size": 131072,
     "n_gpu_layers": 99,
     "parallel": 1,
     "cont_batching": true,
@@ -31,7 +31,7 @@
   },
   "rationale": {
     "ngl_99": "Single dense 9B Q6_K fits fully on 12GB; models-max 1 law.",
-    "ctx_65536": "Hermes agent multi-tool floor is 64k context.",
+    "ctx_131072": "128k local window on 3060 12GB via q8_0 KV + kv-offload (system RAM). Hermes floor remains >=64k. Raised from 65536 2026-08-03.",
     "kv_q8_0": "Canon-safe KV quant; large VRAM win vs f16; avoid q4_0 (tunnel vision).",
     "kv_offload": "Overflow KV pages to system RAM (128GB) without dual-GPU residents.",
     "mmap": "Map weights; leave free RAM for OS/RDP/Discord/Comfy coexistence.",
@@ -40,8 +40,8 @@
     "parallel_1": "One slot; dual parallel exploded KV OOM historically on 65k."
   },
   "budget": {
-    "target_vram_used_mib_idle": "6500-8500",
-    "target_vram_free_mib_min": 3000,
+    "target_vram_used_mib_idle": "7000-10000",
+    "target_vram_free_mib_min": 1500,
     "image_stack": "release Comfy before LLM heal (12GB law)"
   },
   "verify": [

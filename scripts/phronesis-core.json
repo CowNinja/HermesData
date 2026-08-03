@@ -21,8 +21,8 @@
   "allowed_models": [
     "Qwythos-9B-Q6_K"
   ],
-  "ctx_size": 65536,
-  "runtime_ctx_size": 65536,
+  "ctx_size": 131072,
+  "runtime_ctx_size": 131072,
   "use_runtime_ctx_split": false,
   "n_gpu_layers": 99,
   "proxy_script": "D:\\HermesData\\scripts\\sovereign_openai_proxy.py",
@@ -82,7 +82,7 @@
     {
       "label": "Qwythos-9B-Q6_K",
       "path": "D:\\PhronesisModels\\models\\current\\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q6_K.gguf",
-      "ctx_size": 65536,
+      "ctx_size": 131072,
       "n_gpu_layers": 99,
       "active": true
     },
@@ -93,7 +93,7 @@
       "n_gpu_layers": 28,
       "active": false,
       "permanently_disabled": true,
-      "disabled_reason": "Session 7 rotation lock \u00e2\u20ac\u201d 9B Q6_K @ 65536 only"
+      "disabled_reason": "Session 7 rotation lock - 9B Q6_K only (ctx raised 64k->128k 2026-08-03)"
     }
   ],
   "custom_crons": [

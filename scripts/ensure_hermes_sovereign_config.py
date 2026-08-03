@@ -28,7 +28,7 @@ HERMES_USER_CONFIG = Path.home() / ".hermes" / "config.yaml"
 SOVEREIGN_PROVIDER = "phronesis-sovereign"
 MOE_GATEWAY_URL = "http://127.0.0.1:8091/v1"
 CORE_CONFIG = Path(r"D:\HermesData\scripts\phronesis-core.json")
-DEFAULT_CONTEXT = 65536
+DEFAULT_CONTEXT = 131072  # SSOT: phronesis-core.json ctx_size (raised 2026-08-03)
 HERMES_MIN_CONTEXT = 64000
 
 
@@ -250,6 +250,23 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
                 compression.update(COMPRESSION_DEFAULTS)
                 compression["provider"] = f"custom:{SOVEREIGN_PROVIDER}"
                 changes.append("auxiliary.compression?8091-synthesis")
+            # Always pin compress window to live Qwythos n_ctx (Hermes floor >=64k)
+            if not cloud_primary or force_local:
+                try:
+                    cctx = int(compression.get("context_length") or 0)
+                except (TypeError, ValueError):
+                    cctx = 0
+                if cctx != MIN_CONTEXT:
+                    compression["context_length"] = MIN_CONTEXT
+                    changes.append("auxiliary.compression.context_length")
+                # Prefer auto@full-ctx over classify (classify was mis-detected as 32k)
+                m = str(compression.get("model") or "")
+                if "classify" in m.lower() or not m:
+                    compression["model"] = "phronesis-sovereign-auto"
+                    compression["provider"] = f"custom:{SOVEREIGN_PROVIDER}"
+                    compression["base_url"] = MOE_GATEWAY_URL
+                    compression["api_key"] = "local"
+                    changes.append("auxiliary.compression.model->auto")
 
     if force_local:
         fallback = patched.get("fallback_model")
@@ -404,11 +421,25 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
                             ctx = int(ov.get("context_length") or 0)
                         except Exception:
                             ctx = 0
-                        if ctx <= 0 or ctx > MIN_CONTEXT:
+                        if ctx != MIN_CONTEXT:
                             ov["context_length"] = MIN_CONTEXT
                         n_fixed += 1
+                # Raise/align all local override windows to SSOT (not only xai depins)
+                n_ctx_align = 0
+                for cid, ov in overrides.items():
+                    if not isinstance(ov, dict):
+                        continue
+                    try:
+                        ctx = int(ov.get("context_length") or 0)
+                    except Exception:
+                        ctx = 0
+                    if ctx != MIN_CONTEXT:
+                        ov["context_length"] = MIN_CONTEXT
+                        n_ctx_align += 1
                 if n_fixed:
                     changes.append(f"discord.channel_overrides.depin_xai={n_fixed}")
+                if n_ctx_align:
+                    changes.append(f"discord.channel_overrides.ctx_align={n_ctx_align}")
         # Stamp mandatory router entry doctrine
         if isinstance(local_sovereign, dict):
             entry = local_sovereign.get("router_entry")
