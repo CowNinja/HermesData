@@ -27,7 +27,7 @@ from proactive_routing_policy import (  # noqa: E402
 
 POLICY_PATH = Path(r"D:\HermesData\config\image_route_policy.json")
 
-# RP / identity heat — free cloud never owns these (unless headshot allowlist)
+# RP / identity heat - free cloud never owns these (unless headshot allowlist)
 RP_MARKERS = (
     "alice",
     "roleplay",

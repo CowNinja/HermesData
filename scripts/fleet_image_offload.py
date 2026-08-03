@@ -326,7 +326,7 @@ def _ai_horde_generate(
     pid = str(provider.get("id") or "ai-horde")
     api_key = os.environ.get(str(provider.get("api_key_env") or "AI_HORDE_API_KEY") or "") or "0000000000"
     width, height = _dims_for_aspect(aspect_ratio, {**provider, "multiple_of": 64})
-    # keep cheap for anonymous kudos — clamp by max side while PRESERVING aspect
+    # keep cheap for anonymous kudos - clamp by max side while PRESERVING aspect
     # (old min(w,max_w)+min(h,max_h) independently forced near-square / bad AR)
     max_w = int(provider.get("max_width") or 768)
     max_h = int(provider.get("max_height") or 768)

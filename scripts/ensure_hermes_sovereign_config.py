@@ -372,6 +372,61 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         if grok_auth.get("rate_limit_max_wait_sec") is None:
             grok_auth["rate_limit_max_wait_sec"] = 120
             changes.append("grok_auth.rate_limit_max_wait_sec->120")
+        # Treat quota/token exhaustion as retriable then fall through to local/free path
+        codes = list(grok_auth.get("fallback_http_codes") or [])
+        for code in (402, 429):
+            if code not in codes:
+                codes.append(code)
+                changes.append(f"grok_auth.fallback_http_codes+{code}")
+        grok_auth["fallback_http_codes"] = codes
+
+    # Discord channel_overrides must not bypass sovereign router with direct xai-oauth.
+    # Full RP classification lives in enforce_sovereign_router_entry.py; here we only
+    # strip hard Grok pins so Discord never defaults past :8091.
+    if force_local:
+        discord = patched.setdefault("discord", {})
+        if isinstance(discord, dict):
+            overrides = discord.get("channel_overrides") or {}
+            if isinstance(overrides, dict):
+                n_fixed = 0
+                for cid, ov in overrides.items():
+                    if not isinstance(ov, dict):
+                        continue
+                    prov = str(ov.get("provider") or "").lower()
+                    model = str(ov.get("model") or "").lower()
+                    if "xai" in prov or "grok" in model:
+                        ov["provider"] = "custom:phronesis-sovereign"
+                        if "roleplay" not in model and "rp" not in model:
+                            ov["model"] = "phronesis-sovereign-auto"
+                        else:
+                            ov["model"] = "phronesis-sovereign-roleplay"
+                        try:
+                            ctx = int(ov.get("context_length") or 0)
+                        except Exception:
+                            ctx = 0
+                        if ctx <= 0 or ctx > MIN_CONTEXT:
+                            ov["context_length"] = MIN_CONTEXT
+                        n_fixed += 1
+                if n_fixed:
+                    changes.append(f"discord.channel_overrides.depin_xai={n_fixed}")
+        # Stamp mandatory router entry doctrine
+        if isinstance(local_sovereign, dict):
+            entry = local_sovereign.get("router_entry")
+            if not isinstance(entry, dict) or not entry.get("mandatory"):
+                local_sovereign["router_entry"] = {
+                    "mandatory": True,
+                    "entry": "http://127.0.0.1:8091/v1",
+                    "provider": "custom:phronesis-sovereign",
+                    "default_model": "phronesis-sovereign-auto",
+                    "roleplay_model": "phronesis-sovereign-roleplay",
+                    "policy": {
+                        "private_explicit_secrets": "local_only",
+                        "grunt": "local_then_free",
+                        "novel_high_value": "grok_optional_via_proxy_t3",
+                        "token_exhaustion": "never_hard_fail_use_local_free",
+                    },
+                }
+                changes.append("local_sovereign.router_entry.mandatory")
 
     return patched, changes
 

@@ -3,7 +3,8 @@
 proactive_routing_policy.py - Classify requests for local-only vs T2 fleet offload.
 
 Local-first invariant (when in doubt, keep local):
-  - Roleplay, tools, vault/private paths, PII, explicit content -> local_only (Qwythos @ :8090)
+  - Roleplay, tools, vault/private paths, PII, HIPAA, explicit, secrets/credentials
+    -> local_only (Qwythos @ :8090) -- never free fleet, never paid cloud body
   - Public, non-sensitive research/synthesis with clear intent -> offload_compute (T2/T3)
   - Realtime context that should stay with local voice -> augment_local (existing prefetch)
   - Ambiguous or borderline prompts -> local_first (never guess offload)
@@ -20,21 +21,87 @@ ROUTING_AUGMENT_LOCAL = "augment_local"
 ROUTING_OFFLOAD_COMPUTE = "offload_compute"
 ROUTING_LOCAL_FIRST = "local_first"
 
+# Local-only law (Jeff): PII / HIPAA / explicit / secrets+credentials never leave Qwythos.
+# Free fleet + paid Grok are blocked when any of these fire.
 _SENSITIVE_MARKERS = (
+    # --- credentials / secrets / auth ---
     "password",
+    "passwd",
+    "passphrase",
     "api_key",
+    "api-key",
     "api key",
+    "apikey",
+    "access key",
+    "access_key",
     "secret",
+    "client_secret",
+    "client secret",
     "private_key",
+    "private key",
+    "ssh key",
+    "ssh-key",
+    "bearer token",
+    "auth token",
+    "refresh token",
+    "oauth token",
+    "session token",
+    "jwt",
+    "credential",
+    "credentials",
+    "connection string",
+    "conn string",
+    "database password",
+    "db password",
+    "smtp password",
+    "webhook secret",
+    "signing secret",
+    "encryption key",
+    "master key",
+    "service account",
+    "service_account",
+    ".env",
+    "auth.json",
+    "bitwarden",
+    "1password",
+    "lastpass",
+    "discord_bot_token",
+    "discord token",
+    "bot token",
+    "grok_api_key",
+    "xai_api_key",
+    "openrouter_api_key",
+    "openai_api_key",
+    "anthropic_api_key",
+    "groq_api_key",
+    "aws_secret",
+    "aws_access",
+    "azure_client_secret",
+    "gcp_service_account",
+    # --- PII / identity ---
     "ssn",
     "social security",
     "credit card",
+    "card number",
+    "cvv",
+    "date of birth",
+    "date-of-birth",
+    "drivers license",
+    "driver's license",
+    "passport number",
+    "bank account",
+    "routing number",
+    "tax id",
+    "ein ",
+    # --- HIPAA / health ---
     "medical record",
-    ".env",
-    "bitwarden",
-    "discord_bot_token",
-    "grok_api_key",
-    "openrouter_api_key",
+    "patient chart",
+    "patient records",
+    "protected health",
+    "hipaa",
+    "phi ",
+    " phi",
+    "ephi",
 )
 
 _EXPLICIT_MARKERS = (
@@ -45,14 +112,55 @@ _EXPLICIT_MARKERS = (
     "explicit",
     "nsfw",
     "erotic",
+    "porn",
+    "nude",
+    "nudity",
+    "xxx",
 )
 
 _PRIVATE_PATH_RE = re.compile(
-    r"(?i)(?:[d-z]:\\|~/|\./)?(?:phronesisvault|hermesdata|roleplay-sandbox|\.env|secrets?\\)",
+    r"(?i)(?:[d-z]:\\|~/|\./)?(?:phronesisvault|hermesdata|roleplay-sandbox|"
+    r"\.env|secrets?\\|auth\.json|credentials?\\)",
 )
 
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _PHONE_RE = re.compile(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
+
+# Live credential material (high confidence) -- always local-only
+_CREDENTIAL_VALUE_RE = re.compile(
+    r"(?ix)"
+    r"("
+    r"\bsk-[A-Za-z0-9_\-]{16,}\b"  # OpenAI-style
+    r"|\bxai-[A-Za-z0-9_\-]{16,}\b"  # xAI
+    r"|\bghk_[A-Za-z0-9]{20,}\b"  # GitHub fine-grained
+    r"|\bghp_[A-Za-z0-9]{20,}\b"  # GitHub classic
+    r"|\bgho_[A-Za-z0-9]{20,}\b"
+    r"|\bghu_[A-Za-z0-9]{20,}\b"
+    r"|\bglpat-[A-Za-z0-9_\-]{20,}\b"  # GitLab
+    r"|\bxox[baprs]-[A-Za-z0-9\-]{10,}\b"  # Slack
+    r"|\bAKIA[0-9A-Z]{16}\b"  # AWS access key id
+    r"|\bASIA[0-9A-Z]{16}\b"
+    r"|\bAIza[0-9A-Za-z_\-]{20,}\b"  # Google API
+    r"|\beyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b"  # JWT
+    r"|\bBearer\s+[A-Za-z0-9_\-\.=]{16,}\b"
+    r"|\b-----BEGIN\s+(?:RSA\s+|OPENSSH\s+|EC\s+|DSA\s+)?PRIVATE\s+KEY-----"
+    r")"
+)
+
+# assignment-style secrets: KEY=value / token: value
+_CREDENTIAL_ASSIGN_RE = re.compile(
+    r"(?ix)"
+    r"\b("
+    r"api[_-]?key|access[_-]?key|secret[_-]?key|client[_-]?secret|"
+    r"password|passwd|passphrase|auth[_-]?token|refresh[_-]?token|"
+    r"bearer|oauth|session[_-]?token|private[_-]?key|webhook[_-]?secret|"
+    r"connection[_-]?string|database[_-]?url|db[_-]?url|"
+    r"discord[_-]?token|bot[_-]?token|openrouter[_-]?api[_-]?key|"
+    r"openai[_-]?api[_-]?key|xai[_-]?api[_-]?key|groq[_-]?api[_-]?key|"
+    r"anthropic[_-]?api[_-]?key|aws[_-]?secret[_-]?access[_-]?key"
+    r")\b"
+    r"\s*[:=]\s*\S+"
+)
 
 _PUBLIC_OFFLOAD_INTENTS = (
     "summarize",
@@ -107,29 +215,41 @@ def _message_blob(messages: List[Dict[str, Any]]) -> str:
 
 
 def contains_sensitive_content(text: str) -> Tuple[bool, str]:
-    low = (text or "").lower()
+    """True when content must stay on local Qwythos (never free/cloud body).
+
+    Covers: secrets/credentials/API keys, PII, HIPAA, explicit, private paths.
+    """
+    raw = text or ""
+    low = raw.lower()
+    # High-confidence credential material first
+    if _CREDENTIAL_VALUE_RE.search(raw):
+        return True, "credential_material"
+    if _CREDENTIAL_ASSIGN_RE.search(raw):
+        return True, "credential_assignment"
     for marker in _SENSITIVE_MARKERS:
         if marker in low:
             return True, f"sensitive:{marker}"
     for marker in _EXPLICIT_MARKERS:
         if marker in low:
             return True, f"explicit:{marker}"
-    if _PRIVATE_PATH_RE.search(text or ""):
+    if _PRIVATE_PATH_RE.search(raw):
         return True, "private_path"
-    if _EMAIL_RE.search(text or ""):
+    if _EMAIL_RE.search(raw):
         return True, "email_pii"
-    if _PHONE_RE.search(text or ""):
+    if _PHONE_RE.search(raw):
         return True, "phone_pii"
     return False, ""
 
 
 def is_fleet_safe_for_offload(text: str) -> Tuple[bool, str]:
-    """Post-sanitize gate: block fleet dispatch if any private/explicit signal remains."""
+    """Post-sanitize gate: block fleet dispatch if any private/explicit/secret signal remains."""
     sensitive, reason = contains_sensitive_content(text)
     if sensitive:
         return False, reason
     if _PRIVATE_PATH_RE.search(text or ""):
         return False, "private_path_residual"
+    if _CREDENTIAL_VALUE_RE.search(text or "") or _CREDENTIAL_ASSIGN_RE.search(text or ""):
+        return False, "credential_residual"
     return True, ""
 
 
@@ -146,12 +266,24 @@ def _ambiguous_prompt(prompt: str, intent_reasons: List[str]) -> bool:
 
 
 def sanitize_for_fleet(prompt: str) -> str:
-    """Strip obvious local identifiers before sending to free cloud models."""
+    """Strip local identifiers + credentials before free cloud (best-effort).
+
+    Prefer blocking via contains_sensitive_content over relying on redaction alone.
+    """
     out = prompt or ""
+    out = _CREDENTIAL_VALUE_RE.sub("[CREDENTIAL_REDACTED]", out)
+    out = _CREDENTIAL_ASSIGN_RE.sub(
+        lambda m: re.sub(r"[:=]\s*\S+", "=[CREDENTIAL_REDACTED]", m.group(0), count=1),
+        out,
+    )
     out = _PRIVATE_PATH_RE.sub("[LOCAL_PATH_REDACTED]", out)
     out = _EMAIL_RE.sub("[EMAIL_REDACTED]", out)
     out = _PHONE_RE.sub("[PHONE_REDACTED]", out)
-    out = re.sub(r"(?i)\b(?:api[_-]?key|password|token)\s*[:=]\s*\S+", "[CREDENTIAL_REDACTED]", out)
+    out = re.sub(
+        r"(?i)\b(?:api[_-]?key|password|passwd|token|secret|credential|bearer)\s*[:=]\s*\S+",
+        "[CREDENTIAL_REDACTED]",
+        out,
+    )
     return out.strip()
 
 

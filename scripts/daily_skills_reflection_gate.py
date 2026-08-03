@@ -15,6 +15,7 @@ from pathlib import Path
 SKILLS_USAGE = Path(r"D:\HermesData\skills\.usage.json")
 LIBRARIAN_CHANGELOG = Path(r"D:\HermesData\skills\.librarian_changelog.json")
 EVO_LOG = Path(r"D:\PhronesisVault\Operations\Autonomous-Evolution-Log-2026-07-04.md")
+THREAD_AUDIT = Path(r"D:\HermesData\state\skill_evo_thread_audit.json")
 
 
 def _load_json(path: Path) -> dict:
@@ -72,12 +73,32 @@ def _changelog_entries(hours: int = 26) -> int:
     return n
 
 
+def _thread_audit_fail_n() -> int | None:
+    """Latest skill-learn Discord audit fail count if report exists."""
+    data = _load_json(THREAD_AUDIT)
+    if not data:
+        return None
+    by = data.get("by_status") or {}
+    if not isinstance(by, dict):
+        return None
+    return sum(
+        int(by.get(s, 0) or 0)
+        for s in ("unsuccessful", "incorrect", "incomplete", "partial", "unreadable")
+    )
+
+
 def main() -> int:
     used = _recent_usage()
     changes = _changelog_entries()
-    if used == 0 and changes == 0:
+    learn_fail = _thread_audit_fail_n()
+    if used == 0 and changes == 0 and (learn_fail is None or learn_fail == 0):
         print("[SILENT] No skill usage or librarian changes in last 26h -- skip LLM reflection.")
         return 0
+    if learn_fail and learn_fail > 0:
+        print(
+            f"skill-learn audit backlog fail_n={learn_fail} "
+            f"(muscle: skill_learn_thread_audit.py -- not LLM)"
+        )
     line = (
         f"Skills reflection gate: {used} skills used, {changes} librarian changes (26h). "
         "Run ad-hoc wisdom-keeper if deep patch needed."
