@@ -1094,10 +1094,16 @@ discord:
       + thigh-highs + bare feet). Station tours: interview then exactly 2 local images
       then proposals; lock improvements to disk.
 
-      VISUALS (HARD): terminal python D:/HermesData/scripts/hermes_image.py gen -p
-      "FULL PROMPT" ALWAYS MEDIA:D:/full/path.png. Soft identity visual-tags; Version
-      9 from runtime/WARDROBE-PRESETS.md. No cloud image_generate/FAL/openrouter for
-      explicit. Never name Forge/Comfy in IC. N=1..3 women-only default.
+      VISUALS (HARD): SFW/safe stills -> hermes_image free-sfw or gen --route auto.
+      Explicit/heat stills -> hermes_image gen --engine forge (or series --max 4).
+      ALWAYS paste MEDIA:D:/full/path.png. One image command per intent (not 9 shells).
+      Version 9 from runtime/WARDROBE-PRESETS.md. Never name Forge/Comfy in IC.
+
+      TOOL BUDGET (HARD — max_iterations fix 2026-08-03): This channel is IC + images,
+      NOT a code kitchen. Do NOT multi-file patch hermes_image/fleet/gateway/config here.
+      Do NOT run long research/terminal coding loops for "free provider failover".
+      Cap: max_turns 16 enforced. Prefer IC text + 1-2 image tools then answer.
+      If tools fail twice: say so in IC/OOC one line and stop. Ops coding -> ops thread.
 
       Isolation: Roleplay-Sandbox only. Zero bleed K:/silo, Jan, default memory, factual
       channels. After /reset: python D:/HermesData/scripts/thread_local_memory.py
@@ -1430,16 +1436,15 @@ discord:
       provider: xai-oauth
       enabled_toolsets:
         - hermes-cli
-        - browser
         - terminal
         - file
-        - web_search
         - image_gen
       context_length: 200000
       max_turns: 16
-      note: 'MILLBROOK 2026-07-31: campaign millbrook-kingdom; load worlds/millbrook-kingdom;
-        IC Alice; Version 9; sole cock + mute labor; 2 images/station; STATE only
-        under worlds/millbrook-kingdom/continuity/; MEDIA required; max_turns 16.
+      note: 'MILLBROOK 2026-08-03: max_turns 16 NOW ENFORCED via ChannelOverride (was
+        ignored -> global 24). Root of max_iterations: CODING thrash (terminal/patch),
+        not pure reasoning. Dropped browser+web_search from default toolsets for IC.
+        IC+images only; free-sfw or forge; no multi-file ops coding in-thread.
 
         '
     '1525214795236773918':

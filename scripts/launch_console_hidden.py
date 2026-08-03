@@ -31,19 +31,32 @@ def main() -> int:
     if not args:
         return 2
     exe = args[0]
-    if not Path(exe).is_file():
+    exe_path = Path(exe)
+    cwd = str(exe_path.parent) if exe_path.is_file() else None
+    if not exe_path.is_file():
         # still try PATH resolution via CreateProcess
         pass
+    # Optional boot log (env SILO_LLAMA_BOOT_LOG=1) for diagnose
+    import os
+
+    log_path = None
+    if os.environ.get("SILO_LLAMA_BOOT_LOG") == "1":
+        log_dir = Path(r"D:\HermesData\state\llama_boot")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "llama-server-boot.log"
     flags = CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    out = open(log_path, "ab") if log_path else subprocess.DEVNULL
+    err = out
     try:
         flags |= CREATE_BREAKAWAY_FROM_JOB
         subprocess.Popen(
             args,
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=out,
+            stderr=err,
             creationflags=flags,
             close_fds=True,
+            cwd=cwd,
         )
     except OSError:
         # Job may forbid breakaway
@@ -51,10 +64,11 @@ def main() -> int:
         subprocess.Popen(
             args,
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=out,
+            stderr=err,
             creationflags=flags,
             close_fds=True,
+            cwd=cwd,
         )
     return 0
 

@@ -10,6 +10,7 @@
   "model": {
     "gguf": "D:\\PhronesisModels\\models\\current\\Huihui-Qwythos-9B-Claude-Mythos-5-1M-abliterated-Q6_K.gguf",
     "binary": "D:\\PhronesisModels\\binaries\\test-prebuilts\\2026-06-28-b9828-cuda13\\llama-server.exe",
+    "binary_note": "9KB PE loads ggml from same folder; launch cwd MUST be binary dir (launch_console_hidden sets cwd). Do NOT use turboquant build for this hybrid GGUF (missing ssm tensors).",
     "port": 8090
   },
   "launch_entry": "D:\\HermesData\\scripts\\start_qwythos_8090_hidden.vbs",
