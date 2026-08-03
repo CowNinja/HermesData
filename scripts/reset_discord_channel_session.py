@@ -300,7 +300,7 @@ def main() -> int:
             f"(deleted {n_del} session id(s), rotated {n_rot} sticky key(s)). "
             "Transcript wiped. Identity/channel prompt still applies. "
             "Send a short next message to start clean. "
-            "If slash /reset still fails, gateway may be down — ops restart first."
+            "If slash /reset still fails, gateway may be down - ops restart first."
         )
         mid = post_discord(cid, msg)
         print(json.dumps({"discord_message_id": mid}))

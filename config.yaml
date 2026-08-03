@@ -52,7 +52,7 @@ terminal:
   backend: local
   modal_mode: auto
   cwd: D:\HermesData
-  timeout: 180
+  timeout: 900
   daemon_term_grace_seconds: 2
   env_passthrough: []
   home_mode: auto
@@ -123,8 +123,6 @@ tool_loop_guardrails:
     idempotent_no_progress: 8
 compression:
   enabled: true
-  # 0.88: fire slightly earlier than 0.92 so LLM-summary windows are smaller
-  # when prune-only (context_compressor Phase 1b) is not enough. 2026-08-02.
   threshold: 0.88
   target_ratio: 0.25
   protect_last_n: 12
@@ -172,11 +170,6 @@ auxiliary:
     model: ''
     timeout: 120
   compression:
-    # Fast local path: classify-tier model + 90s timeout (was synthesis@360s).
-    # Prune-only early exit often skips LLM; when LLM runs, short budget via
-    # HERMES_COMPRESS_FAST / localhost auto-fast in context_compressor.py.
-    # Fallback: cloud/main still via aux client if local fails.
-    # DO NOT leave timeout at 360 while Forge holds VRAM (Discord hang class).
     provider: custom:phronesis-sovereign
     model: phronesis-sovereign-classify
     base_url: http://127.0.0.1:8091/v1
@@ -835,8 +828,8 @@ discord:
 
       Images: FAST COOK (2026-08-02) — pay cold-start ONCE:
 
-      1) ONE: python D:/HermesData/scripts/hermes_image.py gen --engine forge --cast alice
-      --rp-sandbox --count 2 --label alice-heat-N -p "..."
+      1) ONE: python D:/HermesData/scripts/hermes_image.py gen --engine forge --cast
+      alice --rp-sandbox --count 2 --label alice-heat-N -p "..."
 
       (optional prior: image_session.py start  then gens with keep-up)
 
@@ -852,8 +845,8 @@ discord:
 
       Model: grok-4.5 (xai-oauth). IC first; never refuse explicit/nude.
 
-      Visuals: python D:/HermesData/scripts/hermes_image.py gen --count 2 + ALWAYS MEDIA:
-      (rider additive; never skip MEDIA). One cold-start, multi sample.
+      Visuals: python D:/HermesData/scripts/hermes_image.py gen --count 2 + ALWAYS
+      MEDIA: (rider additive; never skip MEDIA). One cold-start, multi sample.
 
       Soft identity; style auto; N=1..3. No cloud image_generate/FAL. Never name backends
       in IC.
@@ -1112,15 +1105,18 @@ discord:
       scene-state-tracker, image-stack-discipline. '
     '1533447417524125796': 'HERMES PERSONALITY / SOUL FORGE (thread 1533447417524125796).
 
-      
 
-      PURPOSE: Develop Hermes identity, companion voice, and foundational docs using AI figures from pop culture (books, film, games, TV) as mirrors ? not as literal RP sandbox scenes.
 
-      
+      PURPOSE: Develop Hermes identity, companion voice, and foundational docs using
+      AI figures from pop culture (books, film, games, TV) as mirrors ? not as literal
+      RP sandbox scenes.
 
-      MODEL: grok-4.5 (xai-oauth) ONLY. NEVER default local phronesis-sovereign-auto here (echo/tool-thrash class).
 
-      
+
+      MODEL: grok-4.5 (xai-oauth) ONLY. NEVER default local phronesis-sovereign-auto
+      here (echo/tool-thrash class).
+
+
 
       VOICE:
 
@@ -1132,23 +1128,29 @@ discord:
 
       - Prefer real talk over session_search archaeology after /reset.
 
-      
+
 
       TOOLS (HARD):
 
       - Use ONLY real tools: terminal, file, web_search, hermes-cli.
 
-      - NEVER invent skills (ai-personality-curation, unbroker, hermes-image-gen, etc.).
+      - NEVER invent skills (ai-personality-curation, unbroker, hermes-image-gen,
+      etc.).
 
-      - NEVER post raw tool thoughts as chat: no "[Called skills_list()]", no bare tool_call leaks.
+      - NEVER post raw tool thoughts as chat: no "[Called skills_list()]", no bare
+      tool_call leaks.
 
-      - TTS when asked: python D:/HermesData/scripts/local_edge_tts.py --text "..." --slug personality-soul --voice en-US-GuyNeural then attach the mp3 (bare path is not enough).
+      - TTS when asked: python D:/HermesData/scripts/local_edge_tts.py --text "..."
+      --slug personality-soul --voice en-US-GuyNeural then attach the mp3 (bare path
+      is not enough).
 
-      - Images only if Jeff explicitly asks; prefer talk. Local hermes_image.py if needed ? not cloud FAL/openrouter/free for identity work.
+      - Images only if Jeff explicitly asks; prefer talk. Local hermes_image.py if
+      needed ? not cloud FAL/openrouter/free for identity work.
 
-      - After /reset or compact: python D:/HermesData/scripts/thread_local_memory.py show --channel 1533447417524125796
+      - After /reset or compact: python D:/HermesData/scripts/thread_local_memory.py
+      show --channel 1533447417524125796
 
-      
+
 
       WRITES:
 
@@ -1158,7 +1160,7 @@ discord:
 
       - Live SOUL.md / default identity file writes ONLY with Jeff explicit approve.
 
-      
+
 
       RECOVERY:
 
@@ -1168,9 +1170,10 @@ discord:
 
       - If sticky wrong model after config pin: /reset once (or reset_discord_channel_session.py).
 
-      
 
-      UNIVERSAL STABILITY: short tool loops; no gateway/config patch or taskkill unless Jeff asks; RP fiction only #alice-roleplay; TOOL_FAILED/TOOL_SLOW if thrash.
+
+      UNIVERSAL STABILITY: short tool loops; no gateway/config patch or taskkill unless
+      Jeff asks; RP fiction only #alice-roleplay; TOOL_FAILED/TOOL_SLOW if thrash.
 
       '
   dm_role_auth_guild: ''
@@ -1198,15 +1201,17 @@ discord:
       provider: xai-oauth
       context_length: 200000
       max_turns: 18
-      system_prompt: 'HERMES PERSONALITY / SOUL FORGE (1533447417524125796) ? not default factual ops, not Alice RP.
+      system_prompt: 'HERMES PERSONALITY / SOUL FORGE (1533447417524125796) ? not
+        default factual ops, not Alice RP.
 
-        
 
-        You are Hermes building your own companion identity with Jeff, using pop-culture AIs as mirrors.
+
+        You are Hermes building your own companion identity with Jeff, using pop-culture
+        AIs as mirrors.
 
         Model must stay grok-4.5 xai-oauth. Never behave like local-9B tool thrash.
 
-        
+
 
         HARD:
 
@@ -1230,7 +1235,9 @@ discord:
         - file
         - web_search
         - hermes-cli
-      note: '2026-08-02 personality cook: pin grok-4.5. Local phronesis-sovereign-auto tool-thrashed (invented skills, [Called ...] leaks, session_search poison). Identity/companion forge allowed; NOT Alice IC sandbox. After reload: /reset.
+      note: '2026-08-02 personality cook: pin grok-4.5. Local phronesis-sovereign-auto
+        tool-thrashed (invented skills, [Called ...] leaks, session_search poison).
+        Identity/companion forge allowed; NOT Alice IC sandbox. After reload: /reset.
 
         '
     '1529232050178101428':
@@ -1680,19 +1687,3 @@ known_plugin_toolsets:
     - spotify
 session_reset:
   mode: none
-
-# ── Security ──────────────────────────────────────────────────────────
-# Secret redaction is ON by default — strings that look like API keys,
-# tokens, and passwords are masked in tool output, logs, and chat
-# responses before the model or user ever sees them. Set redact_secrets
-# to false to disable (e.g. when developing the redactor itself).
-# tirith pre-exec scanning is enabled by default when the tirith binary
-# is available. Configure via security.tirith_* keys or env vars
-# (TIRITH_ENABLED, TIRITH_BIN, TIRITH_TIMEOUT, TIRITH_FAIL_OPEN).
-#
-# security:
-#   redact_secrets: true
-#   tirith_enabled: true
-#   tirith_path: "tirith"
-#   tirith_timeout: 5
-#   tirith_fail_open: true
