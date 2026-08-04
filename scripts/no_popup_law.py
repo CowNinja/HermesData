@@ -96,13 +96,23 @@ USER_TICKS_QUIET: list[str] = [
     "ComfyUI-Gallery-Watchdog",
 ]
 
-# Keep these ENABLED (user-IL) even under focus/lockdown ? silent pythonw path.
+# Keep these ENABLED (user-IL) even under focus/lockdown - silent protectors.
+# 2026-08-04 solid-stack: do NOT keep Guardian/Bridge Hidden twins here.
+# They race hermes_gateway_service + meta and were re-enabling after disable.
 USER_TICKS_KEEP_ENABLED: list[str] = [
-    "Phronesis-Guardian-Hidden",
-    "Phronesis-Grok-Direct-Bridge-Hidden",
     "Hermes_Popup_Storm_Suppress",
     "Hermes_Popup_Focus_Guard",
     "Hermes_Popup_End_Flashy_30m",
+]
+
+# Solid single stack (2026-08-03/04): keep thrash/duplicate start paths DISABLED.
+# Gateway owner = hermes_gateway_service + hermes_meta_watchdog only.
+SOLID_STACK_KEEP_DISABLED: list[str] = [
+    "Phronesis-Guardian-Hidden",
+    "Phronesis-Grok-Direct-Bridge-Hidden",
+    "Hermes_Image_Queue_Pulse",
+    "Hermes_Gateway_Watchdog_5m",
+    "Hermes_Silent_Green_Pulse",
 ]
 
 # Admin-owned flashy entries (document + trampoline no-op only)
@@ -154,9 +164,12 @@ def schtasks_change(name: str, enable: bool) -> bool:
 
 def quiet_user_ticks() -> dict[str, bool]:
     out = {n: schtasks_change(n, enable=False) for n in USER_TICKS_QUIET}
-    # Always re-assert silent Hidden twins + protectors stay on
+    # Protectors stay on (popup guards only - not stack-heal twins)
     for n in USER_TICKS_KEEP_ENABLED:
         out[f"keep:{n}"] = schtasks_change(n, enable=True)
+    # Solid stack: assert Hidden heal twins stay off
+    for n in SOLID_STACK_KEEP_DISABLED:
+        out[f"solid_off:{n}"] = schtasks_change(n, enable=False)
     return out
 
 
@@ -164,12 +177,22 @@ def resume_user_ticks() -> dict[str, bool]:
     out = {n: schtasks_change(n, enable=True) for n in USER_TICKS_QUIET}
     for n in USER_TICKS_KEEP_ENABLED:
         out[f"keep:{n}"] = schtasks_change(n, enable=True)
+    for n in SOLID_STACK_KEEP_DISABLED:
+        out[f"solid_off:{n}"] = schtasks_change(n, enable=False)
     return out
 
 
 def ensure_hidden_twins_enabled() -> dict[str, bool]:
-    """Prefer pythonw Hidden twins over bare powershell.exe parents."""
-    return {n: schtasks_change(n, enable=True) for n in USER_TICKS_KEEP_ENABLED}
+    """Compat shim.
+
+    Pre-2026-08-04: re-enabled pythonw Hidden Guardian/Bridge twins.
+    Solid-stack law: those twins race the service path - keep them DISABLED.
+    Still re-asserts popup protector tasks that remain in USER_TICKS_KEEP_ENABLED.
+    """
+    out = {n: schtasks_change(n, enable=True) for n in USER_TICKS_KEEP_ENABLED}
+    for n in SOLID_STACK_KEEP_DISABLED:
+        out[f"solid_off:{n}"] = schtasks_change(n, enable=False)
+    return out
 
 
 def schtask_action_line(name: str) -> str:

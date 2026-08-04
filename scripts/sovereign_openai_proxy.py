@@ -1708,9 +1708,56 @@ def dispatch_via_native_router(
                 flat_forward.pop("tools", None)
                 flat_forward.pop("tool_choice", None)
                 retry_candidates.append(flat_forward)
+                # Nuclear: keep system + last 4 plain turns only (no tools). Recovers
+                # long tool-heavy Hermes sessions that still break jinja after flatten.
+                sys_msgs = [
+                    m
+                    for m in (flat_msgs or [])
+                    if isinstance(m, dict) and str(m.get("role") or "") == "system"
+                ][:1]
+                if sys_msgs and isinstance(sys_msgs[0].get("content"), str):
+                    sc = sys_msgs[0]["content"]
+                    if len(sc) > 6000:
+                        sys_msgs = [
+                            {
+                                **sys_msgs[0],
+                                "content": sc[:6000]
+                                + "\n...[system truncated for llama template recovery]",
+                            }
+                        ]
+                tail = [
+                    m
+                    for m in (flat_msgs or [])
+                    if isinstance(m, dict) and str(m.get("role") or "") != "system"
+                ][-4:]
+                if not tail:
+                    tail = [
+                        {
+                            "role": "user",
+                            "content": (
+                                "Continue the conversation briefly. "
+                                "(local template recovery path)"
+                            ),
+                        }
+                    ]
+                nuclear_msgs = sys_msgs + tail
+                nuclear_forward = {
+                    "model": forward.get("model") or logical,
+                    "messages": nuclear_msgs,
+                    "max_tokens": min(int(forward.get("max_tokens") or 384), 384),
+                    "temperature": min(float(forward.get("temperature") or 0.7), 0.85),
+                    "stream": False,
+                    "chat_template_kwargs": {"enable_thinking": False},
+                }
+                retry_candidates.append(nuclear_forward)
                 recovered = False
                 for idx, retry_forward in enumerate(retry_candidates):
-                    event = "grammar_retry_no_tools" if idx == 0 and forward.get("tools") else "grammar_retry_flat_history"
+                    if idx == 0 and forward.get("tools"):
+                        event = "grammar_retry_no_tools"
+                    elif idx == len(retry_candidates) - 1:
+                        event = "grammar_retry_nuclear_short"
+                    else:
+                        event = "grammar_retry_flat_history"
                     _log_event({"event": event, "model": logical, "attempt": idx + 1})
                     result = _dispatch_payload(retry_forward)
                     if result["status"] == 200:

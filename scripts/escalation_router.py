@@ -434,14 +434,16 @@ def _proactive_wants_t3(prompt: str, routing: Dict[str, Any]) -> bool:
         "super grok",
         "tier 3",
         "t3 escalate",
-        "architecture",
-        "system design",
+        # tightened 2026-08-04: bare "architecture"/"system design"/"multi-step plan"
+        # fired too often on routine Discord ops -> paid Grok. Prefer explicit escalate.
+        "full system architecture review",
+        "end-to-end system design",
         "deep synthesis",
         "multi-hour",
         # Policy B expansions - planning/judgment beyond 9B grunt
         "tradeoff analysis",
         "trade-off analysis",
-        "design decision",
+        "design decision matrix",
         "root cause analysis",
         "failure mode",
         "codify autonomy",
@@ -452,9 +454,8 @@ def _proactive_wants_t3(prompt: str, routing: Dict[str, Any]) -> bool:
         "escalate to grok",
         "needs grok",
         "beyond local",
-        "plan the next",
-        "multi-step plan",
-        "strategic plan",
+        "plan the next multi-day",
+        "strategic multi-week plan",
     )
     if any(m in low for m in heavy_markers):
         blocked, reason = _grok_share_blocks_t3()
