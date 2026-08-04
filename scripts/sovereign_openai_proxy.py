@@ -45,9 +45,15 @@ except Exception:
     pass
 
 HERMES_SCRIPTS = Path(__file__).resolve().parent
+HERMES_HOME = Path(os.environ.get("HERMES_HOME") or r"D:\HermesData")
 VAULT_SCRIPTS = Path(r"D:\PhronesisVault\scripts")
-sys.path.insert(0, str(HERMES_SCRIPTS))
-sys.path.insert(0, str(VAULT_SCRIPTS))
+# tool_call_fixer.py and sibling SSOTs live in HERMES_HOME root — not scripts/.
+# Without this, proxy started from System32/schtask cwd silently skips the fixer
+# and local 9B [Called tool(...)] leaks reach Discord as final text.
+for _p in (HERMES_HOME, HERMES_SCRIPTS, VAULT_SCRIPTS):
+    _s = str(_p)
+    if _s not in sys.path:
+        sys.path.insert(0, _s)
 
 DEFAULT_PORT = 8091
 UNIFIED_ROUTER_PORT = 8090
@@ -1813,16 +1819,45 @@ def dispatch_via_native_router(
     raw_msg = choice.get("message") or {}
     msg = _normalize_llamacpp_tool_message(raw_msg)
     # Chain ToolCallFixer for abliterated model repair (markdown-fenced JSON, multi-tool blocks)
+    # Critical for local Qwythos: after grammar_retry_no_tools the model often emits
+    # narrated [Called web_search(...)] as plain text — convert to real tool_calls.
     try:
         from tool_call_fixer import ToolCallFixer
+
         _tc_fixer = getattr(dispatch_via_native_router, "_tc_fixer", None)
         if _tc_fixer is None:
             _tc_fixer = ToolCallFixer()
             dispatch_via_native_router._tc_fixer = _tc_fixer
         available_tools = body.get("tools")
+        before_tc = bool(msg.get("tool_calls"))
+        before_content = str(msg.get("content") or "")[:120]
         msg = _tc_fixer.fix_message(msg, available_tools=available_tools)
-    except Exception:
-        pass  # Fixer is best-effort; fall through to existing behavior
+        if msg.get("tool_calls") and not before_tc:
+            try:
+                _log_event(
+                    {
+                        "event": "tool_call_fixer_extracted",
+                        "model": logical,
+                        "names": [
+                            (tc.get("function") or {}).get("name")
+                            for tc in (msg.get("tool_calls") or [])
+                        ][:8],
+                        "from_content_prefix": before_content,
+                    }
+                )
+            except Exception:
+                pass
+    except Exception as _tc_exc:
+        try:
+            _log_event(
+                {
+                    "event": "tool_call_fixer_failed",
+                    "model": logical,
+                    "error": f"{type(_tc_exc).__name__}: {_tc_exc}"[:240],
+                }
+            )
+        except Exception:
+            pass
 
     factual_tools = _requires_factual_tool_use(messages, routing=routing, model=gateway_model)
     if body.get("tools") and not msg.get("tool_calls"):
