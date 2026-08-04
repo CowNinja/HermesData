@@ -609,17 +609,65 @@ def seed_context_length_cache(dry_run: bool = False) -> Dict[str, Any]:
     }
 
 
+def _run_interview_ux_heal(dry_run: bool = False) -> Dict[str, Any]:
+    """System-wide Discord clarify/interview UX (no fake dialogue / MCQ novels).
+
+    Soft-depends on heal_discord_interview_ux_20260803.py so sovereign boot keeps
+    channel prompts and About-me override consistent after ctx cooks.
+    """
+    heal_path = Path(__file__).resolve().parent / "heal_discord_interview_ux_20260803.py"
+    out: Dict[str, Any] = {"ok": False, "skipped": False, "path": str(heal_path)}
+    if not heal_path.is_file():
+        out["skipped"] = True
+        out["error"] = "heal script missing"
+        return out
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("heal_discord_interview_ux", heal_path)
+        if spec is None or spec.loader is None:
+            out["error"] = "import_spec_failed"
+            return out
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        cfg_path = HERMES_DATA_CONFIG
+        if not cfg_path.is_file():
+            out["error"] = "config_missing"
+            return out
+        cfg = mod._load(cfg_path)
+        report = mod.heal(cfg)
+        out["report"] = report
+        out["ok"] = True
+        if report.get("changes") and not dry_run:
+            bak = cfg_path.with_name(
+                cfg_path.name
+                + f".bak-interview-ux-ensure-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            )
+            bak.write_text(cfg_path.read_text(encoding="utf-8"), encoding="utf-8")
+            mod._dump(cfg_path, cfg)
+            out["backup"] = str(bak)
+            out["changed"] = True
+        else:
+            out["changed"] = False
+            out["dry_run"] = bool(dry_run)
+    except Exception as exc:
+        out["error"] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
 def ensure_all_configs(dry_run: bool = False) -> Dict[str, Any]:
     paths = [HERMES_DATA_CONFIG, HERMES_USER_CONFIG]
     reports = [ensure_config(p, dry_run=dry_run) for p in paths]
     cache_report = seed_context_length_cache(dry_run=dry_run)
+    interview_ux = _run_interview_ux_heal(dry_run=dry_run)
     return {
         "timestamp": _utc_now(),
         "min_context": MIN_CONTEXT,
         "provider": SOVEREIGN_PROVIDER,
-        "changed": any(r.get("changed") for r in reports),
+        "changed": any(r.get("changed") for r in reports) or bool(interview_ux.get("changed")),
         "configs": reports,
         "context_cache": cache_report,
+        "interview_ux_heal": interview_ux,
     }
 
 
