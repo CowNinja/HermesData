@@ -29,12 +29,23 @@ ROLEPLAY_COLON_PREFIXES = (
 
 ROLEPLAY_MODEL = "phronesis-sovereign-roleplay"
 ALICE_ROLEPLAY_CHANNEL_ID = "1519509288286949466"
+# Belt-and-suspenders child threads (parent id still primary). Active heat +
+# infra children as of 2026-08-04 immersion/firewall cook.
 ALICE_ROLEPLAY_THREAD_IDS = frozenset({
     "1519512763863666810",
     "1519522216851673190",
     "1519529411056242779",
     "1521146755985576116",
     "1522330326733422713",
+    "1523604530338730004",
+    "1524821864956956793",  # Harem Image
+    "1525174401740312707",  # New group / story+inline
+    "1525214795236773918",  # Just Alice pure IC
+    "1532906132056838184",  # Millbrook Kingdom
+    "1524552417096761384",  # Voyeur training
+    "1524594840136843445",  # Character cards
+    "1522325123817013269",  # Sandbox central/infra (parent garden; no IC heat)
+    "1528335166462759102",  # Arch/firewall (ops, no IC)
 })
 
 
