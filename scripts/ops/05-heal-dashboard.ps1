@@ -105,21 +105,40 @@ try {
         }
     }
 
-    Write-Host "Starting venv dashboard..."
-    Start-VenvDashboard
+    # Restore web_dist from known-good backup when missing (npm engine mismatch on host)
+    if (-not (Test-Path $webDist)) {
+        $bak = Join-Path $HermesRoot "hermes-agent-backup-20260615-144910\hermes_cli\web_dist"
+        if (Test-Path (Join-Path $bak "index.html")) {
+            Write-Host "Restoring web_dist from backup..."
+            Copy-Item $bak (Join-Path $agentRoot "hermes_cli\web_dist") -Recurse -Force
+        }
+    }
+
+    Write-Host "Starting venv dashboard (Job-Object safe)..."
+    $vbs = Join-Path $HermesRoot "scripts\Start-Dashboard-Hidden.vbs"
+    $det = Join-Path $HermesRoot "scripts\start_detached.py"
+    $dashLauncher = Join-Path $HermesRoot "scripts\start_hermes_dashboard.py"
+    if (Test-Path $vbs) {
+        Start-Process -FilePath "wscript.exe" -ArgumentList @("//B", $vbs) -WindowStyle Hidden | Out-Null
+    } elseif ((Test-Path $det) -and (Test-Path $dashLauncher)) {
+        $pyw = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
+        Start-HiddenProcess -FilePath $pyw -ArgumentList @($det, $dashLauncher) -WorkingDirectory $HermesRoot | Out-Null
+    } else {
+        Start-VenvDashboard
+    }
     $up = $false
     # Bitwarden secret hydration can take 30-60s on cold start
-    for ($i = 0; $i -lt 60; $i++) {
+    for ($i = 0; $i -lt 90; $i++) {
         Start-Sleep -Seconds 1
         if (Test-DashboardHttp -Port $dashPort) { $up = $true; break }
     }
 
     if (-not $up) {
-        Write-Host "Fallback start (hidden pythonw)..."
-        $py = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
+        Write-Host "Fallback start (breakaway python)..."
+        $py = if (Test-Path $VenvPython) { $VenvPython } else { $VenvPythonw }
         $dashArgs = @("-m", "hermes_cli.main", "dashboard", "--port", "$dashPort", "--host", $dashHost, "--no-open")
         if (Test-Path $webDist) { $dashArgs += "--skip-build" }
-        Start-HiddenProcess -FilePath $py -ArgumentList $dashArgs -WorkingDirectory $agentRoot | Out-Null
+        Start-HiddenProcess -FilePath $py -ArgumentList $dashArgs -WorkingDirectory $agentRoot -Breakaway | Out-Null
         for ($i = 0; $i -lt 60; $i++) {
             Start-Sleep -Seconds 1
             if (Test-DashboardHttp -Port $dashPort) { $up = $true; break }
