@@ -47,7 +47,7 @@ except Exception:
 HERMES_SCRIPTS = Path(__file__).resolve().parent
 HERMES_HOME = Path(os.environ.get("HERMES_HOME") or r"D:\HermesData")
 VAULT_SCRIPTS = Path(r"D:\PhronesisVault\scripts")
-# tool_call_fixer.py and sibling SSOTs live in HERMES_HOME root — not scripts/.
+# tool_call_fixer.py and sibling SSOTs live in HERMES_HOME root - not scripts/.
 # Without this, proxy started from System32/schtask cwd silently skips the fixer
 # and local 9B [Called tool(...)] leaks reach Discord as final text.
 for _p in (HERMES_HOME, HERMES_SCRIPTS, VAULT_SCRIPTS):
@@ -1820,7 +1820,7 @@ def dispatch_via_native_router(
     msg = _normalize_llamacpp_tool_message(raw_msg)
     # Chain ToolCallFixer for abliterated model repair (markdown-fenced JSON, multi-tool blocks)
     # Critical for local Qwythos: after grammar_retry_no_tools the model often emits
-    # narrated [Called web_search(...)] as plain text — convert to real tool_calls.
+    # narrated [Called web_search(...)] as plain text - convert to real tool_calls.
     try:
         from tool_call_fixer import ToolCallFixer
 

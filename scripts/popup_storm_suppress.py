@@ -85,7 +85,9 @@ BARE_CONSOLE_TITLE_RE = re.compile(
 SAFE_CMD_RE = re.compile(
     r"(sovereign_openai_proxy|hermes_cli\.main|popup_storm_daemon|"
     r"popup_storm_suppress|popup_focus_enforce|ensure_qwythos|"
-    r"ComfyUI\\\\main\.py|llama-server)",
+    r"ComfyUI\\\\main\.py|llama-server|"
+    r"Run-Session-Debt-Clamp|Session-Debt-Clamp|Steer-UAC|"
+    r"Run-When-Home-Elevated|Popup-Kill-Admin-Once)",
     re.I,
 )
 CUA_CANDIDATES = [
