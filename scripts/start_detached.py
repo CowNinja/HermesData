@@ -25,8 +25,12 @@ CREATE_NEW_PROCESS_GROUP = 0x00000200
 CREATE_BREAKAWAY_FROM_JOB = 0x01000000
 
 
-def _wmi_create(cmdline: str, cwd: str) -> int | None:
-    """Create process via WMI (escapes parent Job Object). Returns PID or None."""
+def _wmi_create(cmdline: str, cwd: str, env_pairs: list[str] | None = None) -> int | None:
+    """Create process via WMI (escapes parent Job Object). Returns PID or None.
+
+    Never wraps in cmd.exe — that flashes visible consoles under WMI Create.
+    Optional env_pairs: list of \"KEY=value\" for Win32_ProcessStartup.EnvironmentVariables.
+    """
     try:
         import pythoncom  # type: ignore
         import win32com.client  # type: ignore
@@ -36,29 +40,44 @@ def _wmi_create(cmdline: str, cwd: str) -> int | None:
             ".", "root\\cimv2"
         )
         startup = wmi.Get("Win32_ProcessStartup").SpawnInstance_()
-        # 0 = hidden window for ShowWindow? Win32_ProcessStartup has ShowWindow
+        # 0 = SW_HIDE — no console window for GUI/pythonw targets
         try:
             startup.ShowWindow = 0
         except Exception:
             pass
+        if env_pairs:
+            try:
+                # WMI expects a multi-string / array of KEY=value
+                startup.EnvironmentVariables = list(env_pairs)
+            except Exception:
+                pass
         result = wmi.Get("Win32_Process").Create(cmdline, cwd, startup)
-        # result is (pid, return_value) or a WMI object depending on bindings
         if hasattr(result, "ProcessId"):
             if int(getattr(result, "ReturnValue", 1)) == 0:
                 return int(result.ProcessId)
             return None
-        # Some pywin32 versions return a tuple
         if isinstance(result, (list, tuple)) and len(result) >= 2:
-            ret, pid = int(result[0]), int(result[1]) if result[1] else 0
-            # Actually Create returns (ReturnValue, ProcessId) order varies
-            # Prefer scanning for ProcessId attribute above.
+            # pywin32 may return (ReturnValue, ProcessId)
+            a, b = result[0], result[1]
+            try:
+                if int(a) == 0 and b:
+                    return int(b)
+                if int(b) == 0 and a:
+                    return int(a)
+            except Exception:
+                pass
         return None
     except Exception:
         pass
-    # Fallback: PowerShell WMI (always available on this host)
+    # Fallback: PowerShell WMI (always available on this host) — still no cmd.exe
     try:
+        # Escape for PowerShell single-quoted string
+        esc = cmdline.replace("'", "''")
+        cwd_esc = cwd.replace("'", "''")
         ps = (
-            f"$p = ([wmiclass]'Win32_Process').Create({cmdline!r}, {cwd!r}); "
+            f"$s = ([wmiclass]'Win32_ProcessStartup').CreateInstance(); "
+            f"$s.ShowWindow = 0; "
+            f"$p = ([wmiclass]'Win32_Process').Create('{esc}', '{cwd_esc}', $s); "
             f"if ($p.ReturnValue -eq 0) {{ $p.ProcessId }} else {{ exit $p.ReturnValue }}"
         )
         r = subprocess.run(
@@ -112,10 +131,14 @@ def main() -> int:
         pyw = ROOT / "hermes-agent" / "venv" / "Scripts" / "pythonw.exe"
         exe = str(pyw if pyw.is_file() else sys.executable)
         argstr = " ".join(f'"{a}"' for a in args)
-        cmdline = f'cmd.exe /c set HERMES_HOME={ROOT}&& set PHRONESIS_BOOT_INTEGRITY=0&& "{exe}" "{script}" {argstr}'.rstrip()
+        # Direct pythonw — NO cmd.exe (cmd flash was the dual console windows).
+        cmdline = f'"{exe}" "{script}" {argstr}'.rstrip()
         cwd = str(ROOT)
 
-    pid = _wmi_create(cmdline, cwd)
+    # Do NOT set WMI EnvironmentVariables to a partial list — that replaces the
+    # whole block and can drop PATH/SystemRoot. Service scripts hardcode
+    # HERMES_HOME / ROOT when needed; children get a full env from Popen.
+    pid = _wmi_create(cmdline, cwd, env_pairs=None)
     if pid:
         print(f"wmi_ok pid={pid}")
         return 0

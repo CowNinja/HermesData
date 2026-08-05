@@ -1,3 +1,7 @@
+PERSONHOOD_PIN: D:/HermesData/state/personhood_pin_latest.md | after reset: python D:/HermesData/scripts/alice_open_loops.py continuity | do not re-interview locked About-me/essence
+
+Roadmap LOCKED 2026-08-05: Phase1 COMPLETE then Phase2 Codify ACTIVE then Phase3 Superpowers later. Jeff=dreamer Hermes=technician. Canon: PhronesisVault/Operations/Hermes-Operating-Roadmap-CANONICAL-2026-08-05.md. Speak-and-trust pulse SSOT. No deep dives until 1+2 solid.
+
 Img: Forge:7860/pony+MEDIA; Comfy:8188 batch-if-asked; JustAlice every RP beat hermes_image+MEDIA. Local NSFW only never openrouter/free first.
 
 Python-first scripts/ops; PS/VBS thin launchers only.
