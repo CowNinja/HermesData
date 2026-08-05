@@ -24,15 +24,15 @@
 
 | Need | Command / path |
 |------|----------------|
-| Start/recycle gateway (WhatsApp-safe) | `scripts/Start-HermesGateway-Reliable.ps1` (`-Force` to recycle) |
-| Stack board | `python scripts/stack_snapshot.py` |
-| Compaction posture | `python scripts/compaction_diagnose.py` |
+| **Status / single heal (SSOT)** | `python scripts/solid_stack_law_once.py --status` then `python scripts/solid_stack_law_once.py` |
+| Stack ensure (ops one-shot) | `scripts/Ensure-HermesStack-Single.ps1` (called by solid law) |
+| Solid scripts list | `SOLID-SCRIPTS.md` · `STACK-LAW.md` |
 | Popup/UAC storm | `scripts/ops/Steer-UAC.ps1 -Quiet` / `-Status` |
 | Connectivity canon | `PhronesisVault/Operations/Hermes-Connectivity-Discord-WhatsApp-CANONICAL-2026-08-02.md` |
-| Popup spawn canon | `PhronesisVault/Operations/Popup-Spawn-Trace-and-Suppress-CANONICAL-2026-08-02.md` |
-| Single gateway policy | `PhronesisVault/Operations/SINGLE-GATEWAY-RESTORE.md` |
+| Ownership map | `PhronesisVault/Operations/Ownership-One-Home-Per-Class-CANONICAL-2026-08-05.md` |
 | Secrets env | `ENV-LOCATION.txt` -> only `D:\HermesData\.env` |
 
+**Forbidden:** bare `Start-HermesGateway-Reliable.ps1` as dual owner while service path owns (STACK-LAW).  
 **Never** start gateway with bare schtask pythonw missing `HERMES_HOME` (WhatsApp dies).  
 **Never** trust stale `gateway_state.json` alone for WhatsApp.
 

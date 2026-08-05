@@ -82,12 +82,25 @@ _CLOUD_FALLBACK_PROVIDERS = frozenset(
     {"openrouter", "xai-oauth", "xai", "nous", "anthropic", "openai", "gemini", "copilot"}
 )
 
+# Single SSOT hint. Must include interview UX so boot ensure + interview heal
+# do NOT thrash config.yaml (was: ensure strips interview, heal re-adds -> bak storm).
 SOVEREIGN_ENVIRONMENT_HINT = (
     f"Phronesis Sovereign Stack: Qwythos-9B Q6_K @ {MIN_CONTEXT} ctx on llama-server:8090 "
-    "via phronesis-sovereign proxy:8091. Model rotation is LOCKED ? 9B only, no 14B "
+    "via phronesis-sovereign proxy:8091. Model rotation is LOCKED - 9B only, no 14B "
     "fallback. ALWAYS invoke terminal/file tools for factual queries (disk space, "
-    "file listings, system state) ? never hallucinate command output. Deliver clean "
-    "final answers only; no scratch reasoning in replies."
+    "file listings, system state) - never hallucinate command output. Deliver clean "
+    "final answers only; no scratch reasoning in replies. INTERVIEW/CLARIFY UX: never "
+    "fake dialogue with Jeff; multi-choice = one clarify(4) then STOP, or one batch of "
+    "<=10 A-D (~2k chars); no MCQ novels; no invent skills; no [Called ...] leaks. "
+    "Skills: discord-clarify-interview, jeff-about-me-interview (About-me thread)."
+)
+
+# Idempotency: if all markers present, do not rewrite (avoids bak-ctx thrash every proxy boot).
+_HINT_OK_MARKERS = (
+    "Qwythos-9B",
+    "proxy:8091",
+    "9B only",
+    "INTERVIEW/CLARIFY",
 )
 
 LOCAL_SOVEREIGN_DEFAULTS = {
@@ -287,17 +300,19 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
 
     agent = patched.setdefault("agent", {})
     if isinstance(agent, dict):
-        if agent.get("environment_hint") != SOVEREIGN_ENVIRONMENT_HINT:
+        hint = str(agent.get("environment_hint") or "")
+        # Marker-based ok (not exact equality): exact match fought interview heal every boot.
+        if not all(m in hint for m in _HINT_OK_MARKERS):
             agent["environment_hint"] = SOVEREIGN_ENVIRONMENT_HINT
-            changes.append("agent.environment_hint?9B-locked")
+            changes.append("agent.environment_hint?9B-locked+interview")
         if agent.get("reasoning_effort") not in (None, "", "low", "none"):
             agent["reasoning_effort"] = "low"
             changes.append("agent.reasoning_effort?low")
-        if str(agent.get("tool_use_enforcement") or "").lower() in (
-            "true", "always", "yes", "on",
-        ):
-            agent["tool_use_enforcement"] = "auto"
-            changes.append("agent.tool_use_enforcement?auto")
+        # config.yaml uses "strict"; do not thrash strict -> auto on every boot
+        tue = str(agent.get("tool_use_enforcement") or "").lower()
+        if tue in ("true", "always", "yes", "on"):
+            agent["tool_use_enforcement"] = "strict"
+            changes.append("agent.tool_use_enforcement?strict")
 
     display = patched.setdefault("display", {})
     if isinstance(display, dict):
@@ -612,8 +627,8 @@ def seed_context_length_cache(dry_run: bool = False) -> Dict[str, Any]:
 def _run_interview_ux_heal(dry_run: bool = False) -> Dict[str, Any]:
     """System-wide Discord clarify/interview UX (no fake dialogue / MCQ novels).
 
-    Soft-depends on heal_discord_interview_ux_20260803.py so sovereign boot keeps
-    channel prompts and About-me override consistent after ctx cooks.
+    Soft-depends on heal_discord_interview_ux_20260803.py. Skips when already
+    marked healthy to stop bak-interview-ux-ensure storms on every proxy boot.
     """
     heal_path = Path(__file__).resolve().parent / "heal_discord_interview_ux_20260803.py"
     out: Dict[str, Any] = {"ok": False, "skipped": False, "path": str(heal_path)}
@@ -621,6 +636,21 @@ def _run_interview_ux_heal(dry_run: bool = False) -> Dict[str, Any]:
         out["skipped"] = True
         out["error"] = "heal script missing"
         return out
+    # Fast path: live config already has interview markers + universal law.
+    try:
+        raw = HERMES_DATA_CONFIG.read_text(encoding="utf-8") if HERMES_DATA_CONFIG.is_file() else ""
+        if (
+            "INTERVIEW/CLARIFY" in raw
+            and "UNIVERSAL INTERVIEW/CLARIFY UX LAW" in raw
+            and "discord-clarify-interview" in raw
+        ):
+            out["ok"] = True
+            out["skipped"] = True
+            out["changed"] = False
+            out["reason"] = "already_marked_healthy"
+            return out
+    except Exception:
+        pass
     try:
         import importlib.util
 
