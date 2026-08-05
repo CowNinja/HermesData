@@ -307,7 +307,7 @@ def kill_uac_consent() -> list[int]:
         pass
     if not pids:
         try:
-            for pid, name, _cmd in _list_processes():
+            for pid, _pp, name, _cmd in _list_processes():
                 if (name or "").lower() == "consent.exe":
                     pids.append(pid)
         except Exception:
@@ -388,7 +388,7 @@ def kill_elevation_spawners() -> list[int]:
         r"GPU\s*Tweak\s*III)",
         re.I,
     )
-    for pid, name, cmd in _list_processes():
+    for pid, _pp, name, cmd in _list_processes():
         nlow = (name or "").lower()
         if nlow not in ("powershell.exe", "pwsh.exe", "cmd.exe", "cua-driver.exe"):
             continue
@@ -397,14 +397,6 @@ def kill_elevation_spawners() -> list[int]:
         # never kill our own suppress shell if any
         if "popup_storm" in (cmd or "").lower():
             continue
-        # never kill WT-hosted grok/work shells (bare powershell under Cascadia)
-        if nlow in ("powershell.exe", "pwsh.exe") and not (cmd or "").strip():
-            # bare cmd with no args is usually a WT tab ? leave it
-            continue
-        if nlow in ("powershell.exe", "pwsh.exe") and len((cmd or "").strip()) < 40:
-            # bare path-only powershell under WT
-            if "runas" not in (cmd or "").lower() and "cua" not in (cmd or "").lower():
-                continue
         try:
             run(["taskkill", "/PID", str(pid), "/F", "/T"], timeout=8)
             killed.append(pid)
@@ -413,16 +405,16 @@ def kill_elevation_spawners() -> list[int]:
     return killed
 
 
-def _list_processes() -> list[tuple[int, str, str]]:
-    """Return (pid, name, cmdline) via WMIC (CREATE_NO_WINDOW ? no flash)."""
-    rows: list[tuple[int, str, str]] = []
+def _list_processes() -> list[tuple[int, int, str, str]]:
+    """Return (pid, parent_pid, name, cmdline) via WMIC (CREATE_NO_WINDOW, no flash)."""
+    rows: list[tuple[int, int, str, str]] = []
     try:
         r = run(
             [
                 "wmic",
                 "process",
                 "get",
-                "ProcessId,Name,CommandLine",
+                "ProcessId,ParentProcessId,Name,CommandLine",
                 "/FORMAT:CSV",
             ],
             timeout=25,
@@ -430,70 +422,115 @@ def _list_processes() -> list[tuple[int, str, str]]:
         lines = [ln for ln in (r.stdout or "").splitlines() if ln.strip()]
         if len(lines) < 2:
             return rows
-        # CSV header: Node,CommandLine,Name,ProcessId
+        # CSV: Node,CommandLine,Name,ParentProcessId,ProcessId
         for ln in lines[1:]:
             parts = ln.split(",")
-            if len(parts) < 4:
+            if len(parts) < 5:
                 continue
             try:
                 pid = int(parts[-1].strip())
+                ppid = int(parts[-2].strip())
             except ValueError:
                 continue
-            name = parts[-2].strip()
-            cmd = ",".join(parts[1:-2]).strip().strip('"')
-            rows.append((pid, name, cmd))
+            name = parts[-3].strip()
+            cmd = ",".join(parts[1:-3]).strip().strip('"')
+            rows.append((pid, ppid, name, cmd))
     except Exception:
         pass
     return rows
 
 
-def kill_flashy_console_procs() -> list[int]:
-    """Kill bare powershell/python that steal focus (CUA/GPU/elevators).
+def _is_bare_console_cmd(cmd: str, name: str) -> bool:
+    """True when process is path-only powershell/cmd with no useful args.
 
-    Under lockdown: do NOT kill Guardian/Bridge/Image-Rider/Loop trampolines ?
-    they FreeConsole+exit 0 in <100ms. Force-kill made schtask Last Result
-    267014 (TERMINATED) which Windows surfaces as an *error* popup.
-    Still kill cua/GPU and elevators.
+    2026-08-05 RCA: explorer-launched bare powershell.exe (empty args) steals
+    focus every few minutes and kills STT/typing. Old code SPARED these as
+    'WT tabs' — wrong: WT tabs usually have parent WindowsTerminal.exe and
+    non-empty host plumbing. Explorer bare PS is the multi-month thrash.
+    """
+    nlow = (name or "").lower()
+    if nlow not in ("powershell.exe", "pwsh.exe", "cmd.exe"):
+        return False
+    c = (cmd or "").strip().strip('"')
+    if not c:
+        return True
+    # Strip surrounding quotes from path
+    cl = c.lower().replace("/", "\\")
+    # Exact image path only (optional quotes already stripped)
+    if re.fullmatch(
+        r'([a-z]:\\windows\\system32\\windowspowershell\\v1\.0\\)?powershell\.exe',
+        cl,
+    ):
+        return True
+    if re.fullmatch(r'([a-z]:\\windows\\system32\\)?cmd\.exe', cl):
+        return True
+    if re.fullmatch(r'([a-z]:\\program files\\powershell\\[^\\]+\\)?pwsh\.exe', cl):
+        return True
+    # Path + only whitespace
+    if re.match(
+        r'^"?[a-z]:\\windows\\system32\\windowspowershell\\v1\.0\\powershell\.exe"?\s*$',
+        cl,
+    ):
+        return True
+    return False
+
+
+def _parent_name_map(rows: list[tuple[int, int, str, str]]) -> dict[int, str]:
+    return {pid: name for pid, _pp, name, _cmd in rows}
+
+
+def kill_flashy_console_procs() -> list[int]:
+    """Kill focus-steal consoles: elevators + bare explorer PowerShell/cmd.
+
+    Under lockdown: do NOT kill Guardian/Bridge trampolines (self-exit 0).
+    NEVER kill WindowsTerminal/Cascadia-hosted shells or grok agent shells.
     """
     killed: list[int] = []
     me = os.getpid()
     lockdown = (STATE / "popup_lockdown.ON").is_file() or (
         STATE / "popup_emergency.STOP"
     ).is_file() or (STATE / "focus_mode.STOP").is_file()
-    # Trampolines that self-exit 0 under lockdown ? never force-kill
     self_exit_re = re.compile(
         r"(Phronesis-Guardian|Ensure-Grok-Direct-Bridge|grok_hermes_loop|"
         r"Start-Image-Rider|Phronesis-OneButton-Start|Guardian-Body)",
         re.I,
     )
-    for pid, name, cmd in _list_processes():
+    rows = _list_processes()
+    parent_names = _parent_name_map(rows)
+    for pid, ppid, name, cmd in rows:
         if pid == me or pid <= 4:
             continue
         nlow = (name or "").lower()
         cmd_s = cmd or ""
+        plow = (parent_names.get(ppid) or "").lower()
+
+        # --- bare explorer (or node workspace) PowerShell/cmd: ALWAYS kill ---
+        # Parent WindowsTerminal / OpenConsole / grok = KEEP (Jeff typing surface)
+        if _is_bare_console_cmd(cmd_s, nlow):
+            if plow in (
+                "windowsterminal.exe",
+                "openconsole.exe",
+                "grok.exe",
+                "code.exe",
+                "cursor.exe",
+                "devenv.exe",
+            ):
+                continue
+            if "hermesdata" in cmd_s.lower() or "grok" in cmd_s.lower():
+                continue
+            # explorer.exe / node.exe / unknown = focus flash
+            try:
+                run(["taskkill", "/PID", str(pid), "/F", "/T"], timeout=8)
+                killed.append(pid)
+            except Exception:
+                pass
+            continue
+
         if nlow in (
             "gpu tweak iii.exe",
             "monitor.exe",
             "gt3 mobile service.exe",
         ):
-            try:
-                r = run(
-                    [
-                        "wmic",
-                        "process",
-                        "where",
-                        f"ProcessId={pid}",
-                        "call",
-                        "terminate",
-                    ],
-                    timeout=10,
-                )
-                blob = ((r.stdout or "") + (r.stderr or "")).lower()
-                if "returnvalue = 0" in blob or r.returncode == 0:
-                    killed.append(pid)
-                    continue
-            except Exception:
-                pass
             try:
                 run(["taskkill", "/PID", str(pid), "/F", "/T"], timeout=8)
                 killed.append(pid)
@@ -506,21 +543,17 @@ def kill_flashy_console_procs() -> list[int]:
             "python.exe",
             "cmd.exe",
             "conhost.exe",
-        ):
-            if nlow in ("cua-driver.exe", "cua-driver-uia.exe"):
-                pass
-            else:
-                continue
-        if SAFE_CMD_RE.search(cmd_s):
-            continue
-        # Lockdown: leave self-exit trampolines alone
-        if lockdown and self_exit_re.search(cmd_s):
-            # Still kill if clearly elevating / cua start
-            if not re.search(r"cua-driver|RunAs|GPU\s*Tweak", cmd_s, re.I):
-                continue
-        if not FLASHY_CMD_RE.search(cmd_s) and nlow not in (
             "cua-driver.exe",
             "cua-driver-uia.exe",
+        ):
+            continue
+        if SAFE_CMD_RE.search(cmd_s):
+            continue
+        if lockdown and self_exit_re.search(cmd_s):
+            if not re.search(r"cua-driver|RunAs|GPU\s*Tweak", cmd_s, re.I):
+                continue
+        if nlow not in ("cua-driver.exe", "cua-driver-uia.exe") and not FLASHY_CMD_RE.search(
+            cmd_s
         ):
             continue
         try:
@@ -554,13 +587,17 @@ def hide_visible_flash_windows(*, use_wmic: bool = False) -> int:
         flash_pids: set[int] = set()
         console_pids: set[int] = set()
         if use_wmic:
-            for pid, name, cmd in _list_processes():
+            for pid, _pp, name, cmd in _list_processes():
                 nlow = (name or "").lower()
                 if nlow in ("powershell.exe", "pwsh.exe", "python.exe", "cmd.exe"):
                     console_pids.add(pid)
                     if SAFE_CMD_RE.search(cmd or ""):
                         continue
-                    if FLASHY_CMD_RE.search(cmd or "") or focus:
+                    if (
+                        FLASHY_CMD_RE.search(cmd or "")
+                        or focus
+                        or _is_bare_console_cmd(cmd or "", nlow)
+                    ):
                         flash_pids.add(pid)
                 if nlow in (
                     "gpu tweak iii.exe",
@@ -605,7 +642,9 @@ def hide_visible_flash_windows(*, use_wmic: bool = False) -> int:
                 kill = True
             elif title and FLASHY_TITLE_RE.search(title):
                 kill = True
-            elif focus and title and BARE_CONSOLE_TITLE_RE.search(title):
+            # ALWAYS hide classic conhost "Windows PowerShell" / "Command Prompt"
+            # (not Cascadia). Was focus-only before → bare explorer PS stole STT for months.
+            elif title and BARE_CONSOLE_TITLE_RE.search(title):
                 if cls and PROTECT_CLASS_RE.search(cls):
                     return True
                 kill = True
@@ -690,7 +729,7 @@ def dedup_pythonw(match: str) -> list[int]:
     killed: list[int] = []
     matches: list[int] = []
     pat = re.compile(match, re.I)
-    for pid, name, cmd in _list_processes():
+    for pid, _pp, name, cmd in _list_processes():
         if (name or "").lower() != "pythonw.exe":
             continue
         if pat.search(cmd or ""):
@@ -714,7 +753,7 @@ def kill_orphan_comfy_dup() -> list[int]:
     """If two ComfyUI main.py, kill non-listeners (frees RAM/VRAM thrash)."""
     killed: list[int] = []
     comfy: list[tuple[int, str]] = []
-    for pid, name, cmd in _list_processes():
+    for pid, _pp, name, cmd in _list_processes():
         if "ComfyUI" in (cmd or "") and "main.py" in (cmd or ""):
             comfy.append((pid, cmd))
     if len(comfy) <= 1:
@@ -781,37 +820,20 @@ def suppress() -> dict[str, Any]:
 
 
 def register() -> dict:
-    # Prefer home pythonw ? venv Scripts\\pythonw trampolines and dual-starts.
-    pyw = Path(r"C:\Users\CowNi\AppData\Local\Programs\Python\Python311\pythonw.exe")
-    if not pyw.is_file():
-        pyw = Path(r"D:\HermesData\hermes-agent\venv\Scripts\pythonw.exe")
-    script = str(SCRIPTS / "popup_storm_suppress.py")
-    run(["schtasks", "/Delete", "/TN", TASK, "/F"])
-    # Every 1 minute (daemon covers 5s; this is backup)
-    tr = f'"{pyw}" "{script}"'
-    r = run(
-        [
-            "schtasks",
-            "/Create",
-            "/TN",
-            TASK,
-            "/TR",
-            tr,
-            "/SC",
-            "MINUTE",
-            "/MO",
-            "1",
-            "/F",
-            "/RL",
-            "LIMITED",
-        ],
-        timeout=30,
-    )
+    """REFUSED under solid stack law (2026-08-05).
+
+    1-minute Hermes_Popup_* schtasks CAUSED the multi-month flash storm.
+    Guard is popup_storm_daemon.py (pythonw, no schtask). --register is no-op.
+    """
+    run(["schtasks", "/End", "/TN", TASK], timeout=15)
+    run(["schtasks", "/Change", "/TN", TASK, "/DISABLE"], timeout=15)
+    run(["schtasks", "/Delete", "/TN", TASK, "/F"], timeout=15)
     return {
-        "ok": r.returncode == 0,
-        "out": ((r.stdout or "") + (r.stderr or ""))[-400:],
+        "ok": True,
+        "refused": True,
+        "reason": "solid_stack_law_2026-08-05_no_popup_schtasks_use_daemon",
         "task": TASK,
-        "tr": tr,
+        "tr": None,
     }
 
 

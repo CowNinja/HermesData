@@ -96,16 +96,13 @@ USER_TICKS_QUIET: list[str] = [
     "ComfyUI-Gallery-Watchdog",
 ]
 
-# Keep these ENABLED (user-IL) even under focus/lockdown - silent protectors.
-# 2026-08-04 solid-stack: do NOT keep Guardian/Bridge Hidden twins here.
-# They race hermes_gateway_service + meta and were re-enabling after disable.
-USER_TICKS_KEEP_ENABLED: list[str] = [
-    "Hermes_Popup_Storm_Suppress",
-    "Hermes_Popup_Focus_Guard",
-    "Hermes_Popup_End_Flashy_30m",
-]
+# Keep ENABLED under quiet: EMPTY under solid-stack law (2026-08-05).
+# Was: Hermes_Popup_* every 1/15/30m — those CAUSED flash + re-enable thrash
+# when quiet_user_ticks / ensure_hidden_twins re-asserted them after Disable.
+# Popup residual is one-shot via Steer-UAC.ps1 -Quiet, not scheduled.
+USER_TICKS_KEEP_ENABLED: list[str] = []
 
-# Solid single stack (2026-08-03/04): keep thrash/duplicate start paths DISABLED.
+# Solid single stack (2026-08-05): thrash/duplicate paths stay DISABLED.
 # Gateway owner = hermes_gateway_service + hermes_meta_watchdog only.
 SOLID_STACK_KEEP_DISABLED: list[str] = [
     "Phronesis-Guardian-Hidden",
@@ -113,7 +110,24 @@ SOLID_STACK_KEEP_DISABLED: list[str] = [
     "Hermes_Image_Queue_Pulse",
     "Hermes_Gateway_Watchdog_5m",
     "Hermes_Silent_Green_Pulse",
+    "Hermes_Popup_Storm_Suppress",
+    "Hermes_Popup_Focus_Guard",
+    "Hermes_Popup_End_Flashy_30m",
+    "Hermes_Gateway_ForceReload_Once",
+    "Hermes_Gateway_Watchdog",
+    "HermesStackWatchdog",
+    "HermesStackBoot",
+    "Phronesis-Guardian",
+    "Phronesis-Grok-Direct-Bridge",
+    "Phronesis-Grok-Hermes-Loop",
 ]
+
+
+def popup_schtasks_parked() -> bool:
+    """Solid law stamp: never re-enable popup schtasks while parked."""
+    return (STATE / "popup_schtasks.PARKED").is_file() or (
+        STATE / "popup_lockdown.ON"
+    ).is_file()
 
 # Admin-owned flashy entries (document + trampoline no-op only)
 ADMIN_FLASY: list[str] = [
@@ -162,36 +176,70 @@ def schtasks_change(name: str, enable: bool) -> bool:
         return False
 
 
+def schtasks_delete(name: str) -> bool:
+    try:
+        r = subprocess.run(
+            ["schtasks", "/Delete", "/TN", name, "/F"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
 def quiet_user_ticks() -> dict[str, bool]:
     out = {n: schtasks_change(n, enable=False) for n in USER_TICKS_QUIET}
-    # Protectors stay on (popup guards only - not stack-heal twins)
+    # Optional keep-enabled list (empty under solid law)
     for n in USER_TICKS_KEEP_ENABLED:
-        out[f"keep:{n}"] = schtasks_change(n, enable=True)
-    # Solid stack: assert Hidden heal twins stay off
+        if popup_schtasks_parked():
+            out[f"park_block_enable:{n}"] = schtasks_change(n, enable=False)
+        else:
+            out[f"keep:{n}"] = schtasks_change(n, enable=True)
+    # Solid stack: assert thrash paths stay off (and deleted when parked)
     for n in SOLID_STACK_KEEP_DISABLED:
-        out[f"solid_off:{n}"] = schtasks_change(n, enable=False)
+        if popup_schtasks_parked() and "Popup" in n:
+            schtasks_change(n, enable=False)
+            out[f"solid_del:{n}"] = schtasks_delete(n)
+        else:
+            out[f"solid_off:{n}"] = schtasks_change(n, enable=False)
     return out
 
 
 def resume_user_ticks() -> dict[str, bool]:
+    """Resume non-stack ticks only. Never re-enable SOLID_STACK_KEEP_DISABLED."""
     out = {n: schtasks_change(n, enable=True) for n in USER_TICKS_QUIET}
     for n in USER_TICKS_KEEP_ENABLED:
-        out[f"keep:{n}"] = schtasks_change(n, enable=True)
+        if popup_schtasks_parked():
+            out[f"park_block_resume:{n}"] = False
+        else:
+            out[f"keep:{n}"] = schtasks_change(n, enable=True)
     for n in SOLID_STACK_KEEP_DISABLED:
         out[f"solid_off:{n}"] = schtasks_change(n, enable=False)
     return out
 
 
 def ensure_hidden_twins_enabled() -> dict[str, bool]:
-    """Compat shim.
+    """Compat shim — solid-stack law: never re-enable popup or Guardian twins.
 
     Pre-2026-08-04: re-enabled pythonw Hidden Guardian/Bridge twins.
-    Solid-stack law: those twins race the service path - keep them DISABLED.
-    Still re-asserts popup protector tasks that remain in USER_TICKS_KEEP_ENABLED.
+    Pre-2026-08-05: re-enabled Hermes_Popup_* (1m flash thrash).
+    Now: only assert SOLID_STACK_KEEP_DISABLED stay off/deleted when parked.
     """
-    out = {n: schtasks_change(n, enable=True) for n in USER_TICKS_KEEP_ENABLED}
+    out: dict[str, bool] = {}
+    for n in USER_TICKS_KEEP_ENABLED:
+        if popup_schtasks_parked():
+            out[f"park_block:{n}"] = schtasks_change(n, enable=False)
+        else:
+            out[f"keep:{n}"] = schtasks_change(n, enable=True)
     for n in SOLID_STACK_KEEP_DISABLED:
-        out[f"solid_off:{n}"] = schtasks_change(n, enable=False)
+        if popup_schtasks_parked() and "Popup" in n:
+            schtasks_change(n, enable=False)
+            out[f"solid_del:{n}"] = schtasks_delete(n)
+        else:
+            out[f"solid_off:{n}"] = schtasks_change(n, enable=False)
     return out
 
 

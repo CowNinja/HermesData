@@ -235,81 +235,105 @@ def _pollinations_generate(
     label: str = "",
     seed: int | None = None,
 ) -> Dict[str, Any]:
-    """Keyless Pollinations URL mode. model query optional (flux/turbo/etc)."""
+    """Keyless Pollinations URL mode.
+
+    2026-08-05: empty model / generic -> HTTP 500 on image.pollinations.ai;
+    gen.pollinations.ai without model -> 401. Always send a free model (flux).
+    Prefer legacy image.pollinations.ai/prompt when it works with model=flux.
+    """
     base = str(provider.get("base_url") or "https://image.pollinations.ai/prompt").rstrip("/")
+    # Prefer working bases (legacy + new gen host)
+    bases = [base]
+    for alt in (
+        "https://image.pollinations.ai/prompt",
+        "https://gen.pollinations.ai/image",
+    ):
+        if alt.rstrip("/") not in {b.rstrip("/") for b in bases}:
+            bases.append(alt)
     encoded = urllib.parse.quote(prompt, safe="")
     width, height = _dims_for_aspect(aspect_ratio, provider)
     seed0 = int(seed) if seed is not None else (int(time.time() * 1000) % 999999)
-    timeout = float(provider.get("timeout_sec") or 45.0)
+    timeout = float(provider.get("timeout_sec") or 60.0)
     retries = int(provider.get("retries") or 3)
     model = str(provider.get("model") or "").strip()
-    # strip fake model ids used only for labeling
-    if model in ("pollinations-generic", "generic", ""):
-        model_q = ""
+    # 2026-08-05: Pollinations routes some prompts/models through paid "pollen".
+    # Prefer free-working models; rotate on 402/500. Empty model -> 500/401.
+    if model in ("pollinations-generic", "generic", "", "pollinations-default", "turbo", "pollinations-turbo"):
+        model_chain = ["flux", "zimage", "sdxl", "stable-diffusion"]
     else:
-        model_q = model
+        model_chain = [model, "flux", "zimage", "sdxl"]
+    # Cap free dims - large 1024 + long prompts often hit pollen 402
+    if width > 768 or height > 768:
+        scale = min(768 / max(width, 1), 768 / max(height, 1))
+        width = max(256, int(width * scale) // 64 * 64)
+        height = max(256, int(height * scale) // 64 * 64)
     last_err = "unknown"
     pid = str(provider.get("id") or "pollinations-sfw")
-    for attempt in range(retries):
-        s = seed0 + attempt
-        q = f"width={width}&height={height}&nologo=true&seed={s}"
-        if model_q:
-            q += f"&model={urllib.parse.quote(model_q)}"
-        # enhance off by default (faster, fewer surprises)
-        if provider.get("enhance"):
-            q += "&enhance=true"
-        url = f"{base}/{encoded}?{q}"
-        try:
-            data = _http_get(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 HermesFreeSFW/2.0",
-                    "Accept": "image/*,*/*",
-                },
-                timeout=timeout,
-            )
-            if not data or len(data) < 64:
-                last_err = "empty_body"
-                time.sleep(2 * (attempt + 1))
-                continue
-            try:
-                img, ext = _decode_image_bytes(data)
-            except ValueError:
-                last_err = "not_image_bytes"
-                continue
-            actual = _probe_image_size(img)
-            if actual and not _aspect_close(actual[0], actual[1], width, height, tol=0.10):
-                last_err = f"aspect_mismatch_got_{actual[0]}x{actual[1]}_want_{width}x{height}"
-                continue
-            aw, ah = actual if actual else (width, height)
-            path = _save_image_bytes(img, label=label or pid, ext=ext)
-            return {
-                "success": True,
-                "image": path,
-                "image_url": url,
-                "output": path,
-                "model": model_q or "pollinations-default",
-                "provider": pid,
-                "attempts": attempt + 1,
-                "width": aw,
-                "height": ah,
-                "requested_width": width,
-                "requested_height": height,
-                "seed": s,
-            }
-        except Exception as exc:
-            last_err = str(exc)
-            if "429" in last_err and attempt + 1 < retries:
-                time.sleep(8 * (attempt + 1))
-                continue
-            if attempt + 1 < retries and any(
-                x in last_err.lower() for x in ("timeout", "temporarily", "503", "502")
-            ):
-                time.sleep(4 * (attempt + 1))
-                continue
-            if attempt + 1 >= retries:
+    attempt = 0
+    for model_q in model_chain:
+        for base_try in bases[:2]:
+            if attempt >= max(retries * 2, 4):
                 break
-            time.sleep(3 * (attempt + 1))
+            s = seed0 + attempt
+            attempt += 1
+            q = (
+                f"width={width}&height={height}&nologo=true&seed={s}"
+                f"&model={urllib.parse.quote(model_q)}"
+            )
+            if provider.get("enhance"):
+                q += "&enhance=true"
+            url = f"{base_try.rstrip('/')}/{encoded}?{q}"
+            try:
+                data = _http_get(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 HermesFreeSFW/2.0",
+                        "Accept": "image/*,*/*",
+                    },
+                    timeout=timeout,
+                )
+                if not data or len(data) < 64:
+                    last_err = "empty_body"
+                    time.sleep(1)
+                    continue
+                try:
+                    img, ext = _decode_image_bytes(data)
+                except ValueError:
+                    last_err = "not_image_bytes"
+                    continue
+                actual = _probe_image_size(img)
+                # Soft aspect: accept image even if slightly off (provider re-crops)
+                if actual and not _aspect_close(actual[0], actual[1], width, height, tol=0.20):
+                    last_err = f"aspect_mismatch_got_{actual[0]}x{actual[1]}_want_{width}x{height}"
+                    # still accept if we have a real image (better than total fail)
+                aw, ah = actual if actual else (width, height)
+                path = _save_image_bytes(img, label=label or pid, ext=ext)
+                return {
+                    "success": True,
+                    "image": path,
+                    "image_url": url,
+                    "output": path,
+                    "model": model_q,
+                    "provider": pid,
+                    "attempts": attempt,
+                    "width": aw,
+                    "height": ah,
+                    "requested_width": width,
+                    "requested_height": height,
+                    "seed": s,
+                }
+            except Exception as exc:
+                last_err = str(exc)
+                low = last_err.lower()
+                if "429" in last_err:
+                    time.sleep(8)
+                    continue
+                if "401" in last_err or "402" in last_err or "pollen" in low or "balance" in low:
+                    # try next free model / base
+                    continue
+                if any(x in low for x in ("timeout", "temporarily", "503", "502", "500")):
+                    time.sleep(2)
+                    continue
     return {"success": False, "error": f"{pid}:{last_err}"}
 
 

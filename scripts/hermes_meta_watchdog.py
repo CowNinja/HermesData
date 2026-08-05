@@ -37,23 +37,29 @@ def log(msg: str) -> None:
 
 
 def pid_alive(pid: int) -> bool:
+    """Silent OpenProcess — never tasklist (tasklist was flashing STT every 15s)."""
     if pid <= 0:
         return False
+    if sys.platform != "win32":
+        return False
     try:
-        r = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
-            capture_output=True,
-            text=True,
-            timeout=12,
-            creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        h = ctypes.windll.kernel32.OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid)
         )
-        out = (r.stdout or "").strip()
-        return str(pid) in out and "No tasks" not in out
+        if h:
+            ctypes.windll.kernel32.CloseHandle(h)
+            return True
+        # ERROR_ACCESS_DENIED (5) usually means process exists
+        return ctypes.windll.kernel32.GetLastError() == 5
     except Exception:
         return False
 
 
 def service_alive() -> bool:
+    """Prefer lock PID; fallback Toolhelp snapshot (no powershell/tasklist spawn)."""
     if SVC_LOCK.is_file():
         try:
             pid = int(SVC_LOCK.read_text(encoding="utf-8").strip().split()[0])
@@ -61,26 +67,16 @@ def service_alive() -> bool:
                 return True
         except Exception:
             pass
+    # Silent: if any process image is pythonw and we still hold lock file stale,
+    # try Toolhelp by name only is weak — re-read lock once more after 0.2s.
     try:
-        r = subprocess.run(
-            [
-                "powershell",
-                "-NoProfile",
-                "-NonInteractive",
-                "-WindowStyle",
-                "Hidden",
-                "-Command",
-                "(Get-CimInstance Win32_Process | Where-Object { "
-                "$_.CommandLine -like '*hermes_gateway_service.py*' }).Count",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=25,
-            creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-        )
-        return int((r.stdout or "0").strip() or "0") > 0
+        time.sleep(0.05)
+        if SVC_LOCK.is_file():
+            pid = int(SVC_LOCK.read_text(encoding="utf-8").strip().split()[0])
+            return pid_alive(pid)
     except Exception:
-        return False
+        pass
+    return False
 
 
 def health() -> bool:

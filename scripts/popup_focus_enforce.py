@@ -49,48 +49,32 @@ def utc() -> str:
 
 
 def register_task() -> dict:
-    """Register/refresh user-level enforcer every 15 minutes via pythonw."""
-    pyw = pythonw_path()
-    script = str(SCRIPTS / "popup_focus_enforce.py")
-    # Delete old if present
+    """REFUSED under solid stack law (2026-08-05).
+
+    15m Hermes_Popup_Focus_Guard schtask was part of the flash thrash.
+    Use popup_storm_daemon.py (pythonw) only.
+    """
+    subprocess.run(
+        ["schtasks", "/End", "/TN", TASK_NAME],
+        capture_output=True,
+        creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+    )
+    subprocess.run(
+        ["schtasks", "/Change", "/TN", TASK_NAME, "/DISABLE"],
+        capture_output=True,
+        creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+    )
     subprocess.run(
         ["schtasks", "/Delete", "/TN", TASK_NAME, "/F"],
         capture_output=True,
-        text=True,
         creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
     )
-    # schtasks /Create with pythonw -- 15 min, indefinite via /RI /DU
-    # /SC MINUTE /MO 15 /RI 15 works with /DU 9999:00
-    cmd = [
-        "schtasks",
-        "/Create",
-        "/TN",
-        TASK_NAME,
-        "/TR",
-        f'"{pyw}" "{script}"',
-        "/SC",
-        "MINUTE",
-        "/MO",
-        "15",
-        "/F",
-        "/RL",
-        "LIMITED",
-    ]
-    r = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-    )
-    ok = r.returncode == 0
     return {
-        "ok": ok,
-        "rc": r.returncode,
-        "out": ((r.stdout or "") + (r.stderr or ""))[-500:],
+        "ok": True,
+        "refused": True,
+        "reason": "solid_stack_law_2026-08-05_no_popup_schtasks_use_daemon",
         "task": TASK_NAME,
-        "tr": f"{pyw} {script}",
+        "tr": None,
     }
 
 

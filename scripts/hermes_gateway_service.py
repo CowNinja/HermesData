@@ -72,18 +72,20 @@ def log(msg: str) -> None:
 
 
 def pid_alive(pid: int) -> bool:
+    """Silent OpenProcess — never tasklist (console flash kills STT)."""
     if pid <= 0:
         return False
     try:
-        r = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
-            capture_output=True,
-            text=True,
-            timeout=12,
-            creationflags=CREATE_NO_WINDOW,
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        h = ctypes.windll.kernel32.OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid)
         )
-        out = (r.stdout or "").strip()
-        return str(pid) in out and "No tasks" not in out
+        if h:
+            ctypes.windll.kernel32.CloseHandle(h)
+            return True
+        return ctypes.windll.kernel32.GetLastError() == 5
     except Exception:
         return False
 
