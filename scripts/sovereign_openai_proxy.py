@@ -2647,9 +2647,12 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                         extra_headers=hdrs,
                     )
                 return
-            if prefer_fleet_now and not is_roleplay_route(routing) and not stream:
+            # Stream AND non-stream: under prefer_fleet, skip local GPU FIFO.
+            # Voice/agent streaming previously ALWAYS hit FIFO (not stream gate),
+            # so Discord voice waited minutes and produced zero TTS clauses.
+            if prefer_fleet_now and not is_roleplay_route(routing):
                 # Attempt proactive free offload again if first pass skipped local_first
-                if not proactive_handled:
+                if not proactive_handled and not stream:
                     try:
                         from escalation_router import try_proactive_offload_dispatch
 
@@ -2695,12 +2698,20 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                             }
                         )
                 if not proactive_handled:
-                    # Fast-fail local ? free via resolve_post_local without FIFO wait
+                    # Fast-fail local → free via resolve_post_local without FIFO wait
+                    # (works for stream=True agent turns used by Discord voice)
                     use_native = False
+                    routing = {
+                        **routing,
+                        "prefer_fleet": True,
+                        "prefer_fleet_reason": prefer_fleet_reason,
+                        "local_fail_reason": prefer_fleet_reason,
+                    }
                     _log_event(
                         {
                             "event": "prefer_fleet_bypass_fifo",
                             "reason": prefer_fleet_reason,
+                            "stream": bool(stream),
                             "note": "skip GPU queue; free-before-grok ladder",
                         }
                     )

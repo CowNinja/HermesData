@@ -430,6 +430,24 @@ class InferenceQueue:
             self._persist_state_unlocked(force=True)
             self._lock.notify_all()
 
+    def force_fail_active(self, reason: str = "forced") -> Optional[Dict[str, Any]]:
+        """Fail the active job so waiters can proceed (voice-heal path)."""
+        with self._lock:
+            if not self._active:
+                return None
+            entry = self._active
+            entry.finished_at = time.time()
+            entry.state = "failed"
+            entry.error = reason
+            if entry.started_at:
+                entry.run_sec = round(entry.finished_at - entry.started_at, 2)
+            self._done.appendleft(entry)
+            self._active = None
+            self._stats["total_failed"] += 1
+            self._persist_state_unlocked(force=True)
+            self._lock.notify_all()
+            return entry.to_dict()
+
     def get(self, request_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
             if self._active and self._active.id == request_id:
@@ -603,6 +621,32 @@ class InferenceQueue:
                 self._maybe_heal(heal_reason)
             return
         run_so_far = time.time() - active.started_at
+        # Interactive voice/discord backlog: fail stuck active sooner so free-fleet
+        # / next job can run (STUCK_HEAL 1680s was far too long for voice).
+        if (
+            waiting_count >= 1
+            and run_so_far >= 120.0
+            and (active.priority_class == PRIORITY_INTERACTIVE or "discord" in (active.caller or "").lower())
+        ):
+            try:
+                failed = self.force_fail_active(
+                    f"interactive_stuck_{run_so_far:.0f}s_waiters_{waiting_count}"
+                )
+                if failed:
+                    try:
+                        from model_resource_manager import append_watchdog_log
+
+                        append_watchdog_log({
+                            "event": "inference_queue_force_fail_active",
+                            "request_id": failed.get("id"),
+                            "run_so_far_sec": round(run_so_far, 1),
+                            "waiting_count": waiting_count,
+                        })
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            return
         if run_so_far >= STUCK_HEAL_SEC:
             heal_reason = f"active_exceeded_{STUCK_HEAL_SEC}s"
         elif run_so_far >= STUCK_WARN_SEC:
@@ -939,6 +983,9 @@ def should_prefer_fleet_offload() -> tuple[bool, str]:
 
     Triggers: live image lock, dual-tenant ports, or 8090 unreachable while
     proxy is up. Also honors fresh muscle signal file (hard_fleet_offload).
+    Also triggers on **FIFO pressure** so Discord voice / interactive text
+    do not wait minutes behind a stuck local job (voice silence root cause
+    2026-08-05: waiting_count>=3, active run_so_far>=90s).
     RP lane still stays local via should_defer_proactive_offload / classify.
     Free before Grok ? Grok-token-outage resilience (2026-07-27).
     """
@@ -975,6 +1022,19 @@ def should_prefer_fleet_offload() -> tuple[bool, str]:
                     sig.get("hard_fleet_offload") or sig.get("prefer_fleet_offload")
                 ):
                     return True, str(sig.get("prefer_fleet_reason") or "muscle_signal")
+    except Exception:
+        pass
+    # FIFO pressure — local interactive backlog kills Discord voice turns
+    try:
+        snap = get_inference_queue().snapshot() or {}
+        wait_n = int(snap.get("waiting_count") or 0)
+        active = snap.get("active") if isinstance(snap.get("active"), dict) else {}
+        run_so_far = float(active.get("run_so_far_sec") or 0.0)
+        if wait_n >= 2:
+            return True, f"fifo_pressure_wait_{wait_n}"
+        # Hung local job (even alone) starves Discord voice for minutes
+        if active and run_so_far >= 45.0:
+            return True, f"fifo_active_slow_{run_so_far:.0f}s"
     except Exception:
         pass
     return False, "ok"
