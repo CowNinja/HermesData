@@ -760,27 +760,29 @@ discord:
   voice_rooms: []
   voice_turn:
     barge_in: true
-    silence_threshold_s: 0.85
-    min_speech_duration_s: 0.35
+    # Hangout Phase A balance: conversation-first; longer turns must survive.
+    # 0.75s was cutting 15–25s thoughts at mid-pause (transcript fragments).
+    silence_threshold_s: 1.25
+    min_speech_duration_s: 0.32
     barge_in_min_playback_s: 0.28
     instant_ack: false
     instant_ack_phrases:
     - Mm-hm.
     - One sec.
     - Got it.
-    # Fast-first + long-call stable: fixed budget sliding window (not main memory)
-    coalesce_delay_s: 0.70
+    # Reassemble silence-split fragments before dispatch (STT takes ~1s).
+    coalesce_delay_s: 1.10
     preview_fragments: false
     fast_path:
       enabled: true
       agent_fallback: true
-      # Quality-with-speed: 1–2 short sentences (1-sentence-only felt abrupt)
+      # Hangout: short riffs, hard timeout; room for full spoken thoughts
       max_tokens: 56
-      timeout_s: 3.2
-      rescue_timeout_s: 2.4
-      temperature: 0.5
-      max_pairs: 3
-      max_msg_chars: 180
+      timeout_s: 2.6
+      rescue_timeout_s: 1.8
+      temperature: 0.55
+      max_pairs: 4
+      max_msg_chars: 480
       max_reply_chars: 200
       max_sentences: 2
       rescue_try: true
