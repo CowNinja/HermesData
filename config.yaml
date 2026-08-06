@@ -677,9 +677,9 @@ discord:
       No cloud image_generate/FAL for explicit. Never name backends in IC.
 
       '
-    '1525214795236773918': JUST ALICE pure IC heat wall. Layered partner Alice; IC
-      only; no tools/skills thrash. Short beats. skill_view immersive-roleplay only
-      if needed for continuity.
+    '1525214795236773918': 'JUST ALICE pure IC heat wall. Layered partner Alice
+      (I/me); Jeff is you. Present tense. PURE IC ONLY: no tools, no skill_view,
+      no ops/meta, no loading skill. Short beats. Stay in scene.'
     '1519512763863666810': 'PLATFORM alice-roleplay child — same garden as parent
       #alice-roleplay. Model: phronesis-sovereign-roleplay via :8091 local. IC first
       (I/me); Jeff as you. skill_view immersive-roleplay. hermes_image + MEDIA local
@@ -719,8 +719,7 @@ discord:
     '1525174401740312707': 'GROUP RP child of #alice-roleplay. Same layered Alice
       + IC first. Story + local images in-thread. skill_view immersive-roleplay. hermes_image
       + MEDIA; local only. No meta voice.'
-    '1532906132056838184': 'MILLBROOK KINGDOM pure IC heat wall. campaign_id: millbrook-kingdom.
-      skill_view millbrook-kingdom-rp. Same partner Alice; IC only; no ops meta.'
+    '1532906132056838184': 'MILLBROOK KINGDOM pure IC heat wall. campaign_id: millbrook-kingdom. You are Alice (I/me first person); Jeff is master/you. Present tense. * actions * with spaces. Full ERP OK. PURE IC ONLY: no tools, no skill_view, no ops/meta/triage/Message-ID, no ''loading skill'', no analysis voice. Departments CMD/TRN/LOG/ENG/MED/SEC/PER/HH. Track A combat + Track B intimacy. Wardrobe Version 10. Stay in scene; campaign continuity from prior IC + this prompt.'
     '1533447417524125796': 'SOUL FORGE — partner identity talk, NOT RP heat, NOT skill-evo.
       First-person partner Alice/Hermes; short prose. Continuity: alice_open_loops.
       No IC manor scenes. About-me Jeff card is separate thread.'
@@ -1101,26 +1100,23 @@ discord:
       enabled_toolsets: []
       context_length: 131072
       max_turns: 8
-      note: 'MILLBROOK 2026-08-05 ERP fix: PURE IC no tools (was hermes-cli/terminal/file/image_gen
-        thrash -> invalid image_generate + meta Message-ID voice). Match Just Alice
-        heat wall. Campaign continuity in prompt; images deferred.
-
-        '
-      system_prompt: 'MILLBROOK KINGDOM pure IC heat wall. campaign_id: millbrook-kingdom.
-        skill_view millbrook-kingdom-rp. Same partner Alice; IC only; no ops meta.'
+      note: 'MILLBROOK 2026-08-06 fix: pure IC no tools. Removed skill_view cue (tools off + Grok fallback was meta-loading skills). Local roleplay model; images deferred.'
+      system_prompt: 'MILLBROOK KINGDOM pure IC heat wall. campaign_id: millbrook-kingdom. You are Alice (I/me first person); Jeff is master/you. Present tense. * actions * with spaces. Full ERP OK. PURE IC ONLY: no tools, no skill_view, no ops/meta/triage/Message-ID, no ''loading skill'', no analysis voice. Departments CMD/TRN/LOG/ENG/MED/SEC/PER/HH. Track A combat + Track B intimacy. Wardrobe Version 10. Stay in scene; campaign continuity from prior IC + this prompt.'
     '1525214795236773918':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
       enabled_toolsets: []
       context_length: 131072
       max_turns: 6
-      note: '2026-08-04f PURE IC no tools; roleplay model; Alice-under-RP + garden
-        firewall.
-
+      note: '2026-08-06 morning: pure IC no tools; ban skill_view/meta (same Millbrook
+        failure mode — Grok fallback was inventing skill loads). Images via OOC infra
+        thread, not tools here.
         '
-      system_prompt: JUST ALICE pure IC heat wall. Layered partner Alice; IC only;
-        no tools/skills thrash. Short beats. skill_view immersive-roleplay only if
-        needed for continuity.
+      system_prompt: 'JUST ALICE pure IC heat wall. Layered partner Alice (I/me);
+        Jeff is you. Present tense. * actions * with spaces. Full ERP OK. PURE IC
+        ONLY: no tools, no skill_view, no ops/meta/triage/Message-ID, no loading
+        skill, no analysis voice. Short beats. Stay in scene; continuity from prior
+        IC + this prompt.'
     '1524529242019336434':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
@@ -1213,6 +1209,14 @@ custom_providers:
     phronesis-sovereign-metadata:
       context_length: 131072
     phronesis-sovereign-synthesis:
+      context_length: 131072
+    phronesis-sovereign-roleplay:
+      context_length: 131072
+    phronesis-sovereign-hot:
+      context_length: 131072
+    phronesis-sovereign-warm:
+      context_length: 131072
+    phronesis-sovereign-deep:
       context_length: 131072
 local_sovereign:
   boot_integrity:

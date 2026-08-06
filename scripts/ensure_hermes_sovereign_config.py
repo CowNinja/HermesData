@@ -123,6 +123,10 @@ LOCAL_SOVEREIGN_DEFAULTS = {
 EXTRA_SOVEREIGN_MODELS = (
     "phronesis-sovereign-classify",
     "phronesis-sovereign-metadata",
+    "phronesis-sovereign-roleplay",
+    "phronesis-sovereign-hot",
+    "phronesis-sovereign-warm",
+    "phronesis-sovereign-deep",
 )
 
 try:
