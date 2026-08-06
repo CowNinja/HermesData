@@ -241,6 +241,14 @@ auxiliary:
     base_url: http://127.0.0.1:8091/v1
     api_key: local
     timeout: 180
+  # Goal judge MUST return one-line JSON. Local Qwythos often returns prose
+  # and auto-pauses after 3 parse failures (token burn). Route to cheap strict
+  # flash model. SSOT fix 2026-08-06 for Smart Ingestion /goal pause.
+  goal_judge:
+    provider: openrouter
+    model: google/gemini-3-flash-preview
+    timeout: 60
+    max_tokens: 4096
 display:
   compact: true
   personality: technical
