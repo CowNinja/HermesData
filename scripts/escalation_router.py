@@ -80,11 +80,16 @@ def fleet_policy() -> Dict[str, Any]:
         return dict(cached)
     raw = _load_yaml(CONFIG_PATH)
     fleet = (raw.get("local_sovereign") or {}).get("opportunistic_fleet") or {}
+    # Prefer config.yaml; also honor fleet_registry policy aliases if present later.
+    fallback_local = fleet.get("fallback_on_local_fail")
+    if fallback_local is None:
+        fallback_local = fleet.get("local_failover_to_fleet", True)
     policy = {
         "enabled": bool(fleet.get("enabled")),
         "prefer_free_before_grok": bool(fleet.get("prefer_free_before_grok", True)),
         "augment_local_with_context": bool(fleet.get("augment_local_with_context", True)),
-        "fallback_on_local_fail": bool(fleet.get("fallback_on_local_fail", True)),
+        "fallback_on_local_fail": bool(fallback_local),
+        "local_failover_to_fleet": bool(fallback_local),  # alias SSOT
         "proactive_realtime_triggers": bool(fleet.get("proactive_realtime_triggers", True)),
         "proactive_offload": bool(fleet.get("proactive_offload", True)),
         # Policy B: auto T3 for hard prompts; share caps mirror thrift gate

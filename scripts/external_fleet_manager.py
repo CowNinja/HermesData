@@ -175,6 +175,43 @@ def _telemetry_monitor():
         return None
 
 
+def _provider_in_cooldown(provider: Dict[str, Any]) -> bool:
+    """Skip free providers under living metrics cooldown_until (shared helper)."""
+    from cooldown_until import record_in_cooldown
+
+    return record_in_cooldown(provider if isinstance(provider, dict) else None)
+
+
+# Free-hop hard timeout when envelope field missing (matches free_model_metrics probe hard ~20s).
+# Friday gap: soft_timeout_ms race abort + cancel losing futures NOT implemented yet.
+_DEFAULT_FREE_HARD_TIMEOUT_S = 20.0
+_DEFAULT_PAID_HARD_TIMEOUT_S = 120.0
+
+
+def _provider_hard_timeout_s(provider: Dict[str, Any]) -> float:
+    """Consume envelope hard_timeout_ms from fleet provider; free hops never sit on bare 120s."""
+    raw = provider.get("hard_timeout_ms")
+    if raw is not None:
+        try:
+            s = float(raw) / 1000.0
+            if s > 0:
+                return min(max(s, 1.0), _DEFAULT_PAID_HARD_TIMEOUT_S)
+        except (TypeError, ValueError):
+            pass
+    base = str(provider.get("base_url") or "").lower()
+    model = str(provider.get("model") or "").lower()
+    pid = str(provider.get("id") or "").lower()
+    if (
+        "openrouter" in base
+        or ":free" in model
+        or pid.startswith("openrouter-free")
+        or pid.startswith("groq-free")
+        or pid.startswith("gemini-free")
+    ):
+        return _DEFAULT_FREE_HARD_TIMEOUT_S
+    return _DEFAULT_PAID_HARD_TIMEOUT_S
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -335,9 +372,19 @@ class FleetManager:
                 tel = _telemetry_monitor()
                 if tel and pid and tel.is_blacklisted(pid):
                     continue
+                # Living metrics cooldown: skip free providers still in quarantine
+                if _provider_in_cooldown(p):
+                    continue
                 eff_priority = int(p.get("priority") or 0)
                 if tel and pid:
                     eff_priority = tel.effective_priority(pid, eff_priority)
+                # Soft demote if failure_streak high but not yet in cooldown field
+                try:
+                    streak = int(p.get("failure_streak") or 0)
+                    if streak >= 3:
+                        eff_priority = min(eff_priority, 5)
+                except Exception:
+                    pass
                 out.append({**p, "_kind": pkind, "_health": health, "_effective_priority": eff_priority})
         out.sort(key=lambda x: (-int(x.get("_effective_priority") or x.get("priority") or 0), str(x.get("id"))))
         return out
@@ -473,6 +520,17 @@ class FleetManager:
             return max(1, min(6, n))
         except Exception:
             return DEFAULT_PARALLEL_COMPUTE_PROVIDERS
+
+    def _parallel_min_priority(self) -> int:
+        """Only race providers at/above this priority. Tail (flaky/low prio) is sequential after race miss.
+
+        Prevents fast-but-flaky hops (e.g. Groq CF 403) winning the parallel race over solid
+        OpenRouter free. 0 = no floor (legacy race-all-batch behavior).
+        """
+        try:
+            return max(0, int((self._registry.get("policy") or {}).get("parallel_min_priority") or 0))
+        except Exception:
+            return 0
 
     def _record_provider_failure(self, provider: Dict[str, Any], result: Dict[str, Any]) -> None:
         """Soft health: require consecutive failures before marking provider down."""
@@ -853,8 +911,9 @@ class FleetManager:
             headers["HTTP-Referer"] = "https://phronesis.local"
             headers["X-Title"] = "Phronesis Opportunistic Fleet"
 
+        hard_s = _provider_hard_timeout_s(provider)
         started = time.time()
-        status, body = self._http_post(url, payload, headers=headers, timeout=120)
+        status, body = self._http_post(url, payload, headers=headers, timeout=hard_s)
         elapsed = round(time.time() - started, 2)
         text = ""
         if isinstance(body, dict):
@@ -870,6 +929,7 @@ class FleetManager:
             "provider_name": provider.get("name"),
             "latency_sec": elapsed,
             "http_status": status,
+            "hard_timeout_s": hard_s,
         }
         if not ok:
             result["error"] = body if isinstance(body, dict) else str(body)[:500]
@@ -880,7 +940,7 @@ class FleetManager:
                 provider_id=str(provider.get("id")),
                 success=ok,
                 latency_sec=elapsed,
-                timeout=status == 0 or elapsed >= 115,
+                timeout=status == 0 or elapsed >= max(1.0, hard_s - 1.0),
                 error=result.get("error") if not ok else None,
             )
         return result
@@ -945,6 +1005,7 @@ class FleetManager:
                 "capabilities": capabilities,
                 "latency_sec": one.get("latency_sec"),
                 "http_status": one.get("http_status"),
+                "hard_timeout_s": one.get("hard_timeout_s"),
                 "failover_attempts": len(attempts),
                 "parallel_dispatch": True,
             }
@@ -986,18 +1047,46 @@ class FleetManager:
         if not candidates:
             return {"success": False, "tier": TIER_NAME, "error": "no_compute_provider", "capabilities": caps}
 
-        if self._parallel_dispatch_enabled() and len(candidates) > 1:
-            return self._dispatch_compute_parallel(
-                candidates,
+        # Race only high-priority providers; flaky tail (low priority) is sequential after race miss.
+        min_prio = self._parallel_min_priority()
+        if min_prio > 0:
+            race_batch = [
+                p
+                for p in candidates
+                if int(p.get("_effective_priority") or p.get("priority") or 0) >= min_prio
+            ]
+            tail_batch = [
+                p
+                for p in candidates
+                if int(p.get("_effective_priority") or p.get("priority") or 0) < min_prio
+            ]
+        else:
+            race_batch = list(candidates)
+            tail_batch = []
+
+        if self._parallel_dispatch_enabled() and len(race_batch) > 1:
+            raced = self._dispatch_compute_parallel(
+                race_batch,
                 prompt,
                 capabilities=caps,
                 system=system,
                 max_tokens=max_tokens,
             )
+            if raced.get("success"):
+                raced["role_preferred_ids"] = preferred or []
+                raced["parallel_min_priority"] = min_prio
+                return raced
+            # Race miss: sequential over remaining race + tail (prefer_free reliability)
+            seq_candidates = race_batch + tail_batch
+        elif self._parallel_dispatch_enabled() and len(race_batch) == 1 and not tail_batch:
+            # Single solid provider: no race overhead
+            seq_candidates = race_batch
+        else:
+            seq_candidates = race_batch + tail_batch if race_batch or tail_batch else candidates
 
-        max_tries = min(len(candidates), self._max_provider_retries() * 2)
+        max_tries = min(len(seq_candidates), self._max_provider_retries() * 2)
         attempts: List[Dict[str, Any]] = []
-        for provider in candidates[:max_tries]:
+        for provider in seq_candidates[:max_tries]:
             one = self._dispatch_compute_one(
                 provider, prompt, system=system, max_tokens=max_tokens,
             )
@@ -1020,8 +1109,10 @@ class FleetManager:
                     "capabilities": caps,
                     "latency_sec": one.get("latency_sec"),
                     "http_status": one.get("http_status"),
+                    "hard_timeout_s": one.get("hard_timeout_s"),
                     "failover_attempts": len(attempts),
                     "role_preferred_ids": preferred or [],
+                    "parallel_min_priority": min_prio,
                 }
                 _log(DISPATCH_LOG, {"event": "compute_dispatch", **{k: result.get(k) for k in result}})
                 return result
@@ -1034,6 +1125,7 @@ class FleetManager:
             "error": last.get("error") or "all_compute_providers_failed",
             "capabilities": caps,
             "attempts": attempts,
+            "parallel_min_priority": min_prio,
         }
         _log(DISPATCH_LOG, {"event": "compute_dispatch_fail", **result})
         return result

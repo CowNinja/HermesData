@@ -5,7 +5,18 @@ model:
   context_length: 131072
   max_tokens: 1024
   base_url: http://127.0.0.1:8091/v1
+# When primary local :8091 fails: free OpenRouter first, Grok only if free fails.
+# No-Grok survival 2026-08-06: do not put paid Grok first under token thrift.
+# Failover harden 2026-08-06: measured free chain before paid.
 fallback_providers:
+- provider: openrouter
+  model: openrouter/free
+- provider: openrouter
+  model: nvidia/nemotron-3-super-120b-a12b:free
+- provider: openrouter
+  model: google/gemma-4-26b-a4b-it:free
+- provider: openrouter
+  model: poolside/laguna-s-2.1:free
 - provider: xai-oauth
   model: grok-4.5
   api_mode: chat_completions
