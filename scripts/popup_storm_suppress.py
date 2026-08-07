@@ -443,10 +443,10 @@ def _list_processes() -> list[tuple[int, int, str, str]]:
 def _is_bare_console_cmd(cmd: str, name: str) -> bool:
     """True when process is path-only powershell/cmd with no useful args.
 
-    2026-08-05 RCA: explorer-launched bare powershell.exe (empty args) steals
-    focus every few minutes and kills STT/typing. Old code SPARED these as
-    'WT tabs' — wrong: WT tabs usually have parent WindowsTerminal.exe and
-    non-empty host plumbing. Explorer bare PS is the multi-month thrash.
+    Kept for diagnostics / optional tooling. 2026-08-07 law: do NOT kill or
+    hide these — Start Menu / Win+X / explorer-launched shells look identical
+    to the old "bare thrash" pattern and are Jeff's interactive surface.
+    Storm prevention is elevators + FLASHY_CMD_RE + flash titles only.
     """
     nlow = (name or "").lower()
     if nlow not in ("powershell.exe", "pwsh.exe", "cmd.exe"):
@@ -480,10 +480,13 @@ def _parent_name_map(rows: list[tuple[int, int, str, str]]) -> dict[int, str]:
 
 
 def kill_flashy_console_procs() -> list[int]:
-    """Kill focus-steal consoles: elevators + bare explorer PowerShell/cmd.
+    """Kill focus-steal consoles: elevators + known flashy cmdlines only.
 
     Under lockdown: do NOT kill Guardian/Bridge trampolines (self-exit 0).
     NEVER kill WindowsTerminal/Cascadia-hosted shells or grok agent shells.
+    2026-08-07: NEVER kill bare explorer PowerShell/cmd — that is the user's
+    intentional shell (Start Menu / Win+X). Killing them made every new
+    PowerShell window auto-close.
     """
     killed: list[int] = []
     me = os.getpid()
@@ -496,34 +499,14 @@ def kill_flashy_console_procs() -> list[int]:
         re.I,
     )
     rows = _list_processes()
-    parent_names = _parent_name_map(rows)
     for pid, ppid, name, cmd in rows:
         if pid == me or pid <= 4:
             continue
         nlow = (name or "").lower()
         cmd_s = cmd or ""
-        plow = (parent_names.get(ppid) or "").lower()
 
-        # --- bare explorer (or node workspace) PowerShell/cmd: ALWAYS kill ---
-        # Parent WindowsTerminal / OpenConsole / grok = KEEP (Jeff typing surface)
+        # Interactive bare shells: spare always (user typing surface)
         if _is_bare_console_cmd(cmd_s, nlow):
-            if plow in (
-                "windowsterminal.exe",
-                "openconsole.exe",
-                "grok.exe",
-                "code.exe",
-                "cursor.exe",
-                "devenv.exe",
-            ):
-                continue
-            if "hermesdata" in cmd_s.lower() or "grok" in cmd_s.lower():
-                continue
-            # explorer.exe / node.exe / unknown = focus flash
-            try:
-                run(["taskkill", "/PID", str(pid), "/F", "/T"], timeout=8)
-                killed.append(pid)
-            except Exception:
-                pass
             continue
 
         if nlow in (
@@ -593,11 +576,10 @@ def hide_visible_flash_windows(*, use_wmic: bool = False) -> int:
                     console_pids.add(pid)
                     if SAFE_CMD_RE.search(cmd or ""):
                         continue
-                    if (
-                        FLASHY_CMD_RE.search(cmd or "")
-                        or focus
-                        or _is_bare_console_cmd(cmd or "", nlow)
-                    ):
+                    # 2026-08-07: never treat bare interactive PS/cmd as flashy
+                    if _is_bare_console_cmd(cmd or "", nlow):
+                        continue
+                    if FLASHY_CMD_RE.search(cmd or ""):
                         flash_pids.add(pid)
                 if nlow in (
                     "gpu tweak iii.exe",
@@ -636,17 +618,14 @@ def hide_visible_flash_windows(*, use_wmic: bool = False) -> int:
             if title and PROTECT_TITLE_RE.search(title):
                 return True
             kill = False
+            # 2026-08-07: spare classic interactive titles (Start Menu / Win+X)
+            if title and BARE_CONSOLE_TITLE_RE.search(title):
+                return True
             if pid.value in flash_pids:
                 if cls and PROTECT_CLASS_RE.search(cls):
                     return True
                 kill = True
             elif title and FLASHY_TITLE_RE.search(title):
-                kill = True
-            # ALWAYS hide classic conhost "Windows PowerShell" / "Command Prompt"
-            # (not Cascadia). Was focus-only before → bare explorer PS stole STT for months.
-            elif title and BARE_CONSOLE_TITLE_RE.search(title):
-                if cls and PROTECT_CLASS_RE.search(cls):
-                    return True
                 kill = True
             # Always snuff GPU Tweak dummy windows (even without focus STOP)
             elif title and re.search(r"SOUI_DUMMY|GPU\s*Tweak", title, re.I):

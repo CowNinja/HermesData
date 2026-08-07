@@ -149,16 +149,19 @@ def _acquire_single_instance() -> bool:
 
 
 def _hot_tick() -> int:
-    """Pure ctypes: hide bare PowerShell/CMD windows. Returns hide count."""
+    """Pure ctypes: hide flashy tool/error consoles only. Returns hide count.
+
+    2026-08-07: interactive 'Windows PowerShell' / 'Command Prompt' are spared.
+    """
     from win_silent_proc import hide_window_titles
 
     return hide_window_titles(bare_console_only=True)
 
 
 def _heavy_tick() -> dict:
-    """Rare: end elevating schtasks + kill bare explorer PS via suppress (CREATE_NO_WINDOW).
+    """Rare: end elevating schtasks + kill flashy elevators (CREATE_NO_WINDOW).
 
-    This may briefly use tasklist but only ~every 10 minutes, not every 5s.
+    Does NOT kill bare explorer PowerShell (user shells). ~every 10 minutes.
     """
     out: dict = {}
     try:
