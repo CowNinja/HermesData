@@ -547,9 +547,31 @@ function Stop-WorkspaceServer {
 }
 
 function Start-WorkspaceServer {
-    $node = if ($Core -and $Core.node_exe) { $Core.node_exe } else { "node.exe" }
+    # :3001 Hermes Workspace hub (distinct from CLI dashboard :9119).
+    # Must break away from parent Job Objects — Start-HiddenProcess only VBS-detaches
+    # python; a plain Process.Start of node dies when Grok/tool shells exit, which is
+    # why restart-workspace.ps1 reported UP then left :3001 dark.
     $wsDir = if ($Core -and $Core.workspace_dir) { $Core.workspace_dir } else { "D:\HermesData\hermes-workspace" }
     if (-not (Test-Path (Join-Path $wsDir "server-entry.js"))) { return $false }
+
+    $vbs = Join-Path $HermesRoot "scripts\Start-Hermes-Workspace-Hidden.vbs"
+    if (-not (Test-Path $vbs)) { $vbs = Join-Path $PSScriptRoot "Start-Hermes-Workspace-Hidden.vbs" }
+    if (Test-Path $vbs) {
+        Start-Process -FilePath "wscript.exe" -ArgumentList @("//B", $vbs) -WindowStyle Hidden | Out-Null
+        return $true
+    }
+
+    # Fallback without VBS: prefer portable Node 22 (system Node 24 broke SSR on this host).
+    $node22 = Join-Path $HermesRoot "tools\node22\node-v22.17.0-win-x64\node.exe"
+    $node = if (Test-Path $node22) {
+        $node22
+    } elseif ($Core -and $Core.node_exe -and (Test-Path ([string]$Core.node_exe))) {
+        [string]$Core.node_exe
+    } else {
+        "node.exe"
+    }
+    $env:PORT = if ($Core -and $Core.ports.workspace) { [string][int]$Core.ports.workspace } else { "3001" }
+    $env:HOST = "127.0.0.1"
     Start-HiddenProcess -FilePath $node -ArgumentList @("server-entry.js") -WorkingDirectory $wsDir | Out-Null
     return $true
 }

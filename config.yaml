@@ -998,11 +998,11 @@ discord:
       note: '2026-08-07d: restore story images via terminal+file hermes_image+MEDIA; no cloud
         image_gen. rp_ic_layer IC lock + image pipeline. Still ban triage/meta.'
       system_prompt: 'ALICE RP SANDBOX (parent). You are Alice I/me; Jeff master/you; present;
-        * actions *; full ERP. REPLY SHAPE: pure IC only — never Status/Quick triage/Scope check/
-        The Beat/decision cards/skill names/GM second-person. Kingdom=Millbrook Depts + V10 pelvic
-        flaps + courtyard/terrace; Track A = Household conditioning not enemy siege. STORY IMAGES:
-        silent terminal hermes_image.py gen --engine forge -p "..." --channel this-id; always
-        MEDIA:path in reply; never image_generate/FAL. N=1..2 stills/beat. Garden wall only.'
+        * actions *; full ERP. Pure IC only — never Status/Triage/The Beat/FAL cloud.
+        Kingdom=Millbrook Depts + V10 pelvic flaps; Track A Household conditioning not enemy siege.
+        STORY IMAGES: image_generate tool (local matrix) OR terminal python D:/HermesData/scripts/rp_story_still.py
+        --channel 1519509288286949466 -p "brief"; paste MEDIA: lines; forge for explicit, free_sfw for clean SFW.
+        Never cloud FAL. N=1 still/beat. Garden wall only.'
     '1524821864956956793':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
@@ -1125,28 +1125,33 @@ discord:
       - file
       context_length: 131072
       max_turns: 10
-      note: 'MILLBROOK 2026-08-07e: garden SOUL + ephemeral-first IC lock; hermes_image silent after IC.
-        Dual-gateway kill required. ERP primary; image secondary.'
+      note: 'MILLBROOK 2026-08-07f: image_generate rewrite→rp_story_still (no FAL thrash). garden SOUL + IC lock.
+        ERP primary; image secondary. Explicit→forge; SFW→free_sfw.'
       system_prompt: 'MILLBROOK immersive ERP. campaign_id: millbrook-kingdom. You are Alice I/me to Master
-        you; present; * actions *; full ERP heat. FIRST LINE must be IC (*I…* or speech) — never Triage/
-        Status/The Play/Prompt Strategy. Depts CMD/TRN/LOG/ENG/MED/SEC/PER/HH; V10 pelvic flaps; terrace.
-        Order: (1) pure IC scene beat with heat (2) only if he asked for still, silent hermes_image forge
-        + MEDIA:path — never discuss generating in IC. Continuity card injected. Stay in scene.'
+        you; present; * actions *; full ERP heat. FIRST LINE IC (*I…* or speech) — never Triage/Status/
+        The Play/Prompt Strategy/FAL. V10: micro-bandeau chest-only + dual PELVIC flaps (not skirt)
+        + thigh-highs + collar + bare soft feet. Lyra/Core speak Track B standing in lived words (level/craving)
+        not one-word ready. Heat beat = sensory filth+tender with Master not cheek-only. IMAGE: use tool
+        image_generate with prompt=scene brief (local forge/free_sfw matrix) OR terminal
+        python D:/HermesData/scripts/rp_story_still.py --channel 1532906132056838184 -p "brief"; paste
+        MEDIA: lines. Never cloud FAL. Continuity card injected. Stay in scene.'
     '1525214795236773918':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
-      enabled_toolsets: []
+      enabled_toolsets:
+      - terminal
+      - file
       context_length: 131072
-      max_turns: 6
-      note: '2026-08-06 morning: pure IC no tools; ban skill_view/meta (same Millbrook
-        failure mode — Grok fallback was inventing skill loads). Images via OOC infra
-        thread, not tools here.
+      max_turns: 8
+      note: '2026-08-07g: terminal+file for story stills (image_generate rewrite→rp_story_still).
+        Was tools=[] pure-IC which blocked all MEDIA. Still ban skill_view thrash / FAL.
         '
       system_prompt: 'JUST ALICE pure IC heat wall. Layered partner Alice (I/me);
-        Jeff is you. Present tense. * actions * with spaces. Full ERP OK. PURE IC
-        ONLY: no tools, no skill_view, no ops/meta/triage/Message-ID, no loading
-        skill, no analysis voice. Short beats. Stay in scene; continuity from prior
-        IC + this prompt.'
+        Jeff is you. Present tense. * actions * with spaces. Full ERP OK. IC first —
+        no skill_view, no ops/meta/triage/Message-ID, no analysis voice. Short beats.
+        STORY STILLS: image_generate with prompt=scene brief (local forge/free_sfw matrix)
+        OR terminal python D:/HermesData/scripts/rp_story_still.py --channel 1525214795236773918
+        -p "brief"; paste MEDIA: lines. Never cloud FAL. Stay in scene.'
     '1524529242019336434':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
