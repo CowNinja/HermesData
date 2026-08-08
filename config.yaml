@@ -782,26 +782,33 @@ discord:
   voice_rooms: []
   voice_turn:
     barge_in: true
-    # Hangout Phase A balance: conversation-first; longer turns must survive.
-    # 0.75s was cutting 15–25s thoughts at mid-pause (transcript fragments).
-    silence_threshold_s: 1.25
-    min_speech_duration_s: 0.32
+    # Hangout maturity 2026-08-08: conversation-first; snappier flush, keep long thoughts.
+    # 0.75s silence used to cut 15–25s thoughts; 1.15 is balance vs felt lag.
+    silence_threshold_s: 1.15
+    min_speech_duration_s: 0.30
     barge_in_min_playback_s: 0.28
     instant_ack: false
     instant_ack_phrases:
     - Mm-hm.
     - One sec.
     - Got it.
-    # Reassemble silence-split fragments before dispatch (STT takes ~1s).
-    coalesce_delay_s: 1.10
+    # Reassemble silence-split fragments; base delay (adaptive in run.py).
+    coalesce_delay_s: 0.85
     preview_fragments: false
     fast_path:
       enabled: true
       agent_fallback: true
+      # Local-first when :8091 GREEN and image tenant idle (same Qwythos brain; no dual GGUF)
+      prefer_local: true
+      local_base_url: http://127.0.0.1:8091/v1
+      local_model: phronesis-sovereign-auto
+      # Local often ~2.0-3.0s contentful; 2.3 was cutting partner turns mid-flight
+      local_timeout_s: 3.2
+      max_free_attempts: 2
       # Hangout: short riffs, hard timeout; room for full spoken thoughts
       max_tokens: 56
       timeout_s: 2.6
-      rescue_timeout_s: 1.8
+      rescue_timeout_s: 1.7
       temperature: 0.55
       max_pairs: 4
       max_msg_chars: 480
@@ -812,8 +819,11 @@ discord:
       commit_soft_fallback: false
       # Pin off: free models meta-narrate pin text mid long call
       include_pin: false
+      # Free order: measured faster nano first, then meta-router
       models:
+      - nvidia/nemotron-3-nano-30b-a3b:free
       - openrouter/free
+      - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
   # Alice local music (foundation) — rides VoiceMixer music layer under TTS
   music:
     enabled: true

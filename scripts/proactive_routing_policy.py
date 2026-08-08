@@ -268,8 +268,18 @@ def _ambiguous_prompt(prompt: str, intent_reasons: List[str]) -> bool:
 def sanitize_for_fleet(prompt: str) -> str:
     """Strip local identifiers + credentials before free cloud (best-effort).
 
-    Prefer blocking via contains_sensitive_content over relying on redaction alone.
+    Phase 4: prefer privacy_mask_rehydrate.mask_for_offload (handles + rehydrate).
+    This function remains one-way redaction for callers that do not keep a map.
     """
+    try:
+        from privacy_mask_rehydrate import mask_for_offload
+
+        pack = mask_for_offload(prompt or "")
+        masked = str(pack.get("masked") or "")
+        if masked:
+            return masked.strip()
+    except Exception:
+        pass
     out = prompt or ""
     out = _CREDENTIAL_VALUE_RE.sub("[CREDENTIAL_REDACTED]", out)
     out = _CREDENTIAL_ASSIGN_RE.sub(
@@ -351,15 +361,45 @@ def classify_proactive_routing(
         }
 
     blob = _message_blob(messages)
+    # Phase 4: hard-local (RP/explicit/HIPAA/identity) always; maskable spans may
+    # offload only after privacy_mask_rehydrate handle replacement.
+    try:
+        from privacy_mask_rehydrate import hard_local_reason, prepare_structural_offload
+    except Exception:
+        hard_local_reason = None  # type: ignore
+        prepare_structural_offload = None  # type: ignore
+
+    _MASKABLE_REASONS = frozenset(
+        {
+            "email_pii",
+            "phone_pii",
+            "private_path",
+            "credential_material",
+            "credential_assignment",
+        }
+    )
+
     for surface in (blob, prompt or ""):
+        if hard_local_reason is not None:
+            hard = hard_local_reason(surface, routing=routing)
+            if hard:
+                return {
+                    "mode": ROUTING_LOCAL_ONLY,
+                    "eligible": False,
+                    "reasons": [hard],
+                    "sanitized_prompt": prompt,
+                    "privacy_seal": "privacy-mask-rehydrate-v1-2026-08-08",
+                }
         sensitive, sens_reason = contains_sensitive_content(surface)
-        if sensitive:
+        if sensitive and sens_reason not in _MASKABLE_REASONS:
+            # Keyword markers (password, secret, hipaa, explicit, ...) stay local
             return {
                 "mode": ROUTING_LOCAL_ONLY,
                 "eligible": False,
                 "reasons": [sens_reason],
                 "sanitized_prompt": prompt,
             }
+        # maskable reasons: fall through; offload pack will mask or fail closed
 
     hdr_route = (headers.get("X-Phronesis-Routing") or headers.get("x-phronesis-routing") or "").strip().lower()
     if hdr_route in ("local", "local-only", "sovereign"):
@@ -372,15 +412,33 @@ def classify_proactive_routing(
 
     intent_ok, intent_reasons = _public_offload_intent(prompt, routing)
 
-    if hdr_route in ("offload", "fleet", "t2"):
-        reasons.append("header_force_offload")
+    def _offload_pack(reasons: List[str]) -> Dict[str, Any]:
+        if prepare_structural_offload is not None:
+            prep = prepare_structural_offload(prompt or "", routing=routing)
+            if not prep.get("allow"):
+                return {
+                    "mode": ROUTING_LOCAL_ONLY,
+                    "eligible": False,
+                    "reasons": [prep.get("block_reason") or "offload_blocked", *reasons],
+                    "sanitized_prompt": prompt,
+                    "privacy_seal": prep.get("seal"),
+                }
+            return {
+                "mode": ROUTING_OFFLOAD_COMPUTE,
+                "eligible": True,
+                "reasons": reasons,
+                "sanitized_prompt": prep.get("fleet_prompt") or prompt,
+                "mask_map": prep.get("mask_map") or {},
+                "privacy_span_count": prep.get("span_count") or 0,
+                "privacy_seal": prep.get("seal"),
+            }
         sanitized = sanitize_for_fleet(prompt)
         safe, block_reason = is_fleet_safe_for_offload(sanitized)
         if not safe:
             return {
                 "mode": ROUTING_LOCAL_ONLY,
                 "eligible": False,
-                "reasons": [block_reason, "header_offload_blocked_unsafe"],
+                "reasons": [block_reason, "offload_blocked_unsafe", *reasons],
                 "sanitized_prompt": prompt,
             }
         return {
@@ -388,7 +446,12 @@ def classify_proactive_routing(
             "eligible": True,
             "reasons": reasons,
             "sanitized_prompt": sanitized,
+            "mask_map": {},
         }
+
+    if hdr_route in ("offload", "fleet", "t2"):
+        reasons.append("header_force_offload")
+        return _offload_pack(reasons)
 
     if intent_ok:
         if _ambiguous_prompt(prompt, intent_reasons):
@@ -398,21 +461,7 @@ def classify_proactive_routing(
                 "reasons": ["ambiguous_keep_local"],
                 "sanitized_prompt": prompt,
             }
-        sanitized = sanitize_for_fleet(prompt)
-        safe, block_reason = is_fleet_safe_for_offload(sanitized)
-        if not safe:
-            return {
-                "mode": ROUTING_LOCAL_ONLY,
-                "eligible": False,
-                "reasons": [block_reason, "offload_blocked_unsafe"],
-                "sanitized_prompt": prompt,
-            }
-        return {
-            "mode": ROUTING_OFFLOAD_COMPUTE,
-            "eligible": True,
-            "reasons": intent_reasons,
-            "sanitized_prompt": sanitized,
-        }
+        return _offload_pack(list(intent_reasons))
 
     # Borderline realtime - augment path handles; keep Qwythos as voice.
     from router_bridge import detect_opportunistic_fleet_triggers

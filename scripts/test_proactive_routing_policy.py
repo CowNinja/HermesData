@@ -40,13 +40,14 @@ def test_tools_stay_local() -> None:
 
 
 def test_pii_stays_local() -> None:
+    """No public intent: email alone must not offload (local_first or local_only)."""
     result = classify_proactive_routing(
         "Email me at alice@example.com",
         {"task_type": "general"},
         [{"role": "user", "content": "Email me at alice@example.com"}],
     )
-    assert result["mode"] == ROUTING_LOCAL_ONLY
-    assert "email_pii" in result["reasons"]
+    assert not result.get("eligible")
+    assert result["mode"] in (ROUTING_LOCAL_ONLY, ROUTING_LOCAL_FIRST, ROUTING_AUGMENT_LOCAL)
 
 
 def test_public_research_offloads() -> None:
@@ -74,7 +75,8 @@ def test_sanitize_redacts_paths() -> None:
     raw = "Check D:\\PhronesisVault\\Operations\\logs\\foo.json"
     clean = sanitize_for_fleet(raw)
     assert "PhronesisVault" not in clean
-    assert "[LOCAL_PATH_REDACTED]" in clean
+    # Phase 4: deterministic handles (or legacy redaction fallback)
+    assert "<<PH:path:" in clean or "[LOCAL_PATH_REDACTED]" in clean
 
 
 def test_explicit_content_local() -> None:
@@ -103,13 +105,33 @@ def test_ambiguous_stays_local() -> None:
 
 
 def test_private_path_blocks_offload() -> None:
+    """Vault/HermesData absolute paths trip tools/local-ops gate -> hard local."""
     result = classify_proactive_routing(
         "Summarize D:\\PhronesisVault\\Operations\\logs\\agent.log",
         {"task_type": "research"},
         [{"role": "user", "content": "Summarize D:\\PhronesisVault\\Operations\\logs\\agent.log"}],
     )
     assert result["mode"] == ROUTING_LOCAL_ONLY
-    assert not result["eligible"]
+    assert not result.get("eligible")
+
+
+def test_email_research_masks_and_offloads() -> None:
+    """Public research with incidental email: mask then offload."""
+    result = classify_proactive_routing(
+        "Summarize latest open source LLM news and CC jeff@example.com",
+        {"task_type": "research"},
+        [
+            {
+                "role": "user",
+                "content": "Summarize latest open source LLM news and CC jeff@example.com",
+            }
+        ],
+    )
+    assert result["mode"] == ROUTING_OFFLOAD_COMPUTE
+    assert result.get("eligible")
+    assert "jeff@example.com" not in (result.get("sanitized_prompt") or "")
+    assert "<<PH:email:" in (result.get("sanitized_prompt") or "")
+    assert (result.get("mask_map") or {})
 
 
 def test_explicit_stays_local() -> None:

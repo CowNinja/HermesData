@@ -173,24 +173,43 @@ def _fleet_triggers(prompt: str, routing: Dict[str, Any], *, local_failed: bool 
     )
 
 
-def _prepare_fleet_prompt(prompt: str, routing: Dict[str, Any]) -> tuple[bool, str, str]:
-    """Sanitize and block fleet/T3 dispatch when private, explicit, or ambiguous unsafe."""
+def _prepare_fleet_prompt(prompt: str, routing: Dict[str, Any]) -> tuple[bool, str, str, Dict[str, str]]:
+    """Mask + gate fleet/T3 dispatch. Returns (ok, block_reason, fleet_prompt, mask_map).
+
+    Phase 4: deterministic handle mask (privacy_mask_rehydrate). Fail closed for
+    RP / explicit / HIPAA / hard identity. Mask map used to rehydrate responses.
+    """
+    if is_roleplay_route(routing):
+        return False, "roleplay_blocked", prompt, {}
+    try:
+        from privacy_mask_rehydrate import prepare_structural_offload, rehydrate_result  # noqa: F401
+
+        prep = prepare_structural_offload(prompt or "", routing=routing)
+        if not prep.get("allow"):
+            return False, str(prep.get("block_reason") or "fleet_blocked"), prompt, {}
+        return (
+            True,
+            "",
+            str(prep.get("fleet_prompt") or prompt),
+            dict(prep.get("mask_map") or {}),
+        )
+    except Exception:
+        pass
+    # Fallback legacy path
     from proactive_routing_policy import (
         contains_sensitive_content,
         is_fleet_safe_for_offload,
         sanitize_for_fleet,
     )
 
-    if is_roleplay_route(routing):
-        return False, "roleplay_blocked", prompt
     sensitive, reason = contains_sensitive_content(prompt)
     if sensitive:
-        return False, reason, prompt
+        return False, reason, prompt, {}
     sanitized = sanitize_for_fleet(prompt)
     safe, block = is_fleet_safe_for_offload(sanitized)
     if not safe:
-        return False, block, prompt
-    return True, "", sanitized
+        return False, block, prompt, {}
+    return True, "", sanitized, {}
 
 
 def maybe_augment_messages_with_context(
@@ -265,13 +284,32 @@ def try_t2_fleet_dispatch(
     if is_roleplay_route(routing):
         return {"success": False, "tier": "opportunistic_fleet", "error": "roleplay_blocked"}
 
-    ok, block_reason, fleet_prompt = _prepare_fleet_prompt(prompt, routing)
+    ok, block_reason, fleet_prompt, mask_map = _prepare_fleet_prompt(prompt, routing)
     if not ok:
         return {
             "success": False,
             "tier": "opportunistic_fleet",
             "error": f"fleet_blocked:{block_reason}",
         }
+
+    # Phase 5: structural semantic cache (post-mask fleet_prompt only; fail-closed miss)
+    try:
+        from semantic_cache import cache_lookup_for_dispatch, cache_store_from_dispatch
+        from privacy_mask_rehydrate import rehydrate_result as _rehydrate_cached
+
+        cached = cache_lookup_for_dispatch(fleet_prompt, routing)
+        if cached and cached.get("success"):
+            cached = _rehydrate_cached(cached, mask_map)
+            cached.setdefault("provenance", {})["privacy_mask_spans"] = len(mask_map or {})
+            cached["latency_sec"] = round(time.time() - started, 2)
+            _log({
+                "event": "t2_cache_hit",
+                "match_kind": cached.get("cache_match_kind"),
+                "score": cached.get("cache_score"),
+            })
+            return cached
+    except Exception:
+        pass
 
     triggers = _fleet_triggers(fleet_prompt, routing, local_failed=local_failed)
     tier = str(routing.get("escalation_tier") or "")
@@ -288,6 +326,7 @@ def try_t2_fleet_dispatch(
 
     try:
         from external_fleet_manager import FleetManager, fleet_available
+        from privacy_mask_rehydrate import rehydrate_result
 
         if not fleet_available():
             return {"success": False, "tier": "opportunistic_fleet", "error": "fleet_unavailable"}
@@ -317,6 +356,10 @@ def try_t2_fleet_dispatch(
             "model": res.get("model"),
             "tier": "opportunistic_fleet",
             "latency_sec": latency,
+            "provider_id": res.get("provider_id"),
+            "triggers": triggers.get("matched_triggers"),
+            "context_prefetch": res.get("context_prefetch"),
+            "context_only": res.get("context_only"),
             "provenance": {
                 "selected_backend": "opportunistic_fleet",
                 "escalation_tier": "T2",
@@ -325,8 +368,17 @@ def try_t2_fleet_dispatch(
                 "fleet_triggers": triggers.get("matched_triggers"),
                 "context_prefetch": res.get("context_prefetch"),
                 "local_failed": local_failed,
+                "privacy_mask_spans": len(mask_map or {}),
             },
         }
+        # Phase 5: remember pre-rehydrate body (handles only; no raw mask map on disk)
+        try:
+            from semantic_cache import cache_store_from_dispatch
+
+            cache_store_from_dispatch(fleet_prompt, out, routing)
+        except Exception:
+            pass
+        out = rehydrate_result(out, mask_map)
         _log({"event": "t2_ok", "provider_id": res.get("provider_id"), "latency_sec": latency})
         return out
     except Exception as exc:
@@ -347,22 +399,25 @@ def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]
     if is_roleplay_route(routing):
         return {"success": False, "tier": "paid", "error": "roleplay_blocked"}
 
-    ok, block_reason, fleet_prompt = _prepare_fleet_prompt(prompt, routing)
+    ok, block_reason, fleet_prompt, mask_map = _prepare_fleet_prompt(prompt, routing)
     if not ok:
         return {"success": False, "tier": "paid", "error": f"fleet_blocked:{block_reason}"}
 
     pol = fleet_policy()
     if pol.get("prefer_free_before_grok"):
-        t2 = try_t2_fleet_dispatch(fleet_prompt, routing, local_failed=True)
+        # Pass original prompt so try_t2 owns mask_map + rehydrate
+        t2 = try_t2_fleet_dispatch(prompt, routing, local_failed=True)
         if t2.get("success"):
             prov = t2.setdefault("provenance", {})
             prov["t3_deferred_to_t2"] = True
             return t2
 
     from grok_auth import grok_user_prompt_completion
+    from privacy_mask_rehydrate import rehydrate_result
 
     result = grok_user_prompt_completion(fleet_prompt)
     if result.get("success"):
+        result = rehydrate_result(result, mask_map)
         prov = result.setdefault("provenance", {})
         prov["escalation_tier"] = "T3"
         _log({
@@ -484,15 +539,36 @@ def try_proactive_t2_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str,
         return {"success": False, "tier": "opportunistic_fleet", "error": "fleet_unavailable"}
     if is_roleplay_route(routing):
         return {"success": False, "tier": "opportunistic_fleet", "error": "roleplay_blocked"}
-    ok, block_reason, fleet_prompt = _prepare_fleet_prompt(prompt, routing)
+    ok, block_reason, fleet_prompt, mask_map = _prepare_fleet_prompt(prompt, routing)
     if not ok:
         return {
             "success": False,
             "tier": "opportunistic_fleet",
             "error": f"fleet_blocked:{block_reason}",
         }
+    # Phase 5: structural semantic cache before free hop
+    try:
+        from semantic_cache import cache_lookup_for_dispatch
+        from privacy_mask_rehydrate import rehydrate_result as _rehydrate_cached
+
+        cached = cache_lookup_for_dispatch(fleet_prompt, routing)
+        if cached and cached.get("success"):
+            cached = _rehydrate_cached(cached, mask_map)
+            cached.setdefault("provenance", {}).update({
+                "proactive_offload": True,
+                "routing_mode": "offload_t2",
+                "privacy_mask_spans": len(mask_map or {}),
+            })
+            _log({
+                "event": "proactive_t2_cache_hit",
+                "match_kind": cached.get("cache_match_kind"),
+            })
+            return cached
+    except Exception:
+        pass
     try:
         from external_fleet_manager import FleetManager
+        from privacy_mask_rehydrate import rehydrate_result
 
         fm = FleetManager()
         triggers = _fleet_triggers(fleet_prompt, routing, local_failed=False)
@@ -510,7 +586,16 @@ def try_proactive_t2_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str,
                 "escalation_tier": "T2",
                 "proactive_offload": True,
                 "routing_mode": "offload_t2",
+                "privacy_mask_spans": len(mask_map or {}),
             })
+            # Phase 5: store pre-rehydrate free body only
+            try:
+                from semantic_cache import cache_store_from_dispatch
+
+                cache_store_from_dispatch(fleet_prompt, res, routing)
+            except Exception:
+                pass
+            res = rehydrate_result(res, mask_map)
             _log({"event": "proactive_t2_ok", "provider_id": res.get("provider_id")})
         return res
     except Exception as exc:
@@ -626,9 +711,10 @@ def try_proactive_offload_dispatch(
 
     t2_result: Dict[str, Any] = {"success": False}
     # Under hard prefer_fleet, always try free T2 first even if wants_t3
-    # (prefer_free_before_grok law ? never burn Grok when free can serve).
+    # (prefer_free_before_grok law). Dispatch with ORIGINAL prompt so
+    # privacy_mask_rehydrate owns mask_map + rehydrate (not double-mask).
     if not wants_t3 or prefer_fleet:
-        t2_result = try_proactive_t2_dispatch(safe_prompt, routing)
+        t2_result = try_proactive_t2_dispatch(prompt, routing)
         if t2_result.get("success"):
             t2_result["classification"] = classification
             if prefer_fleet:
@@ -637,7 +723,7 @@ def try_proactive_offload_dispatch(
 
     if wants_t3 or pol.get("prefer_free_before_grok"):
         if wants_t3 and pol.get("enabled") and fleet_routing_enabled():
-            t2_result = try_proactive_t2_dispatch(safe_prompt, routing)
+            t2_result = try_proactive_t2_dispatch(prompt, routing)
             if t2_result.get("success"):
                 t2_result["classification"] = classification
                 return t2_result
@@ -645,7 +731,7 @@ def try_proactive_offload_dispatch(
     # Only escalate to T3 (paid Grok) when free failed AND not blocked by thrift
     # Under prefer_fleet with free available, still allow T3 as last resort for wants_t3.
     t3_route = {**routing, "escalation_tier": "T3"}
-    t3_result = try_t3_paid_dispatch(safe_prompt, t3_route)
+    t3_result = try_t3_paid_dispatch(prompt, t3_route)
     if t3_result.get("success"):
         t3_result.setdefault("provenance", {})
         t3_result["provenance"]["proactive_offload"] = True
@@ -727,7 +813,7 @@ def resolve_post_local_dispatch(
     if decision is not None:
         blocked_free = getattr(decision, "blocked_free_reason", None)
 
-    ok, block_reason, fleet_prompt = _prepare_fleet_prompt(prompt, routing)
+    ok, block_reason, fleet_prompt, mask_map = _prepare_fleet_prompt(prompt, routing)
     if blocked_free:
         ok = False
         block_reason = blocked_free
@@ -743,9 +829,10 @@ def resolve_post_local_dispatch(
     want_free = BACKEND_FREE in hop and pol.get("prefer_free_before_grok", True)
     want_grok = BACKEND_GROK in hop or tier == "T3"
 
-    # Free fleet first on local fail (prefer_free_before_grok)
+    # Free fleet first on local fail (prefer_free_before_grok).
+    # Pass original prompt so try_t2 owns mask_map + rehydrate.
     if want_free and fleet_routing_enabled():
-        t2 = try_t2_fleet_dispatch(fleet_prompt, routing, local_failed=True)
+        t2 = try_t2_fleet_dispatch(prompt, routing, local_failed=True)
         if t2.get("success"):
             prov = t2.setdefault("provenance", {})
             prov["path"] = path_stamp
@@ -783,14 +870,14 @@ def resolve_post_local_dispatch(
             }
         )
     elif fleet_routing_enabled() and BACKEND_FREE in hop:
-        t2 = try_t2_fleet_dispatch(fleet_prompt, routing, local_failed=True)
+        t2 = try_t2_fleet_dispatch(prompt, routing, local_failed=True)
         if t2.get("success"):
             t2.setdefault("provenance", {})["path"] = path_stamp
             t2.setdefault("provenance", {})["tier_bucket"] = "free"
             return t2
 
     if want_grok and tier == "T3":
-        t3 = try_t3_paid_dispatch(fleet_prompt, routing)
+        t3 = try_t3_paid_dispatch(prompt, routing)
         try:
             t3.setdefault("provenance", {})["path"] = path_stamp
             t3.setdefault("provenance", {})["failover"] = "local_fail_to_t3_after_free"
