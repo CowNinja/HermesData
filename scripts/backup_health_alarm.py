@@ -302,7 +302,7 @@ def evaluate() -> Dict[str, Any]:
                 issues.append(f"resilience job ok=False: {errs[:160]}")
         # fossil scan / governor already layered above
 
-    # K manifest age
+    # K manifest age (file mtime of latest-backup.json)
     kh = age_hours(K_LATEST)
     layers["k_manifest_age_h"] = kh
     if kh is None:
@@ -310,18 +310,39 @@ def evaluate() -> Dict[str, Any]:
     elif kh > K_STALE_HOURS:
         issues.append(f"K manifest stale {kh:.1f}h > {K_STALE_HOURS}h")
 
-    km = age_hours(K_MIRROR)
+    # K mirror age: prefer job receipt ts (Windows directory mtime often frozen)
+    kstate = load_json(K_MIRROR_STATE)
+    km_dir = age_hours(K_MIRROR)
+    km_stamp = age_hours(K_MIRROR / ".mirror-ok")
+    km_job = None
+    job_ts = kstate.get("ts") or kstate.get("ts_utc") or kstate.get("last_backup")
+    if job_ts and kstate.get("ok") is not False:
+        try:
+            jdt = datetime.fromisoformat(str(job_ts).replace("Z", "+00:00"))
+            if jdt.tzinfo is None:
+                jdt = jdt.replace(tzinfo=timezone.utc)
+            km_job = max(0.0, (datetime.now(timezone.utc) - jdt).total_seconds() / 3600.0)
+        except Exception:
+            km_job = None
+    ages = [a for a in (km_job, km_stamp, km_dir) if a is not None]
+    km = min(ages) if ages else None
     layers["k_mirror_age_h"] = km
+    layers["k_mirror_age_sources"] = {
+        "job_h": km_job,
+        "stamp_h": km_stamp,
+        "dir_h": km_dir,
+    }
     if km is None:
         issues.append("K HermesData-Current mirror missing")
     elif km > K_STALE_HOURS:
         issues.append(f"K HermesData-Current stale {km:.1f}h > {K_STALE_HOURS}h")
 
-    kstate = load_json(K_MIRROR_STATE)
     layers["k_mirror_job"] = {
         "ok": kstate.get("ok"),
-        "ts": kstate.get("ts_utc") or kstate.get("last_backup"),
+        "ts": job_ts,
         "errors": (kstate.get("errors") or [])[:5],
+        "slices_ok": kstate.get("slices_ok"),
+        "slices_total": kstate.get("slices_total"),
     }
 
     # Cloud recovery
