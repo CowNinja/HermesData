@@ -22,13 +22,22 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from copy import deepcopy
 from datetime import datetime, timezone
 from http.client import HTTPConnection, HTTPSConnection
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
+
+from free_model_envelope import (
+    cancel_losing_futures,
+    hard_timeout_s as envelope_hard_timeout_s,
+    race_soft_deadline_s,
+    race_worker_cap,
+    soft_timeout_s as envelope_soft_timeout_s,
+)
+from cooldown_until import record_in_cooldown
 
 _CONTEXT_CACHE: Dict[str, Tuple[float, str]] = {}
 _CONTEXT_CACHE_LOCK = threading.Lock()
@@ -177,39 +186,17 @@ def _telemetry_monitor():
 
 def _provider_in_cooldown(provider: Dict[str, Any]) -> bool:
     """Skip free providers under living metrics cooldown_until (shared helper)."""
-    from cooldown_until import record_in_cooldown
-
     return record_in_cooldown(provider if isinstance(provider, dict) else None)
 
 
-# Free-hop hard timeout when envelope field missing (matches free_model_metrics probe hard ~20s).
-# Friday gap: soft_timeout_ms race abort + cancel losing futures NOT implemented yet.
-_DEFAULT_FREE_HARD_TIMEOUT_S = 20.0
-_DEFAULT_PAID_HARD_TIMEOUT_S = 120.0
-
-
 def _provider_hard_timeout_s(provider: Dict[str, Any]) -> float:
-    """Consume envelope hard_timeout_ms from fleet provider; free hops never sit on bare 120s."""
-    raw = provider.get("hard_timeout_ms")
-    if raw is not None:
-        try:
-            s = float(raw) / 1000.0
-            if s > 0:
-                return min(max(s, 1.0), _DEFAULT_PAID_HARD_TIMEOUT_S)
-        except (TypeError, ValueError):
-            pass
-    base = str(provider.get("base_url") or "").lower()
-    model = str(provider.get("model") or "").lower()
-    pid = str(provider.get("id") or "").lower()
-    if (
-        "openrouter" in base
-        or ":free" in model
-        or pid.startswith("openrouter-free")
-        or pid.startswith("groq-free")
-        or pid.startswith("gemini-free")
-    ):
-        return _DEFAULT_FREE_HARD_TIMEOUT_S
-    return _DEFAULT_PAID_HARD_TIMEOUT_S
+    """Consume envelope hard_timeout_ms (SSOT: free_model_envelope)."""
+    return envelope_hard_timeout_s(provider if isinstance(provider, dict) else {})
+
+
+def _provider_soft_timeout_s(provider: Dict[str, Any]) -> float:
+    """Consume envelope soft_timeout_ms (SSOT: free_model_envelope)."""
+    return envelope_soft_timeout_s(provider if isinstance(provider, dict) else {})
 
 
 def _utc_now() -> str:
@@ -954,12 +941,24 @@ class FleetManager:
         system: str = "",
         max_tokens: int = 1024,
     ) -> Dict[str, Any]:
-        workers = min(self._parallel_compute_workers(), len(candidates))
+        """Race free providers; first success wins; cancel losers; honor soft deadline.
+
+        Envelope consume-path:
+          - max_in_flight caps race workers (rate protection)
+          - soft_timeout_ms sets wait-for-first-win deadline
+          - hard_timeout_ms applies per hop inside _dispatch_compute_one
+          - cancel_losing_futures stops unstarted work after win/soft miss
+        """
+        workers = race_worker_cap(candidates, self._parallel_compute_workers())
         batch = candidates[: max(workers, self._max_provider_retries() * 2)]
+        soft_deadline_s = race_soft_deadline_s(batch)
         attempts: List[Dict[str, Any]] = []
         winner: Optional[Tuple[Dict[str, Any], Dict[str, Any]]] = None
+        cancelled = 0
+        soft_miss = False
 
-        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="fleet-compute") as pool:
+        pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="fleet-compute")
+        try:
             futures = {
                 pool.submit(
                     self._dispatch_compute_one,
@@ -970,26 +969,49 @@ class FleetManager:
                 ): provider
                 for provider in batch
             }
-            for fut in as_completed(futures):
-                provider = futures[fut]
-                try:
-                    one = fut.result()
-                except Exception as exc:
-                    one = {
-                        "success": False,
-                        "error": str(exc),
-                        "provider_id": provider.get("id"),
-                    }
-                attempts.append({
-                    "provider_id": provider.get("id"),
-                    "http_status": one.get("http_status"),
-                    "success": one.get("success"),
-                    "error": one.get("error"),
-                    "parallel": True,
-                })
-                if one.get("success") and winner is None:
-                    winner = (provider, one)
+            pending = set(futures.keys())
+            deadline = time.monotonic() + soft_deadline_s
+            while pending and winner is None:
+                timeout = max(0.05, deadline - time.monotonic())
+                done, pending = wait(pending, timeout=timeout, return_when=FIRST_COMPLETED)
+                if not done:
+                    # Soft deadline: stop waiting for first win; cancel remaining
+                    soft_miss = True
+                    cancelled += cancel_losing_futures(list(futures.keys()))
                     break
+                for fut in done:
+                    provider = futures[fut]
+                    try:
+                        one = fut.result()
+                    except Exception as exc:
+                        one = {
+                            "success": False,
+                            "error": str(exc),
+                            "provider_id": provider.get("id"),
+                        }
+                    attempts.append({
+                        "provider_id": provider.get("id"),
+                        "http_status": one.get("http_status"),
+                        "success": one.get("success"),
+                        "error": one.get("error"),
+                        "parallel": True,
+                        "soft_timeout_s": _provider_soft_timeout_s(provider),
+                        "hard_timeout_s": one.get("hard_timeout_s"),
+                    })
+                    if one.get("success") and winner is None:
+                        winner = (provider, one)
+                        cancelled += cancel_losing_futures(
+                            list(futures.keys()), winner=fut
+                        )
+                        pending.clear()
+                        break
+        finally:
+            # Do not block dispatch on loser HTTP; cancel unstarted if possible
+            try:
+                pool.shutdown(wait=False, cancel_futures=True)
+            except TypeError:
+                # older Python without cancel_futures
+                pool.shutdown(wait=False)
 
         if winner:
             provider, one = winner
@@ -1006,6 +1028,9 @@ class FleetManager:
                 "latency_sec": one.get("latency_sec"),
                 "http_status": one.get("http_status"),
                 "hard_timeout_s": one.get("hard_timeout_s"),
+                "soft_deadline_s": soft_deadline_s,
+                "race_workers": workers,
+                "losers_cancelled": cancelled,
                 "failover_attempts": len(attempts),
                 "parallel_dispatch": True,
             }
@@ -1016,10 +1041,18 @@ class FleetManager:
         result = {
             "success": False,
             "tier": TIER_NAME,
-            "error": last.get("error") or "all_compute_providers_failed",
+            "error": (
+                "soft_deadline_no_winner"
+                if soft_miss and not attempts
+                else last.get("error") or "all_compute_providers_failed"
+            ),
             "capabilities": capabilities,
             "attempts": attempts,
             "parallel_dispatch": True,
+            "soft_deadline_s": soft_deadline_s,
+            "soft_miss": soft_miss,
+            "race_workers": workers,
+            "losers_cancelled": cancelled,
         }
         _log(DISPATCH_LOG, {"event": "compute_dispatch_parallel_fail", **result})
         return result
