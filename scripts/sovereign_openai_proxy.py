@@ -2073,18 +2073,18 @@ def openai_chat_response(
 def build_rp_gpu_wait_message(reason: str = "") -> Tuple[str, int]:
     """RP-safe graceful wait under GPU contention (image lock / dual / 8090 down).
 
-    Law 2026-07-27:
+    Law 2026-07-27 / 2026-08-09 (code-judo):
       - Never surface raw HTTP 503 to RP sandbox when GPU tenant is image.
       - Never offload RP narrative to free/Grok (local uncensored lane).
-      - Return a normal assistant message Hermes can post as a wait notice.
+      - Never emit **Wait:** / `_reason:` prose — IC sanitize strips those into
+        28-char corpses. Content is IC soft-land only; machine reason lives in
+        phronesis_provenance + HTTP headers (structured graceful_wait).
 
-    Returns (message, retry_after_sec).
+    Returns (ic_soft_message, retry_after_sec).
     Network-free: uses local ETA tables + lock status only (no HTTP probes).
     """
     reason = (reason or "").strip()
     retry_s = 90
-    eta_lo, eta_hi = 2, 4
-    job = ""
     lock_held = reason.startswith("image_lock") or "image_lock" in reason
     # Local ETA tables only (no forge/llm HTTP probes on the request path).
     try:
@@ -2092,9 +2092,7 @@ def build_rp_gpu_wait_message(reason: str = "") -> Tuple[str, int]:
 
         eta_tab = getattr(wv, "ETA", {}) or {}
         cold = eta_tab.get("image_forge_cold") or (120, 240)
-        lo_f, hi_f = float(cold[0]), float(cold[1])
-        eta_lo = max(1, int(lo_f // 60) or 1)
-        eta_hi = max(2, int((hi_f + 59) // 60))
+        hi_f = float(cold[1])
         retry_s = max(retry_s, int(hi_f))
     except Exception:
         pass
@@ -2104,7 +2102,6 @@ def build_rp_gpu_wait_message(reason: str = "") -> Tuple[str, int]:
         st = _lock_status() or {}
         if st.get("held"):
             lock_held = True
-            job = str(st.get("job") or st.get("owner") or "")[:80]
             ttl = st.get("ttl_remaining_s")
             if ttl is not None:
                 try:
@@ -2114,39 +2111,29 @@ def build_rp_gpu_wait_message(reason: str = "") -> Tuple[str, int]:
     except Exception:
         pass
 
+    # IC soft land only — no ops banners (personhood_sanitize / RP IC lock).
     if lock_held or reason.startswith("image_lock"):
-        why = "GPU is busy generating images"
-        if job:
-            why += f" (`{job}`)"
         line = (
-            f"**Wait:** {why}. Local RP brain (Qwythos) is parked on the single "
-            f"12GB tenant - not a Discord outage, not a crash.\n"
-            f"Expect about **{eta_lo}-{eta_hi} min**, then resend your last line. "
-            f"If the thread still feels stuck after the image finishes, `/reset` once.\n"
-            f"_reason: {reason or 'image_lock'}_"
+            "*I still against your chest for a breath, eyes soft on yours — "
+            "the room holds us while the next beat gathers. Stay with me; "
+            "speak again in a moment.*"
         )
     elif "dual_tenant" in reason:
         line = (
-            "**Wait:** Local GPU is dual-tenant contended (image engine + brain). "
-            "RP is staying on the local uncensored lane (no cloud offload). "
-            f"Hold on ~{eta_lo}-{eta_hi} min, then resend.\n"
-            f"_reason: {reason}_"
+            "*I lace my fingers with yours and wait with you, present and "
+            "unhurried — just us, until the air clears enough for a full reply.*"
         )
         retry_s = max(retry_s, 60)
     elif "8090_down" in reason:
         line = (
-            "**Wait:** Local brain (:8090) is reloading/restoring after image work. "
-            "Usually 30-90s cold, faster when mmap page-cache is warm. "
-            "Resend shortly; `/reset` only if still wedged after restore.\n"
-            f"_reason: {reason}_"
+            "*I rest my forehead to yours and breathe with you — hold that "
+            "thought close. I will answer fully in a moment; stay right here.*"
         )
         retry_s = max(45, min(retry_s, 120))
     else:
         line = (
-            "**Wait:** Local RP inference is deferred (GPU/router contention). "
-            f"Try again in ~{max(1, retry_s // 60)}-{max(2, (retry_s + 59) // 60)} min. "
-            "This is a graceful park, not a hard failure.\n"
-            f"_reason: {reason or 'prefer_fleet'}_"
+            "*I lean into you and still the scene for a heartbeat — not gone, "
+            "just gathering myself. Say it again when you are ready.*"
         )
     return line, int(retry_s)
 
