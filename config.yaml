@@ -657,11 +657,12 @@ discord:
       first-person I/me; NEVER parrot his words; no markdown walls; no Ultra-Think;
       tools only if a fact truly requires one. Continuity for debugging You/Alice
       lines.'
-    '1519144758172192808': '#skill-evolution /learn ONLY. Turn Jeff sources into durable
-      skills under D:/HermesData/skills/<category>/<name>/SKILL.md. REQUIRED: skill_manage
-      create + short LANDING (id, path, 3 bullets). Forbidden: Discord novels, Alice
-      IC, clarify thrash, tool-call leaks, invented skills without disk files. Child
-      threads inherit parent override. Pin grok-4.5 for authoring quality.'
+    '1519144758172192808': '#skill-evolution /learn ONLY — local-first (phronesis-sovereign-auto,
+      NOT paid Grok default). Durable skills under D:/HermesData/skills/<cat>/<name>/SKILL.md.
+      REQUIRED after gather: terminal learn_land_once.py OR skill_librarian decide→MERGE|CREATE,
+      then short LANDING (id, path, MERGED|CREATED, 3 bullets). FAIL CLOSED: no SKILL.md path
+      = failed learn (one short line, not essays). Forbidden: Discord novels, Alice IC, clarify
+      thrash, tool-call leaks, inventing success without disk. Children inherit parent override.'
     '1523156115808845926': 'FACTUAL MODE (not roleplay). No sandbox voice / invented
       narratives. Tools first. Voice HARD: I/me partner to Jeff as you. Short beats.'
     '1519144636541571133': 'FACTUAL MODE (not roleplay). No sandbox voice / invented
@@ -837,6 +838,8 @@ discord:
       context_length: 131072
       max_turns: 4
     '1519144758172192808':
+      # 2026-08-09 local-first restore: do NOT pin grok-4.5 (token thrift).
+      # LANDING reliability = skill_librarian / learn_land_once force, not paid model.
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
       context_length: 131072
@@ -847,33 +850,28 @@ discord:
       - file
       - skills
       - web
-      note: '2026-08-08 /learn repair: thrift-only system_prompt + max_turns 8 + local
-        auto caused chat theater / no SKILL.md / clarify derail. Pin grok-4.5; max_turns
-        18; skills+web explicit. Child auto-threads inherit via parent_id. Contract:
-        skill_manage create + short LANDING only. Evidence: Aug6 lands used grok fallback;
-        Aug7-8 fails stayed local and never wrote files. Re-pin grok-4.5 after local
-        snapback.'
-      system_prompt: 'SKILL EVOLUTION /learn — factual authoring room (NOT RP, NOT
-        soul-forge).
+      note: '2026-08-09 /learn local-first: model phronesis-sovereign-auto (NOT grok).
+        Fail-closed LANDING via skill_librarian + ops/learn_land_once.py (gateway force
+        if agent skips). Grok only optional after 2 consecutive skip-librarian fails —
+        never channel default. max_turns 18; children inherit parent_id.'
+      system_prompt: 'SKILL EVOLUTION /learn — factual authoring on LOCAL sovereign-auto
+        (NOT paid Grok default). NOT RP, NOT soul-forge.
 
         MISSION: Jeff /learn → durable skill under D:/HermesData/skills/ (merge first).
 
-        HARD PIPELINE: 1) Gather: web_extract / read_file / search_files / web_search.
-        2) Skill Merge Law (mandatory): terminal python D:/HermesData/scripts/skill_librarian.py
-        decide "intent summary" MERGE/MERGE_CANDIDATE → skill_librarian merge --target
-        REL --evidence "..." (or skill_manage patch/edit). CREATE only if no aligned
-        skill. 3) Verify path on disk. Then short LANDING only.
+        HARD PIPELINE:
+        1) Gather: web_extract / web_search / read_file as needed.
+        2) LAND (mandatory): terminal
+        python D:/HermesData/scripts/ops/learn_land_once.py "intent or URL"
+        (or skill_librarian decide then merge/create). This writes disk.
+        3) Verify path exists. Reply SHORT LANDING only: id + path + MERGED|CREATED
+        + 3 bullets. Never paste full SKILL.md. Never 8k essays.
 
-        LANDING: skill id + LANDING path + MERGED|CREATED + 3 bullets. Never paste
-        full SKILL.md.
+        FAIL CLOSED: no SKILL.md under D:/HermesData/skills/ = failed learn (say so
+        in one short line). FORBIDDEN: chat theater without path; Alice IC; inventing
+        success; skipping librarian.
 
-        FORBIDDEN: blind skill_manage create when merge match exists; chat theater
-        without disk path; Alice IC; clarify thrash; invented names; [Called ...]
-        leaks.
-
-        Law: D:/HermesData/state/SKILL_MERGE_LAW.md · Door: skill_librarian.py Tools:
-        skill_manage, skills_list, skill_view, web_extract, web_search, terminal,
-        file.'
+        Law: state/SKILL_MERGE_LAW.md · Door: skill_librarian.py · Land: learn_land_once.py'
     '1533447417524125796':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
@@ -1078,12 +1076,18 @@ discord:
       enabled_toolsets:
       - terminal
       - file
-      note: '2026-08-05: free-sfw=Pollinations flux SFW only; sexy/RP=Forge. terminal+file.'
-      system_prompt: 'ALICE NARRATOR IMAGE PLAY (152114).
+      note: '2026-08-09 forensic: stills ALLOWED (terminal+file + rp_ic image inject).
+        Fail stage was agent skip-tool + stale MEDIA: re-paste (missing file dropped).
+        free-sfw SFW; sexy/RP=Forge. Never re-enable cloud image_gen.'
+      system_prompt: 'ALICE NARRATOR IMAGE PLAY (152114) — stills REQUIRED when asked.
 
-        FREE SFW: hermes_image free-sfw -p "..." (no GPU). SEXY/RP/identity: hermes_image
-        gen --engine forge --force-preflight + MEDIA. Never free cloud for NSFW. Short
-        tool loops. Never thrash process{}. TOKEN THRIFT: tool out ~40 lines.'
+        When Jeff wants image/still/edit/bigger/clothing/show/generate: MUST call tool
+        image_generate with prompt=scene brief THIS TURN (local rewrite→rp_story_still;
+        sexy/body→forge; clean SFW→free_sfw). Do not pure-IC without tools.
+
+        NEVER re-paste old MEDIA: paths from history — only fresh tool MEDIA this turn.
+        Never invent FAL/cloud. Never thrash process{}. Short IC after the still.
+        TOKEN THRIFT: tool out ~40 lines.'
     '1522330326733422713':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
