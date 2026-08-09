@@ -1043,10 +1043,12 @@ discord:
         compact thrash novels. skill_view roleplay-image-pipeline only if needed once.
 
         PATH: image_generate (local) OR hermes_image / rp_story_still + MEDIA. Never
-        cloud FAL.
+        cloud FAL. Pipeline auto-negatives include cat/animal ears (do not put "no cat
+        ears" only in the positive prompt — use hermes_image and let ensure_quality_neg
+        apply). Human ears only; never catgirl/neko/animal ears.
 
         FORBIDDEN: invented tools (image_stack_ops etc), [Called ...] leaks, Status/Triage
-        essays.
+        essays. FORBIDDEN in gens: cat ears, animal ears, neko, kemonomimi.
 
         Thrift: max ~8 tool loops; dumps to D:/HermesData/tmp/; stop if compacting
         thrash — ask for /reset rather than re-compact.'
@@ -1134,9 +1136,10 @@ discord:
         + MEDIA; no FAL image_gen.
 
         '
-      system_prompt: 'GROUP RP child of #alice-roleplay. Same layered Alice + IC first.
-        Story + local images in-thread. skill_view immersive-roleplay. hermes_image
-        + MEDIA; local only. No meta voice.'
+      system_prompt: 'GROUP RP child of #alice-roleplay. Same layered Alice + IC first
+        (I/me; Jeff as you). Story + local images in-thread via image_generate (local
+        matrix) or terminal rp_story_still + MEDIA. No skill_view thrash (tools are
+        terminal+file only — do not invent skills). No meta/ops voice. No Message-ID.'
     '1532906132056838184':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
@@ -1373,3 +1376,19 @@ plugins:
   entries:
     omh:
       allow_tool_override: false
+
+# --- Bitwarden Secrets Manager (BWS plane) — enabled 2026-08-08 by secrets-plane harden ---
+# Bootstrap only in .env: BWS_ACCESS_TOKEN. Machine API keys live in SM project below.
+# Fail-open: if BWS unreachable, dotenv still supplies keys. override_existing: SM wins when both present.
+secrets:
+  bitwarden:
+    enabled: true
+    access_token_env: BWS_ACCESS_TOKEN
+    project_id: "25a2f2f9-d7fc-4766-80b1-b47c014b72b3"
+    cache_ttl_seconds: 300
+    override_existing: true
+    auto_install: true
+    server_url: ""
+    encrypted_cache:
+      enabled: false
+      max_stale_seconds: 0

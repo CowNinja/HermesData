@@ -9,6 +9,17 @@ __pycache__/
 .venv/
 venv/
 .env
+.env.*
+!.env.example
+
+# Secrets plane — never commit credential material
+secrets/
+**/secrets/**
+*.import.json
+*bitwarden*import*.json
+**/bws_cache.json
+**/bws_cache.enc.json
+state/quarantine/
 
 # Hermes internal
 .hermes/sessions/

@@ -628,15 +628,20 @@ def try_fleet_image_generate(
                 sanitized.rstrip(", ")
                 + ", native vertical portrait framing, correct unstretched human proportions"
             )
-    providers = list_image_providers()
-    if not providers:
-        return {"success": False, "error": "no_image_providers_configured"}
-
+    # Explicit provider_id includes disabled rows (bench/matrix capability tests).
+    # Ranked failover path stays enabled_only so demoted/ghost stay out of live route.
     if provider_id:
-        providers = [p for p in providers if str(p.get("id")) == provider_id]
+        providers = [
+            p
+            for p in list_image_providers(enabled_only=False)
+            if str(p.get("id")) == provider_id
+        ]
         if not providers:
             return {"success": False, "error": f"provider_not_found:{provider_id}"}
     else:
+        providers = list_image_providers()
+        if not providers:
+            return {"success": False, "error": "no_image_providers_configured"}
         providers = rate.rank_providers(providers, prompt=sanitized)
 
     tags = rate.infer_task_tags(sanitized)
