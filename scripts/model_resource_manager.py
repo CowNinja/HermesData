@@ -41,14 +41,18 @@ DEFAULT_PORTS = {
     "11434": {"tier": "ollama", "role": "interim_fallback"},
 }
 
-# Context window hints per tier (tokens) ? expand via MoE map later
+# Context window hints per tier (tokens).
+# 2026-08-10 Just Alice continuity: local_roleplay was frozen at 12k from the
+# dual-GGUF era while live Qwythos runs 131k — long IC history thrash + amnesia.
+# Roleplay/generalist now use a large share of live_llama_ctx_budget(); cap still
+# min()'d against live so we never claim more than llama actually has.
 TIER_CONTEXT_BUDGET = {
-    "local_classifier": 12288,
-    "local_hot": 12288,
-    "local_warm": 32768,
-    "local_cold": 65536,
-    "local_roleplay": 12288,
-    "local_generalist": 12288,
+    "local_classifier": 16384,
+    "local_hot": 32768,
+    "local_warm": 65536,
+    "local_cold": 98304,
+    "local_roleplay": 98304,  # immersive IC + stills; was 12288
+    "local_generalist": 65536,  # personhood / partner chat; was 12288
     "ollama": 32768,
 }
 

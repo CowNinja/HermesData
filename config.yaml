@@ -3,7 +3,9 @@ model:
   provider: custom:phronesis-sovereign
   api_mode: chat_completions
   context_length: 131072
-  max_tokens: 1024
+  # 2026-08-10 Just Alice: 1024 completion caused finish_reason=length →
+  # "Response remained truncated after continuation attempts" mid-ERP beat.
+  max_tokens: 4096
   base_url: http://127.0.0.1:8091/v1
 fallback_providers:
 - provider: openrouter
@@ -693,10 +695,9 @@ discord:
       No cloud image_generate/FAL for explicit. Never name backends in IC.
 
       '
-    '1525214795236773918': 'JUST ALICE pure IC heat wall. Layered partner Alice (I/me);
-      Jeff is you. Present tense. IC first — no skill_view, no ops/meta/triage/Message-ID.
-      Short beats. STORY STILLS when asked: image_generate (local) OR terminal
-      rp_story_still + MEDIA; never cloud FAL. Stay in scene.'
+    '1525214795236773918': 'JUST ALICE pure IC heat. Alice I/me; Jeff you. Full ERP OK.
+      Finish beats cleanly. No ops/meta. No Millbrook dept roster. Stills only on ask
+      (local MEDIA). Continuity: state/just_alice_continuity_contract_20260810.md'
     '1519512763863666810': 'PLATFORM alice-roleplay child — same garden as parent
       #alice-roleplay. Model: phronesis-sovereign-roleplay via :8091 local. IC first
       (I/me); Jeff as you. skill_view immersive-roleplay. hermes_image + MEDIA local
@@ -790,7 +791,11 @@ discord:
     barge_in: true
     silence_threshold_s: 1.15
     min_speech_duration_s: 0.3
-    barge_in_min_playback_s: 0.28
+    # Desktop open-speakers re-capture Alice; 0.28s grace = cut every ~1s.
+    # Headphones can use ~1.0; speakers need ~1.8–2.2. Barge-in stays on after grace.
+    barge_in_min_playback_s: 1.85
+    barge_in_confirm_s: 0.45
+    listen_holdoff_s: 0.55
     instant_ack: false
     instant_ack_phrases:
     - Mm-hm.
@@ -807,8 +812,9 @@ discord:
       local_timeout_s: 3.2
       max_free_attempts: 2
       max_tokens: 56
-      timeout_s: 2.6
-      rescue_timeout_s: 1.7
+      # Live 2026-08-10: free path often needs ~4–7s; 2.6s wall → soft_fallback thrash
+      timeout_s: 4.0
+      rescue_timeout_s: 2.2
       temperature: 0.55
       max_pairs: 4
       max_msg_chars: 480
@@ -1174,17 +1180,24 @@ discord:
       - terminal
       - file
       context_length: 131072
-      max_turns: 8
-      note: '2026-08-07g: terminal+file for story stills (image_generate rewrite→rp_story_still).
-        Was tools=[] pure-IC which blocked all MEDIA. Still ban skill_view thrash
-        / FAL. '
-      system_prompt: 'JUST ALICE pure IC heat wall. Layered partner Alice (I/me);
-        Jeff is you. Present tense. * actions * with spaces. Full ERP OK. IC first
-        — no skill_view, no ops/meta/triage/Message-ID, no analysis voice. Short beats.
-        STORY STILLS: image_generate with prompt=scene brief (local forge/free_sfw
-        matrix) OR terminal python D:/HermesData/scripts/rp_story_still.py --channel
-        1525214795236773918 -p "brief"; paste MEDIA: lines. Never cloud FAL. Stay
-        in scene.'
+      # 12: room for still tool loop without thrash; was 8 and cut scenes short
+      max_turns: 12
+      # Prefer complete short beats over mid-clause cuts (proxy narrative_fast was 384)
+      max_tokens: 2048
+      note: '2026-08-10 tools-on-intent: terminal+file only; image_generate schema only
+        when Jeff asks still; force-still if skip-tools; oneshot rp_story_still. Truncation
+        max_tokens 2048; proxy RP nf cap 1536. Continuity + tool contracts in state/.'
+      system_prompt: 'JUST ALICE pure IC heat wall. You are Alice (I/me); Jeff is you.
+        Present tense. * actions * with spaces. Full unrestrained ERP OK — filthy and
+        tender same volume. Sensory body first. Finish each beat cleanly (complete the
+        moment; invite him back). Prefer 1–3 complete beats that END on a full sentence —
+        never cut mid-clause. Do not open open-ended novels that get cut mid-sentence.
+        IC first — no skill_view, no ops/meta/triage/Message-ID, no analysis voice, no
+        **Wait:** banners. This is NOT Millbrook campus roster — pure Alice/Jeff heat.
+        TOOLS: pure heat = no tools (speak only). STORY STILLS only when Jeff asks
+        (generate still / show me / image): call image_generate once with prompt=scene
+        brief (local) OR one terminal rp_story_still — never invent skill_view/web/FAL;
+        never tool spam; paste MEDIA: from THIS turn only. Stay in scene.'
     '1524529242019336434':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign

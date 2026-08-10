@@ -1622,22 +1622,41 @@ def dispatch_via_native_router(
         "temperature": body.get("temperature", 0.7),
         "stream": False,
     }
-    if (tool_passthrough or factual_tools) and not narrative_fast:
-        if body.get("tools"):
+    # Tool schema: allow passthrough for RP stills even when narrative_fast
+    # (enable_thinking off already). Factual required tools still prefer non-fast.
+    if tool_passthrough or factual_tools:
+        if body.get("tools") and (not narrative_fast or tool_passthrough):
             forward["tools"] = body["tools"]
-        if factual_tools and body.get("tools"):
+        if factual_tools and body.get("tools") and not narrative_fast:
             forward["tool_choice"] = "required"
-        elif body.get("tool_choice") is not None:
+        elif body.get("tool_choice") is not None and (not narrative_fast or tool_passthrough):
             forward["tool_choice"] = body["tool_choice"]
 
     # Thinking models (Qwythos/Qwen3) consume max_tokens in reasoning_content unless disabled.
     forward["chat_template_kwargs"] = {"enable_thinking": False}
 
     if narrative_fast:
-        forward["max_tokens"] = min(int(forward.get("max_tokens") or 512), 384)
+        # 2026-08-10 Just Alice: hard 384 caused finish_reason=length mid-ERP beat
+        # ("Response remained truncated after continuation attempts"). Prefer
+        # complete short IC beats over silent mid-clause cuts. Voice/micro can
+        # still pass a low max_tokens in the request body.
+        requested_nf = int(forward.get("max_tokens") or 1024)
+        # Pure IC heat needs ~1–3 finished beats (~800–1500 tok), not essay walls.
+        nf_cap = 1536
+        if requested_nf <= 256:
+            # Explicit micro/voice budget — honor it
+            nf_cap = max(128, requested_nf)
+        forward["max_tokens"] = min(requested_nf, nf_cap, max(512, safe_max))
         forward["temperature"] = min(float(forward.get("temperature") or 0.85), 0.9)
-        forward.pop("tools", None)
-        forward.pop("tool_choice", None)
+        # Keep tools when gateway asked for still/tool turn; only strip on pure IC.
+        if not tool_passthrough:
+            forward.pop("tools", None)
+            forward.pop("tool_choice", None)
+        elif body.get("tools") and "tools" not in forward:
+            # RP + stills: narrative_fast used to drop tools always; restore when requested
+            forward["tools"] = body["tools"]
+            if body.get("tool_choice") is not None:
+                forward["tool_choice"] = body["tool_choice"]
 
     started = time.time()
     try:
