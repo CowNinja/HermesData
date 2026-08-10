@@ -5,9 +5,15 @@ proactive_routing_policy.py - Classify requests for local-only vs T2 fleet offlo
 Local-first invariant (when in doubt, keep local):
   - Roleplay, tools, vault/private paths, PII, HIPAA, explicit, secrets/credentials
     -> local_only (Qwythos @ :8090) -- never free fleet, never paid cloud body
+  - Alice depth surfaces (personhood / Just Alice / Millbrook / partner IC)
+    -> local_only -- never free nano body, never hard-upgrade under GPU contention
   - Public, non-sensitive research/synthesis with clear intent -> offload_compute (T2/T3)
   - Realtime context that should stay with local voice -> augment_local (existing prefetch)
   - Ambiguous or borderline prompts -> local_first (never guess offload)
+
+Depth tune (alice-depth-tune-v1-2026-08-10): companion/personhood was leaking to free
+via local_first + prefer_fleet hard-upgrade. Depth returns local_only so private_modes
+blocks hard-upgrade in escalation_router.try_proactive_offload_dispatch.
 """
 from __future__ import annotations
 
@@ -20,6 +26,48 @@ ROUTING_LOCAL_ONLY = "local_only"
 ROUTING_AUGMENT_LOCAL = "augment_local"
 ROUTING_OFFLOAD_COMPUTE = "offload_compute"
 ROUTING_LOCAL_FIRST = "local_first"
+
+# Discord surfaces that need Qwythos depth (never free-body, never prefer_fleet upgrade).
+# chat_id / thread_id / parent_channel_id match (string compare).
+_DEPTH_LOCAL_CHANNEL_IDS = frozenset(
+    {
+        "1533447417524125796",  # soul forge / personhood
+        "1531786894445121648",  # about-me / Jeff interview
+        "1525214795236773918",  # Just Alice pure IC
+        "1532906132056838184",  # Millbrook pure IC heat wall
+        "1519509288286949466",  # Alice RP sandbox parent
+        "1521146755985576116",  # narrator / image play (garden)
+        "1524821864956956793",  # harem image mod (garden)
+        "1523604530338730004",  # Alice RP child
+    }
+)
+
+# Partner / personhood content markers (channel-agnostic safety net).
+_COMPANION_DEPTH_MARKERS = (
+    "personhood",
+    "soul forge",
+    "soul-forge",
+    "i missed you",
+    "i love you",
+    "love you",
+    "sit with me",
+    "hold me",
+    "kiss me",
+    "how are we",
+    "how are you feeling",
+    "our relationship",
+    "about us",
+    "partner pin",
+    "us_now",
+    "just alice",
+    "millbrook",
+    "be with me",
+    "come here",
+    "cuddle",
+    "snuggle",
+    "missed you",
+    "feel about us",
+)
 
 # Local-only law (Jeff): PII / HIPAA / explicit / secrets+credentials never leave Qwythos.
 # Free fleet + paid Grok are blocked when any of these fire.
@@ -162,13 +210,10 @@ _CREDENTIAL_ASSIGN_RE = re.compile(
     r"\s*[:=]\s*\S+"
 )
 
+# Strong public/ops intents — free OK (grunt thrift).
 _PUBLIC_OFFLOAD_INTENTS = (
     "summarize",
     "summary of",
-    "explain",
-    "what is",
-    "what are",
-    "how does",
     "compare",
     "research",
     "latest news",
@@ -181,6 +226,14 @@ _PUBLIC_OFFLOAD_INTENTS = (
     "open source",
     "trends in",
     "overview of",
+)
+
+# Weak classify intents — free only when not companion-depth and prompt has grunt length.
+_WEAK_PUBLIC_INTENTS = (
+    "explain",
+    "what is",
+    "what are",
+    "how does",
 )
 
 _TOOL_INTENT_MARKERS = (
@@ -314,17 +367,68 @@ def _has_tool_context(messages: List[Dict[str, Any]], body: Dict[str, Any]) -> b
 def _public_offload_intent(prompt: str, routing: Dict[str, Any]) -> Tuple[bool, List[str]]:
     low = (prompt or "").lower()
     matched: List[str] = []
+    strong = False
     for phrase in _PUBLIC_OFFLOAD_INTENTS:
         if phrase in low:
             matched.append(f"intent:{phrase}")
+            strong = True
+    weak: List[str] = []
+    for phrase in _WEAK_PUBLIC_INTENTS:
+        if phrase in low:
+            weak.append(f"intent:{phrase}")
     task = str(routing.get("task_type") or "").lower()
     if task in ("research", "web", "summarize"):
         matched.append(f"task_type:{task}")
+        strong = True
     if re.search(r"\b(today|this week|202[4-9])\b", low) and any(
         k in low for k in ("news", "ai", "tech", "release", "announce")
     ):
         matched.append("realtime_public_news")
-    return bool(matched), matched
+        strong = True
+    if strong:
+        return True, matched + weak
+    # Weak classify alone: free OK only as real grunt (length or classify task).
+    if weak:
+        if task == "classify" or len((prompt or "").strip()) >= 64:
+            return True, weak + ["weak_intent_grunt_ok"]
+        return False, []
+    return False, matched
+
+
+def _routing_ids(routing: Optional[Dict[str, Any]]) -> List[str]:
+    route = routing or {}
+    ids: List[str] = []
+    for key in ("chat_id", "thread_id", "parent_channel_id", "channel_id"):
+        val = str(route.get(key) or "").strip()
+        if val:
+            ids.append(val)
+    return ids
+
+
+def depth_local_reason(
+    routing: Optional[Dict[str, Any]],
+    prompt: str,
+    messages: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[str]:
+    """Why this turn must stay on Qwythos for companion depth (or None).
+
+    local_only blocks prefer_fleet hard-upgrade in escalation_router (private_modes).
+    """
+    route = routing or {}
+    for cid in _routing_ids(route):
+        if cid in _DEPTH_LOCAL_CHANNEL_IDS:
+            return f"depth_channel:{cid}"
+    model = str(route.get("model") or route.get("request_model") or "").lower()
+    if "roleplay" in model or model.endswith("-rp"):
+        return "depth_roleplay_model"
+    blob = f"{prompt or ''}\n{_message_blob(messages or [])}".lower()
+    for marker in _COMPANION_DEPTH_MARKERS:
+        if marker in blob:
+            return f"depth_marker:{marker}"
+    # System/context already carrying personhood pin language
+    if "personhood_pin" in blob or "alice_open_loops" in blob:
+        return "depth_personhood_context"
+    return None
 
 
 def classify_proactive_routing(
@@ -350,6 +454,17 @@ def classify_proactive_routing(
             "eligible": False,
             "reasons": ["roleplay_sandbox"],
             "sanitized_prompt": prompt,
+        }
+
+    # Alice depth: personhood / Just Alice / Millbrook / partner IC — never free nano body.
+    depth_reason = depth_local_reason(routing, prompt or "", messages)
+    if depth_reason:
+        return {
+            "mode": ROUTING_LOCAL_ONLY,
+            "eligible": False,
+            "reasons": [depth_reason, "alice_depth_local"],
+            "sanitized_prompt": prompt,
+            "depth_seal": "alice-depth-tune-v1-2026-08-10",
         }
 
     if _has_tool_context(messages, body):

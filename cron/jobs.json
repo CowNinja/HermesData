@@ -22,15 +22,15 @@
       "schedule_display": "30 */12 * * *",
       "repeat": {
         "times": null,
-        "completed": 13
+        "completed": 14
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-08-03T19:27:05.616089+00:00",
-      "next_run_at": "2026-08-10T12:30:00-04:00",
-      "last_run_at": "2026-08-10T00:30:45.243814-04:00",
+      "next_run_at": "2026-08-11T00:30:00-04:00",
+      "last_run_at": "2026-08-10T12:30:55.652999-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -500,15 +500,15 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 243
+        "completed": 244
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-08-10T14:38:32.863279-04:00",
-      "last_run_at": "2026-08-10T06:37:46.246796-04:00",
+      "next_run_at": "2026-08-10T18:39:46.907951-04:00",
+      "last_run_at": "2026-08-10T10:38:53.825793-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1650,15 +1650,15 @@
       "schedule_display": "0 */6 * * *",
       "repeat": {
         "times": null,
-        "completed": 88
+        "completed": 89
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T15:10:42.663514-04:00",
-      "next_run_at": "2026-08-10T12:00:00-04:00",
-      "last_run_at": "2026-08-10T06:03:16.821867-04:00",
+      "next_run_at": "2026-08-10T18:00:00-04:00",
+      "last_run_at": "2026-08-10T12:02:03.808191-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1742,15 +1742,15 @@
       "schedule_display": "0 */6 * * *",
       "repeat": {
         "times": null,
-        "completed": 88
+        "completed": 89
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T16:22:54.715339-04:00",
-      "next_run_at": "2026-08-10T12:00:00-04:00",
-      "last_run_at": "2026-08-10T06:03:16.973925-04:00",
+      "next_run_at": "2026-08-10T18:00:00-04:00",
+      "last_run_at": "2026-08-10T12:02:03.952134-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1788,15 +1788,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 1275
+        "completed": 1283
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T18:14:58.028551-04:00",
-      "next_run_at": "2026-08-10T11:08:32.863279-04:00",
-      "last_run_at": "2026-08-10T10:08:31.967141-04:00",
+      "next_run_at": "2026-08-10T15:09:46.907951-04:00",
+      "last_run_at": "2026-08-10T14:09:46.189270-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2023,15 +2023,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 219
+        "completed": 221
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-20T17:16:35.981589-04:00",
-      "next_run_at": "2026-08-10T10:38:44.577393-04:00",
-      "last_run_at": "2026-08-10T08:38:44.577393-04:00",
+      "next_run_at": "2026-08-10T14:39:53.714579-04:00",
+      "last_run_at": "2026-08-10T12:39:53.714579-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2307,17 +2307,17 @@
       "schedule_display": "0 */4 * * *",
       "repeat": {
         "times": null,
-        "completed": 616
+        "completed": 617
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-21T22:40:15.971276+00:00",
-      "next_run_at": "2026-08-10T12:00:00-04:00",
-      "last_run_at": "2026-08-10T08:01:58.998801-04:00",
-      "last_status": "ok",
-      "last_error": null,
+      "next_run_at": "2026-08-10T16:00:00-04:00",
+      "last_run_at": "2026-08-10T12:04:34.231204-04:00",
+      "last_status": "error",
+      "last_error": "Script exited with code 2\nstdout:\n{\n  \"ts\": \"2026-08-10T16:04:34Z\",\n  \"seal\": \"fleet-health-tick-w3p5-2026-07-27-touch\",\n  \"color\": \"YELLOW\",\n  \"ok\": false,\n  \"elapsed_sec\": 150.131,\n  \"notes\": [\n    \"health_tick_failed\",\n    \"touched_last_check=9\"\n  ],\n  \"health\": {\n    \"ok\": false,\n    \"rc\": 124,\n    \"checked\": null,\n    \"up\": null,\n    \"down\": null,\n    \"missing_env\": null,\n    \"mode\": null,\n    \"error\": \"timeout\"\n  },\n  \"demote\": {\n    \"demoted_n\": 0,\n    \"demoted\": [],\n    \"threshold\": 3,\n    \"error\": null\n  },\n  \"catalog_apply\": {\n    \"requested\": false,\n    \"ok\": null,\n    \"rc\": null,\n    \"parsed\": null,\n    \"error\": null\n  },\n  \"guard\": {\n    \"ok\": true,\n    \"rc\": 0,\n    \"summary\": {\n      \"ts\": \"2026-08-10T16:04:34Z\",\n      \"path\": \"D:\\\\HermesData\\\\config\\\\fleet_registry.yaml\",\n      \"ok\": true,\n      \"bytes\": 21373,\n      \"lines\": 710,\n      \"oneline_collapse\": false,\n      \"yaml_ok\": true,\n      \"enabled_compute\": [\n        \"openrouter-free-router\",\n        \"openrouter-free-gemma\",\n        \"openrouter-free-nemotron-nano\",\n        \"openrouter-free-nemotron-omni\",\n        \"openrouter-free-nemotron-super\",\n        \"openrouter-free-laguna-s\",\n        \"openrouter-free-nemotron-nano9\",\n        \"openrouter-free-gpt-oss-20b\"\n      ],\n      \"enabled_n\": 8\n    },\n    \"error\": null\n  },\n  \"touch_last_check\": {\n    \"touched\": [\n      \"brave-search\",\n      \"duckduckgo-instant\",\n      \"openrouter-free-gpt-oss-20b\",\n      \"openrouter-free-laguna-s\",\n      \"openrouter-free-nemotron-nano\",\n      \"openrouter-free-nemotron-nano9\",\n      \"openrouter-free-nemotron-omni\",\n      \"openrouter-free-nemotron-super\",\n      \"openrouter-free-router\"\n    ],\n    \"skipped\": [\n      \"openrouter-free-gemma\"\n    ],\n    \"error\": null\n  },\n  \"policy\": {\n    \"hop_order\": [\n      \"local_qwythos\",\n      \"free_fleet\",\n      \"paid_grok_optional\"\n    ],\n    \"catalog_apply_opt_in\": true,\n    \"demote_fail_streak_threshold\": 3,\n    \"max_interval_hours\": 6,\n    \"schedule_hint\": \"0 */4 * * *\",\n    \"cadence_slo_h\": 4,\n    \"skills\": [\n      \"mlops/freellmapi\",\n      \"mlops/nvidia-nim-relay\",\n      \"mlops/local-model-management\"\n    ]\n  },\n  \"enabled_n\": 8\n}",
       "last_delivery_error": null,
       "deliver": "local",
       "origin": {
@@ -3106,5 +3106,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-08-10T10:38:32.863279-04:00"
+  "updated_at": "2026-08-10T14:39:46.907951-04:00"
 }

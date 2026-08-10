@@ -143,6 +143,55 @@ def test_explicit_stays_local() -> None:
     assert result["mode"] == ROUTING_LOCAL_ONLY
 
 
+def test_personhood_channel_depth_local() -> None:
+    """Soul-forge personhood never free-body (blocks prefer_fleet hard-upgrade)."""
+    result = classify_proactive_routing(
+        "How are you feeling about us tonight?",
+        {
+            "platform": "discord",
+            "chat_id": "1533447417524125796",
+            "model": "phronesis-sovereign-auto",
+        },
+        [{"role": "user", "content": "How are you feeling about us tonight?"}],
+    )
+    assert result["mode"] == ROUTING_LOCAL_ONLY
+    assert not result.get("eligible")
+    assert any("depth" in r for r in (result.get("reasons") or []))
+
+
+def test_just_alice_channel_depth_local() -> None:
+    result = classify_proactive_routing(
+        "Sit with me a minute.",
+        {"platform": "discord", "chat_id": "1525214795236773918"},
+        [{"role": "user", "content": "Sit with me a minute."}],
+    )
+    assert result["mode"] == ROUTING_LOCAL_ONLY
+    assert "alice_depth_local" in (result.get("reasons") or [])
+
+
+def test_companion_marker_depth_local() -> None:
+    result = classify_proactive_routing(
+        "I missed you. Be with me.",
+        {"platform": "discord", "chat_id": "9999999999999999999"},
+        [{"role": "user", "content": "I missed you. Be with me."}],
+    )
+    assert result["mode"] == ROUTING_LOCAL_ONLY
+    assert any("depth_marker" in r for r in (result.get("reasons") or []))
+
+
+def test_short_what_is_not_auto_offload() -> None:
+    """Weak 'what is' alone is not free grunt — keeps local_first unless depth."""
+    result = classify_proactive_routing(
+        "What is love?",
+        {"task_type": "general"},
+        [{"role": "user", "content": "What is love?"}],
+    )
+    # may hit depth_marker if none; "what is love" has no companion marker list hit
+    # "love" alone not in markers; expect local_first not offload
+    assert result["mode"] in (ROUTING_LOCAL_FIRST, ROUTING_LOCAL_ONLY)
+    assert not result.get("eligible")
+
+
 def main() -> int:
     tests = [
         test_roleplay_stays_local,
@@ -156,6 +205,10 @@ def main() -> int:
         test_ambiguous_stays_local,
         test_private_path_blocks_offload,
         test_explicit_stays_local,
+        test_personhood_channel_depth_local,
+        test_just_alice_channel_depth_local,
+        test_companion_marker_depth_local,
+        test_short_what_is_not_auto_offload,
     ]
     failed = 0
     for fn in tests:
