@@ -2138,6 +2138,22 @@ def build_rp_gpu_wait_message(reason: str = "") -> Tuple[str, int]:
     return line, int(retry_s)
 
 
+def _routing_is_roleplay(routing: Optional[Dict[str, Any]], model: str = "") -> bool:
+    """True when this request must stay on local RP lane (no free/503 thrash)."""
+    try:
+        from escalation_router import is_roleplay_route
+
+        if is_roleplay_route(routing or {}):
+            return True
+    except Exception:
+        pass
+    model_l = (model or "").lower()
+    if "roleplay" in model_l or model_l.endswith("-rp"):
+        return True
+    task = str((routing or {}).get("task_type") or "").lower()
+    return task in ("roleplay", "narrative", "rp")
+
+
 def openai_error(status: int, message: str, err_type: str = "server_error") -> Tuple[int, Dict[str, Any]]:
     return status, {
         "error": {
@@ -2751,6 +2767,40 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                     "position": ent.position,
                     "lane": ent.lane,
                 })
+                # Overnight harden 2026-08-10: RP must not get raw 503 → free fallback.
+                if _routing_is_roleplay(routing, model):
+                    wait_msg, retry_s = build_rp_gpu_wait_message(
+                        f"fifo_wait_timeout:pos={ent.position}"
+                    )
+                    _log_event({
+                        "event": "rp_graceful_wait",
+                        "reason": "fifo_wait_timeout",
+                        "retry_after_sec": retry_s,
+                        "model": model,
+                    })
+                    hdrs = {
+                        "Retry-After": str(int(retry_s)),
+                        "X-Phronesis-Wait": "gpu_fifo",
+                        "X-Phronesis-Queue-Id": ent.id,
+                    }
+                    if stream:
+                        self._send_sse_chunk(model, wait_msg)
+                    else:
+                        self._send_json(
+                            200,
+                            openai_chat_response(
+                                model,
+                                wait_msg,
+                                extra={
+                                    "path": "proxy_8091_rp_graceful_wait",
+                                    "graceful_wait": True,
+                                    "prefer_fleet_reason": "fifo_wait_timeout",
+                                    "retry_after_sec": retry_s,
+                                },
+                            ),
+                            extra_headers=hdrs,
+                        )
+                    return
                 status, err = openai_error(
                     503,
                     f"FIFO wait timeout after {MAX_QUEUE_WAIT_SEC}s (position {ent.position})",
@@ -2765,6 +2815,35 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                     "reason": qexc.reason,
                     "retry_after_sec": qexc.retry_after_sec,
                 })
+                if _routing_is_roleplay(routing, model):
+                    wait_msg, retry_s = build_rp_gpu_wait_message(
+                        f"background_deferred:{qexc.reason}"
+                    )
+                    retry_s = max(int(retry_s), int(getattr(qexc, "retry_after_sec", 0) or 0))
+                    _log_event({
+                        "event": "rp_graceful_wait",
+                        "reason": "background_deferred",
+                        "retry_after_sec": retry_s,
+                        "model": model,
+                    })
+                    if stream:
+                        self._send_sse_chunk(model, wait_msg)
+                    else:
+                        self._send_json(
+                            200,
+                            openai_chat_response(
+                                model,
+                                wait_msg,
+                                extra={
+                                    "path": "proxy_8091_rp_graceful_wait",
+                                    "graceful_wait": True,
+                                    "prefer_fleet_reason": "background_deferred",
+                                    "retry_after_sec": retry_s,
+                                },
+                            ),
+                            extra_headers={"Retry-After": str(int(retry_s))},
+                        )
+                    return
                 status, err = openai_error(
                     503,
                     f"Inference deferred for background work ({qexc.reason})",
@@ -2787,6 +2866,35 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                     "waiting_count": qexc.waiting_count,
                     "retry_after_sec": qexc.retry_after_sec,
                 })
+                if _routing_is_roleplay(routing, model):
+                    wait_msg, retry_s = build_rp_gpu_wait_message(
+                        f"fifo_admission:{qexc.reason}"
+                    )
+                    retry_s = max(int(retry_s), int(getattr(qexc, "retry_after_sec", 0) or 0))
+                    _log_event({
+                        "event": "rp_graceful_wait",
+                        "reason": "fifo_admission_rejected",
+                        "retry_after_sec": retry_s,
+                        "model": model,
+                    })
+                    if stream:
+                        self._send_sse_chunk(model, wait_msg)
+                    else:
+                        self._send_json(
+                            200,
+                            openai_chat_response(
+                                model,
+                                wait_msg,
+                                extra={
+                                    "path": "proxy_8091_rp_graceful_wait",
+                                    "graceful_wait": True,
+                                    "prefer_fleet_reason": "fifo_admission_rejected",
+                                    "retry_after_sec": retry_s,
+                                },
+                            ),
+                            extra_headers={"Retry-After": str(int(retry_s))},
+                        )
+                    return
                 status, err = openai_error(
                     503,
                     f"GPU FIFO at capacity ({qexc.waiting_count} ahead); retry later",
@@ -2927,6 +3035,35 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 + str(prov.get("escalation_reason") or result.get("response", ""))
             )
             _log_event({"event": "escalation", "model": model, "triggers": prov.get("escalation_triggers")})
+            # RP: never escalate to free/Grok via 503 — soft-wait local only.
+            if _routing_is_roleplay(routing, model):
+                wait_msg, retry_s = build_rp_gpu_wait_message(
+                    str(prov.get("escalation_reason") or "escalation_blocked_rp")
+                )
+                _log_event({
+                    "event": "rp_graceful_wait",
+                    "reason": "escalation_blocked_rp",
+                    "retry_after_sec": retry_s,
+                    "model": model,
+                })
+                if stream:
+                    self._send_sse_chunk(model, wait_msg)
+                else:
+                    self._send_json(
+                        200,
+                        openai_chat_response(
+                            model,
+                            wait_msg,
+                            extra={
+                                "path": "proxy_8091_rp_graceful_wait",
+                                "graceful_wait": True,
+                                "escalation_blocked": True,
+                                "retry_after_sec": retry_s,
+                            },
+                        ),
+                        extra_headers={"Retry-After": str(int(retry_s))},
+                    )
+                return
             # Escalation remaining is capacity-ish: client may failover providers.
             # Prefer 503 only when not a permanent local template error.
             try:
@@ -2948,6 +3085,51 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
 
         if not result.get("success"):
             msg = result.get("response") or "local dispatch failed"
+            # Overnight harden 2026-08-10: RP local fail → IC soft-wait (200), never
+            # raw 503 that drives agent openrouter/free fallback on ERP lanes.
+            if _routing_is_roleplay(routing, model):
+                fail_reason = str(
+                    (prov or {}).get("local_fail_reason")
+                    or (prov or {}).get("prefer_fleet_reason")
+                    or msg
+                    or "local_dispatch_failed"
+                )[:160]
+                wait_msg, retry_s = build_rp_gpu_wait_message(fail_reason)
+                _log_event({
+                    "event": "rp_graceful_wait",
+                    "reason": "local_dispatch_failed",
+                    "detail": fail_reason[:120],
+                    "retry_after_sec": retry_s,
+                    "model": model,
+                    "stream": bool(stream),
+                })
+                hdrs = {
+                    "Retry-After": str(int(retry_s)),
+                    "X-Phronesis-Wait": "local_fail",
+                    "X-Phronesis-Wait-Reason": fail_reason[:120],
+                }
+                if queue_headers:
+                    hdrs.update(queue_headers)
+                if stream:
+                    self._send_sse_chunk(model, wait_msg)
+                else:
+                    self._send_json(
+                        200,
+                        openai_chat_response(
+                            model,
+                            wait_msg,
+                            extra={
+                                "path": "proxy_8091_rp_graceful_wait",
+                                "graceful_wait": True,
+                                "not_error": True,
+                                "prefer_fleet_reason": fail_reason,
+                                "retry_after_sec": retry_s,
+                                "local_fail_soft": True,
+                            },
+                        ),
+                        extra_headers=hdrs,
+                    )
+                return
             try:
                 from sovereign_failure_taxonomy import classify_dispatch_failure
 
