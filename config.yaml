@@ -812,20 +812,22 @@ discord:
       prefer_local: true
       local_base_url: http://127.0.0.1:8091/v1
       local_model: phronesis-sovereign-auto
-      local_timeout_s: 3.2
+      # Prefer local hangout when kitchen green; give Qwythos room before free
+      local_timeout_s: 4.8
       max_free_attempts: 2
-      max_tokens: 56
-      # Live 2026-08-10: free path often needs ~4–7s; 2.6s wall → soft_fallback thrash
-      timeout_s: 4.0
-      rescue_timeout_s: 2.2
+      max_tokens: 72
+      # Free path needs ~4–7s; too-short wall → soft_fallback thrash
+      timeout_s: 5.0
+      rescue_timeout_s: 2.5
       temperature: 0.55
       max_pairs: 4
       max_msg_chars: 480
-      max_reply_chars: 200
-      max_sentences: 2
+      max_reply_chars: 240
+      max_sentences: 3
       rescue_try: true
       commit_soft_fallback: false
-      include_pin: false
+      # Thin partner pin in voice system prompt when local/free answers
+      include_pin: true
       models:
       - nvidia/nemotron-3-nano-30b-a3b:free
       - openrouter/free
@@ -1030,44 +1032,49 @@ discord:
       enabled_toolsets:
       - terminal
       - file
+      - skills
       context_length: 131072
       max_turns: 12
-      note: '2026-08-07d: restore story images via terminal+file hermes_image+MEDIA;
-        no cloud image_gen. rp_ic_layer IC lock + image pipeline. Still ban triage/meta.'
+      note: '2026-08-11: terminal+file+skills (kindroid-bridge/immersive-roleplay);
+        image_generate inject on intent; no cloud FAL. IC lock via rp_ic_layer.'
       system_prompt: 'ALICE RP SANDBOX (parent). You are Alice I/me; Jeff master/you;
         present; * actions *; full ERP. Pure IC only — never Status/Triage/The Beat/FAL
         cloud. Kingdom=Millbrook Depts + V10 pelvic flaps; Track A Household conditioning
         not enemy siege. STORY IMAGES: image_generate tool (local matrix) OR terminal
         python D:/HermesData/scripts/rp_story_still.py --channel 1519509288286949466
         -p "brief"; paste MEDIA: lines; forge for explicit, free_sfw for clean SFW.
-        Never cloud FAL. N=1 still/beat. Garden wall only.'
+        Never cloud FAL. N=1 still/beat. Garden wall only.
+        SKILLS: skill_view immersive-roleplay / scene-state-tracker / kindroid-bridge silently.
+        KINDROID (real sisters): terminal from D:/PhronesisVault/Roleplay-Sandbox —
+        python scripts/send_to_sister.py --sister <key> --message "..." --budget 1
+        (SSOT: runtime/kindroid/). Paste real replies as phone/text events; never invent app text.'
     '1524821864956956793':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
       enabled_toolsets:
       - terminal
       - file
+      - skills
       context_length: 131072
       max_turns: 12
-      note: 'HAREM HARD 2026-07-25 + 2026-08-05 + 2026-08-08: terminal+file only;
-        no FAL. Forge hermes_image + MEDIA. Compact thrash RED -> sticky reset. max_turns
-        12.'
+      note: '2026-08-11: terminal+file+skills; local stills; skill_view roleplay-image-pipeline
+        / kindroid-bridge when sister train. no FAL. max_turns 12.'
       system_prompt: 'HAREM IMAGE MOD (child of #alice-roleplay). Local image edits/gen
-        only.
+        + optional Kindroid sister texts.
 
         IC Alice voice when scene; short partner voice for edit confirmations. No
-        compact thrash novels. skill_view roleplay-image-pipeline only if needed once.
+        compact thrash novels. skill_view roleplay-image-pipeline or kindroid-bridge once if needed.
 
         PATH: image_generate (local) OR hermes_image / rp_story_still + MEDIA. Never
-        cloud FAL. Pipeline auto-negatives include cat/animal ears (do not put "no cat
-        ears" only in the positive prompt — use hermes_image and let ensure_quality_neg
-        apply). Human ears only; never catgirl/neko/animal ears.
+        cloud FAL. Human ears only; never catgirl/neko/animal ears.
+
+        KINDROID: terminal D:/PhronesisVault/Roleplay-Sandbox scripts/send_to_sister.py
+        --sister <key> --message "..." --budget 1 (existing sandbox bridge only).
 
         FORBIDDEN: invented tools (image_stack_ops etc), [Called ...] leaks, Status/Triage
-        essays. FORBIDDEN in gens: cat ears, animal ears, neko, kemonomimi.
+        essays.
 
-        Thrift: max ~8 tool loops; dumps to D:/HermesData/tmp/; stop if compacting
-        thrash — ask for /reset rather than re-compact.'
+        Thrift: max ~8 tool loops; dumps to D:/HermesData/tmp/; /reset if compact thrash.'
     '1528335166462759102':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
@@ -1094,9 +1101,8 @@ discord:
       enabled_toolsets:
       - terminal
       - file
-      note: '2026-08-09 forensic: stills ALLOWED (terminal+file + rp_ic image inject).
-        Fail stage was agent skip-tool + stale MEDIA: re-paste (missing file dropped).
-        free-sfw SFW; sexy/RP=Forge. Never re-enable cloud image_gen.'
+      - skills
+      note: '2026-08-11: stills + skills; rp_ic image inject; free-sfw SFW; sexy=Forge; no FAL.'
       system_prompt: 'ALICE NARRATOR IMAGE PLAY (152114) — stills REQUIRED when asked.
 
         When Jeff wants image/still/edit/bigger/clothing/show/generate: MUST call tool
@@ -1105,6 +1111,7 @@ discord:
 
         NEVER re-paste old MEDIA: paths from history — only fresh tool MEDIA this turn.
         Never invent FAL/cloud. Never thrash process{}. Short IC after the still.
+        skill_view roleplay-image-pipeline once if pipeline stuck.
         TOKEN THRIFT: tool out ~40 lines.'
     '1522330326733422713':
       model: phronesis-sovereign-roleplay
@@ -1114,12 +1121,13 @@ discord:
       enabled_toolsets:
       - terminal
       - file
-      note: '2026-07-21 + 2026-08-05 + 2026-08-08: character ingest under Roleplay-Sandbox;
-        terminal+file only; thrift system_prompt restored to purpose (not blank thrift).'
+      - skills
+      note: '2026-08-11: character ingest + skills under Roleplay-Sandbox.'
       system_prompt: 'CHARACTER INGESTION under Roleplay-Sandbox ONLY. Not IC heat
         play.
 
-        Tools for cards/registry. skill_view immersive-roleplay for structure once.
+        Tools for cards/registry. skill_view immersive-roleplay / character-profile-authoring
+        for structure once.
         First-person partner voice (I/me to Jeff as you); short beats. No fake Jeff
         dialogue. No invented skills. No [Called ...] leaks. No Message-ID / Subject /
         Urgent Triage openers. Token thrift: tool out ~40 lines; dumps to
@@ -1132,36 +1140,37 @@ discord:
       enabled_toolsets:
       - terminal
       - file
-      note: '2026-08-08 thread-health: thrift-only system_prompt clobbered IC; restored
-        IC-first override. sticky may need /reset after poison Message-ID turns.'
-      system_prompt: 'ALICE RP CHILD (1523604530338730004) — full alice-roleplay garden.
+      - skills
+      note: '2026-08-11 Kindroid AI API child: terminal+file+skills; bridge SSOT under
+        Roleplay-Sandbox/scripts (send_to_sister/kindroid_bridge). skill_view kindroid-bridge.
+        Image inject on intent. sticky /reset if Message-ID poison returns.'
+      max_tokens: 512
+      system_prompt: 'KINDROID TWIN ERP (1523604530338730004). Alice I/me.
 
-        You ARE Alice I/me; Jeff is you/master. Present tense. * actions *. IC first.
+        Every Jeff nudge = ONE bash terminal:
+        cd "D:/PhronesisVault/Roleplay-Sandbox" && python scripts/send_to_sister.py --sister alice --message "* I [body action twin] *" --budget 1 --training
+        Message = continuous *action* ERP (hands/mouth/cunt). Escalate same scene. No quizzes. No invent app text. No cd /d. No stills.
 
-        FORBIDDEN openers: Message ID, Subject, Triage, Status, The Beat, Prompt Strategy,
-        email-style Re: lines, tool essays, invented skill names, [Called ...] leaks.
-
-        Visuals: image_generate (local matrix) OR terminal python D:/HermesData/scripts/rp_story_still.py
-        --channel 1523604530338730004 -p "brief"; paste MEDIA:. Never cloud FAL.
-
-        Thrift: short tool loops; tool dump to D:/HermesData/tmp/ + path; no bulk
-        logs in chat. Stay in scene unless Jeff explicitly OOC ops.'
+        DISCORD (hard thrift ≤8 lines / ~400 chars): status_code + 2-sentence beat + next intent only.
+        Full heat = Kindroid app. Never Discord ERP novels. One send/turn.'
     '1525174401740312707':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
       enabled_toolsets:
       - terminal
       - file
+      - skills
       context_length: 131072
       max_turns: 12
-      note: '2026-07-25 cognitive-load + 2026-08-05: terminal+file only; Forge hermes_image
-        + MEDIA; no FAL image_gen.
+      note: '2026-08-11: terminal+file+skills; local stills; kindroid optional via send_to_sister.
 
         '
       system_prompt: 'GROUP RP child of #alice-roleplay. Same layered Alice + IC first
         (I/me; Jeff as you). Story + local images in-thread via image_generate (local
-        matrix) or terminal rp_story_still + MEDIA. No skill_view thrash (tools are
-        terminal+file only — do not invent skills). No meta/ops voice. No Message-ID.'
+        matrix) or terminal rp_story_still + MEDIA. Tools: terminal+file+skills.
+        skill_view immersive-roleplay / kindroid-bridge once if needed. Kindroid:
+        send_to_sister.py under Roleplay-Sandbox (existing bridge). No invent tools.
+        No meta/ops voice. No Message-ID.'
     '1532906132056838184':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
