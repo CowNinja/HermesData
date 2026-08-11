@@ -2,6 +2,9 @@
 """Meta-watchdog v2: keep hermes_gateway_SERVICE alive (Red-style outer loop).
 
 Does NOT start gateway.run directly (avoids dual-start races).
+
+2026-08-11: also when-down ensure sovereign proxy :8091 (RP + local primary path).
+Gateway-only heal left RP dead while :8642 stayed GREEN.
 """
 from __future__ import annotations
 
@@ -19,11 +22,16 @@ LOCK = STATE / "gateway-meta-watchdog.lock"
 SVC_LOCK = STATE / "gateway-service.lock"
 LOG = ROOT / "logs" / "gateway-meta-watchdog.log"
 INTERVAL = 15
+# Cooldown between proxy ensure attempts (matches ensure_single_proxy restart gate)
+PROXY_ENSURE_COOLDOWN_S = 90.0
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
 DETACHED = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
 NEW_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
 BREAKAWAY = 0x01000000
 VENV_PYW = ROOT / "hermes-agent" / "venv" / "Scripts" / "pythonw.exe"
+VENV_PY = ROOT / "hermes-agent" / "venv" / "Scripts" / "python.exe"
+ENSURE_PROXY = SCRIPTS / "ensure_single_proxy_8091.py"
+_last_proxy_ensure_mono = 0.0
 
 
 def log(msg: str) -> None:
@@ -93,6 +101,54 @@ def health() -> bool:
         return False
 
 
+def health_proxy() -> bool:
+    """Sovereign MoE proxy :8091 — required for RP + local primary routing."""
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(
+            "http://127.0.0.1:8091/health",
+            headers={"User-Agent": "meta-watchdog/2.1-proxy"},
+        )
+        with urllib.request.urlopen(req, timeout=2.5) as resp:
+            return 200 <= int(resp.status) < 300
+    except Exception:
+        return False
+
+
+def ensure_proxy_when_down() -> None:
+    """When-down only: kitchen helper ensure_single_proxy_8091 (cooldown)."""
+    global _last_proxy_ensure_mono
+    if health_proxy():
+        return
+    now = time.monotonic()
+    if (now - _last_proxy_ensure_mono) < PROXY_ENSURE_COOLDOWN_S:
+        log("proxy :8091 DOWN (ensure cooldown active)")
+        return
+    if not ENSURE_PROXY.is_file():
+        log("proxy :8091 DOWN but ensure_single_proxy_8091.py missing")
+        return
+    _last_proxy_ensure_mono = now
+    py = str(VENV_PY if VENV_PY.is_file() else sys.executable)
+    log("proxy :8091 DOWN -> ensure_single_proxy_8091.py")
+    try:
+        r = subprocess.run(
+            [py, str(ENSURE_PROXY), "--json"],
+            cwd=str(SCRIPTS),
+            timeout=200,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+        up = health_proxy()
+        tail = ((r.stdout or "") + (r.stderr or ""))[-240:].replace("\n", " ")
+        log(f"proxy ensure rc={r.returncode} up={up} tail={tail}")
+    except Exception as exc:
+        log(f"proxy ensure err: {exc}")
+
+
 def start_service() -> None:
     """Start gateway-service outside Job Objects (WMI via start_detached)."""
     det = SCRIPTS / "start_detached.py"
@@ -158,7 +214,10 @@ def acquire() -> bool:
 def main() -> int:
     if not acquire():
         return 0
-    log(f"meta-watchdog v2 start pid={os.getpid()} (owns gateway-service only)")
+    log(
+        f"meta-watchdog v2.1 start pid={os.getpid()} "
+        f"(gateway-service + when-down :8091 proxy)"
+    )
     try:
         while True:
             try:
@@ -167,8 +226,11 @@ def main() -> int:
                     start_service()
                     time.sleep(10)
                 else:
+                    # Measure gateway + proxy; ensure proxy only when-down
+                    ensure_proxy_when_down()
                     log(
-                        f"OK service_alive=True gateway_health={health()}"
+                        f"OK service_alive=True gateway_health={health()} "
+                        f"proxy_8091={health_proxy()}"
                     )
                 LOCK.write_text(
                     f"{os.getpid()} {datetime.now().isoformat()}", encoding="utf-8"

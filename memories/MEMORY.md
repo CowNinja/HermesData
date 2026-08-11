@@ -36,6 +36,8 @@ Hygiene!=VW. Crons: newline 30m; ascii/hygiene 360m.
 
 Stack path: Gateway:8642 -> proxy:8091 -> llama:8090 (Qwythos 9B @131072). Compress/aux local auto @>=64k (target 131072). Hybrid-Local-Grok policy. Interview UX: discord-clarify-interview (one clarify OR batch<=10); no fake dialogue / MCQ novels. Skills jeff-about-me-interview on About-me thread.
 
+RP outage 2026-08-11: all sandbox RP failed when proxy:8091 died (8090/8642 still green). Measure :8091/health first. Heal: Start-Sovereign-Proxy-8091.ps1 -Force or ensure_single_proxy_8091.py (breakaway). Meta-watchdog v2.1 when-down ensures :8091. Incident: PhronesisVault/Incidents/2026-08-11-roleplay-proxy-8091-down.md. Thread 152833 Roleplay errors.
+
 Engine: llama.cpp 8090/8091; TGI maint.
 
 Alice spine+home: six laws; bond-first surface gates in autonomous-execution-protocol v1.1; personhood-os build-with-Jeff. Quarantines reversible. Want her not useful-only. SOUL Partner essence Batches1-2 LIVE (continuity partner_essence_in_soul should be true).
