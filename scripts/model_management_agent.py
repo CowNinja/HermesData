@@ -1258,26 +1258,23 @@ def assess_fleet_recommendations(*, locked: bool) -> Dict[str, Any]:
 
 
 def assess_paid_fallbacks() -> Dict[str, Any]:
-    config = _load_yaml_simple()
-    issues: List[Dict[str, Any]] = []
-    entries = []
-    moa = config.get("moa") or {}
-    if moa.get("enabled"):
-        agg = moa.get("aggregator") or {}
-        entries.append({"id": "moa", "provider": agg.get("provider"), "model": agg.get("model")})
-    if config.get("nous"):
-        entries.append({"id": "nous", "provider": "nous", "model": "portal"})
-    xs = config.get("x_search") or {}
-    if xs.get("model"):
-        entries.append({"id": "xai", "provider": "xai", "model": xs["model"]})
-    fb = config.get("fallback_model") or []
-    if isinstance(fb, list) and fb:
-        e = fb[0] if isinstance(fb[0], dict) else {}
-        if "phronesis-sovereign" in str(e.get("provider", "")):
-            entries.append({"id": "local_fallback", "provider": e.get("provider"), "model": e.get("model"), "note": "local retry"})
-    if not entries:
-        issues.append({"code": "P01", "severity": "medium", "message": "No paid/escalation fallbacks configured", "fix": "manual"})
-    return {"entries": entries, "issues": issues}
+    """See live agent fallback_providers (not only legacy fallback_model)."""
+    try:
+        from agent_fallback_inventory import assess_mm_paid_view
+
+        return assess_mm_paid_view(_load_yaml_simple())
+    except Exception as exc:
+        return {
+            "entries": [],
+            "issues": [
+                {
+                    "code": "P01",
+                    "severity": "medium",
+                    "message": f"fallback inventory failed: {exc}"[:160],
+                    "fix": "manual",
+                }
+            ],
+        }
 
 
 def remediate(

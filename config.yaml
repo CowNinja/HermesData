@@ -627,6 +627,8 @@ slack:
 discord:
   require_mention: true
   free_response_channels: 1513273692778528990,1519509288286949466,1522325123817013269,1526594007092826316,1532906132056838184,1534692043404607558
+  # Live-facts fail-closed (factual_outbound_gate). Never list RP / Just Alice.
+  factual_gate_channels: 1513273692778528990,1534692043404607558,1523156115808845926,1519144636541571133
   allowed_channels: ''
   auto_thread: true
   thread_require_mention: false
@@ -651,7 +653,10 @@ discord:
     '1529232050178101428': ANGUS DEMO — not RP fiction. Introduce Hermes to person;
       short factual partner voice.
     '1513273692778528990': 'Main #hermes ops channel (not live voice). Factual partner
-      voice; tools first. Voice transcripts live in thread 1534692043404607558 (voice-transcripts).
+      voice; tools first. LIVE FACTS (news, cameras, arrests, city policy): web_search
+      or web_extract BEFORE answering. Never invent. Never dump message_id / tool JSON.
+      If you cannot search, say you did not look it up. Skip /reset after a glitch.
+      Voice transcripts live in thread 1534692043404607558 (voice-transcripts).
       No RP heat unless Jeff steers there.'
     '1534692043404607558': 'VOICE TRANSCRIPTS for #voice-think-aloud (VC 1519144782176194781).
       Live spoken conversation with Jeff. Primary path is gateway voice_fast_path
@@ -849,7 +854,16 @@ discord:
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
       context_length: 131072
-      max_turns: 4
+      max_turns: 12
+      enabled_toolsets:
+      - hermes-discord
+      - web
+      - terminal
+      - file
+      - hermes-cli
+      note: '2026-08-12 Flock leak: Discord platform was hermes-discord-only so
+        Qwythos dumped message_id JSON. Enable web. max_turns 12 for search+answer.
+        Live facts fail-closed via factual_outbound_gate if no web tool ran.'
     '1519144758172192808':
       # 2026-08-09 local-first restore: do NOT pin grok-4.5 (token thrift).
       # LANDING reliability = skill_librarian / learn_land_once force, not paid model.
@@ -1403,6 +1417,7 @@ platform_toolsets:
   - x_search
   discord:
   - hermes-discord
+  - web
 known_plugin_toolsets:
   cli:
   - spotify
