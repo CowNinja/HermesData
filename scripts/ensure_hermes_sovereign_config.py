@@ -359,7 +359,7 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
             if fleet.get("proactive_offload") is None:
                 fleet["proactive_offload"] = True
                 changes.append("local_sovereign.opportunistic_fleet.proactive_offload->true")
-            # Policy B (2026-07-27): auto Grok for hard reasoning only; thrift caps 5%/20%
+            # Policy B: auto Grok for hard reasoning only; 2026-08-13 modest caps 12%/28%
             if fleet.get("grok_policy") in (None, ""):
                 fleet["grok_policy"] = "B"
                 changes.append("local_sovereign.opportunistic_fleet.grok_policy->B")
@@ -367,11 +367,11 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
                 fleet["hard_prompt_auto_t3"] = True
                 changes.append("local_sovereign.opportunistic_fleet.hard_prompt_auto_t3->true")
             if fleet.get("grok_share_cap_yellow") is None:
-                fleet["grok_share_cap_yellow"] = 0.05
-                changes.append("local_sovereign.opportunistic_fleet.grok_share_cap_yellow->0.05")
+                fleet["grok_share_cap_yellow"] = 0.12
+                changes.append("local_sovereign.opportunistic_fleet.grok_share_cap_yellow->0.12")
             if fleet.get("grok_share_cap_red") is None:
-                fleet["grok_share_cap_red"] = 0.20
-                changes.append("local_sovereign.opportunistic_fleet.grok_share_cap_red->0.20")
+                fleet["grok_share_cap_red"] = 0.28
+                changes.append("local_sovereign.opportunistic_fleet.grok_share_cap_red->0.28")
         for key, value in LOCAL_SOVEREIGN_DEFAULTS.items():
             if key == "tiers" and isinstance(value, dict):
                 tiers = local_sovereign.setdefault("tiers", {})

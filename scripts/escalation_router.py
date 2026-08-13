@@ -95,8 +95,8 @@ def fleet_policy() -> Dict[str, Any]:
         # Policy B: auto T3 for hard prompts; share caps mirror thrift gate
         "grok_policy": str(fleet.get("grok_policy") or "B").upper(),
         "hard_prompt_auto_t3": bool(fleet.get("hard_prompt_auto_t3", True)),
-        "grok_share_cap_yellow": float(fleet.get("grok_share_cap_yellow", 0.05)),
-        "grok_share_cap_red": float(fleet.get("grok_share_cap_red", 0.20)),
+        "grok_share_cap_yellow": float(fleet.get("grok_share_cap_yellow", 0.12)),
+        "grok_share_cap_red": float(fleet.get("grok_share_cap_red", 0.28)),
         "registry": str(fleet.get("registry") or HERMES_ROOT / "config" / "fleet_registry.yaml"),
         "block_roleplay": True,
     }
@@ -392,8 +392,10 @@ def try_t2_fleet_dispatch(
 
 def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Tier 3 -- heavy reasoning. Tries free fleet first when prefer_free_before_grok.
+    Tier 3 -- heavy reasoning. Grok first, free backup.
 
+    prefer_free_before_grok is grunt law (T1/T2). Public brains skip 9B/free
+    as the first thinker. Garden / RP never enter this function.
     Grok auth via grok_auth.py (subscription OAuth first, console API key fallback).
     """
     if is_roleplay_route(routing):
@@ -403,15 +405,6 @@ def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]
     if not ok:
         return {"success": False, "tier": "paid", "error": f"fleet_blocked:{block_reason}"}
 
-    pol = fleet_policy()
-    if pol.get("prefer_free_before_grok"):
-        # Pass original prompt so try_t2 owns mask_map + rehydrate
-        t2 = try_t2_fleet_dispatch(prompt, routing, local_failed=True)
-        if t2.get("success"):
-            prov = t2.setdefault("provenance", {})
-            prov["t3_deferred_to_t2"] = True
-            return t2
-
     from grok_auth import grok_user_prompt_completion
     from privacy_mask_rehydrate import rehydrate_result
 
@@ -420,6 +413,7 @@ def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]
         result = rehydrate_result(result, mask_map)
         prov = result.setdefault("provenance", {})
         prov["escalation_tier"] = "T3"
+        prov["selected_backend"] = "grok"
         _log({
             "event": "t3_ok",
             "model": result.get("model"),
@@ -431,6 +425,15 @@ def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]
 
     err_msg = str(result.get("error") or result.get("response") or "t3_dispatch_failed")
     _log({"event": "t3_fail", "error": err_msg})
+
+    # Free backup after Grok miss — never the other way around on T3
+    t2 = try_t2_fleet_dispatch(prompt, routing, local_failed=True)
+    if t2.get("success"):
+        prov = t2.setdefault("provenance", {})
+        prov["t3_fallback_to_t2"] = True
+        prov["t3_grok_error"] = err_msg[:240]
+        return t2
+
     return {
         "success": False,
         "escalation": True,
@@ -487,45 +490,33 @@ def _proactive_wants_t3(prompt: str, routing: Dict[str, Any]) -> bool:
     # Policy A was driver-only rare; Policy B enables marker auto-T3 (default).
     if not pol.get("hard_prompt_auto_t3", True) and str(pol.get("grok_policy") or "B") == "A":
         return False
-    low = (prompt or "").lower()
-    # Explicit spend: Jeff asked for brains. No share-cap (scalpel, not loop).
-    explicit_markers = (
-        "needs grok",
-        "escalate to grok",
-        "beyond local",
-        "t3 escalate",
-        "tier 3",
-        "super grok",
-        "grok heavy",
-    )
-    if any(m in low for m in explicit_markers):
+    # Spend kind SSOT: token_resource_governor (explicit / strong / modest).
+    # Hop color (RED strips Grok) is applied in pick_backend, not here.
+    try:
+        from token_resource_governor import spend_kind
+
+        kind = spend_kind(prompt, routing)
+    except Exception:
+        kind = "none"
+        low = (prompt or "").lower()
+        if any(
+            m in low
+            for m in (
+                "needs grok",
+                "escalate to grok",
+                "beyond local",
+                "t3 escalate",
+                "tier 3",
+                "super grok",
+                "grok heavy",
+            )
+        ):
+            kind = "explicit"
+        elif "tradeoff analysis" in low or "root cause analysis" in low:
+            kind = "auto_strong"
+    if kind == "explicit":
         return True
-    # Auto-detect: planning/judgment only. Share-cap applies.
-    # Cook-loop phrases (codify / programmatically) must NOT live here.
-    auto_markers = (
-        "heavy reasoning",
-        "full system architecture review",
-        "end-to-end system design",
-        "deep synthesis",
-        "multi-hour",
-        "tradeoff analysis",
-        "trade-off analysis",
-        "design decision matrix",
-        "root cause analysis",
-        "failure mode",
-        "anti-hallucination audit",
-        "policy judgment",
-        "gray policy",
-        "plan the next multi-day",
-        "strategic multi-week plan",
-    )
-    if any(m in low for m in auto_markers):
-        blocked, reason = _grok_share_blocks_t3()
-        if blocked:
-            _log({"event": "t3_blocked_share_cap", "reason": reason})
-            return False
-        return True
-    if int(routing.get("tool_fail_count") or 0) > 2:
+    if kind in {"auto_strong", "auto_modest"} or int(routing.get("tool_fail_count") or 0) > 2:
         blocked, reason = _grok_share_blocks_t3()
         if blocked:
             _log({"event": "t3_blocked_share_cap", "reason": reason})
@@ -712,38 +703,33 @@ def try_proactive_offload_dispatch(
     wants_t3 = _proactive_wants_t3(safe_prompt, routing)
 
     t2_result: Dict[str, Any] = {"success": False}
-    # Under hard prefer_fleet, always try free T2 first even if wants_t3
-    # (prefer_free_before_grok law). Dispatch with ORIGINAL prompt so
-    # privacy_mask_rehydrate owns mask_map + rehydrate (not double-mask).
-    if not wants_t3 or prefer_fleet:
+    t3_result: Dict[str, Any] = {"success": False}
+
+    # Public brains: Grok first, free backup. Grunt: free first (prefer_free law).
+    if wants_t3:
+        t3_route = {**routing, "escalation_tier": "T3"}
+        t3_result = try_t3_paid_dispatch(prompt, t3_route)
+        if t3_result.get("success"):
+            t3_result.setdefault("provenance", {})
+            t3_result["provenance"]["proactive_offload"] = True
+            t3_result["provenance"]["routing_mode"] = "offload_t3"
+            t3_result["classification"] = classification
+            _log({"event": "proactive_t3_ok", "model": t3_result.get("model")})
+            return t3_result
+        t2_result = try_proactive_t2_dispatch(prompt, routing)
+        if t2_result.get("success"):
+            t2_result["classification"] = classification
+            t2_result.setdefault("provenance", {})["t3_fallback_to_t2"] = True
+            return t2_result
+    else:
+        # Grunt / prefer_fleet: free first. Dispatch original prompt so
+        # privacy_mask_rehydrate owns mask_map + rehydrate (not double-mask).
         t2_result = try_proactive_t2_dispatch(prompt, routing)
         if t2_result.get("success"):
             t2_result["classification"] = classification
             if prefer_fleet:
                 t2_result.setdefault("provenance", {})["prefer_fleet_reason"] = prefer_reason
             return t2_result
-
-    if wants_t3 or pol.get("prefer_free_before_grok"):
-        if wants_t3 and pol.get("enabled") and fleet_routing_enabled():
-            t2_result = try_proactive_t2_dispatch(prompt, routing)
-            if t2_result.get("success"):
-                t2_result["classification"] = classification
-                return t2_result
-
-    # Only escalate to T3 (paid Grok) when free failed AND not blocked by thrift
-    # Under prefer_fleet with free available, still allow T3 as last resort for wants_t3.
-    t3_route = {**routing, "escalation_tier": "T3"}
-    t3_result = try_t3_paid_dispatch(prompt, t3_route)
-    if t3_result.get("success"):
-        t3_result.setdefault("provenance", {})
-        t3_result["provenance"]["proactive_offload"] = True
-        t3_result["provenance"]["routing_mode"] = "offload_t3"
-        t3_result["classification"] = classification
-        _log({"event": "proactive_t3_ok", "model": t3_result.get("model")})
-        return t3_result
-
-    if t2_result.get("success"):
-        return t2_result
 
     return {
         "success": False,
@@ -828,8 +814,47 @@ def resolve_post_local_dispatch(
 
     pol = fleet_policy()
     tier = str(routing.get("escalation_tier") or "")
-    want_free = BACKEND_FREE in hop and pol.get("prefer_free_before_grok", True)
-    want_grok = BACKEND_GROK in hop or tier == "T3"
+    hop_first = hop[0] if hop else ""
+    brains_first = hop_first == BACKEND_GROK or tier == "T3"
+    want_free = BACKEND_FREE in hop and (
+        (not brains_first) and pol.get("prefer_free_before_grok", True)
+    )
+    want_grok = BACKEND_GROK in hop or brains_first
+
+    # Public brains: Grok first even after local miss. Grunt: free first.
+    if brains_first and want_grok:
+        t3 = try_t3_paid_dispatch(prompt, {**routing, "escalation_tier": "T3"})
+        try:
+            t3.setdefault("provenance", {})["path"] = path_stamp
+            t3.setdefault("provenance", {})["failover"] = "brains_first_t3"
+            t3.setdefault("provenance", {})["selected_backend"] = "grok"
+            t3.setdefault("provenance", {})["tier_bucket"] = "grok"
+            if decision is not None and hasattr(decision, "to_dict"):
+                t3.setdefault("provenance", {})["backend_policy"] = decision.to_dict()
+        except Exception:
+            pass
+        if t3.get("success"):
+            _append_provenance(
+                {
+                    "event": "brains_first_t3",
+                    "path": path_stamp,
+                    "success": True,
+                    "tier": t3.get("tier"),
+                    "tier_bucket": "grok",
+                    "selected_backend": "grok",
+                }
+            )
+            return t3
+        if BACKEND_FREE in hop and fleet_routing_enabled():
+            t2 = try_t2_fleet_dispatch(prompt, routing, local_failed=True)
+            if t2.get("success"):
+                prov = t2.setdefault("provenance", {})
+                prov["path"] = path_stamp
+                prov["failover"] = "brains_t3_miss_to_free"
+                prov["selected_backend"] = "free"
+                prov["tier_bucket"] = "free"
+                return t2
+        return t3
 
     # Free fleet first on local fail (prefer_free_before_grok).
     # Pass original prompt so try_t2 owns mask_map + rehydrate.
@@ -878,8 +903,8 @@ def resolve_post_local_dispatch(
             t2.setdefault("provenance", {})["tier_bucket"] = "free"
             return t2
 
-    if want_grok and tier == "T3":
-        t3 = try_t3_paid_dispatch(prompt, routing)
+    if want_grok and (tier == "T3" or brains_first):
+        t3 = try_t3_paid_dispatch(prompt, {**routing, "escalation_tier": "T3"})
         try:
             t3.setdefault("provenance", {})["path"] = path_stamp
             t3.setdefault("provenance", {})["failover"] = "local_fail_to_t3_after_free"

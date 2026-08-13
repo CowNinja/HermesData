@@ -42,28 +42,12 @@ def _iso() -> str:
 
 
 def listeners_on_port(port: int = PORT) -> list[int]:
-    pids: set[int] = set()
     try:
-        r = subprocess.run(
-            ["cmd.exe", "/c", f"netstat -ano | findstr :{port}"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        for line in (r.stdout or "").splitlines():
-            if "LISTENING" not in line.upper():
-                continue
-            parts = line.split()
-            if len(parts) >= 5:
-                try:
-                    pid = int(parts[-1])
-                    if pid > 4:
-                        pids.add(pid)
-                except ValueError:
-                    pass
+        from win_silent_proc import tcp_listen_pids
+
+        return [int(p) for p in tcp_listen_pids(port) if int(p) > 4]
     except Exception:
-        pass
-    return sorted(pids)
+        return []
 
 
 def health_probe(timeout: float = 3.0) -> dict:

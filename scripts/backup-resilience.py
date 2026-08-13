@@ -330,13 +330,9 @@ def _acquire_resilience_lock() -> bool:
             if age < 7200:
                 # check pid
                 try:
-                    r = subprocess.run(
-                        ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
-                    )
-                    if str(pid) in (r.stdout or "") and "No tasks" not in (r.stdout or ""):
+                    from win_silent_proc import pid_alive as _alive
+
+                    if _alive(int(pid)):
                         log(f"SKIP resilience: already running pid={pid} age_s={age:.0f}")
                         return False
                 except Exception:
