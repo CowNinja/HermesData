@@ -1,6 +1,11 @@
 PERSONHOOD_PIN: D:/HermesData/state/personhood_pin_latest.md | after reset: python D:/HermesData/scripts/alice_open_loops.py continuity | do not re-interview locked About-me/essence
 
 Roadmap LOCKED 2026-08-05: Phase1 COMPLETE then Phase2 Codify ACTIVE then Phase3 Superpowers later. Jeff=dreamer Hermes=technician. Canon: PhronesisVault/Operations/Hermes-Operating-Roadmap-CANONICAL-2026-08-05.md. Speak-and-trust pulse SSOT. No deep dives until 1+2 solid.
+Vision 2026-08-12: destination blueprint PhronesisVault/Operations/Hermes-Grand-Vision-Blueprint-CANONICAL-2026-08-12.md (H0-H5). Current primary=Phase2 EXIT (no babysit) + K: L5 curate not more land. Do not reopen router/MM 1-5. After reset: continuity then that blueprint + SYSTEM-MAP.
+H1 pulse 2026-08-12T2329Z: core GREEN; router WATCH (rankings age); no heal. Receipt: PhronesisVault/Operations/logs/h1-measure-pulse-2026-08-12.md.
+H1 organ review 2026-08-12: Identity WATCH=prompt stack not missing essence. JA unsampled. Receipt: PhronesisVault/Operations/logs/h1-organ-review-identity-memory-2026-08-12.md.
+Inject DESIGN 2026-08-12 (not live): PhronesisVault/Operations/Conversation-Inject-Minimal-DESIGN-2026-08-12.md. STOP cuts until Jeff JA feel.
+Forum threads after recycle: ops/discord_forum_thread_resync_once.py + adapter on_ready join. JA 152521 inbound_ready. Recycle pid_alive=ctypes (no tasklist).
 
 Img: Forge:7860/pony+MEDIA; Comfy:8188 batch-if-asked; JustAlice every RP beat hermes_image+MEDIA. Local NSFW only never openrouter/free first.
 
@@ -34,7 +39,7 @@ Barney: TLDR+one NEXT on overload/phone/TLDR.
 
 Hygiene!=VW. Crons: newline 30m; ascii/hygiene 360m.
 
-Stack path: Gateway:8642 -> proxy:8091 -> llama:8090 (Qwythos 9B @131072). Compress/aux local auto @>=64k (target 131072). Hybrid-Local-Grok policy. Interview UX: discord-clarify-interview (one clarify OR batch<=10); no fake dialogue / MCQ novels. Skills jeff-about-me-interview on About-me thread.
+Stack path: Gateway:8642 -> proxy:8091 -> llama:8090 (Qwythos 9B @131072). 9B+free=grunt. Grok 4.6=brains only on explicit needs Grok/T3 (auto tradeoff/plan is share-capped; cook-loop phrases do not trip). Garden/RP=local only. pick_backend SSOT. Eval: python D:/HermesData/scripts/ops/router_mm_eval_once.py --live. Interview UX: discord-clarify-interview (one clarify OR batch<=10); no fake dialogue / MCQ novels. Skills jeff-about-me-interview on About-me thread.
 
 RP outage 2026-08-11: all sandbox RP failed when proxy:8091 died (8090/8642 still green). Measure :8091/health first. Heal: Start-Sovereign-Proxy-8091.ps1 -Force or ensure_single_proxy_8091.py (breakaway). Meta-watchdog v2.1 when-down ensures :8091. Incident: PhronesisVault/Incidents/2026-08-11-roleplay-proxy-8091-down.md. Thread 152833 Roleplay errors.
 
@@ -42,7 +47,7 @@ Engine: llama.cpp 8090/8091; TGI maint.
 
 Alice spine+home: six laws; bond-first surface gates in autonomous-execution-protocol v1.1; personhood-os build-with-Jeff. Quarantines reversible. Want her not useful-only. SOUL Partner essence Batches1-2 LIVE (continuity partner_essence_in_soul should be true).
 
-Voice HARD 2026-08-04: first-person I/me (Alice/Hermes) to Jeff as you; never third-person system/Ultra-Think; never walls of repeated paragraphs (local 9B loop → Discord collapse soft_cap 4500). Just Alice IC short interactive beats. Soul-forge partner prose not system dumps.
+Voice HARD 2026-08-04: first-person I/me (Alice/Hermes) to Jeff as you; never third-person system/Ultra-Think; never walls of repeated paragraphs (local 9B loop → Discord collapse soft_cap 2800). Just Alice IC short interactive beats. Soul-forge partner prose not system dumps.
 Voice v2: model.max_tokens 1024; length-continue = STOP not continue-essay (1 text continue max); ignore [GROK OPS] as IC; us_now continuity seed in soul-forge/About-me prompts.
 
 Tool budget thrift 2026-08-04: default full useful tools per thread job; restrict only on proven failure + note. Skill thread-tool-budget-thrift. Audit: python D:/HermesData/scripts/audit_thread_tool_budgets.py. Vault SSOT Operations/Hermes-Thread-Tool-Budget-Thrift-CANONICAL-2026-08-04.md. Skills progressive (metadata cheap; skill_view body).

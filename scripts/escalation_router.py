@@ -488,36 +488,38 @@ def _proactive_wants_t3(prompt: str, routing: Dict[str, Any]) -> bool:
     if not pol.get("hard_prompt_auto_t3", True) and str(pol.get("grok_policy") or "B") == "A":
         return False
     low = (prompt or "").lower()
-    heavy_markers = (
-        "heavy reasoning",
-        "grok heavy",
-        "super grok",
-        "tier 3",
+    # Explicit spend: Jeff asked for brains. No share-cap (scalpel, not loop).
+    explicit_markers = (
+        "needs grok",
+        "escalate to grok",
+        "beyond local",
         "t3 escalate",
-        # tightened 2026-08-04: bare "architecture"/"system design"/"multi-step plan"
-        # fired too often on routine Discord ops -> paid Grok. Prefer explicit escalate.
+        "tier 3",
+        "super grok",
+        "grok heavy",
+    )
+    if any(m in low for m in explicit_markers):
+        return True
+    # Auto-detect: planning/judgment only. Share-cap applies.
+    # Cook-loop phrases (codify / programmatically) must NOT live here.
+    auto_markers = (
+        "heavy reasoning",
         "full system architecture review",
         "end-to-end system design",
         "deep synthesis",
         "multi-hour",
-        # Policy B expansions - planning/judgment beyond 9B grunt
         "tradeoff analysis",
         "trade-off analysis",
         "design decision matrix",
         "root cause analysis",
         "failure mode",
-        "codify autonomy",
-        "programmatically codify",
         "anti-hallucination audit",
         "policy judgment",
         "gray policy",
-        "escalate to grok",
-        "needs grok",
-        "beyond local",
         "plan the next multi-day",
         "strategic multi-week plan",
     )
-    if any(m in low for m in heavy_markers):
+    if any(m in low for m in auto_markers):
         blocked, reason = _grok_share_blocks_t3()
         if blocked:
             _log({"event": "t3_blocked_share_cap", "reason": reason})

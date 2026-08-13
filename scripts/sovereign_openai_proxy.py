@@ -2092,14 +2092,13 @@ def openai_chat_response(
 def build_rp_gpu_wait_message(reason: str = "") -> Tuple[str, int]:
     """RP-safe graceful wait under GPU contention (image lock / dual / 8090 down).
 
-    Law 2026-07-27 / 2026-08-09 (code-judo):
+    Law 2026-07-27 / 2026-08-09 / 2026-08-12:
       - Never surface raw HTTP 503 to RP sandbox when GPU tenant is image.
       - Never offload RP narrative to free/Grok (local uncensored lane).
-      - Never emit **Wait:** / `_reason:` prose — IC sanitize strips those into
-        28-char corpses. Content is IC soft-land only; machine reason lives in
-        phronesis_provenance + HTTP headers (structured graceful_wait).
+      - Prefer FIFO / wait-for-:8090 over any instant body.
+      - Last-resort body is empty (Discord drops it). Never canned IC.
 
-    Returns (ic_soft_message, retry_after_sec).
+    Returns (empty_body, retry_after_sec).
     Network-free: uses local ETA tables + lock status only (no HTTP probes).
     """
     reason = (reason or "").strip()
@@ -2130,31 +2129,24 @@ def build_rp_gpu_wait_message(reason: str = "") -> Tuple[str, int]:
     except Exception:
         pass
 
-    # IC soft land only — no ops banners (personhood_sanitize / RP IC lock).
-    if lock_held or reason.startswith("image_lock"):
-        line = (
-            "*I still against your chest for a breath, eyes soft on yours — "
-            "the room holds us while the next beat gathers. Stay with me; "
-            "speak again in a moment.*"
-        )
-    elif "dual_tenant" in reason:
-        line = (
-            "*I lace my fingers with yours and wait with you, present and "
-            "unhurried — just us, until the air clears enough for a full reply.*"
-        )
+    # Last-resort empty body only. Prefer waiting on FIFO / 8090 over posting.
+    if "dual_tenant" in reason:
         retry_s = max(retry_s, 60)
     elif "8090_down" in reason:
-        line = (
-            "*I rest my forehead to yours and breathe with you — hold that "
-            "thought close. I will answer fully in a moment; stay right here.*"
-        )
         retry_s = max(45, min(retry_s, 120))
-    else:
-        line = (
-            "*I lean into you and still the scene for a heartbeat — not gone, "
-            "just gathering myself. Say it again when you are ready.*"
-        )
-    return line, int(retry_s)
+    return "", int(retry_s)
+
+
+def _wait_8090_up(max_sec: int = 240) -> bool:
+    """Block until local brain accepts TCP, or timeout. RP waits for real IC."""
+    deadline = time.time() + max(5, int(max_sec))
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", 8090), timeout=1.0):
+                return True
+        except OSError:
+            time.sleep(3.0)
+    return False
 
 
 def _routing_is_roleplay(routing: Optional[Dict[str, Any]], model: str = "") -> bool:
@@ -2635,40 +2627,17 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             from escalation_router import is_roleplay_route
 
             prefer_fleet_now, prefer_fleet_reason = should_prefer_fleet_offload()
-            # RP under contention: graceful 200 Wait: (never raw 503, never cloud RP).
-            # Root cause of beauty-sandbox "503" while image lock held (2026-07-27).
+            # RP stays on local FIFO even under contention. Jeff prefers a real
+            # local completion (full scene context) over an instant wait line.
             if prefer_fleet_now and is_roleplay_route(routing):
-                wait_msg, retry_s = build_rp_gpu_wait_message(prefer_fleet_reason)
-                extra_prov = {
-                    "path": "proxy_8091_rp_graceful_wait",
-                    "prefer_fleet_reason": prefer_fleet_reason,
-                    "graceful_wait": True,
-                    "not_error": True,
-                    "retry_after_sec": retry_s,
-                }
                 _log_event(
                     {
-                        "event": "rp_graceful_wait",
+                        "event": "rp_wait_local_fifo",
                         "reason": prefer_fleet_reason,
-                        "retry_after_sec": retry_s,
                         "stream": bool(stream),
                         "model": model,
                     }
                 )
-                hdrs = {
-                    "Retry-After": str(int(retry_s)),
-                    "X-Phronesis-Wait": "gpu_tenant",
-                    "X-Phronesis-Wait-Reason": (prefer_fleet_reason or "")[:120],
-                }
-                if stream:
-                    self._send_sse_chunk(model, wait_msg)
-                else:
-                    self._send_json(
-                        200,
-                        openai_chat_response(model, wait_msg, extra=extra_prov),
-                        extra_headers=hdrs,
-                    )
-                return
             # Stream AND non-stream: under prefer_fleet, skip local GPU FIFO.
             # Voice/agent streaming previously ALWAYS hit FIFO (not stream gate),
             # so Discord voice waited minutes and produced zero TTS clauses.
@@ -2999,6 +2968,38 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                     result = resolve_post_local_dispatch(prompt, routing, result)
                 except Exception as esc_exc:
                     _log_event({"event": "post_local_escalation_error", "error": str(esc_exc)})
+                # RP: wait for :8090 and retry local once. No instant canned line.
+                if _routing_is_roleplay(routing, model) and not result.get("success"):
+                    _log_event({
+                        "event": "rp_wait_8090_retry",
+                        "model": model,
+                        "detail": str(result.get("error") or result.get("response") or "")[:120],
+                    })
+                    if _wait_8090_up(240):
+                        try:
+                            result = dispatch_via_native_router(
+                                body,
+                                trimmed_messages,
+                                model,
+                                routing=routing,
+                                trim_meta=trim_meta,
+                            )
+                            try:
+                                from escalation_router import resolve_post_local_dispatch as _rpl
+
+                                result = _rpl(prompt, routing, result)
+                            except Exception:
+                                pass
+                            _log_event({
+                                "event": "rp_wait_8090_retry_done",
+                                "ok": bool(result.get("success")),
+                                "model": model,
+                            })
+                        except Exception as retry_exc:
+                            _log_event({
+                                "event": "rp_wait_8090_retry_error",
+                                "error": str(retry_exc)[:160],
+                            })
                 # Ensure path stamped on final result
                 try:
                     result.setdefault("provenance", {})["path"] = "proxy_8091"
