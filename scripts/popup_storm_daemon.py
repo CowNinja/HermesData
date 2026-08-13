@@ -155,7 +155,14 @@ def _hot_tick() -> int:
     """
     from win_silent_proc import hide_window_titles
 
-    return hide_window_titles(bare_console_only=True)
+    n = hide_window_titles(bare_console_only=True)
+    try:
+        from win_silent_proc import hide_hermes_stack_consoles
+
+        n += hide_hermes_stack_consoles()
+    except Exception:
+        pass
+    return n
 
 
 def _heavy_tick() -> dict:

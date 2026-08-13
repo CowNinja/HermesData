@@ -2,6 +2,7 @@ PERSONHOOD_PIN: D:/HermesData/state/personhood_pin_latest.md | after reset: pyth
 
 Roadmap LOCKED 2026-08-05: Phase1 COMPLETE then Phase2 Codify ACTIVE then Phase3 Superpowers later. Jeff=dreamer Hermes=technician. Canon: PhronesisVault/Operations/Hermes-Operating-Roadmap-CANONICAL-2026-08-05.md. Speak-and-trust pulse SSOT. No deep dives until 1+2 solid.
 Vision 2026-08-12: destination blueprint PhronesisVault/Operations/Hermes-Grand-Vision-Blueprint-CANONICAL-2026-08-12.md (H0-H5). Current primary=Phase2 EXIT (no babysit) + K: L5 curate not more land. Do not reopen router/MM 1-5. After reset: continuity then that blueprint + SYSTEM-MAP.
+Live board: PhronesisVault/Operations/Hermes-Next-Steps-LIVE.md (H1; Jeff JA feel then inject DESIGN).
 H1 pulse 2026-08-12T2329Z: core GREEN; router WATCH (rankings age); no heal. Receipt: PhronesisVault/Operations/logs/h1-measure-pulse-2026-08-12.md.
 H1 organ review 2026-08-12: Identity WATCH=prompt stack not missing essence. JA unsampled. Receipt: PhronesisVault/Operations/logs/h1-organ-review-identity-memory-2026-08-12.md.
 Inject DESIGN 2026-08-12 (not live): PhronesisVault/Operations/Conversation-Inject-Minimal-DESIGN-2026-08-12.md. STOP cuts until Jeff JA feel.

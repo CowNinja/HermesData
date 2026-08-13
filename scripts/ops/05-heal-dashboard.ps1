@@ -135,7 +135,7 @@ try {
 
     if (-not $up) {
         Write-Host "Fallback start (breakaway python)..."
-        $py = if (Test-Path $VenvPython) { $VenvPython } else { $VenvPythonw }
+        $py = if (Test-Path $VenvPythonw) { $VenvPythonw } else { $VenvPython }
         $dashArgs = @("-m", "hermes_cli.main", "dashboard", "--port", "$dashPort", "--host", $dashHost, "--no-open")
         if (Test-Path $webDist) { $dashArgs += "--skip-build" }
         Start-HiddenProcess -FilePath $py -ArgumentList $dashArgs -WorkingDirectory $agentRoot -Breakaway | Out-Null
