@@ -1,8 +1,8 @@
 PERSONHOOD_PIN: D:/HermesData/state/personhood_pin_latest.md | after reset: python D:/HermesData/scripts/alice_open_loops.py continuity | do not re-interview locked About-me/essence
 
 Roadmap LOCKED 2026-08-05: Phase1 COMPLETE then Phase2 Codify ACTIVE then Phase3 Superpowers later. Jeff=dreamer Hermes=technician. Canon: PhronesisVault/Operations/Hermes-Operating-Roadmap-CANONICAL-2026-08-05.md. Speak-and-trust pulse SSOT. No deep dives until 1+2 solid.
-Vision 2026-08-12: destination blueprint PhronesisVault/Operations/Hermes-Grand-Vision-Blueprint-CANONICAL-2026-08-12.md (H0-H5). After reset: continuity then shared picture Next-Steps-LIVE + SYSTEM-MAP. Do not reopen router/MM 1-5.
-Shared picture: PhronesisVault/Operations/Hermes-Next-Steps-LIVE.md — vision + OS chart primary (A+B locked). Not JA/RP homework tonight. Receipt: Operations/logs/Vision-OS-Chart-2026-08-13.md.
+Vision 2026-08-12: destination blueprint PhronesisVault/Operations/Hermes-Grand-Vision-Blueprint-CANONICAL-2026-08-12.md (H0-H5). Do not write a second vision. After reset: SAT --status-only then continuity then growth --status then Next-Steps-LIVE + SYSTEM-MAP. Do not reopen router/MM 1-5.
+Shared picture: PhronesisVault/Operations/Hermes-Next-Steps-LIVE.md — H0 done, H1 current job, Phase 2 still active. Option A: leave kitchen quiet so OS-1 can book. Self-heal = SAT when-down only. Mouth law is interface. Continuous Grok GRAY. JA feel / L5 / Kindroid = Jeff-owned. Inventory: Operations/logs/Option-A-Automation-Inventory-2026-08-14.md.
 H1 pulse 2026-08-12T2329Z: core GREEN; router WATCH (rankings age); no heal. Receipt: PhronesisVault/Operations/logs/h1-measure-pulse-2026-08-12.md.
 H1 organ review 2026-08-12: Identity WATCH=prompt stack not missing essence. JA unsampled. Receipt: PhronesisVault/Operations/logs/h1-organ-review-identity-memory-2026-08-12.md.
 Inject DESIGN LIVE 2026-08-13: PhronesisVault/Operations/Conversation-Inject-Minimal-DESIGN-2026-08-12.md + logs/Partner-Inject-Cuts-2026-08-13.md. JA snip + skip MEMORY + exclusive ephemeral + forge pin. No SOUL rewrite.

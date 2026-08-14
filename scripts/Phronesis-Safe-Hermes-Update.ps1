@@ -1,90 +1,208 @@
-# Safe Hermes update - stops all venv lock-holders BEFORE update/installer runs.
-# Use this instead of clicking Update in Desktop while gateway/rider/proxy are live.
+# Safe Hermes update - ONE door.
+# Unload house overlays from hermes-agent, quiet the kitchen, run hermes update,
+# re-layer house code, restore 8642/8091 via Ensure (not SAT --heal).
+#
+# Use this instead of the Desktop 0.19.1 Update button while the kitchen is live.
+# Desktop preflight treats service/meta/proxy/dashboard as venv blockers.
+#
+#   powershell -NoProfile -ExecutionPolicy Bypass -File D:\HermesData\scripts\Phronesis-Safe-Hermes-Update.ps1
+#   ... -ExportOnly     snapshot house code, do not update
+#   ... -NoReapply      stay vanilla after update (house code stays in house-overlays)
+#   ... -NoBackup       pass --no-backup to hermes update
+#   ... -Force          pass --force to hermes update (shim guard only)
+#   ... -DryRun         export + status only
+#   ... -Resume         skip export+unload (tree already vanilla; keep overlay)
+#
+# ASCII-only. Windows PowerShell 5.1 breaks on em-dashes in UTF-8 without BOM.
+# Native stderr (Bitwarden, pip) must NOT abort: EAP=Continue around hermes.exe.
 param(
     [switch]$Force,
-    [switch]$NoBackup
+    [switch]$NoBackup,
+    [switch]$NoReapply,
+    [switch]$ExportOnly,
+    [switch]$DryRun,
+    [switch]$Resume
 )
 
-$ErrorActionPreference = "Stop"
-$HermesExe = "D:\HermesData\hermes-agent\venv\Scripts\hermes.exe"
+$ErrorActionPreference = "Continue"
+if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
+$HermesRoot = "D:\HermesData"
+$Agent = Join-Path $HermesRoot "hermes-agent"
+$State = Join-Path $HermesRoot "state"
+$LogDir = Join-Path $HermesRoot "logs"
+$Py = Join-Path $Agent "venv\Scripts\python.exe"
+$HermesExe = Join-Path $Agent "venv\Scripts\hermes.exe"
+$Overlay = Join-Path $HermesRoot "scripts\ops\hermes_house_overlay.py"
+$Quiet = Join-Path $HermesRoot "scripts\Quiet-HermesStack-For-Update.ps1"
+$Ensure = Join-Path $HermesRoot "scripts\Ensure-HermesStack-Single.ps1"
+$Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$Log = Join-Path $LogDir "safe-update-$Stamp.log"
+
+New-Item -ItemType Directory -Force -Path $State, $LogDir | Out-Null
+
+function Write-Safe([string]$msg) {
+    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | $msg"
+    try { Add-Content -Path $Log -Value $line -Encoding ascii } catch {}
+    Write-Host $line
+}
+
+function Invoke-Overlay([string]$action) {
+    if (-not (Test-Path $Py)) {
+        throw "venv python missing: $Py"
+    }
+    $out = & $Py $Overlay $action 2>&1 | Out-String
+    $code = $LASTEXITCODE
+    if ($out) {
+        Write-Host $out
+        try { Add-Content -Path $Log -Value $out -Encoding ascii } catch {}
+    }
+    if ($null -eq $code) { return 0 }
+    return [int]$code
+}
 
 if (-not (Test-Path $HermesExe)) {
     Write-Host "venv hermes.exe missing - run Phronesis-Hermes-Venv-Recover.ps1 first" -ForegroundColor Red
     exit 1
 }
-
-Write-Host "=== Phronesis Safe Hermes Update ===" -ForegroundColor Cyan
-
-# Guardian (5m heal) and ForkGuard respawn proxy/gateway and block venv updates.
-$guardianWasRunning = $false
-try {
-    $gt = Get-ScheduledTask -TaskName "Phronesis-Guardian" -ErrorAction SilentlyContinue
-    if ($gt -and $gt.State -eq "Running") {
-        $guardianWasRunning = $true
-        Stop-ScheduledTask -TaskName "Phronesis-Guardian" -ErrorAction SilentlyContinue
-        Disable-ScheduledTask -TaskName "Phronesis-Guardian" -ErrorAction SilentlyContinue | Out-Null
-        Write-Host "Paused Phronesis-Guardian for update window" -ForegroundColor Yellow
-    }
-} catch {}
-
-$lockPath = "D:\HermesData\state\maintenance-lock.json"
-$lockUntil = (Get-Date).AddMinutes(45).ToString("o")
-@{
-    reason           = "hermes_update"
-    until            = $lockUntil
-    protect_vram     = $false
-    block_stack_heal = $true
-    set_at           = (Get-Date).ToString("o")
-} | ConvertTo-Json | Set-Content -Path $lockPath -Encoding UTF8
-
-function Get-VenvLockHolderCount {
-    $n = 0
-    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object {
-        $cmd = $_.CommandLine
-        if (-not $cmd) { return }
-        if ($cmd -like "*hermes-agent\venv*") { $script:n++ }
-    }
-    return $n
-}
-
-$stopAll = Join-Path $PSScriptRoot "Phronesis-Hermes-StopAll.ps1"
-for ($attempt = 1; $attempt -le 5; $attempt++) {
-    & $stopAll -Quiet
-    Start-Sleep -Seconds 3
-    $holders = Get-VenvLockHolderCount
-    if ($holders -eq 0) { break }
-    Write-Host "  venv lock-holders remaining: $holders (attempt $attempt/5)" -ForegroundColor Yellow
-}
-if ((Get-VenvLockHolderCount) -gt 0) {
-    Write-Host "Cannot update: venv processes still running. Close Hermes Desktop and retry." -ForegroundColor Red
-    Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
-    if ($guardianWasRunning) { Enable-ScheduledTask -TaskName "Phronesis-Guardian" -ErrorAction SilentlyContinue | Out-Null }
+if (-not (Test-Path $Overlay)) {
+    Write-Host "overlay door missing: $Overlay" -ForegroundColor Red
     exit 1
 }
 
-# Brief wait for Windows to release .pyd handles
-Start-Sleep -Seconds 4
+Write-Host "=== Phronesis Safe Hermes Update ===" -ForegroundColor Cyan
+Write-Safe "start export_only=$ExportOnly dry=$DryRun noreapply=$NoReapply resume=$Resume"
 
-$args = @("update", "--yes")
-if ($Force) { $args += "--force" }
-if ($NoBackup) { $args += "--no-backup" }
-
-Write-Host "Running: hermes $($args -join ' ')"
-& $HermesExe @args 2>&1 | Tee-Object -FilePath "D:\HermesData\logs\safe-update-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Update failed (exit $LASTEXITCODE). Run Phronesis-Hermes-Venv-Recover.ps1" -ForegroundColor Red
-    if (Test-Path $lockPath) { Remove-Item $lockPath -Force -ErrorAction SilentlyContinue }
-    if ($guardianWasRunning) {
-        Enable-ScheduledTask -TaskName "Phronesis-Guardian" -ErrorAction SilentlyContinue | Out-Null
+if ($Resume) {
+    Write-Safe "resume: skip export+unload (keep existing overlay)"
+    $man = Join-Path $HermesRoot "house-overlays\hermes-agent\latest\MANIFEST.json"
+    if (-not (Test-Path $man)) {
+        Write-Host "Resume refused: no overlay MANIFEST at house-overlays\hermes-agent\latest" -ForegroundColor Red
+        exit 1
     }
-    exit $LASTEXITCODE
+} else {
+    Write-Safe "overlay export"
+    $exportRc = Invoke-Overlay "export"
+    if ($exportRc -ne 0) {
+        Write-Host "overlay export failed (exit $exportRc). See $Log" -ForegroundColor Red
+        exit $exportRc
+    }
+
+    if ($ExportOnly -or $DryRun) {
+        Write-Safe "stop after export/dry-run"
+        Write-Host "House overlay snapshotted at D:\HermesData\house-overlays\hermes-agent\latest" -ForegroundColor Green
+        Write-Host "Receipt: D:\HermesData\state\hermes_house_overlay_latest.json"
+        exit 0
+    }
+
+    Write-Safe "overlay unload (revert hermes-agent house patches)"
+    $unloadRc = Invoke-Overlay "unload"
+    if ($unloadRc -ne 0) {
+        Write-Host "overlay unload failed (exit $unloadRc). Tree may still be dirty." -ForegroundColor Red
+        exit $unloadRc
+    }
 }
 
-Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
-if ($guardianWasRunning) {
-    Enable-ScheduledTask -TaskName "Phronesis-Guardian" -ErrorAction SilentlyContinue | Out-Null
+$quietFlags = @(
+    "hermes_update.IN_PROGRESS",
+    "silo_continuous.STOP",
+    "silo_autonomous.STOP",
+    "popup_emergency.STOP",
+    "hermes_ops_quiet.ON"
+)
+$preexist = @{}
+foreach ($f in $quietFlags) {
+    $preexist[$f] = Test-Path (Join-Path $State $f)
 }
 
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "Phronesis-Heal.ps1") -Quiet | Out-Null
-Write-Host "=== Safe update complete - stack healed ===" -ForegroundColor Green
+Write-Safe "quiet kitchen"
+& powershell -NoProfile -ExecutionPolicy Bypass -File $Quiet
+Start-Sleep -Seconds 3
+
+function Get-VenvHolderCount {
+    $rows = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -and ($_.CommandLine -like "*hermes-agent\venv*")
+    })
+    return $rows.Count
+}
+
+$holders = Get-VenvHolderCount
+if ($holders -gt 0) {
+    Write-Safe "venv holders remaining=$holders - extra StopAll sweep"
+    $stopAll = Join-Path $HermesRoot "scripts\Phronesis-Hermes-StopAll.ps1"
+    if (Test-Path $stopAll) {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $stopAll -Quiet
+        Start-Sleep -Seconds 3
+    }
+    $holders = Get-VenvHolderCount
+}
+if ($holders -gt 0) {
+    Write-Host "Cannot update: $holders venv process(es) still running. Close Hermes Desktop and retry." -ForegroundColor Red
+    if (-not $preexist["hermes_update.IN_PROGRESS"]) {
+        Remove-Item (Join-Path $State "hermes_update.IN_PROGRESS") -Force -ErrorAction SilentlyContinue
+    }
+    if (-not $preexist["hermes_ops_quiet.ON"]) {
+        Remove-Item (Join-Path $State "hermes_ops_quiet.ON") -Force -ErrorAction SilentlyContinue
+    }
+    exit 1
+}
+
+Start-Sleep -Seconds 2
+
+$updArgs = @("update", "--yes")
+if ($Force) { $updArgs += "--force" }
+if ($NoBackup) { $updArgs += "--no-backup" }
+
+Write-Safe "running hermes $($updArgs -join ' ')"
+Write-Host "Running: hermes $($updArgs -join ' ')"
+# cmd.exe so native stderr (Bitwarden) is not a terminating ErrorRecord.
+$argLine = ($updArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
+cmd.exe /c "`"$HermesExe`" $argLine" 1>> $Log 2>&1
+$updRc = $LASTEXITCODE
+if ($null -eq $updRc) { $updRc = 0 }
+Get-Content -Path $Log -Tail 40 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+
+Write-Safe "install messaging extras (discord.py)"
+& $Py -m pip install --disable-pip-version-check "discord.py[voice]==2.7.1"
+if ($LASTEXITCODE -ne 0) {
+    Write-Safe "discord.py install failed rc=$LASTEXITCODE"
+}
+
+if ($updRc -ne 0) {
+    Write-Host "hermes update failed (exit $updRc). Overlay is at house-overlays\hermes-agent\latest" -ForegroundColor Red
+    Write-Safe "update failed rc=$updRc - attempting overlay apply + Ensure anyway"
+}
+
+if (-not $NoReapply) {
+    Write-Safe "overlay apply"
+    $applyRc = Invoke-Overlay "apply"
+    if ($applyRc -ne 0) {
+        Write-Host "overlay apply had conflicts. House copies are in house-overlays\hermes-agent\latest" -ForegroundColor Yellow
+        Write-Safe "apply conflicts rc=$applyRc"
+    }
+} else {
+    Write-Safe "skip reapply (vanilla tree)"
+}
+
+Write-Safe "Ensure-HermesStack-Single -AlsoProxy"
+& powershell -NoProfile -ExecutionPolicy Bypass -File $Ensure -AlsoProxy
+
+foreach ($f in $quietFlags) {
+    if (-not $preexist[$f]) {
+        Remove-Item (Join-Path $State $f) -Force -ErrorAction SilentlyContinue
+        Write-Safe "cleared $f"
+    }
+}
+
+Write-Safe "SAT --status-only (no heal)"
+& $Py (Join-Path $HermesRoot "scripts\ops\speak_and_trust_once.py") --status-only
+
+if ($updRc -ne 0) {
+    Write-Host "=== Safe update FAILED - kitchen restore attempted. Log: $Log ===" -ForegroundColor Red
+    exit $updRc
+}
+
+Write-Host "=== Safe update complete. Overlay receipt: D:\HermesData\state\hermes_house_overlay_latest.json ===" -ForegroundColor Green
+Write-Safe "done"
+exit 0

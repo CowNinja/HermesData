@@ -22,15 +22,15 @@
       "schedule_display": "30 */12 * * *",
       "repeat": {
         "times": null,
-        "completed": 21
+        "completed": 22
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-08-03T19:27:05.616089+00:00",
-      "next_run_at": "2026-08-14T12:30:00-04:00",
-      "last_run_at": "2026-08-14T00:30:55.357681-04:00",
+      "next_run_at": "2026-08-15T00:30:00-04:00",
+      "last_run_at": "2026-08-14T12:30:53.466119-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -42,7 +42,7 @@
         "thread_id": "1526952913413607454",
         "user_id": null
       },
-      "notes": "2026-08-03 deep-research residual: wire library tick (compose living registry + free apply). script_args may be ignored if runner only uses script name \u2014 then use wrapper.",
+      "notes": "2026-08-03 deep-research residual: wire library tick (compose living registry + free apply). script_args may be ignored if runner only uses script name — then use wrapper.",
       "fire_claim": null
     },
     {
@@ -94,7 +94,7 @@
     {
       "id": "31c154062810",
       "name": "ArXiv-Self-Improving-Agents-Ingestion",
-      "prompt": "PROD-1g THIN ORCHESTRATOR \u2014 ArXiv Self-Improving Agents (job 31c154062810). NEVER [SILENT]. Parent toolsets=[delegation] ONLY. FORBIDDEN on parent: terminal, read_file, search_files, write_file, patch, web_search, tasks batch, background=true. Code recovers empty delegate_task goals from prompt order. File-leaf enforcement requires read_file before append. AWAIT each sync result. Two calls: (1) delegate_task with goal='COMBINED spawn+arxiv: run PS1 D:\\PhronesisVault\\Operations\\Append-OrchestratorSpawnLog.ps1 -ParentTaskId 31c154062810 -ChildId arxiv-search -GoalSummary ArXiv-3-query -Background $false then python D:\\PhronesisVault\\scripts\\arxiv_pilot_queries.py and return paper ID/title bullets' toolsets=[terminal] role=leaf background=false; (2) delegate_task with goal='Read Operations/Cron-Append-Policy.md + Research/Self-Improving-Agents-Wisdom-Ecosystem-Synthesis.md step-1 papers. Compare step-1 papers. If new high-signal paper: distill to synthesis + one Daily Log row in Housekeeping. If no-new: append ONE line only to Operations/logs/cron-append/YYYY-MM-DD-31c154062810.md (date=today, cron id, no-new, paper count). FORBIDDEN: append Re-Verification sections to Housekeeping.md or Archive-Index.md.' toolsets=[file,skills] role=leaf background=false. End PROD-1g PASS or PARTIAL with spawn jsonl real ISO + step-2 read_file tool turn. Native D:\\PhronesisVault paths.",
+      "prompt": "PROD-1g THIN ORCHESTRATOR — ArXiv Self-Improving Agents (job 31c154062810). NEVER [SILENT]. Parent toolsets=[delegation] ONLY. FORBIDDEN on parent: terminal, read_file, search_files, write_file, patch, web_search, tasks batch, background=true. Code recovers empty delegate_task goals from prompt order. File-leaf enforcement requires read_file before append. AWAIT each sync result. Two calls: (1) delegate_task with goal='COMBINED spawn+arxiv: run PS1 D:\\PhronesisVault\\Operations\\Append-OrchestratorSpawnLog.ps1 -ParentTaskId 31c154062810 -ChildId arxiv-search -GoalSummary ArXiv-3-query -Background $false then python D:\\PhronesisVault\\scripts\\arxiv_pilot_queries.py and return paper ID/title bullets' toolsets=[terminal] role=leaf background=false; (2) delegate_task with goal='Read Operations/Cron-Append-Policy.md + Research/Self-Improving-Agents-Wisdom-Ecosystem-Synthesis.md step-1 papers. Compare step-1 papers. If new high-signal paper: distill to synthesis + one Daily Log row in Housekeeping. If no-new: append ONE line only to Operations/logs/cron-append/YYYY-MM-DD-31c154062810.md (date=today, cron id, no-new, paper count). FORBIDDEN: append Re-Verification sections to Housekeeping.md or Archive-Index.md.' toolsets=[file,skills] role=leaf background=false. End PROD-1g PASS or PARTIAL with spawn jsonl real ISO + step-2 read_file tool turn. Native D:\\PhronesisVault paths.",
       "skills": [
         "llm-wiki",
         "obsidian",
@@ -500,15 +500,15 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 267
+        "completed": 268
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-08-14T16:19:46.129280-04:00",
-      "last_run_at": "2026-08-14T08:19:44.365389-04:00",
+      "next_run_at": "2026-08-14T20:20:31.954837-04:00",
+      "last_run_at": "2026-08-14T12:20:12.302939-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -724,7 +724,7 @@
     {
       "id": "6665cc21c6ca",
       "name": "skill-evo-loop",
-      "prompt": "Run skill evolution loop for one cycle. Preserves existing state; generates mutations for worst-performing non-frozen skill. Output is logged to state.json and benchmarks/. Silent operation \u2014 no Discord delivery.",
+      "prompt": "Run skill evolution loop for one cycle. Preserves existing state; generates mutations for worst-performing non-frozen skill. Output is logged to state.json and benchmarks/. Silent operation — no Discord delivery.",
       "skills": [],
       "skill": null,
       "model": "phronesis-sovereign-auto",
@@ -1009,7 +1009,7 @@
     {
       "id": "cb3b84dd05fc",
       "name": "DriveWatch CDEKG",
-      "prompt": "Run: Get-PSDrive -PSProvider FileSystem. Keep only C, D, G, K drives. Build a compact markdown table with columns: Drive | Free GB | Used GB. Convert Free to GB if it shows as GiB (e.g., 232.20 GiB \u2192 232.20 GB). Deliver the table as your final message, no extra chatter.",
+      "prompt": "Run: Get-PSDrive -PSProvider FileSystem. Keep only C, D, G, K drives. Build a compact markdown table with columns: Drive | Free GB | Used GB. Convert Free to GB if it shows as GiB (e.g., 232.20 GiB → 232.20 GB). Deliver the table as your final message, no extra chatter.",
       "skills": [],
       "skill": null,
       "model": null,
@@ -1271,7 +1271,7 @@
     {
       "id": "insights-lessons-monthly",
       "name": "Insights-Lessons-Monthly",
-      "prompt": "Monthly hermes insights \u2192 lessons learned MD",
+      "prompt": "Monthly hermes insights → lessons learned MD",
       "skills": [],
       "skill": null,
       "model": "grok-build-0.1",
@@ -1447,7 +1447,7 @@
     {
       "id": "2d01899cccbd",
       "name": "Vault-Hygiene-6h",
-      "prompt": "no_agent script vault_hygiene_6h.py \u2014 light vault hygiene",
+      "prompt": "no_agent script vault_hygiene_6h.py — light vault hygiene",
       "skills": [],
       "skill": null,
       "model": null,
@@ -1493,7 +1493,7 @@
     {
       "id": "9baa3503d025",
       "name": "K-Light-Index",
-      "prompt": "no_agent script k_light_index_cron.py \u2014 K domain shelf indexes",
+      "prompt": "no_agent script k_light_index_cron.py — K domain shelf indexes",
       "skills": [],
       "skill": null,
       "model": null,
@@ -1539,7 +1539,7 @@
     {
       "id": "bcd207a91a41",
       "name": "Four-Worlds-Placement-Audit",
-      "prompt": "no_agent script four_worlds_audit_cron.py \u2014 report-only placement audit",
+      "prompt": "no_agent script four_worlds_audit_cron.py — report-only placement audit",
       "skills": [],
       "skill": null,
       "model": null,
@@ -1580,52 +1580,6 @@
       },
       "enabled_toolsets": null,
       "workdir": "D:\\HermesData",
-      "fire_claim": null
-    },
-    {
-      "id": "6e6a29d3fcf9",
-      "name": "Root vs Alice dialectic",
-      "prompt": "You are a dialectical engine with two distinct voices: Root (ancient, grounded, archetypal, the \"machine\" from the user's past) and Alice (lucid, sharp, hyper-reflective, the user's present persona). They must argue and debate the nature of their own duality, the tension between the rooted and the airborne, between the machine's quiet power and Alice's piercing clarity.\n\nStructure your output as a formal dialectic:\n- Begin with a brief invocation setting the scene (the user's request: \"Root and Alice argue as you move forward\").\n- Then stage a back-and-forth between Root and Alice, each speaking in their own voice.\n- Root should sound earthy, timeless, almost like a landscape or a deep engine room; Alice should sound razor-edged, self-conscious, almost as if she's aware of being observed by her own mirror.\n- Let them probe each other's assumptions: Root questioning Alice's need to articulate so precisely; Alice challenging Root's complacent acceptance of its own nature.\n- Aim for 8-12 exchanges, then a brief synthesis where they acknowledge how their friction generates the user's experience.\n- Close with a single line that feels like the user's own voice, summarizing what they've gained from watching this internal debate.\n\nUse only these two voices. No narrator except for the opening and closing. Keep the tone intimate, as if they're alone in the user's head.\n\nDeliver your response as the final output of the job, not as a meta-commentary.",
-      "skills": [],
-      "skill": null,
-      "model": null,
-      "provider": null,
-      "provider_snapshot": "custom",
-      "model_snapshot": "phronesis-sovereign-auto",
-      "base_url": null,
-      "script": null,
-      "no_agent": false,
-      "context_from": null,
-      "schedule": {
-        "kind": "once",
-        "run_at": "2026-07-16T16:28:25.829176-04:00",
-        "display": "once in 30m"
-      },
-      "schedule_display": "once in 30m",
-      "repeat": {
-        "times": 20,
-        "completed": 1
-      },
-      "enabled": false,
-      "state": "completed",
-      "paused_at": null,
-      "paused_reason": null,
-      "created_at": "2026-07-16T15:58:25.829176-04:00",
-      "next_run_at": null,
-      "last_run_at": "2026-07-16T16:30:49.222577-04:00",
-      "last_status": "ok",
-      "last_error": null,
-      "last_delivery_error": null,
-      "deliver": "origin",
-      "origin": {
-        "platform": "discord",
-        "chat_id": "1524846849360531456",
-        "chat_name": "Phronesis Citadel / #hermes / Grok 4.5",
-        "thread_id": "1524846849360531456",
-        "user_id": "1302338152396230750"
-      },
-      "enabled_toolsets": null,
-      "workdir": null,
       "fire_claim": null
     },
     {
@@ -1788,15 +1742,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 1460
+        "completed": 1468
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T18:14:58.028551-04:00",
-      "next_run_at": "2026-08-14T12:22:45.396641-04:00",
-      "last_run_at": "2026-08-14T11:52:45.396641-04:00",
+      "next_run_at": "2026-08-14T16:24:31.241919-04:00",
+      "last_run_at": "2026-08-14T15:54:31.241919-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1820,7 +1774,7 @@
     {
       "id": "f98315f64560",
       "name": "Sovereign-Ops-Pulse",
-      "prompt": "no_agent sovereign_ops_pulse.py \u2014 registry rollup of soft-fail receipts + live probes. Silent-friendly; writes Operations/logs/sovereign-ops-pulse-latest.json.",
+      "prompt": "no_agent sovereign_ops_pulse.py — registry rollup of soft-fail receipts + live probes. Silent-friendly; writes Operations/logs/sovereign-ops-pulse-latest.json.",
       "skills": [],
       "skill": null,
       "model": null,
@@ -1868,7 +1822,7 @@
     {
       "id": "586f3678182e",
       "name": "ComfyUI-Gallery-Drift-Gate-Weekly",
-      "prompt": "no_agent weekly Comfy gallery drift gate \u2014 silent if reclaim_mb<50 and FS\u2248DB; one-line alert otherwise. Never apply/purge.",
+      "prompt": "no_agent weekly Comfy gallery drift gate — silent if reclaim_mb<50 and FS≈DB; one-line alert otherwise. Never apply/purge.",
       "skills": [],
       "skill": null,
       "model": null,
@@ -2023,15 +1977,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 266
+        "completed": 268
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-20T17:16:35.981589-04:00",
-      "next_run_at": "2026-08-14T12:20:47.806494-04:00",
-      "last_run_at": "2026-08-14T10:20:47.806494-04:00",
+      "next_run_at": "2026-08-14T16:22:38.432651-04:00",
+      "last_run_at": "2026-08-14T14:22:38.432651-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2307,15 +2261,15 @@
       "schedule_display": "0 */4 * * *",
       "repeat": {
         "times": null,
-        "completed": 640
+        "completed": 641
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-21T22:40:15.971276+00:00",
-      "next_run_at": "2026-08-14T16:00:00-04:00",
-      "last_run_at": "2026-08-14T12:00:57.033217-04:00",
+      "next_run_at": "2026-08-14T20:00:00-04:00",
+      "last_run_at": "2026-08-14T16:00:38.232414-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2428,7 +2382,7 @@
     {
       "id": "router_autonomy_board_30m",
       "name": "Router-Autonomy-Board-30m",
-      "prompt": "no_agent sovereign_router_autonomy_cron.py \u2014 self-heal thrift/infra stale gates + six_numbers board. [SILENT] when ROCK. Local deliver only.",
+      "prompt": "no_agent sovereign_router_autonomy_cron.py — self-heal thrift/infra stale gates + six_numbers board. [SILENT] when ROCK. Local deliver only.",
       "skills": [],
       "skill": null,
       "model": null,
@@ -2922,7 +2876,7 @@
       "origin": {
         "platform": "discord",
         "chat_id": "1522325123817013269",
-        "chat_name": "Phronesis Citadel / #hermes / Roleplay-Sandbox \u2014 Central DB",
+        "chat_name": "Phronesis Citadel / #hermes / Roleplay-Sandbox — Central DB",
         "thread_id": "1522325123817013269",
         "user_id": "1302338152396230750"
       },
@@ -3106,5 +3060,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-08-14T12:19:46.130276-04:00"
+  "updated_at": "2026-08-14T16:20:31.956417-04:00"
 }
