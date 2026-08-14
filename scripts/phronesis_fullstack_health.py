@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Local health report for Phronesis Full Stack dashboard tile + travel ops."""
+"""MEASURE ONLY — dashboard tile + travel probe. Not a kitchen.
+
+CORE heal: speak_and_trust_once.py --heal. Do not start/stop stack from here.
+"""
 from __future__ import annotations
 
 import argparse

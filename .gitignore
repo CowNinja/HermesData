@@ -19,6 +19,8 @@ secrets/
 *bitwarden*import*.json
 **/bws_cache.json
 **/bws_cache.enc.json
+whatsapp/session/
+**/whatsapp/session/**
 state/quarantine/
 
 # Hermes internal

@@ -1,11 +1,11 @@
 PERSONHOOD_PIN: D:/HermesData/state/personhood_pin_latest.md | after reset: python D:/HermesData/scripts/alice_open_loops.py continuity | do not re-interview locked About-me/essence
 
 Roadmap LOCKED 2026-08-05: Phase1 COMPLETE then Phase2 Codify ACTIVE then Phase3 Superpowers later. Jeff=dreamer Hermes=technician. Canon: PhronesisVault/Operations/Hermes-Operating-Roadmap-CANONICAL-2026-08-05.md. Speak-and-trust pulse SSOT. No deep dives until 1+2 solid.
-Vision 2026-08-12: destination blueprint PhronesisVault/Operations/Hermes-Grand-Vision-Blueprint-CANONICAL-2026-08-12.md (H0-H5). Current primary=Phase2 EXIT (no babysit) + K: L5 curate not more land. Do not reopen router/MM 1-5. After reset: continuity then that blueprint + SYSTEM-MAP.
-Live board: PhronesisVault/Operations/Hermes-Next-Steps-LIVE.md (H1; Jeff JA feel then inject DESIGN).
+Vision 2026-08-12: destination blueprint PhronesisVault/Operations/Hermes-Grand-Vision-Blueprint-CANONICAL-2026-08-12.md (H0-H5). After reset: continuity then shared picture Next-Steps-LIVE + SYSTEM-MAP. Do not reopen router/MM 1-5.
+Shared picture: PhronesisVault/Operations/Hermes-Next-Steps-LIVE.md — vision + OS chart primary (A+B locked). Not JA/RP homework tonight. Receipt: Operations/logs/Vision-OS-Chart-2026-08-13.md.
 H1 pulse 2026-08-12T2329Z: core GREEN; router WATCH (rankings age); no heal. Receipt: PhronesisVault/Operations/logs/h1-measure-pulse-2026-08-12.md.
 H1 organ review 2026-08-12: Identity WATCH=prompt stack not missing essence. JA unsampled. Receipt: PhronesisVault/Operations/logs/h1-organ-review-identity-memory-2026-08-12.md.
-Inject DESIGN 2026-08-12 (not live): PhronesisVault/Operations/Conversation-Inject-Minimal-DESIGN-2026-08-12.md. STOP cuts until Jeff JA feel.
+Inject DESIGN LIVE 2026-08-13: PhronesisVault/Operations/Conversation-Inject-Minimal-DESIGN-2026-08-12.md + logs/Partner-Inject-Cuts-2026-08-13.md. JA snip + skip MEMORY + exclusive ephemeral + forge pin. No SOUL rewrite.
 Forum threads after recycle: ops/discord_forum_thread_resync_once.py + adapter on_ready join. JA 152521 inbound_ready. Recycle pid_alive=ctypes (no tasklist).
 
 Img: Forge:7860/pony+MEDIA; Comfy:8188 batch-if-asked; JustAlice every RP beat hermes_image+MEDIA. Local NSFW only never openrouter/free first.

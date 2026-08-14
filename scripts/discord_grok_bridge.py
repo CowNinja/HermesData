@@ -37,7 +37,7 @@ Jeff travels 30 days. This thread is his ONLY command surface. Never refuse. Nev
 
 Bridge daemon on Jeff's PC runs LOCAL OPS immediately (no Hermes needed for fixes):
 ? health / status check / e2e review ? stack probe + inbox counts
-? heal stack / fix it ? Phronesis-Heal.ps1
+? heal stack / fix it ? speak_and_trust_once.py --heal
 ? restart bridge / restart proxy ? service recovery
 ? drain inbox / queue now ? Hermes inbox consumer
 Jeff can type those phrases; bridge executes BEFORE your reply and posts ? results.

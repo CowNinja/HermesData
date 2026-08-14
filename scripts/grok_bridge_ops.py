@@ -21,11 +21,11 @@ OPS: dict[str, dict] = {
         "summary": "Full stack health JSON",
     },
     "heal": {
-        "script": ROOT / "scripts" / "Phronesis-Heal.ps1",
-        "kind": "powershell",
-        "args": ["-Quiet"],
+        "script": ROOT / "scripts" / "ops" / "speak_and_trust_once.py",
+        "kind": "python",
+        "args": ["--heal"],
         "timeout": 300,
-        "summary": "Phronesis-Heal stack recovery",
+        "summary": "Speak-and-trust heal (single recovery door)",
     },
     "restart_bridge": {
         "script": ROOT / "scripts" / "ops" / "Ensure-Grok-Direct-Bridge.ps1",
