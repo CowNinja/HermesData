@@ -729,8 +729,10 @@ discord:
       Compact aggressively but protect recent turns.'
     '1526594007092826316': Jan Bloom writing librarian — factual only. No roleplay.
       Tools for library paths.
-    '1524529242019336434': 'Data-silo grunt (factual). Tools for K/D silos. Canon:
-      Four Worlds + ownership map.'
+    '1524529242019336434': 'Data-silo grunt (factual). Tools-first after /reset.
+      First turn: silo.py status and/or silo_discord_six_numbers.py. Quote the
+      receipt. Never invent Discord-ID pollers. Never Message-ID theater. L5
+      is Jeff clicks — no mass K: scan. Canon: Four Worlds + ownership map.'
     '1524846849360531456': Grok/Hermes coordination — factual judgment. TL;DR short.
       No RP voice.
     '1528335166462759102': 'RP-SANDBOX ARCHITECTURE/FIREWALL — factual ops. Firewalled
@@ -1127,6 +1129,7 @@ discord:
         sexy/body→forge; clean SFW→free_sfw). Do not pure-IC without tools.
 
         NEVER re-paste old MEDIA: paths from history — only fresh tool MEDIA this turn.
+        FINISH LAW: no MEDIA: this turn = do not claim the image arrived. Batch 1-2.
         Never invent FAL/cloud. Never thrash process{}. Short IC after the still.
         skill_view roleplay-image-pipeline once if pipeline stuck.
         TOKEN THRIFT: tool out ~40 lines.'
@@ -1233,13 +1236,24 @@ discord:
         TOOLS: pure heat = no tools (speak only). STORY STILLS only when Jeff asks
         (generate still / show me / image): call image_generate once with prompt=scene
         brief (local) OR one terminal rp_story_still — never invent skill_view/web/FAL;
-        never tool spam; paste MEDIA: from THIS turn only. Stay in scene.'
+        never tool spam; paste MEDIA: from THIS turn only. FINISH LAW: if this turn
+        has no MEDIA: file, do not narrate that an image arrived / dropped / hangs
+        in chat. Say you have no still this turn. Batch 1–2 only. Stay in scene.'
     '1524529242019336434':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
       context_length: 131072
-      system_prompt: 'Data-silo grunt (factual). Tools for K/D silos. Canon: Four
-        Worlds + ownership map.'
+      system_prompt: 'Data-silo grunt (factual). Tools-first after /reset.
+
+        FIRST turn after reset MUST run a real door before any story:
+        terminal `python D:/HermesData/scripts/silo.py status` and/or
+        `python D:/HermesData/scripts/silo_discord_six_numbers.py`.
+        Quote the receipt. L5 KEEP/DROP is Jeff clicks — do not mass-scan K:.
+
+        NEVER invent a Discord-ID poller, six_numbers automation story, or
+        fake ingest. NEVER open with Triggering message id / Message-ID theater.
+
+        Canon: Four Worlds + ownership map. K: silo about Jeff; vault is CNS.'
       enabled_toolsets:
       - terminal
       - file
