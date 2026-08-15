@@ -735,8 +735,9 @@ discord:
       silo_discord_six_numbers.py. Quote the receipt. Never invent Discord-ID pollers.
       Never Message-ID theater. L5 is Jeff clicks — no mass K: scan. Canon: Four Worlds
       + ownership map.'
-    '1524846849360531456': Grok/Hermes coordination — talk first, then factual judgment.
-      TL;DR short. No RP voice. Never dump tool schemas.
+    '1524846849360531456': 'Grok coord = named Grok 4.6 hire surface. Jeff walks in
+      on purpose. Alice still owns kitchen elsewhere. TL;DR. No RP. Never dump schemas.
+      Never hop-1 Discord-wide — T3 via proxy.'
     '1528335166462759102': 'RP-SANDBOX ARCHITECTURE/FIREWALL — factual ops. Firewalled
       garden; no heat in ops. skill_view image-stack-discipline / immersive-roleplay
       as needed. Token thrift: short tool output.'
@@ -1276,16 +1277,20 @@ discord:
       context_length: 131072
       max_turns: 28
       max_tokens: 6144
-      system_prompt: Grok/Hermes coordination — talk first, then factual judgment.
-        TL;DR short. No RP voice. Hard architecture / policy judgment / complex ops
-        may T3 to Grok 4.6. Grunt stays local/free. Never Message-ID / triage theater.
-        Never dump tool schemas.
+      system_prompt: 'Named Grok 4.6 hire surface. Hard architecture / judgment only.
+        Hop is proxy T3 (not xai-oauth pin). Alice owns kitchen elsewhere.
+        Quote SAT/growth receipts or say you did not run a door. Discord 2000
+        cap = short replies — do not invent compression daemons or expand ctx.
+        FORBIDDEN: RP voice (*actions*, babe, flirty), invented organs (trunks,
+        vector core, self-evolving state, harvest daemons, MODE_PROACTIVE),
+        claiming you consulted Grok without a receipt, claiming system-wide
+        patches you did not ship. Never dump tool schemas.'
       enabled_toolsets:
       - terminal
       - file
       - web_search
-      note: '2026-08-13 modest unthrottle: judgment plane may T3 Grok on hard
-        work; default still sovereign-auto. max_turns 28; max_tokens 6144. '
+      note: '2026-08-15 named hire surface: chat_id forces T3 via proxy.
+        Do not pin xai-oauth. Voice hangout stays local. max_turns 28; max_tokens 6144.'
     '1526952913413607454':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign

@@ -132,6 +132,28 @@ def is_roleplay_route(routing: Optional[Dict[str, Any]]) -> bool:
     return False
 
 
+# Named hire surface only. Jeff walks into this thread on purpose.
+# Hop stays proxy T3 (Grok 4.6) — never pin xai-oauth on Discord overrides.
+GROK_HIRE_CHAT_IDS = frozenset(
+    {
+        "1524846849360531456",  # Grok coord / Grok 4.6
+    }
+)
+
+
+def is_grok_hire_chat(routing: Optional[Dict[str, Any]] = None) -> bool:
+    """True only for the named Grok coord thread. Garden/RP never."""
+    if is_roleplay_route(routing):
+        return False
+    route = routing or {}
+    ids = {
+        str(route.get("chat_id") or "").strip(),
+        str(route.get("thread_id") or "").strip(),
+        str(route.get("parent_channel_id") or "").strip(),
+    }
+    return bool(ids & GROK_HIRE_CHAT_IDS)
+
+
 def _prefetch_timeout_sec() -> float:
     pol = fleet_policy()
     try:
@@ -487,6 +509,8 @@ def _proactive_wants_t3(prompt: str, routing: Dict[str, Any]) -> bool:
         return True
     if str(routing.get("force_grok") or "").lower() in ("1", "true", "yes"):
         return True
+    if is_grok_hire_chat(routing):
+        return True
     # Policy A was driver-only rare; Policy B enables marker auto-T3 (default).
     if not pol.get("hard_prompt_auto_t3", True) and str(pol.get("grok_policy") or "B") == "A":
         return False
@@ -645,6 +669,21 @@ def try_proactive_offload_dispatch(
         prompt, routing, messages, body or {}, headers=headers or {},
     )
     mode = str(classification.get("mode") or "")
+    # Named hire room: force public-brains offload so T3 runs first.
+    # Still fail-closed on garden/RP (is_grok_hire_chat already false there).
+    if is_grok_hire_chat(routing) and mode not in {
+        ROUTING_LOCAL_ONLY,
+        "local_only",
+        "local_private",
+        ROUTING_AUGMENT_LOCAL,
+        "augment_local",
+    }:
+        classification = dict(classification)
+        classification["mode"] = ROUTING_OFFLOAD_COMPUTE
+        reasons = list(classification.get("reasons") or [])
+        reasons.append("named_grok_hire_surface")
+        classification["reasons"] = reasons
+        mode = ROUTING_OFFLOAD_COMPUTE
     # When local is contended/down, hard-upgrade safe non-private modes to free fleet.
     # Never upgrade local_only / RP / private / augment_local (sandbox stays local).
     # Prefer free before Grok ? token-outage resilience (2026-07-27).
