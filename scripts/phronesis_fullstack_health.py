@@ -181,19 +181,19 @@ def build_report() -> dict:
     bridge = _bridge_health()
     probes["grok_direct_bridge"] = {"ok": bridge["ok"], "detail": bridge}
 
-    core_ok = sum(
-        1 for k, v in probes.items()
-        if k not in ("grok_direct_bridge", "inference_fifo") and v.get("ok")
+    # Kitchen CORE only. 9119 / workspace / grok-direct are observers, not CORE.
+    kitchen = (
+        bool((probes.get("llama") or {}).get("ok")),
+        bool((probes.get("proxy") or {}).get("ok")),
+        bool((probes.get("gateway") or {}).get("ok")),
     )
-    if probes.get("inference_fifo", {}).get("ok"):
-        core_ok += 1
+    kitchen_n = sum(kitchen)
     travel_ok = bridge["ok"]
-    score = core_ok * 15 + (15 if travel_ok else 0)
+    score = kitchen_n * 30 + (10 if travel_ok else 0)
     score = min(100, score)
-
-    if score >= 85 and travel_ok:
+    if kitchen_n == 3:
         status = "healthy"
-    elif score >= 60:
+    elif kitchen_n >= 1:
         status = "degraded"
     else:
         status = "critical"

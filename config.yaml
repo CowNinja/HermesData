@@ -661,11 +661,10 @@ discord:
       Voice transcripts live in thread 1534692043404607558 (voice-transcripts).
       No RP heat unless Jeff steers there.'
     '1534692043404607558': 'VOICE TRANSCRIPTS for #voice-think-aloud (VC 1519144782176194781).
-      Live spoken conversation with Jeff. Primary path is gateway voice_fast_path
-      (free LLM + Edge Alice) — short 1–2 sentence replies. Fallback agent: Alice,
-      first-person I/me; NEVER parrot his words; no markdown walls; no Ultra-Think;
-      tools only if a fact truly requires one. Continuity for debugging You/Alice
-      lines.'
+      Live spoken conversation with Jeff. Thin adapter: STT/TTS. Conversation
+      core = hangout + allowlisted web_search. No terminal, no PC sight, no SAT
+      heal. Short 1-2 sentence I/me. Never invent live facts — search or say you
+      did not look it up. Never parrot his words.'
     '1519144758172192808': '#skill-evolution /learn ONLY — local-first (phronesis-sovereign-auto,
       NOT paid Grok default). Durable skills under D:/HermesData/skills/<cat>/<name>/SKILL.md.
       REQUIRED after gather: terminal learn_land_once.py OR skill_librarian decide→MERGE|CREATE,
@@ -855,6 +854,11 @@ discord:
     priority: conversation_speech_over_music
   voice_channel_inactivity_timeout_seconds: 0
   channel_overrides:
+    '1534692043404607558':
+      enabled_toolsets:
+      - web
+      note: '2026-08-15 voice vector: web only. No terminal/computer_use/browser.
+        Fast-path is primary; fallback agent may web_search a live fact.'
     '1513273692778528990':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
