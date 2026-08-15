@@ -836,8 +836,8 @@ discord:
       max_sentences: 3
       rescue_try: true
       commit_soft_fallback: false
-      # Thin partner pin in voice system prompt when local/free answers
-      include_pin: true
+      # Kitchen pin is for /reset text. Spoken VC treated "Now: beat:" as Jeff.
+      include_pin: false
       models:
       - nvidia/nemotron-3-nano-30b-a3b:free
       - openrouter/free

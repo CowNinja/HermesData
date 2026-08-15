@@ -548,7 +548,7 @@ function Stop-WorkspaceServer {
 
 function Start-WorkspaceServer {
     # :3001 Hermes Workspace hub (distinct from CLI dashboard :9119).
-    # Must break away from parent Job Objects — Start-HiddenProcess only VBS-detaches
+    # Must break away from parent Job Objects - Start-HiddenProcess only VBS-detaches
     # python; a plain Process.Start of node dies when Grok/tool shells exit, which is
     # why restart-workspace.ps1 reported UP then left :3001 dark.
     $wsDir = if ($Core -and $Core.workspace_dir) { $Core.workspace_dir } else { "D:\HermesData\hermes-workspace" }
