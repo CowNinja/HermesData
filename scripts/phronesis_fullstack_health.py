@@ -176,10 +176,22 @@ def build_report() -> dict:
         "inference_fifo": _fifo_queue(),
         "gateway": _probe("http://127.0.0.1:8642/health"),
         "cli_dashboard": _probe("http://127.0.0.1:9119/health"),
-        "workspace": _probe("http://127.0.0.1:3001/health/detailed"),
+        "workspace": _probe("http://127.0.0.1:3001/api/auth-check"),
     }
     bridge = _bridge_health()
     probes["grok_direct_bridge"] = {"ok": bridge["ok"], "detail": bridge}
+    for key, plane in (
+        ("llama", "core"),
+        ("proxy", "core"),
+        ("gateway", "core"),
+        ("inference_fifo", "core"),
+        ("cli_dashboard", "optional"),
+        ("workspace", "optional"),
+        ("grok_direct_bridge", "gray"),
+    ):
+        row = probes.get(key)
+        if isinstance(row, dict):
+            row["plane"] = plane
 
     # Kitchen CORE only. 9119 / workspace / grok-direct are observers, not CORE.
     kitchen = (
@@ -208,9 +220,15 @@ def build_report() -> dict:
     fifo_probe = probes.get("inference_fifo") or {}
     return {
         "timestamp": _utc_now(),
-        "tile_version": "v1.2",
+        "tile_version": "v1.3",
         "status": status,
         "score": score,
+        "sat_align": {
+            "core": ["8642", "8091", "8090"],
+            "optional": ["3001", "9119"],
+            "gray": ["grok_direct_bridge"],
+            "note": "CORE healthy does not require :9119 or a live Grok-direct PID. Continuous Grok stays gray.",
+        },
         "probes": probes,
         "rp_comfy": _rp_comfy_embed(fifo_probe if fifo_probe.get("ok") else {}),
         "travel_lane": {
