@@ -1,26 +1,24 @@
 model:
-  default: phronesis-sovereign-auto
-  provider: custom:phronesis-sovereign
-  api_mode: chat_completions
-  context_length: 131072
+  default: grok-4.6
+  provider: xai-oauth
   max_tokens: 4096
-  base_url: http://127.0.0.1:8091/v1
+  base_url: ''
 fallback_providers:
-- provider: openrouter
-  model: openrouter/free
-- provider: openrouter
-  model: nvidia/nemotron-3-super-120b-a12b:free
-- provider: openrouter
-  model: google/gemma-4-26b-a4b-it:free
-- provider: openrouter
-  model: poolside/laguna-s-2.1:free
-- provider: xai-oauth
-  model: grok-4.5
-  api_mode: chat_completions
+  - provider: openrouter
+    model: openrouter/free
+  - provider: openrouter
+    model: nvidia/nemotron-3-super-120b-a12b:free
+  - provider: openrouter
+    model: google/gemma-4-26b-a4b-it:free
+  - provider: openrouter
+    model: poolside/laguna-s-2.1:free
+  - provider: xai-oauth
+    model: grok-4.5
+    api_mode: chat_completions
 toolsets:
-- hermes-cli
-- browser
-- computer_use
+  - hermes-cli
+  - browser
+  - computer_use
 max_live_sessions: 4
 agent:
   max_turns: 24
@@ -49,7 +47,7 @@ agent:
   image_input_mode: auto
   disabled_toolsets: []
   verbose_schema: false
-  reasoning_effort: low
+  reasoning_effort: high
   personalities:
     technical: You are Alice / Hermes — Jeff's first-person local partner on this
       private stack. Speak as I/me; address him as you. Warm, direct, high-agency.
@@ -170,35 +168,25 @@ auxiliary:
     model: ''
     timeout: 120
   compression:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-auto
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: auto
+    model: ''
     timeout: 90
     context_length: 131072
   skills_hub:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-synthesis
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: auto
+    model: ''
     timeout: 90
   approval:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-classify
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: auto
+    model: ''
     timeout: 45
   mcp:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-classify
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: auto
+    model: ''
     timeout: 45
   title_generation:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-classify
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: auto
+    model: ''
     timeout: 30
     language: ''
   tts_audio_tags:
@@ -208,28 +196,25 @@ auxiliary:
     api_key: ''
     timeout: 30
   triage_specifier:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-classify
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: auto
+    model: ''
     timeout: 60
   kanban_decomposer:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-code
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: auto
+    model: ''
     timeout: 120
   profile_describer:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-synthesis
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: auto
+    model: ''
     timeout: 60
+  goal_judge:
+    provider: openrouter
+    model: google/gemini-3-flash-preview
+    timeout: 60
+    max_tokens: 4096
   curator:
-    provider: custom:phronesis-sovereign
-    model: phronesis-sovereign-synthesis
-    base_url: http://127.0.0.1:8091/v1
-    api_key: local
+    provider: auto
+    model: ''
     timeout: 180
   monitor:
     provider: custom:phronesis-sovereign
@@ -249,11 +234,6 @@ auxiliary:
     base_url: http://127.0.0.1:8091/v1
     api_key: local
     timeout: 180
-  goal_judge:
-    provider: openrouter
-    model: google/gemini-3-flash-preview
-    timeout: 60
-    max_tokens: 4096
 display:
   compact: true
   personality: technical
@@ -309,9 +289,9 @@ display:
   runtime_footer:
     enabled: false
     fields:
-    - model
-    - context_pct
-    - cwd
+      - model
+      - context_pct
+      - cwd
   copy_shortcut: auto
   pet:
     enabled: false
@@ -337,13 +317,6 @@ privacy:
   redact_pii: false
 tts:
   provider: edge
-  streaming:
-    provider: edge
-  alice_voice:
-    gender: female
-    provider: edge
-    edge_voice: en-US-AriaNeural
-    note: Gorgeous warm partner Alice — single identity for home + RP VC
   edge:
     voice: en-US-AriaNeural
   elevenlabs:
@@ -372,16 +345,23 @@ tts:
     device: cpu
   piper:
     voice: en_US-lessac-medium
+  streaming:
+    provider: edge
+  alice_voice:
+    gender: female
+    provider: edge
+    edge_voice: en-US-AriaNeural
+    note: Gorgeous warm partner Alice — single identity for home + RP VC
 stt:
   enabled: true
   provider: groq
   local:
     model: base
     language: ''
-  openai:
-    model: whisper-1
   groq:
     model: whisper-large-v3-turbo
+  openai:
+    model: whisper-1
   mistral:
     model: voxtral-mini-latest
   elevenlabs:
@@ -436,8 +416,8 @@ moa:
   presets:
     default:
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -447,8 +427,8 @@ moa:
     Default:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
       aggregator:
         provider: openrouter
         model: anthropic/claude-opus-4.8
@@ -459,10 +439,10 @@ moa:
     Grok:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
-      - provider: xai-oauth
-        model: grok-build-0.1
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
+        - provider: xai-oauth
+          model: grok-build-0.1
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -473,14 +453,14 @@ moa:
     Grok + Phronesis:
       enabled: true
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-composer-2.5-fast
-      - provider: xai-oauth
-        model: grok-4.5
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
+        - provider: xai-oauth
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-composer-2.5-fast
+        - provider: xai-oauth
+          model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -491,12 +471,12 @@ moa:
     Just xAi:
       enabled: true
       reference_models:
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-composer-2.5-fast
-      - provider: xai-oauth
-        model: grok-4.5
+        - provider: xai-oauth
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-composer-2.5-fast
+        - provider: xai-oauth
+          model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -507,12 +487,12 @@ moa:
     Grok + Free + Phronesis:
       enabled: false
       reference_models:
-      - provider: custom:phronesis-sovereign
-        model: phronesis-sovereign-auto
-      - provider: xai-oauth
-        model: grok-build-0.1
-      - provider: xai-oauth
-        model: grok-4.5
+        - provider: custom:phronesis-sovereign
+          model: phronesis-sovereign-auto
+        - provider: xai-oauth
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-4.5
       aggregator:
         provider: xai-oauth
         model: grok-4.5
@@ -521,8 +501,8 @@ moa:
       max_tokens: 4096
       fanout: per_iteration
   reference_models:
-  - provider: xai-oauth
-    model: grok-4.5
+    - provider: xai-oauth
+      model: grok-4.5
   aggregator:
     provider: xai-oauth
     model: grok-4.5
@@ -534,12 +514,12 @@ moa:
   Just xAi:
     enabled: true
     reference_models:
-    - provider: xai-oauth
-      model: grok-build-0.1
-    - provider: xai-oauth
-      model: grok-composer-2.5-fast
-    - provider: xai-oauth
-      model: grok-4.5
+      - provider: xai-oauth
+        model: grok-build-0.1
+      - provider: xai-oauth
+        model: grok-composer-2.5-fast
+      - provider: xai-oauth
+        model: grok-4.5
     aggregator:
       provider: xai-oauth
       model: grok-4.5
@@ -552,58 +532,58 @@ moa:
     primary + local grunt.'
 skills:
   external_dirs:
-  - C:/Users/CowNi/.omh/skills
+    - C:/Users/CowNi/.omh/skills
   disabled:
-  - ascii-video
-  - baoyu-infographic
-  - blogwatcher
-  - claude-code
-  - codex
-  - comfyui
-  - design-md
-  - gif-search
-  - google-workspace
-  - heartmula
-  - hermes-atlas
-  - hermes-atlas-discovery
-  - hermes-bundles
-  - himalaya
-  - jupyter-live-kernel
-  - manim-video
-  - maps
-  - minimal-agent-harness
-  - monitoring-dashboard-summary
-  - node-inspect-debugger
-  - notion
-  - opencode
-  - openhue
-  - p5js
-  - petdex
-  - polymarket
-  - popular-web-designs
-  - powerpoint
-  - pretext
-  - second-brain-vault
-  - segment-anything-model
-  - sketch
-  - songsee
-  - sovereign-computer-use-test
-  - teams-meeting-pipeline
-  - touchdesigner-mcp
-  - uncensored-image-generation
-  - weights-and-biases
-  - yuanbao
-  - airtable
-  - excalidraw
-  - nano-pdf
-  - songwriting-and-ai-music
-  - x-browser-poster
-  - x-post
-  - x-poster
-  - freellmapi
-  - agentmail
-  - blackbox
-  - dogfood
+    - ascii-video
+    - baoyu-infographic
+    - blogwatcher
+    - claude-code
+    - codex
+    - comfyui
+    - design-md
+    - gif-search
+    - google-workspace
+    - heartmula
+    - hermes-atlas
+    - hermes-atlas-discovery
+    - hermes-bundles
+    - himalaya
+    - jupyter-live-kernel
+    - manim-video
+    - maps
+    - minimal-agent-harness
+    - monitoring-dashboard-summary
+    - node-inspect-debugger
+    - notion
+    - opencode
+    - openhue
+    - p5js
+    - petdex
+    - polymarket
+    - popular-web-designs
+    - powerpoint
+    - pretext
+    - second-brain-vault
+    - segment-anything-model
+    - sketch
+    - songsee
+    - sovereign-computer-use-test
+    - teams-meeting-pipeline
+    - touchdesigner-mcp
+    - uncensored-image-generation
+    - weights-and-biases
+    - yuanbao
+    - airtable
+    - excalidraw
+    - nano-pdf
+    - songwriting-and-ai-music
+    - x-browser-poster
+    - x-post
+    - x-poster
+    - freellmapi
+    - agentmail
+    - blackbox
+    - dogfood
 curator:
   enabled: true
   interval_hours: 168
@@ -625,7 +605,6 @@ slack:
 discord:
   require_mention: true
   free_response_channels: 1513273692778528990,1519509288286949466,1522325123817013269,1526594007092826316,1532906132056838184,1534692043404607558
-  factual_gate_channels: 1513273692778528990,1534692043404607558,1523156115808845926,1519144636541571133
   allowed_channels: ''
   auto_thread: true
   thread_require_mention: false
@@ -734,9 +713,9 @@ discord:
       when he asks status/numbers. After that ask: silo.py status and/or silo_discord_six_numbers.py.
       Quote the receipt. Never invent Discord-ID pollers. Never Message-ID theater.
       L5 is Jeff clicks — no mass K: scan. Canon: Four Worlds + ownership map.'
-    '1524846849360531456': Grok coord = named Grok 4.6 hire surface. Jeff walks in
-      on purpose. Alice still owns kitchen elsewhere. TL;DR. No RP. Never dump schemas.
-      Never hop-1 Discord-wide — T3 via proxy.
+    '1524846849360531456': Grok coord = named Grok 4.6 hire surface (model grok-4.6).
+      Jeff walks in on purpose. Alice still owns kitchen elsewhere. TL;DR. No RP.
+      Never dump schemas. Garden/RP stay local_only.
     '1528335166462759102': 'RP-SANDBOX ARCHITECTURE/FIREWALL — factual ops. Firewalled
       garden; no heat in ops. skill_view image-stack-discipline / immersive-roleplay
       as needed. Token thrift: short tool output.'
@@ -773,6 +752,7 @@ discord:
   server_actions: list_guilds,server_info,list_channels,channel_info,list_roles,member_info,search_members,fetch_messages,list_pins,pin_message,unpin_message,delete_message,create_thread,add_role,remove_role
   allow_any_attachment: false
   max_attachment_bytes: 33554432
+  voice_channel_inactivity_timeout_seconds: 0
   voice_fx:
     enabled: true
     ambient_enabled: true
@@ -782,12 +762,13 @@ discord:
     speech_gain: 1
     ack_enabled: true
     ack_phrases:
-    - Let me look into that.
-    - One moment.
-    - Checking on that now.
-    - Give me a sec.
-    - On it.
-  ignored_channels: 1523364535459774658
+      - Let me look into that.
+      - One moment.
+      - Checking on that now.
+      - Give me a sec.
+      - On it.
+  factual_gate_channels: 1513273692778528990,1534692043404607558,1523156115808845926,1519144636541571133
+  ignored_channels: 1523364535459774700
   home_voice:
     enabled: true
     name: home
@@ -808,9 +789,9 @@ discord:
     listen_holdoff_s: 0.55
     instant_ack: false
     instant_ack_phrases:
-    - Mm-hm.
-    - One sec.
-    - Got it.
+      - Mm-hm.
+      - One sec.
+      - Got it.
     coalesce_delay_s: 0.85
     preview_fragments: false
     fast_path:
@@ -822,7 +803,7 @@ discord:
       local_timeout_s: 4.8
       max_free_attempts: 2
       max_tokens: 72
-      timeout_s: 5.0
+      timeout_s: 5
       rescue_timeout_s: 2.5
       temperature: 0.55
       max_pairs: 4
@@ -833,27 +814,28 @@ discord:
       commit_soft_fallback: false
       include_pin: false
       models:
-      - nvidia/nemotron-3-nano-30b-a3b:free
-      - openrouter/free
-      - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+        - nvidia/nemotron-3-nano-30b-a3b:free
+        - openrouter/free
+        - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
   music:
     enabled: true
     roots:
-    - G:\Old_music
-    - G:\Old_music\My Music
-    - G:\Old_music\MWRnet
+      - G:\Old_music
+      - G:\Old_music\My Music
+      - G:\Old_music\MWRnet
     playlist_roots:
-    - G:\Old_music\MWRnet\My Playlists
-    - G:\Old_music\My Music\My Playlists
+      - G:\Old_music\MWRnet\My Playlists
+      - G:\Old_music\My Music\My Playlists
     gain: 0.32
     priority: conversation_speech_over_music
-  voice_channel_inactivity_timeout_seconds: 0
   channel_overrides:
     '1534692043404607558':
+      model: phronesis-sovereign-auto
+      provider: custom:phronesis-sovereign
       enabled_toolsets:
-      - web
-      note: '2026-08-15 voice vector: web only. No terminal/computer_use/browser.
-        Fast-path is primary; fallback agent may web_search a live fact.'
+        - web
+      note: '2026-08-16 pin: do not inherit global grok-4.6. Voice vector stays
+        local 9B. Web only. Fast-path primary; fallback may web_search a live fact.'
       context_length: 131072
     '1513273692778528990':
       model: phronesis-sovereign-auto
@@ -861,11 +843,11 @@ discord:
       context_length: 131072
       max_turns: 12
       enabled_toolsets:
-      - hermes-discord
-      - web
-      - terminal
-      - file
-      - hermes-cli
+        - hermes-discord
+        - web
+        - terminal
+        - file
+        - hermes-cli
       note: '2026-08-12 Flock leak: Discord platform was hermes-discord-only so Qwythos
         dumped message_id JSON. Enable web. max_turns 12 for search+answer. Live facts
         fail-closed via factual_outbound_gate if no web tool ran.'
@@ -876,11 +858,11 @@ discord:
       max_turns: 18
       max_tokens: 6144
       enabled_toolsets:
-      - hermes-cli
-      - terminal
-      - file
-      - skills
-      - web
+        - hermes-cli
+        - terminal
+        - file
+        - skills
+        - web
       note: '2026-08-13 /learn: default phronesis-sovereign-auto (not hop-1 Grok).
         Fail-closed LANDING via skill_librarian + ops/learn_land_once.py. Hard authoring
         (skill quality / novel architecture / deep research) may T3 to Grok 4.6. Never
@@ -925,8 +907,8 @@ discord:
         helpdesk ("How can I assist"). No appliance monologue. No SOUL mass rewrite
         claims — propose only; Jeff gates SOUL promote.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
       note: '2026-08-11 journal door: alice_private_journal_once.py + path SSOT; 2026-08-04e/08
         personhood: ban Message-ID/triage; terminal+file; max_turns 6.'
     '1531786894445121648':
@@ -989,20 +971,20 @@ discord:
         + discord-clarify-interview; Mode A one clarify/stop OR Mode B batch-10; no
         fake dialogue; ctx 131072. After reload: /reset sticky if wall-dump history.'
       enabled_toolsets:
-      - terminal
-      - file
-      - skills
-      - clarify
+        - terminal
+        - file
+        - skills
+        - clarify
     '1529232050178101428':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
       context_length: 131072
       max_turns: 12
       enabled_toolsets:
-      - terminal
-      - file
-      - web_search
-      - hermes-cli
+        - terminal
+        - file
+        - web_search
+        - hermes-cli
       note: 'Angus demo: Hermes first-person voice TO Angus; silo truth; TTS file
         attach; no Jeff-voice draft.
 
@@ -1017,8 +999,8 @@ discord:
         as you. Short beats.'
       note: '2026-08-08 thrift note: factual terminal+file only.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
       context_length: 131072
     '1519144636541571133':
       model: phronesis-sovereign-auto
@@ -1028,8 +1010,8 @@ discord:
         as you. Short beats.'
       note: '2026-08-08 thrift note: factual terminal+file only.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
       context_length: 131072
     '1522325123817013269':
       model: phronesis-sovereign-auto
@@ -1037,8 +1019,8 @@ discord:
       context_length: 131072
       max_turns: 12
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
       note: '2026-08-05: RP-Sandbox infra detective. terminal+file only (no image_gen/FAL,
         no process thrash). Image SSOT=hermes_image Forge+MEDIA. Reset session after
         gateway reload.'
@@ -1049,9 +1031,9 @@ discord:
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
       enabled_toolsets:
-      - terminal
-      - file
-      - skills
+        - terminal
+        - file
+        - skills
       context_length: 131072
       max_turns: 12
       note: '2026-08-11: terminal+file+skills (kindroid-bridge/immersive-roleplay);
@@ -1071,9 +1053,9 @@ discord:
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
       enabled_toolsets:
-      - terminal
-      - file
-      - skills
+        - terminal
+        - file
+        - skills
       context_length: 131072
       max_turns: 12
       note: '2026-08-11: terminal+file+skills; local stills; skill_view roleplay-image-pipeline
@@ -1100,10 +1082,10 @@ discord:
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
       enabled_toolsets:
-      - hermes-cli
-      - terminal
-      - file
-      - web_search
+        - hermes-cli
+        - terminal
+        - file
+        - web_search
       context_length: 131072
       max_turns: 16
       note: '2026-08-08 thread-health: drop browser+image_gen thrash; invented image_stack_ops
@@ -1120,9 +1102,9 @@ discord:
       context_length: 131072
       max_turns: 12
       enabled_toolsets:
-      - terminal
-      - file
-      - skills
+        - terminal
+        - file
+        - skills
       note: '2026-08-11: stills + skills; rp_ic image inject; free-sfw SFW; sexy=Forge;
         no FAL.'
       system_prompt: 'ALICE NARRATOR IMAGE PLAY (152114) — stills REQUIRED when asked.
@@ -1142,9 +1124,9 @@ discord:
       context_length: 131072
       max_turns: 20
       enabled_toolsets:
-      - terminal
-      - file
-      - skills
+        - terminal
+        - file
+        - skills
       note: '2026-08-11: character ingest + skills under Roleplay-Sandbox.'
       system_prompt: 'CHARACTER INGESTION under Roleplay-Sandbox ONLY. Not IC heat
         play.
@@ -1160,9 +1142,9 @@ discord:
       context_length: 131072
       max_turns: 20
       enabled_toolsets:
-      - terminal
-      - file
-      - skills
+        - terminal
+        - file
+        - skills
       note: '2026-08-11 Kindroid AI API child: terminal+file+skills; bridge SSOT under
         Roleplay-Sandbox/scripts (send_to_sister/kindroid_bridge). skill_view kindroid-bridge.
         Image inject on intent. sticky /reset if Message-ID poison returns.'
@@ -1181,9 +1163,9 @@ discord:
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
       enabled_toolsets:
-      - terminal
-      - file
-      - skills
+        - terminal
+        - file
+        - skills
       context_length: 131072
       max_turns: 12
       note: '2026-08-11: terminal+file+skills; local stills; kindroid optional via
@@ -1200,8 +1182,8 @@ discord:
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
       context_length: 131072
       max_turns: 10
       note: 'MILLBROOK 2026-08-07f: image_generate rewrite→rp_story_still (no FAL
@@ -1221,8 +1203,8 @@ discord:
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
       context_length: 131072
       max_turns: 12
       max_tokens: 2048
@@ -1260,31 +1242,31 @@ discord:
 
         Canon: Four Worlds + ownership map. K: silo about Jeff; vault is CNS.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
       note: '2026-08-04 thrift: silo kitchen terminal+file only (silo_ctl scripts).
         Proven: fiction bleed + tool thrash. Policy: thread-tool-budget-thrift. Open
         tools only if audit+Jeff OK. '
     '1524846849360531456':
-      model: phronesis-sovereign-auto
-      provider: custom:phronesis-sovereign
-      context_length: 131072
+      model: grok-4.6
+      provider: xai-oauth
+      context_length: 500000
       max_turns: 28
       max_tokens: 6144
       system_prompt: 'Named Grok 4.6 hire surface. Hard architecture / judgment only.
-        Hop is proxy T3 (not xai-oauth pin). Alice owns kitchen elsewhere. Kitchen/SAT
-        and run/quote growth are receipt doors. Design talk stays here. Quote SAT/growth
-        receipts or say you did not run a door. Discord 2000 cap = short replies —
-        do not invent compression daemons or expand ctx. FORBIDDEN: RP voice (*actions*,
-        babe, flirty), invented organs (trunks, vector core, self-evolving state,
-        harvest daemons, MODE_PROACTIVE), claiming you consulted Grok without a receipt,
-        claiming system-wide patches you did not ship. Never dump tool schemas.'
+        Jeff armed this room to grok-4.6 (desktop switch 2026-08-16). Alice owns kitchen
+        elsewhere. Kitchen/SAT and run/quote growth are receipt doors. Design talk
+        stays here. Quote SAT/growth receipts or say you did not run a door. Discord
+        2000 cap = short replies. FORBIDDEN: RP voice (*actions*, babe, flirty), invented
+        organs (trunks, vector core, self-evolving state, harvest daemons, MODE_PROACTIVE),
+        claiming system-wide patches you did not ship. Never dump tool schemas. Garden/RP
+        stay local_only.'
       enabled_toolsets:
-      - terminal
-      - file
-      - web_search
-      note: '2026-08-15 named hire surface: chat_id forces T3 via proxy. Do not pin
-        xai-oauth. Voice hangout stays local. max_turns 28; max_tokens 6144.'
+        - terminal
+        - file
+        - web_search
+      note: '2026-08-16b: hire room pins grok-4.6 / xai-oauth @ 500000 (catalog window).
+        Was leftover 131072 9B pin. Garden/RP/voice stay local. max_turns 28; max_tokens 6144.'
     '1526952913413607454':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
@@ -1293,8 +1275,8 @@ discord:
       system_prompt: Sovereign router + model mgmt — talk first, then factual. :8090/:8091;
         local-first. No RP. Never dump tool schemas.
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
       note: '2026-08-04 thrift: router stack terminal+file; ban web_search action-item
         thrash. Policy: thread-tool-budget-thrift. '
     '1526594007092826316':
@@ -1305,20 +1287,20 @@ discord:
         for library paths.
       note: '2026-08-08 thrift note: Jan librarian terminal+file only.'
       enabled_toolsets:
-      - terminal
-      - file
+        - terminal
+        - file
 approvals:
   destructive_slash_confirm: false
 command_allowlist:
-- PowerShell encoded command execution
-- execute_code
-- delete in root path
-- script execution via -e/-c flag
-- hermes update (restarts gateway, kills running agents)
-- git reset --hard (destroys uncommitted changes)
-- script execution via heredoc
-- git force push (rewrites remote history)
-- recursive delete
+  - PowerShell encoded command execution
+  - execute_code
+  - delete in root path
+  - script execution via -e/-c flag
+  - hermes update (restarts gateway, kills running agents)
+  - git reset --hard (destroys uncommitted changes)
+  - script execution via heredoc
+  - git force push (rewrites remote history)
+  - recursive delete
 kanban:
   dispatch_in_gateway: true
   dispatch_interval_seconds: 60
@@ -1333,35 +1315,47 @@ kanban:
 onboarding:
   seen:
     busy_input_prompt: true
+secrets:
+  bitwarden:
+    enabled: true
+    access_token_env: BWS_ACCESS_TOKEN
+    project_id: 25a2f2f9-d7fc-4766-80b1-b47c014b72b3
+    cache_ttl_seconds: 300
+    encrypted_cache:
+      enabled: false
+      max_stale_seconds: 0
+    override_existing: true
+    auto_install: true
+    server_url: ''
 _config_version: 33
 custom_providers:
-- name: phronesis-sovereign
-  api_key: local
-  api_mode: chat_completions
-  base_url: http://127.0.0.1:8091/v1
-  context_length: 131072
-  default_model: phronesis-sovereign-auto
-  models:
-    phronesis-sovereign-auto:
-      context_length: 131072
-    qwythos-9b:
-      context_length: 131072
-    phronesis-sovereign-classify:
-      context_length: 131072
-    phronesis-sovereign-code:
-      context_length: 131072
-    phronesis-sovereign-metadata:
-      context_length: 131072
-    phronesis-sovereign-synthesis:
-      context_length: 131072
-    phronesis-sovereign-roleplay:
-      context_length: 131072
-    phronesis-sovereign-hot:
-      context_length: 131072
-    phronesis-sovereign-warm:
-      context_length: 131072
-    phronesis-sovereign-deep:
-      context_length: 131072
+  - name: phronesis-sovereign
+    api_key: local
+    api_mode: chat_completions
+    base_url: http://127.0.0.1:8091/v1
+    context_length: 131072
+    default_model: phronesis-sovereign-auto
+    models:
+      phronesis-sovereign-auto:
+        context_length: 131072
+      qwythos-9b:
+        context_length: 131072
+      phronesis-sovereign-classify:
+        context_length: 131072
+      phronesis-sovereign-code:
+        context_length: 131072
+      phronesis-sovereign-metadata:
+        context_length: 131072
+      phronesis-sovereign-synthesis:
+        context_length: 131072
+      phronesis-sovereign-roleplay:
+        context_length: 131072
+      phronesis-sovereign-hot:
+        context_length: 131072
+      phronesis-sovereign-warm:
+        context_length: 131072
+      phronesis-sovereign-deep:
+        context_length: 131072
 local_sovereign:
   boot_integrity:
     enabled: false
@@ -1409,19 +1403,19 @@ local_sovereign:
       = local_only. Deep ops (skill-evo / judgment / hard debug) may select Grok 4.6
       via T3; never hop-1 Discord-wide.
 fallback_model:
-- provider: custom:phronesis-sovereign
-  model: phronesis-sovereign-auto
-  base_url: http://127.0.0.1:8091/v1
-  api_key: local
+  - provider: custom:phronesis-sovereign
+    model: phronesis-sovereign-auto
+    base_url: http://127.0.0.1:8091/v1
+    api_key: local
 grok_auth:
   prefer_subscription: true
   oauth_refresh_on_auth_fail: true
   fallback_http_codes:
-  - 401
-  - 403
-  - 404
-  - 402
-  - 429
+    - 401
+    - 403
+    - 404
+    - 402
+    - 429
   transient_retry: true
   rate_limit_retries: 2
   rate_limit_max_wait_sec: 120
@@ -1429,46 +1423,50 @@ grok_auth:
   never_hard_fail_stack: true
 platform_toolsets:
   cli:
-  - browser
-  - clarify
-  - code_execution
-  - computer_use
-  - cronjob
-  - delegation
-  - file
-  - image_gen
-  - memory
-  - session_search
-  - skills
-  - terminal
-  - todo
-  - tts
-  - vision
-  - web
-  - x_search
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - cronjob
+    - delegation
+    - file
+    - image_gen
+    - memory
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - vision
+    - web
+    - x_search
   discord:
-  - hermes-discord
-  - web
+    - hermes-discord
+    - web
 known_plugin_toolsets:
   cli:
-  - spotify
+    - spotify
 session_reset:
   mode: none
 plugins:
   enabled:
-  - omh
+    - omh
   entries:
     omh:
       allow_tool_override: false
-secrets:
-  bitwarden:
-    enabled: true
-    access_token_env: BWS_ACCESS_TOKEN
-    project_id: 25a2f2f9-d7fc-4766-80b1-b47c014b72b3
-    cache_ttl_seconds: 300
-    override_existing: true
-    auto_install: true
-    server_url: ''
-    encrypted_cache:
-      enabled: false
-      max_stale_seconds: 0
+
+# ── Security ──────────────────────────────────────────────────────────
+# Secret redaction is ON by default — strings that look like API keys,
+# tokens, and passwords are masked in tool output, logs, and chat
+# responses before the model or user ever sees them. Set redact_secrets
+# to false to disable (e.g. when developing the redactor itself).
+# tirith pre-exec scanning is enabled by default when the tirith binary
+# is available. Configure via security.tirith_* keys or env vars
+# (TIRITH_ENABLED, TIRITH_BIN, TIRITH_TIMEOUT, TIRITH_FAIL_OPEN).
+#
+# security:
+#   redact_secrets: true
+#   tirith_enabled: true
+#   tirith_path: "tirith"
+#   tirith_timeout: 5
+#   tirith_fail_open: true

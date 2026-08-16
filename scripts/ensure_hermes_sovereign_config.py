@@ -188,12 +188,18 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         "openai",
         "gemini",
     } or current_provider.startswith("custom:") and "phronesis-sovereign" not in current_provider
-    if force_local and (leaked_cloud or not str(model.get("default") or "").startswith("phronesis-sovereign")):
+    # Jeff may arm a cloud primary (grok-4.6 / xai-oauth). That is not a leak.
+    # force_local still keeps sovereign custom_providers + aux compression +
+    # depin of stray (non-hire) xai channel pins. It must NOT rewrite the
+    # armed default back to 9B or slam every Discord window to 131k.
+    if force_local and not cloud_primary and (
+        leaked_cloud or not str(model.get("default") or "").startswith("phronesis-sovereign")
+    ):
         for key, value in MODEL_DEFAULTS.items():
             if model.get(key) != value:
                 model[key] = value
                 changes.append(f"model.{key}")
-    # Cloud primaries (e.g. grok-4.5 @ 500k) must keep their large context_length.
+    # Cloud primaries keep catalog windows (unset or 500k). Local default = 131k.
     # Forcing 65536 here caused endless Discord compaction loops.
     if not cloud_primary:
         if int(model.get("context_length") or 0) != MIN_CONTEXT:
@@ -309,7 +315,8 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         if not all(m in hint for m in _HINT_OK_MARKERS):
             agent["environment_hint"] = SOVEREIGN_ENVIRONMENT_HINT
             changes.append("agent.environment_hint?9B-locked+interview")
-        if agent.get("reasoning_effort") not in (None, "", "low", "none"):
+        # Grok can keep high reasoning. 9B stays low so local essays do not balloon.
+        if not cloud_primary and agent.get("reasoning_effort") not in (None, "", "low", "none"):
             agent["reasoning_effort"] = "low"
             changes.append("agent.reasoning_effort?low")
         # config.yaml uses "strict"; do not thrash strict -> auto on every boot
@@ -416,49 +423,72 @@ def _patch_structured(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
                 changes.append(f"grok_auth.fallback_http_codes+{code}")
         grok_auth["fallback_http_codes"] = codes
 
-    # Discord channel_overrides must not bypass sovereign router with direct xai-oauth.
-    # Full RP classification lives in enforce_sovereign_router_entry.py; here we only
-    # strip hard Grok pins so Discord never defaults past :8091.
+    # Discord channel_overrides: depin stray xai/grok pins, keep Jeff-armed hire
+    # rooms, and align each window to THAT channel's model. Never slam 500k
+    # onto 9B or 131k onto Grok.
     if force_local:
         discord = patched.setdefault("discord", {})
         if isinstance(discord, dict):
             overrides = discord.get("channel_overrides") or {}
             if isinstance(overrides, dict):
                 n_fixed = 0
+                n_hire_kept = 0
+                default_model = str((patched.get("model") or {}).get("default") or "")
+                default_provider = str((patched.get("model") or {}).get("provider") or "")
+                try:
+                    from model_window_profiles import (
+                        align_channel_overrides,
+                        is_armed_hire_channel,
+                    )
+                except Exception:
+                    align_channel_overrides = None  # type: ignore
+                    is_armed_hire_channel = None  # type: ignore
                 for cid, ov in overrides.items():
                     if not isinstance(ov, dict):
                         continue
+                    hire = False
+                    if is_armed_hire_channel is not None:
+                        try:
+                            hire = bool(is_armed_hire_channel(cid, ov))
+                        except Exception:
+                            hire = str(cid) == "1524846849360531456"
+                    else:
+                        hire = str(cid) == "1524846849360531456"
                     prov = str(ov.get("provider") or "").lower()
-                    model = str(ov.get("model") or "").lower()
-                    if "xai" in prov or "grok" in model:
+                    model_name = str(ov.get("model") or "").lower()
+                    if hire:
+                        n_hire_kept += 1
+                        continue
+                    if "xai" in prov or "grok" in model_name:
                         ov["provider"] = "custom:phronesis-sovereign"
-                        if "roleplay" not in model and "rp" not in model:
+                        if "roleplay" not in model_name and "rp" not in model_name:
                             ov["model"] = "phronesis-sovereign-auto"
                         else:
                             ov["model"] = "phronesis-sovereign-roleplay"
+                        n_fixed += 1
+                n_ctx_align = 0
+                if align_channel_overrides is not None:
+                    ctx_changes = align_channel_overrides(
+                        overrides, default_model, default_provider
+                    )
+                    n_ctx_align = len(ctx_changes)
+                else:
+                    for cid, ov in overrides.items():
+                        if not isinstance(ov, dict):
+                            continue
                         try:
                             ctx = int(ov.get("context_length") or 0)
                         except Exception:
                             ctx = 0
-                        if ctx != MIN_CONTEXT:
+                        if ctx and ctx != MIN_CONTEXT and str(cid) != "1524846849360531456":
                             ov["context_length"] = MIN_CONTEXT
-                        n_fixed += 1
-                # Raise/align all local override windows to SSOT (not only xai depins)
-                n_ctx_align = 0
-                for cid, ov in overrides.items():
-                    if not isinstance(ov, dict):
-                        continue
-                    try:
-                        ctx = int(ov.get("context_length") or 0)
-                    except Exception:
-                        ctx = 0
-                    if ctx != MIN_CONTEXT:
-                        ov["context_length"] = MIN_CONTEXT
-                        n_ctx_align += 1
+                            n_ctx_align += 1
                 if n_fixed:
                     changes.append(f"discord.channel_overrides.depin_xai={n_fixed}")
                 if n_ctx_align:
                     changes.append(f"discord.channel_overrides.ctx_align={n_ctx_align}")
+                if n_hire_kept:
+                    changes.append(f"discord.channel_overrides.hire_kept={n_hire_kept}")
         # Stamp mandatory router entry doctrine
         if isinstance(local_sovereign, dict):
             entry = local_sovereign.get("router_entry")
@@ -618,6 +648,20 @@ def seed_context_length_cache(dry_run: bool = False) -> Dict[str, Any]:
         f"{model_id}@{MOE_GATEWAY_URL.rstrip('/')}": MIN_CONTEXT
         for model_id in SOVEREIGN_MODEL_IDS
     }
+    # Cloud catalog pins so a Grok default cannot inherit a leftover 131k cache.
+    entries.update(
+        {
+            "grok-4.6": 500000,
+            "grok-4.6@xai-oauth": 500000,
+            "grok-4.6@https://api.x.ai/v1": 500000,
+            "grok-4.5": 500000,
+            "grok-4.5@xai-oauth": 500000,
+            "grok-4.5@https://api.x.ai/v1": 500000,
+            "grok-build-0.1": 256000,
+            "grok-build-0.1@xai-oauth": 256000,
+            "grok-build-0.1@https://api.x.ai/v1": 256000,
+        }
+    )
     for cache_path in cache_paths:
         _write_context_length_cache_yaml(cache_path, entries, dry_run)
     return {

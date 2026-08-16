@@ -1,9 +1,12 @@
-# Safe Hermes update - ONE door.
-# Unload house overlays from hermes-agent, quiet the kitchen, run hermes update,
-# re-layer house code, restore 8642/8091 via Ensure (not SAT --heal).
+# Safe Hermes update - ONE apply door (Jeff-armed).
+# Measure first: python D:\HermesData\scripts\ops\hermes_update_once.py status
+# Preflight refuses unmerged / diverged / extra house voice files.
+# Then: unload house overlays, quiet kitchen, hermes update, re-layer, Ensure
+# (not SAT --heal). SAT --status-only at the end.
 #
-# Use this instead of the Desktop 0.19.1 Update button while the kitchen is live.
+# Use this instead of the Desktop Update button while the kitchen is live.
 # Desktop preflight treats service/meta/proxy/dashboard as venv blockers.
+# Apply bounces 8642/8091/8090 and resets OS-1 that UTC day.
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File D:\HermesData\scripts\Phronesis-Safe-Hermes-Update.ps1
 #   ... -ExportOnly     snapshot house code, do not update
@@ -35,6 +38,7 @@ $LogDir = Join-Path $HermesRoot "logs"
 $Py = Join-Path $Agent "venv\Scripts\python.exe"
 $HermesExe = Join-Path $Agent "venv\Scripts\hermes.exe"
 $Overlay = Join-Path $HermesRoot "scripts\ops\hermes_house_overlay.py"
+$UpdateDoor = Join-Path $HermesRoot "scripts\ops\hermes_update_once.py"
 $Quiet = Join-Path $HermesRoot "scripts\Quiet-HermesStack-For-Update.ps1"
 $Ensure = Join-Path $HermesRoot "scripts\Ensure-HermesStack-Single.ps1"
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -70,9 +74,29 @@ if (-not (Test-Path $Overlay)) {
     Write-Host "overlay door missing: $Overlay" -ForegroundColor Red
     exit 1
 }
+if (-not (Test-Path $UpdateDoor)) {
+    Write-Host "update door missing: $UpdateDoor" -ForegroundColor Red
+    exit 1
+}
 
 Write-Host "=== Phronesis Safe Hermes Update ===" -ForegroundColor Cyan
 Write-Safe "start export_only=$ExportOnly dry=$DryRun noreapply=$NoReapply resume=$Resume"
+
+if (-not $ExportOnly -and -not $DryRun) {
+    Write-Safe "preflight hermes_update_once.py"
+    $preOut = & $Py $UpdateDoor preflight 2>&1 | Out-String
+    $preRc = $LASTEXITCODE
+    if ($preOut) {
+        Write-Host $preOut
+        try { Add-Content -Path $Log -Value $preOut -Encoding ascii } catch {}
+    }
+    if ($null -eq $preRc) { $preRc = 1 }
+    if ([int]$preRc -ne 0) {
+        Write-Host "Preflight refused apply. Measure: python D:\HermesData\scripts\ops\hermes_update_once.py status" -ForegroundColor Red
+        Write-Host "Do not use the Desktop Update button. Do not hermes update --force-venv." -ForegroundColor Red
+        exit [int]$preRc
+    }
+}
 
 if ($Resume) {
     Write-Safe "resume: skip export+unload (keep existing overlay)"
@@ -154,14 +178,28 @@ $updArgs = @("update", "--yes")
 if ($Force) { $updArgs += "--force" }
 if ($NoBackup) { $updArgs += "--no-backup" }
 
-Write-Safe "running hermes $($updArgs -join ' ')"
-Write-Host "Running: hermes $($updArgs -join ' ')"
-# cmd.exe so native stderr (Bitwarden) is not a terminating ErrorRecord.
+Write-Safe "running python -m hermes_cli.main $($updArgs -join ' ') cwd=$Agent"
+Write-Host "Running: python -m hermes_cli.main $($updArgs -join ' ') (cwd hermes-agent)"
+# cwd MUST be hermes-agent. `uv pip install -e .` from D:\HermesData exits 2.
+# Use venv python -m hermes_cli so this PS1 does not lock hermes.exe.
 $argLine = ($updArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
-cmd.exe /c "`"$HermesExe`" $argLine" 1>> $Log 2>&1
+$prevLoc = Get-Location
+Set-Location $Agent
+cmd.exe /c "`"$Py`" -m hermes_cli.main $argLine" 1>> $Log 2>&1
 $updRc = $LASTEXITCODE
 if ($null -eq $updRc) { $updRc = 0 }
+Set-Location $prevLoc
 Get-Content -Path $Log -Tail 40 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+
+# hermes update may spawn its own gateway. Ensure owns the only tree.
+Write-Safe "stop updater-spawned gateway before Ensure"
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.CommandLine -and $_.CommandLine -match "hermes_cli\.main gateway|hermes_gateway_service|hermes_meta_watchdog"
+} | ForEach-Object {
+    Write-Safe "kill updater child $($_.ProcessId)"
+    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+}
+Start-Sleep -Seconds 2
 
 Write-Safe "install messaging extras (discord.py)"
 & $Py -m pip install --disable-pip-version-check "discord.py[voice]==2.7.1"
@@ -183,6 +221,22 @@ if (-not $NoReapply) {
     }
 } else {
     Write-Safe "skip reapply (vanilla tree)"
+}
+
+# Git/zip update wipes gitignored apps/desktop/release. Rebuild Start Menu exe.
+$deskExe = Join-Path $Agent "apps\desktop\release\win-unpacked\Hermes.exe"
+if (-not (Test-Path $deskExe)) {
+    Write-Safe "desktop win-unpacked missing - hermes desktop --build-only"
+    $prevLoc2 = Get-Location
+    Set-Location $Agent
+    cmd.exe /c "`"$Py`" -m hermes_cli.main desktop --build-only --hermes-root `"$Agent`"" 1>> $Log 2>&1
+    $deskRc = $LASTEXITCODE
+    Set-Location $prevLoc2
+    if ($deskRc -ne 0 -or -not (Test-Path $deskExe)) {
+        Write-Safe "desktop rebuild failed rc=$deskRc (Start Menu uses Start-Hermes-Desktop.ps1 fallback)"
+    } else {
+        Write-Safe "desktop rebuilt $deskExe"
+    }
 }
 
 Write-Safe "Ensure-HermesStack-Single -AlsoProxy"
