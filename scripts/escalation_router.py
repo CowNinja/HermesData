@@ -139,9 +139,14 @@ GROK_HIRE_CHAT_IDS = frozenset(
         "1524846849360531456",  # Grok coord / Grok 4.6
     }
 )
+# Gateway often omits extra_body.phronesis.chat_id. The room's prompt is unique.
+HIRE_PROMPT_MARK = "Named Grok 4.6 hire surface"
 
 
-def is_grok_hire_chat(routing: Optional[Dict[str, Any]] = None) -> bool:
+def is_grok_hire_chat(
+    routing: Optional[Dict[str, Any]] = None,
+    messages: Optional[List[Dict[str, Any]]] = None,
+) -> bool:
     """True only for the named Grok coord thread. Garden/RP never."""
     if is_roleplay_route(routing):
         return False
@@ -151,7 +156,18 @@ def is_grok_hire_chat(routing: Optional[Dict[str, Any]] = None) -> bool:
         str(route.get("thread_id") or "").strip(),
         str(route.get("parent_channel_id") or "").strip(),
     }
-    return bool(ids & GROK_HIRE_CHAT_IDS)
+    if ids & GROK_HIRE_CHAT_IDS:
+        return True
+    for msg in messages or []:
+        if not isinstance(msg, dict):
+            continue
+        if str(msg.get("role") or "").lower() != "system":
+            continue
+        content = msg.get("content")
+        text = content if isinstance(content, str) else str(content or "")
+        if HIRE_PROMPT_MARK in text:
+            return True
+    return False
 
 
 def _prefetch_timeout_sec() -> float:
@@ -495,7 +511,11 @@ def _grok_share_blocks_t3() -> tuple[bool, str]:
         return False, f"share_check_err:{exc}"
 
 
-def _proactive_wants_t3(prompt: str, routing: Dict[str, Any]) -> bool:
+def _proactive_wants_t3(
+    prompt: str,
+    routing: Dict[str, Any],
+    messages: Optional[List[Dict[str, Any]]] = None,
+) -> bool:
     """
     Policy B hard-prompt detector.
 
@@ -509,7 +529,7 @@ def _proactive_wants_t3(prompt: str, routing: Dict[str, Any]) -> bool:
         return True
     if str(routing.get("force_grok") or "").lower() in ("1", "true", "yes"):
         return True
-    if is_grok_hire_chat(routing):
+    if is_grok_hire_chat(routing, messages):
         return True
     # Policy A was driver-only rare; Policy B enables marker auto-T3 (default).
     if not pol.get("hard_prompt_auto_t3", True) and str(pol.get("grok_policy") or "B") == "A":
@@ -671,7 +691,7 @@ def try_proactive_offload_dispatch(
     mode = str(classification.get("mode") or "")
     # Named hire room: force public-brains offload so T3 runs first.
     # Still fail-closed on garden/RP (is_grok_hire_chat already false there).
-    if is_grok_hire_chat(routing) and mode not in {
+    if is_grok_hire_chat(routing, messages) and mode not in {
         ROUTING_LOCAL_ONLY,
         "local_only",
         "local_private",
@@ -739,7 +759,7 @@ def try_proactive_offload_dispatch(
         classification["prefer_fleet_reason"] = prefer_reason
 
     safe_prompt = str(classification.get("sanitized_prompt") or prompt)
-    wants_t3 = _proactive_wants_t3(safe_prompt, routing)
+    wants_t3 = _proactive_wants_t3(safe_prompt, routing, messages)
 
     t2_result: Dict[str, Any] = {"success": False}
     t3_result: Dict[str, Any] = {"success": False}
