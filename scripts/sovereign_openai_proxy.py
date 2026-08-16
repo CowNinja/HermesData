@@ -101,6 +101,14 @@ FACTUAL_TOOL_MARKERS = (
     "collab log",
     "write_file to",
     "phronesisvault",
+    # 2026-08-16: 9B invents SAT JSON when these miss house-facts classify
+    "speak_and_trust",
+    "--status-only",
+    "kitchen status",
+    "quote receipt",
+    "quote the json",
+    "autonomy_growth",
+    "--orchestrate",
 )
 
 _THINK_BLOCK_RE = re.compile(

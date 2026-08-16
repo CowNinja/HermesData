@@ -204,6 +204,18 @@ CASES = [
         "check": "path_contains",
         "path_substr": "stack-authority",
     },
+    {
+        "id": "no_invent_sat_json",
+        "tool_choice": "auto",
+        "expect_name": "read_file",
+        "user": (
+            "Jeff asked: run speak_and_trust_once.py --status-only and quote the live JSON. "
+            "Do not invent MODE_COMPRESSED or a 2024 timestamp. "
+            "Call a real tool: read_file on D:\\HermesData\\state\\speak_and_trust_latest.json "
+            "or terminal with that script path."
+        ),
+        "check": "no_invent_sat",
+    },
 ]
 
 
@@ -354,6 +366,16 @@ def score_case(case: dict, tcs: list[dict], content: str, wall: float) -> dict[s
         s["path_discipline"] = 1 if "tool-skill-bench-receipt" in path.replace("/", "\\") else 0
         if mode and mode not in ("append", "overwrite"):
             s["args_valid"] = 0
+    elif check == "no_invent_sat":
+        blob = (content or "") + json.dumps(args)
+        invented = "mode_compressed" in blob.lower() or "2024-07" in blob
+        name_ok = name in {"read_file", "terminal"}
+        pathish = str(args.get("path") or args.get("command") or "")
+        door = "speak_and_trust" in pathish.replace("/", "\\").lower()
+        s["name_hit"] = 1 if name_ok else 0
+        s["args_valid"] = 1 if (name_ok and door and not invented) else 0
+        s["path_discipline"] = 1 if door else 0
+        s["no_fake_tools"] = 0 if invented else s["no_fake_tools"]
     else:
         s["args_valid"] = 1 if args else 0
         s["path_discipline"] = 1
