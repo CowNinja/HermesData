@@ -22,14 +22,21 @@ LOCAL_BACKENDS = frozenset(
 LOCAL_BILLING_PROVIDERS = frozenset({"custom:phronesis-sovereign", "custom", "local"})
 LOCAL_BILLING_URL_MARKERS = ("127.0.0.1:8091", "127.0.0.1:8090", "localhost:8091", "localhost:8090")
 
-# USD per 1M tokens ? official docs snapshots (2026-07).
+# Priced contrast table. The *painted* default is hire_model_from_config(),
+# not a frozen SKU. Last-known hire rates stay here so a new xAI name still
+# has a dollar contrast until Jeff arms a rate row.
 CLOUD_BASELINES: Dict[str, Dict[str, Any]] = {
+    "grok-4.6": {
+        "label": "Grok 4.6",
+        "input_per_m": 2.00,
+        "output_per_m": 6.00,
+        "source": "https://docs.x.ai/developers/models",
+    },
     "grok-4.20": {
-        "label": "Grok 4.20",
+        "label": "Grok 4.20 (historical)",
         "input_per_m": 1.25,
         "output_per_m": 2.50,
         "source": "https://docs.x.ai/developers/pricing",
-        "default": True,
     },
     "claude-sonnet-4-6": {
         "label": "Claude Sonnet 4.6",
@@ -45,8 +52,35 @@ CLOUD_BASELINES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-DEFAULT_BASELINE_ID = "grok-4.20"
+FALLBACK_BASELINE_ID = "grok-4.6"
+CONFIG_PATH = HERMES_ROOT / "config.yaml"
 PROVENANCE_INPUT_ESTIMATE = 2000
+
+
+def hire_model_from_config(raw: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
+    """Named-hire model/provider from config.yaml. Not an always-on T3 slot."""
+    cfg = raw if isinstance(raw, dict) else {}
+    if not cfg:
+        try:
+            import yaml  # type: ignore
+
+            if CONFIG_PATH.is_file():
+                loaded = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+                cfg = loaded if isinstance(loaded, dict) else {}
+        except Exception:
+            cfg = {}
+    model_cfg = cfg.get("model") if isinstance(cfg.get("model"), dict) else {}
+    hire_model = str(model_cfg.get("default") or FALLBACK_BASELINE_ID).strip() or FALLBACK_BASELINE_ID
+    hire_provider = str(model_cfg.get("provider") or "xai-oauth").strip() or "xai-oauth"
+    return hire_model, hire_provider
+
+
+def default_baseline_id(raw: Optional[Dict[str, Any]] = None) -> str:
+    """Hub savings default = live hire SKU when we have rates, else last-known hire."""
+    hire_model, _ = hire_model_from_config(raw)
+    if hire_model in CLOUD_BASELINES:
+        return hire_model
+    return FALLBACK_BASELINE_ID
 
 
 def _utc_now() -> str:
@@ -105,15 +139,17 @@ def is_local_billing_row(row: Dict[str, Any]) -> bool:
 def estimate_cost_usd(
     input_tokens: int,
     output_tokens: int,
-    baseline_id: str = DEFAULT_BASELINE_ID,
+    baseline_id: Optional[str] = None,
 ) -> float:
-    baseline = CLOUD_BASELINES.get(baseline_id) or CLOUD_BASELINES[DEFAULT_BASELINE_ID]
+    resolved = baseline_id or default_baseline_id()
+    baseline = CLOUD_BASELINES.get(resolved) or CLOUD_BASELINES[FALLBACK_BASELINE_ID]
     inp_cost = (max(0, input_tokens) / 1_000_000) * float(baseline["input_per_m"])
     out_cost = (max(0, output_tokens) / 1_000_000) * float(baseline["output_per_m"])
     return round(inp_cost + out_cost, 4)
 
 
 def _baseline_payload() -> List[Dict[str, Any]]:
+    live = default_baseline_id()
     rows: List[Dict[str, Any]] = []
     for baseline_id, meta in CLOUD_BASELINES.items():
         rows.append(
@@ -123,7 +159,7 @@ def _baseline_payload() -> List[Dict[str, Any]]:
                 "input_per_m": meta["input_per_m"],
                 "output_per_m": meta["output_per_m"],
                 "source": meta.get("source"),
-                "default": bool(meta.get("default")),
+                "default": baseline_id == live,
             }
         )
     return rows
@@ -395,7 +431,8 @@ def build_usage_savings(*, period_days: int = 30) -> Dict[str, Any]:
             "local_actual_usd": 0.0,
         }
 
-    default_saved = savings_by_baseline[DEFAULT_BASELINE_ID]["saved_usd"]
+    live_id = default_baseline_id()
+    default_saved = savings_by_baseline[live_id]["saved_usd"]
     cloud_paid = state_db.get("cloud_paid") or _empty_bucket()
 
     return {
@@ -410,12 +447,12 @@ def build_usage_savings(*, period_days: int = 30) -> Dict[str, Any]:
             "note": "Local llama inference ? API cost is $0; electricity not included.",
         },
         "cloud_comparison": {
-            "default_baseline_id": DEFAULT_BASELINE_ID,
+            "default_baseline_id": live_id,
             "baselines": _baseline_payload(),
             "saved_usd": default_saved,
             "saved_usd_by_baseline": savings_by_baseline,
             "headline": (
-                f"~${default_saved:,.2f} saved vs {CLOUD_BASELINES[DEFAULT_BASELINE_ID]['label']} "
+                f"~${default_saved:,.2f} saved vs {CLOUD_BASELINES[live_id]['label']} "
                 f"over {period_days}d"
                 if default_saved > 0
                 else f"Tracking local tokens ? savings appear once sovereign dispatches accumulate"
