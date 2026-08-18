@@ -238,7 +238,7 @@ auxiliary:
     timeout: 180
 display:
   compact: true
-  personality: technical
+  personality: ''
   resume_display: full
   resume_exchanges: 10
   resume_max_user_chars: 300
@@ -401,7 +401,7 @@ delegation:
   max_iterations: 20
   child_timeout_seconds: 300
   reasoning_effort: low
-  max_concurrent_children: 3
+  max_concurrent_children: 10
   max_spawn_depth: 2
   orchestrator_enabled: false
   subagent_auto_approve: false
@@ -1330,7 +1330,7 @@ secrets:
     override_existing: true
     auto_install: true
     server_url: ''
-_config_version: 33
+_config_version: 37
 custom_providers:
 - name: phronesis-sovereign
   api_key: local
