@@ -767,6 +767,19 @@ def kill_orphan_comfy_dup() -> list[int]:
     return killed
 
 
+def _collapse_orphan_terminals() -> dict[str, Any]:
+    """WM_CLOSE surplus generic Cascadia 'Terminal' frames. Never kill WT.exe."""
+    try:
+        ops = Path(r"D:\HermesData\scripts\ops")
+        if str(ops) not in sys.path:
+            sys.path.insert(0, str(ops))
+        from collapse_orphan_terminals import collapse
+
+        return collapse(dry_run=False)
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:160]}
+
+
 def suppress() -> dict[str, Any]:
     ensure_focus_stops()
     rep: dict[str, Any] = {
@@ -780,6 +793,7 @@ def suppress() -> dict[str, Any]:
         # Do NOT kill sovereign_openai_proxy ? dual-proxy thrash left :8091 dead.
         "killed_dup_dash": dedup_pythonw(r"dashboard --port 9119"),
         "killed_orphan_comfy": kill_orphan_comfy_dup(),
+        "collapsed_orphan_terminals": _collapse_orphan_terminals(),
     }
     try:
         sys.path.insert(0, str(SCRIPTS))

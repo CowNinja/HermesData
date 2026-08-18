@@ -162,6 +162,16 @@ def _hot_tick() -> int:
         n += hide_hermes_stack_consoles()
     except Exception:
         pass
+    try:
+        ops = Path(r"D:\HermesData\scripts\ops")
+        if str(ops) not in sys.path:
+            sys.path.insert(0, str(ops))
+        from collapse_orphan_terminals import collapse
+
+        rep = collapse(dry_run=False, write_receipt=False)
+        n += int(rep.get("closed_n") or 0)
+    except Exception:
+        pass
     return n
 
 
