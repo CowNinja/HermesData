@@ -21,6 +21,7 @@ toolsets:
 - computer_use
 max_live_sessions: 4
 agent:
+  bot_mode_protocol: true
   max_turns: 24
   gateway_timeout: 1800
   restart_drain_timeout: 180
