@@ -502,15 +502,15 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 298
+        "completed": 299
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-08-19T22:58:30.828421-04:00",
-      "last_run_at": "2026-08-19T14:58:29.316632-04:00",
+      "next_run_at": "2026-08-20T02:59:14.898831-04:00",
+      "last_run_at": "2026-08-19T18:58:47.519021-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -527,8 +527,8 @@
       ],
       "workdir": "D:\\HermesData",
       "fire_claim": {
-        "at": "2026-08-19T18:58:30.856612-04:00",
-        "by": "DELLWinn11:48408:cd7144647c8947ebbf599fb80f083fca"
+        "at": "2026-08-19T22:59:14.927705-04:00",
+        "by": "DELLWinn11:33968:7b91f65e93bb4ca48b7b8a64c0a908ca"
       },
       "pinned": true,
       "failure_streak": 0
@@ -1753,15 +1753,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 1702
+        "completed": 1710
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T18:14:58.028551-04:00",
-      "next_run_at": "2026-08-19T19:00:30.232787-04:00",
-      "last_run_at": "2026-08-19T18:30:30.232787-04:00",
+      "next_run_at": "2026-08-19T23:01:14.437464-04:00",
+      "last_run_at": "2026-08-19T22:31:14.437464-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1989,15 +1989,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 327
+        "completed": 329
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-20T17:16:35.981589-04:00",
-      "next_run_at": "2026-08-19T19:05:18.309766-04:00",
-      "last_run_at": "2026-08-19T17:05:18.309766-04:00",
+      "next_run_at": "2026-08-19T23:06:21.104315-04:00",
+      "last_run_at": "2026-08-19T21:06:21.104315-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2274,17 +2274,17 @@
       "schedule_display": "0 */4 * * *",
       "repeat": {
         "times": null,
-        "completed": 670
+        "completed": 671
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-21T22:40:15.971276+00:00",
-      "next_run_at": "2026-08-19T20:00:00-04:00",
-      "last_run_at": "2026-08-19T16:03:02.618393-04:00",
-      "last_status": "error",
-      "last_error": "Script exited with code 2\nstdout:\n{\n  \"ts\": \"2026-08-19T20:03:02Z\",\n  \"seal\": \"fleet-health-tick-w3p5-2026-07-27-touch\",\n  \"color\": \"YELLOW\",\n  \"ok\": false,\n  \"elapsed_sec\": 150.181,\n  \"notes\": [\n    \"health_tick_failed\",\n    \"touched_last_check=8\"\n  ],\n  \"health\": {\n    \"ok\": false,\n    \"rc\": 124,\n    \"checked\": null,\n    \"up\": null,\n    \"down\": null,\n    \"missing_env\": null,\n    \"mode\": null,\n    \"error\": \"timeout\"\n  },\n  \"demote\": {\n    \"demoted_n\": 0,\n    \"demoted\": [],\n    \"threshold\": 3,\n    \"error\": null\n  },\n  \"catalog_apply\": {\n    \"requested\": false,\n    \"ok\": null,\n    \"rc\": null,\n    \"parsed\": null,\n    \"error\": null\n  },\n  \"guard\": {\n    \"ok\": true,\n    \"rc\": 0,\n    \"summary\": {\n      \"ts\": \"2026-08-19T20:03:02Z\",\n      \"path\": \"D:\\\\HermesData\\\\config\\\\fleet_registry.yaml\",\n      \"ok\": true,\n      \"bytes\": 22102,\n      \"lines\": 715,\n      \"oneline_collapse\": false,\n      \"yaml_ok\": true,\n      \"enabled_compute\": [\n        \"openrouter-free-router\",\n        \"openrouter-free-gemma\",\n        \"openrouter-free-nemotron-nano\",\n        \"openrouter-free-nemotron-omni\",\n        \"openrouter-free-nemotron-super\",\n        \"openrouter-free-nemotron-nano9\"\n      ],\n      \"enabled_n\": 6\n    },\n    \"error\": null\n  },\n  \"touch_last_check\": {\n    \"touched\": [\n      \"brave-search\",\n      \"duckduckgo-instant\",\n      \"openrouter-free-gemma\",\n      \"openrouter-free-nemotron-nano\",\n      \"openrouter-free-nemotron-nano9\",\n      \"openrouter-free-nemotron-omni\",\n      \"openrouter-free-nemotron-super\",\n      \"openrouter-free-router\"\n    ],\n    \"skipped\": [],\n    \"error\": null\n  },\n  \"policy\": {\n    \"hop_order\": [\n      \"local_qwythos\",\n      \"free_fleet\",\n      \"paid_grok_optional\"\n    ],\n    \"catalog_apply_opt_in\": true,\n    \"demote_fail_streak_threshold\": 3,\n    \"max_interval_hours\": 6,\n    \"schedule_hint\": \"0 */4 * * *\",\n    \"cadence_slo_h\": 4,\n    \"skills\": [\n      \"mlops/freellmapi\",\n      \"mlops/nvidia-nim-relay\",\n      \"mlops/local-model-management\"\n    ]\n  },\n  \"enabled_n\": 6\n}",
+      "next_run_at": "2026-08-20T00:00:00-04:00",
+      "last_run_at": "2026-08-19T20:00:20.930723-04:00",
+      "last_status": "ok",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
       "origin": {
@@ -2299,7 +2299,7 @@
       "provider_snapshot": null,
       "model_snapshot": null,
       "pinned": true,
-      "failure_streak": 3
+      "failure_streak": 0
     },
     {
       "id": "1c0a27d7486e",
@@ -3074,5 +3074,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-08-19T18:58:30.858840-04:00"
+  "updated_at": "2026-08-19T22:59:14.929215-04:00"
 }
