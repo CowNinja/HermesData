@@ -1,9 +1,10 @@
 ' Start Qwythos llama-server with ZERO visible console (no focus steal).
-' Phase 3 + 128k (2026-08-03): cmd start /B survives parent exit on Windows.
+' WMI via start_qwythos_detached.py — start /B still dies inside Grok Job Objects.
 ' SSOT numbers: qwythos_8090_profile.json / phronesis-core.json (keep in sync).
 Option Explicit
-Dim sh, cmd
+Dim sh, pyw, starter
 Set sh = CreateObject("WScript.Shell")
-cmd = "D:\HermesData\scripts\start_qwythos_8090.cmd"
-' 0 = hidden window, False = do not wait
-sh.Run """" & cmd & """", 0, False
+pyw = "C:\Users\CowNi\AppData\Local\Programs\Python\Python311\pythonw.exe"
+starter = "D:\HermesData\scripts\start_qwythos_detached.py"
+sh.CurrentDirectory = "D:\HermesData"
+sh.Run """" & pyw & """ """ & starter & """", 0, False

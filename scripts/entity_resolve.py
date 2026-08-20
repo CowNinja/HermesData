@@ -54,12 +54,19 @@ def build_alias_index(data: dict) -> list[tuple[str, str, dict]]:
     return out
 
 
-def resolve_person(name: str, data: dict | None = None) -> dict | None:
-    """Return best match dict or None."""
+def resolve_person(
+    name: str, data: dict | None = None, *, card_safe: bool = False
+) -> dict | None:
+    """Return best match dict or None.
+
+    card_safe=True: exact alias only. No substring, no fuzzy, no entity_context.
+    Use this when the caller would otherwise mint a contacts_db fact.
+    Default remains silo-filing OCR assist (substring+fuzzy).
+    """
     data = data or load_aliases()
     fuzzy_cfg = data.get("fuzzy") or {}
     min_r = float(fuzzy_cfg.get("min_ratio", 0.86))
-    enabled = fuzzy_cfg.get("enabled", True)
+    enabled = False if card_safe else fuzzy_cfg.get("enabled", True)
     surname_aliases = data.get("surname_aliases") or {}
 
     q = norm(name)
@@ -78,6 +85,9 @@ def resolve_person(name: str, data: dict | None = None) -> dict | None:
                 "score": 1.0,
                 "query": name,
             }
+
+    if card_safe:
+        return None
 
     # 2) substring strong (canonical in query or vice versa) with length guard
     for alias, cid, rec in index:

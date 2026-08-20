@@ -128,8 +128,14 @@ def main() -> int:
     else:
         script = Path(sys.argv[1]).resolve()
         args = sys.argv[2:]
-        pyw = ROOT / "hermes-agent" / "venv" / "Scripts" / "pythonw.exe"
-        exe = str(pyw if pyw.is_file() else sys.executable)
+        # Inherit this interpreter so VBS can pick system pythonw (venv
+        # pythonw is a trampoline that writes locks then dies). Dashboard
+        # still launches this file with venv pythonw, so its child stays venv.
+        exe = sys.executable
+        name = Path(exe).name.lower()
+        if name not in ("python.exe", "pythonw.exe"):
+            pyw = ROOT / "hermes-agent" / "venv" / "Scripts" / "pythonw.exe"
+            exe = str(pyw if pyw.is_file() else sys.executable)
         argstr = " ".join(f'"{a}"' for a in args)
         # Direct pythonw — NO cmd.exe (cmd flash was the dual console windows).
         cmdline = f'"{exe}" "{script}" {argstr}'.rstrip()

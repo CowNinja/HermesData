@@ -108,7 +108,7 @@ These maps are the single source of truth. Read them first. Do not re-walk `D:\H
 - Idea parking lot: `D:\PhronesisVault\Operations\Architecture-Idea-Triage.md`
 - X living inbox: `D:\HermesData\state\X_IDEA_INBOX.md`
 - Planner law (FM-48): `D:\HermesData\state\PLANNER_BRIDGE.md`
-- Planner drop: `D:\HermesData\state\planner_inbox\` — Grok Build writes receipts here. Heavy optional, not the daily router. Captain is not the paste bus.
+- Planner drop: `D:\HermesData\state\planner_inbox\LATEST.md` — Grok Build writes dated receipts, then refreshes LATEST. FirstMate reads that one file. Captain is not the paste bus.
 - Alice Bot Mode judge (tap when you have energy): `D:\HermesData\state\ALICE_BOT_MODE_JUDGE.md`
 - alice-roleplay is personal playground only. Isolated. No public, no leak into default/Alice/XO, no posts, no brand.
 - Voice (paused): `D:\HermesData\state\VOICE_OPERATION.md`

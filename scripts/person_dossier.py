@@ -1,97 +1,68 @@
 #!/usr/bin/env python3
-"""Holistic person dossier: identity + validity handles + ledger + silo hits.
+"""Holistic person dossier from contacts_db only.
+
+Fail closed: UNKNOWN unless exact card match AND evidence.source + date.
+Never reads entity_context.json (337 OCR names). Never fuzzy.
+File-graph hub counts stay out of packs.
 
 Usage:
   python person_dossier.py jeffrey_bloom
   python person_dossier.py --name "Jan Bloom"
-  python person_dossier.py gary_bloom --json
+  python person_dossier.py "Joseph Cagle" --json
 """
 from __future__ import annotations
 
 import argparse
 import json
-import re
-import sqlite3
+import sys
 from pathlib import Path
 
-DB = Path(r"D:\HermesData\state\contacts_db.json")
-REG = Path(r"D:\HermesData\state\ingest_registry.sqlite3")
+SCRIPTS = Path(r"D:\HermesData\scripts")
+sys.path.insert(0, str(SCRIPTS))
+from contacts_db import (  # noqa: E402
+    DB,
+    find_person_exact,
+    has_dated_evidence,
+    load,
+    rebuild_handles_active,
+)
 
 
-def norm(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "").lower().strip())
-
-
-def find_person(db: dict, key: str) -> tuple[str, dict] | None:
-    people = db.get("people") or {}
-    if key in people:
-        return key, people[key]
-    nk = norm(key)
-    for cid, p in people.items():
-        names = [p.get("canonical_name"), cid.replace("_", " "), *(p.get("name_variants") or [])]
-        for n in names:
-            if n and norm(str(n)) == nk:
-                return cid, p
-            if n and nk in norm(str(n)) and len(nk) >= 4:
-                return cid, p
-    return None
-
-
-def extra_registry_hits(p: dict, limit: int = 8) -> list:
-    if not REG.exists():
-        return []
-    toks = []
-    for n in [p.get("canonical_name"), *(p.get("name_variants") or [])][:5]:
-        if n and len(str(n)) >= 5:
-            toks.append(str(n).lower())
-    for h in (p.get("handles") or {}).get("email") or []:
-        if isinstance(h, dict) and h.get("status") == "active" and h.get("value"):
-            toks.append(str(h["value"]).lower())
-    if not toks:
-        return []
-    con = sqlite3.connect(str(REG))
-    hits = []
-    seen = set()
-    for t in toks[:6]:
-        for row in con.execute(
-            "SELECT dest_path, domain, process_status FROM ingest WHERE lower(dest_path) LIKE ? LIMIT 5",
-            (f"%{t}%",),
-        ):
-            if row[0] in seen:
-                continue
-            seen.add(row[0])
-            hits.append({"path": row[0], "domain": row[1], "process_status": row[2]})
-            if len(hits) >= limit:
-                break
-        if len(hits) >= limit:
-            break
-    con.close()
-    return hits
-
-
-def dossier(cid: str, p: dict) -> dict:
+def pack_handles(p: dict) -> dict:
     handles = p.get("handles") or {}
 
-    def pack(kind: str):
-        rows = []
+    def rows(kind: str) -> list:
+        out = []
         for h in handles.get(kind) or []:
             if isinstance(h, dict):
-                rows.append(
+                out.append(
                     {
                         "value": h.get("value"),
                         "status": h.get("status"),
                         "confidence": (h.get("validity") or {}).get("confidence"),
+                        "last_verified": (h.get("validity") or {}).get("last_verified"),
+                        "method": (h.get("validity") or {}).get("method"),
                         "signals": (h.get("validity") or {}).get("signals"),
-                        "first_seen": h.get("first_seen"),
-                        "last_seen": h.get("last_seen"),
                     }
                 )
             else:
-                rows.append({"value": h, "status": "legacy_string"})
-        return rows
+                out.append({"value": h, "status": "legacy_string"})
+        return out
 
-    ledger = p.get("ledger") or []
+    rebuild_handles_active(p)
     return {
+        "email": rows("email"),
+        "phone": rows("phone"),
+        "active_summary": p.get("handles_active") or {},
+        "historical_summary": p.get("handles_historical") or {},
+    }
+
+
+def dossier(cid: str, p: dict) -> dict:
+    ledger = p.get("ledger") or []
+    evidence = p.get("evidence") or []
+    return {
+        "lookup": "CARD",
         "canonical_id": cid,
         "canonical_name": p.get("canonical_name"),
         "roles": p.get("roles"),
@@ -99,20 +70,29 @@ def dossier(cid: str, p: dict) -> dict:
         "confidence": p.get("confidence"),
         "relations": p.get("relations") or [],
         "name_variants": p.get("name_variants") or [],
-        "handles": {
-            "email": pack("email"),
-            "phone": pack("phone"),
-            "address": pack("address"),
-            "active_summary": p.get("handles_active"),
-            "historical_summary": p.get("handles_historical"),
-        },
+        "handles": pack_handles(p),
         "ledger_tail": ledger[-15:],
         "ledger_count": len(ledger),
-        "silo_links": p.get("silo_links") or {},
-        "registry_hits_live": extra_registry_hits(p),
+        "evidence_tail": evidence[-8:],
+        "evidence_count": len(evidence),
         "bio": p.get("bio") or {},
-        "note": "Historical handles retained for synaptic connections; status marks validity.",
+        "note": (
+            "Card facts only. File-graph / silo path-hits omitted. "
+            "entity_context OCR names are not this card."
+        ),
     }
+
+
+def unknown(query: str, reason: str, **extra) -> dict:
+    rec = {
+        "lookup": "UNKNOWN",
+        "query": query,
+        "reason": reason,
+        "entity_context": "ignored",
+        "fuzzy": False,
+    }
+    rec.update(extra)
+    return rec
 
 
 def main() -> int:
@@ -125,45 +105,48 @@ def main() -> int:
     if not key:
         print(json.dumps({"error": "pass id or --name"}))
         return 1
-    db = json.loads(DB.read_text(encoding="utf-8"))
-    hit = find_person(db, key)
+    db = load()
+    hit = find_person_exact(db, key)
     if not hit:
-        print(json.dumps({"error": "not found", "query": key}))
+        rec = unknown(key, "not_on_card")
+        print(json.dumps(rec, indent=2) if args.json else json.dumps(rec))
         return 2
     cid, p = hit
+    if not has_dated_evidence(p):
+        rec = unknown(key, "no_evidence_source_date", canonical_id=cid)
+        print(json.dumps(rec, indent=2) if args.json else json.dumps(rec))
+        return 2
     doc = dossier(cid, p)
     if args.json:
         print(json.dumps(doc, indent=2))
         return 0
-    # human markdown-ish
+    act = (doc["handles"].get("active_summary") or {})
     lines = [
         f"# Dossier: {doc['canonical_name']} (`{cid}`)",
         "",
-        f"Roles: {', '.join(doc['roles'] or [])} ? Domain: {doc['domain_primary']} ? {doc['confidence']}",
+        f"lookup: CARD | {doc.get('confidence')} | {doc.get('domain_primary')}",
+        f"Roles: {', '.join(doc['roles'] or [])}",
         "",
-        "## Active contact",
+        "## Active contact (Gmail From/To verified)",
+        f"- emails: {act.get('email') or []}",
+        f"- phones: {act.get('phone') or []}",
         "",
+        "## All emails",
     ]
-    act = (doc["handles"].get("active_summary") or {})
-    lines.append(f"- emails: {act.get('email') or []}")
-    lines.append(f"- phones: {act.get('phone') or []}")
-    lines += ["", "## All emails (validity)", ""]
     for h in doc["handles"]["email"]:
-        lines.append(f"- **{h.get('status')}** `{h.get('value')}` ? {h.get('confidence')} ? {h.get('signals')}")
-    lines += ["", "## All phones (validity)", ""]
-    for h in doc["handles"]["phone"]:
-        lines.append(f"- **{h.get('status')}** `{h.get('value')}` ? {h.get('confidence')}")
+        lines.append(
+            f"- **{h.get('status')}** `{h.get('value')}` "
+            f"verified={h.get('last_verified')} method={h.get('method')}"
+        )
     lines += ["", f"## Ledger (last {len(doc['ledger_tail'])} of {doc['ledger_count']})", ""]
     for e in doc["ledger_tail"]:
-        lines.append(f"- {e.get('action')} {e.get('kind')}: `{str(e.get('value'))[:80]}` ? {str(e.get('source'))[:60]}")
-    lines += ["", "## Silo connections", ""]
-    for path in (doc.get("silo_links") or {}).get("sample_paths") or []:
-        lines.append(f"- `{path}`")
-    for h in doc.get("registry_hits_live") or []:
-        lines.append(f"- [{h.get('domain')}] `{h.get('path')}`")
+        lines.append(
+            f"- {e.get('action')} {e.get('kind')}: `{str(e.get('value'))[:80]}` "
+            f"src={str(e.get('source'))[:60]}"
+        )
     lines += ["", "## Relations", ""]
     for r in doc["relations"]:
-        lines.append(f"- {r.get('type')} ? `{r.get('to_id')}`")
+        lines.append(f"- {r.get('type')} → `{r.get('to_id')}`")
     print("\n".join(lines))
     return 0
 
