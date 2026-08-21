@@ -137,6 +137,8 @@ compression:
   target_ratio: 0.2
   protect_last_n: 8
   hygiene_hard_message_limit: 240
+  hygiene_timeout_seconds: 90
+  hygiene_total_ceiling_seconds: 600
   protect_first_n: 3
   abort_on_summary_failure: true
   codex_gpt55_autoraise: true
@@ -770,7 +772,7 @@ discord:
     - Checking on that now.
     - Give me a sec.
     - On it.
-  factual_gate_channels: 1513273692778528990,1534692043404607558,1523156115808845926,1519144636541571133
+  factual_gate_channels: 1513273692778528990,1534692043404607558,1523156115808845926,1519144636541571133,1528335166462759102,1522325123817013269
   ignored_channels: 1523364535459774700
   home_voice:
     enabled: true
@@ -1000,10 +1002,11 @@ discord:
       system_prompt: 'FACTUAL MODE (not roleplay). Talk first. No sandbox voice /
         invented narratives. Web before live facts. Voice HARD: I/me partner to Jeff
         as you. Short beats.'
-      note: '2026-08-08 thrift note: factual terminal+file only.'
+      note: '2026-08-21: factual needs web for live facts; terminal+file remain.'
       enabled_toolsets:
       - terminal
       - file
+      - web
       context_length: 131072
     '1519144636541571133':
       model: phronesis-sovereign-auto
@@ -1151,7 +1154,7 @@ discord:
       note: '2026-08-11 Kindroid AI API child: terminal+file+skills; bridge SSOT under
         Roleplay-Sandbox/scripts (send_to_sister/kindroid_bridge). skill_view kindroid-bridge.
         Image inject on intent. sticky /reset if Message-ID poison returns.'
-      max_tokens: 512
+      max_tokens: 1024
       system_prompt: 'KINDROID TWIN ERP (1523604530338730004). Alice I/me.
 
         Every Jeff nudge = ONE bash terminal: cd "D:/PhronesisVault/Roleplay-Sandbox"
