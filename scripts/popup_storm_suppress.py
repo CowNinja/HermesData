@@ -112,19 +112,44 @@ def run(cmd: list[str], timeout: int = 20) -> subprocess.CompletedProcess:
     )
 
 
-def end_tasks() -> list[str]:
-    """END only tasks that can leave long-running focus stealers (CUA/GPU/logon).
+# ITaskService: 0 unknown, 1 disabled, 2 queued, 3 ready, 4 running
+TASK_STATE_RUNNING = 4
 
-    Do NOT End Guardian/Bridge/Loop/Image-Rider when lockdown is on ? those
-    trampolines now exit 0 immediately. Force-End was producing Last Result
-    267014 (TERMINATED), which Task Scheduler UI surfaces as an *error* popup.
+
+def task_state(name: str) -> int:
+    """Silent Task Scheduler state. No schtasks.exe (that flashes a console)."""
+    tn = str(name or "").strip().lstrip("\\")
+    if not tn:
+        return 0
+    try:
+        import pythoncom  # type: ignore
+        import win32com.client  # type: ignore
+
+        pythoncom.CoInitialize()
+        svc = win32com.client.Dispatch("Schedule.Service")
+        svc.Connect()
+        folder = svc.GetFolder("\\")
+        task = folder.GetTask(tn)
+        return int(task.State)
+    except Exception:
+        return 0
+
+
+def task_is_running(name: str) -> bool:
+    return task_state(name) == TASK_STATE_RUNNING
+
+
+def end_tasks() -> list[str]:
+    """END only *running* elevators. Skip Disabled/Ready.
+
+    2026-08-21: heavy tick /End on Disabled Phronesis-Start-At-Logon every 10 min
+    wrote Last Result 267014. Task Scheduler surfaces that as an error popup,
+    which steals focus, kills STT, and resets the screensaver idle timer.
     """
     lockdown = (STATE / "popup_lockdown.ON").is_file() or (
         STATE / "popup_emergency.STOP"
     ).is_file() or (STATE / "focus_mode.STOP").is_file()
-    # Always end these ? they start real daemons/overlays
     always = ["cua-driver-serve", "GPU Tweak III", "Phronesis-Start-At-Logon"]
-    # Only end flashy PS trampolines if NOT under lockdown (they self-exit 0)
     trampolines = [
         "Phronesis-Guardian",
         "Phronesis-Grok-Direct-Bridge",
@@ -134,9 +159,10 @@ def end_tasks() -> list[str]:
     names = list(always)
     if not lockdown:
         names.extend(trampolines)
-    # Under lockdown trampolines exit 0 themselves ? do not End them (avoids 267014 "error").
     ended = []
     for n in names:
+        if not task_is_running(n):
+            continue
         try:
             r = run(["schtasks", "/End", "/TN", n], timeout=10)
             blob = (r.stdout or "") + (r.stderr or "")
