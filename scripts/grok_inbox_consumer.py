@@ -18,6 +18,7 @@ INBOX_FILE = ROOT / "state" / "grok-inbox.json"
 CONFIG_FILE = ROOT / "state" / "grok-direct-discord.json"
 STATE_FILE = ROOT / "state" / "grok-inbox-consumer.json"
 DRAIN_LOCK = ROOT / "state" / "grok-inbox-drain.lock"
+PARK = ROOT / "state" / "grok_inbox.PARKED"
 VENV = ROOT / "hermes-agent" / "venv" / "Scripts" / "python.exe"
 AGENT_LOG = ROOT / "logs" / "agent.log"
 PROXY_RESTART = ROOT / "scripts" / "Start-Sovereign-Proxy-8091.ps1"
@@ -415,12 +416,29 @@ def drain_all(*, max_items: int = MAX_DRAIN, dry_run: bool = False) -> list[dict
     return results
 
 
+def _parked() -> bool:
+    return PARK.is_file()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Grok inbox consumer")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--drain-all", action="store_true", help="Process up to 5 pending items")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+
+    if _parked():
+        print(
+            json.dumps(
+                {
+                    "action": "parked",
+                    "ok": True,
+                    "park": str(PARK),
+                    "law": "planner_inbox LATEST.md is the only tape; grok-inbox.json is archive",
+                }
+            )
+        )
+        return 0
 
     if args.drain_all:
         results = drain_all(dry_run=args.dry_run)

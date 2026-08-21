@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(r"D:\HermesData")
 INBOX_FILE = ROOT / "state" / "grok-inbox.json"
+PARK = ROOT / "state" / "grok_inbox.PARKED"
 VENV_PY = ROOT / "hermes-agent" / "venv" / "Scripts" / "python.exe"
 PWSH = Path(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
 
@@ -127,6 +128,8 @@ def inbox_status_text() -> str:
         counts[st] = counts.get(st, 0) + 1
     pending = counts.get("pending", 0)
     parts = [f"pending={pending}"]
+    if PARK.is_file():
+        parts.append("parked=true")
     for key in ("running", "done", "failed", "cancelled"):
         if counts.get(key):
             parts.append(f"{key}={counts[key]}")
@@ -154,6 +157,12 @@ def _run_powershell(script: Path, args: list[str], timeout: int) -> tuple[int, s
 
 
 def run_op(name: str) -> dict:
+    if name in ("drain_inbox", "drain_all") and PARK.is_file():
+        return {
+            "op": name,
+            "ok": True,
+            "output": "parked: planner_inbox LATEST.md is the only tape; grok-inbox.json is archive",
+        }
     spec = OPS.get(name)
     if not spec:
         return {"op": name, "ok": False, "error": "unknown_op"}

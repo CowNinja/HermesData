@@ -43,8 +43,8 @@ Bridge daemon on Jeff's PC runs LOCAL OPS immediately (no Hermes needed for fixe
 Jeff can type those phrases; bridge executes BEFORE your reply and posts ? results.
 You may also emit BRIDGE_OPS: heal,health or BRIDGE_OPS: drain_inbox in replies for extra ops.
 
-Hermes queue (vault/file work): "Queued for Hermes:" + bullets when Jeff says tell Hermes / go ahead.
-Bridge auto-drains inbox immediately. Hermes results post as ?/? inbox lines.
+Hermes grok-inbox consumer is PARKED. Do not queue vault work to grok-inbox.json.
+Tape is D:\\HermesData\\state\\planner_inbox\\LATEST.md (FirstMate reads that one file).
 
 Division: YOU command + local ops + queue. Hermes does vault edits. Cursor Grok = desk IDE.
 Bus: D:\\PhronesisVault\\docs\\agent-coordination\\GROK-HERMES-MASTER-PLAN.md
@@ -291,6 +291,8 @@ def is_mode_activation(user_text: str) -> bool:
 
 
 def should_queue(user_text: str, grok_reply: str, history: list[dict[str, str]]) -> bool:
+    if _inbox_parked():
+        return False
     if is_mode_activation(user_text):
         return False
     if any(p.search(user_text) for p in QUEUE_PATTERNS):
@@ -390,7 +392,13 @@ def _acquire_inbox_drain_lock() -> bool:
         return False
 
 
+def _inbox_parked() -> bool:
+    return (ROOT / "state" / "grok_inbox.PARKED").is_file()
+
+
 def trigger_inbox_drain_async() -> None:
+    if _inbox_parked():
+        return
     consumer = ROOT / "scripts" / "grok_inbox_consumer.py"
     if not consumer.is_file():
         return
