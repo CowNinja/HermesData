@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-Discord ? Phronesis roleplay routing connector.
+Session-id roleplay routing scan (Discord snowflakes are one mouth's IDs).
+
+Not a Discord SDK/HTTP client. Gateway adapters (Discord today; others later)
+stamp chat_id/thread_id/parent_channel_id into the OpenAI body. This module
+maps those IDs + slash/colon markers onto local_roleplay.
 
 Rewrites slash triggers that Hermes gateway would swallow as unknown commands,
-detects alice-roleplay channels, and logs ingest traces for E2E debugging.
+detects alice-roleplay thread IDs, and logs ingest traces for E2E debugging.
+New mouths: do not import discord.py here; pass IDs from the adapter.
 """
 from __future__ import annotations
 

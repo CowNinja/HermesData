@@ -393,6 +393,24 @@ def main() -> int:
     try:
         while True:
             try:
+                quiet = False
+                try:
+                    scripts = ROOT / "scripts"
+                    if str(scripts) not in sys.path:
+                        sys.path.insert(0, str(scripts))
+                    import kitchen_quiet as kq
+
+                    quiet = bool(kq.is_quiet())
+                except Exception:
+                    quiet = any(
+                        (STATE / n).is_file()
+                        for n in ("hermes_update.IN_PROGRESS", "hermes_ops_quiet.ON")
+                    )
+                if quiet:
+                    log("quiet: skip gateway spawn (Safe-Update park)")
+                    heartbeat("quiet")
+                    time.sleep(15)
+                    continue
                 code = run_gateway_once()
                 heartbeat("restarting", last_exit=code)
                 # Discord IDENTIFY budget: backoff after crashes

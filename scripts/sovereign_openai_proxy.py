@@ -178,9 +178,20 @@ def _model_catalog_entry(spec: Dict[str, Any]) -> Dict[str, Any]:
 
 REGISTERED_MODELS = [_model_catalog_entry(spec) for spec in MODEL_SPECS]
 
-SYSTEM_BUDGET_RATIO = 0.15
-STUB_MAX_CHARS = 6000
-MESSAGE_PREVIEW_CHARS = 180
+from proxy_trim import (  # noqa: E402
+    extract_message_content as _extract_content,
+    estimate_tokens,
+    message_tokens as _message_tokens,
+    estimate_tools_tokens as _estimate_tools_tokens,
+    truncate_text as _truncate_text,
+    truncate_message as _truncate_message,
+    truncate_messages as _truncate_messages,
+    compress_history_stub as _compress_history_stub,
+    trim_messages_tier_aware,
+    messages_to_prompt,
+    fifo_pressure_reserve_tokens as _fifo_pressure_reserve_tokens,
+    estimate_context_tokens,
+)
 
 
 def _utc_now() -> str:
@@ -580,49 +591,6 @@ def _touch_last_dispatch(
         pass
 
 
-def _extract_content(content: Any) -> str:
-    if content is None:
-        return ""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for block in content:
-            if isinstance(block, dict):
-                if block.get("type") == "text":
-                    parts.append(str(block.get("text", "")))
-                elif "text" in block:
-                    parts.append(str(block["text"]))
-            elif isinstance(block, str):
-                parts.append(block)
-        return "\n".join(parts)
-    return str(content)
-
-
-def estimate_tokens(text: str) -> int:
-    return max(1, len(text or "") // 3)
-
-
-def _message_tokens(msg: Dict[str, Any]) -> int:
-    tokens = estimate_tokens(_extract_content(msg.get("content")))
-    tool_calls = msg.get("tool_calls")
-    if tool_calls:
-        try:
-            tokens += estimate_tokens(json.dumps(tool_calls))
-        except Exception:
-            tokens += 256
-    return max(1, tokens)
-
-
-def _estimate_tools_tokens(tools: Any) -> int:
-    if not tools:
-        return 0
-    try:
-        return estimate_tokens(json.dumps(tools))
-    except Exception:
-        return 4096
-
-
 def _assistant_visible_content(message: Dict[str, Any], *, allow_reasoning_fallback: bool = True) -> str:
     """Extract user-visible text; thinking models may leave content empty."""
     content = str(message.get("content") or "").strip()
@@ -635,15 +603,6 @@ def _assistant_visible_content(message: Dict[str, Any], *, allow_reasoning_fallb
         if alt:
             return _strip_think_blocks(alt)
     return ""
-
-
-def _truncate_text(text: str, max_tokens: int) -> str:
-    if max_tokens <= 0:
-        return ""
-    max_chars = max(1, max_tokens * 3)
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars] + f"\n...[truncated {len(text) - max_chars} chars for tier budget]"
 
 
 def _flatten_tool_history_for_llama(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -689,52 +648,6 @@ def _flatten_tool_history_for_llama(messages: List[Dict[str, Any]]) -> List[Dict
                 clean["name"] = msg["name"]
             out.append(clean)
     return out if out else list(messages or [])
-
-
-def _truncate_message(msg: Dict[str, Any], max_tokens: int) -> Dict[str, Any]:
-    content = _extract_content(msg.get("content"))
-    return {**msg, "content": _truncate_text(content, max_tokens)}
-
-
-def _truncate_messages(messages: List[Dict[str, Any]], max_tokens: int) -> List[Dict[str, Any]]:
-    remaining = max_tokens
-    out: List[Dict[str, Any]] = []
-    for msg in messages:
-        need = _message_tokens(msg)
-        if need <= remaining:
-            out.append(msg)
-            remaining -= need
-            continue
-        if remaining > 64:
-            out.append(_truncate_message(msg, remaining))
-        break
-    return out
-
-
-def _compress_history_stub(dropped: List[Dict[str, Any]]) -> str:
-    lines: List[str] = []
-    for msg in dropped[-24:]:
-        role = str(msg.get("role", "user"))
-        content = _extract_content(msg.get("content")).replace("\n", " ").strip()
-        if not content:
-            continue
-        preview = content[:MESSAGE_PREVIEW_CHARS]
-        suffix = "..." if len(content) > MESSAGE_PREVIEW_CHARS else ""
-        lines.append(f"- {role}: {preview}{suffix}")
-    body = "\n".join(lines) if lines else "(no recoverable text in dropped turns)"
-    stub = (
-        f"[TIER-AWARE CONTEXT TRIM - {len(dropped)} earlier turns compressed "
-        f"to protect local MoE hardware]\n{body}"
-    )
-    try:
-        from headroom_backends import compress_via_backend
-
-        stub = compress_via_backend(stub, role="summary", mode="local")
-    except Exception:
-        pass
-    if len(stub) > STUB_MAX_CHARS:
-        stub = stub[:STUB_MAX_CHARS] + f"...[stub capped at {STUB_MAX_CHARS} chars]"
-    return stub
 
 
 def resolve_task_type(model: str) -> Optional[str]:
@@ -821,204 +734,6 @@ def _roleplay_route_requested(model: str, messages: List[Dict[str, Any]], body: 
         return False
 
 
-def trim_messages_tier_aware(
-    messages: List[Dict[str, Any]],
-    model: str,
-    extra_reserve_tokens: int = 0,
-) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """
-    Trim chat history to the safe input budget for the resolved MoE tier.
-    Preserves system prompts + recent turns; middle history becomes a stub.
-    Roleplay tier bypasses trim -- full unfiltered working memory preserved.
-    """
-    from model_resource_manager import context_budget_for_tier, input_budget_for_tier
-
-    # Flatten Grok/OpenAI tool-call history before budgeting ? primary fix path for
-    # llama-server template 400s (CallExpression). Logged so soak/watchdog can see it.
-    pre_flat = messages or []
-    had_tool_shape = any(
-        isinstance(m, dict)
-        and (m.get("role") == "tool" or (m.get("role") == "assistant" and m.get("tool_calls")))
-        for m in pre_flat
-    )
-    messages = _flatten_tool_history_for_llama(messages)
-    if had_tool_shape:
-        _log_event({
-            "event": "proactive_tool_history_flatten",
-            "phase": "trim_messages_tier_aware",
-            "model": model,
-            "orig_turns": len(pre_flat),
-            "flat_turns": len(messages or []),
-        })
-
-    if _roleplay_route_requested(model, messages):
-        original_tokens = sum(_message_tokens(m) for m in messages)
-        route = preview_route_for_request(model, messages)
-        input_cap = input_budget_for_tier("local_roleplay")
-        if original_tokens <= input_cap:
-            return list(messages), {
-                "tier": "local_roleplay",
-                "tier_budget_tokens": context_budget_for_tier("local_roleplay"),
-                "input_cap_tokens": input_cap,
-                "original_tokens_estimate": original_tokens,
-                "original_message_count": len(messages),
-                "trimmed": False,
-                "roleplay_bounded": False,
-                "route_preview": route,
-                "final_tokens_estimate": original_tokens,
-                "final_message_count": len(messages),
-            }
-        # Bounded roleplay trim: keep system + recent turns; never ship 20k+ tokens to 8090.
-        system_msgs = [m for m in messages if str(m.get("role")) == "system"]
-        non_system = [m for m in messages if str(m.get("role")) != "system"]
-        system_cap = max(1024, int(input_cap * 0.2))
-        trimmed_system = _truncate_messages(system_msgs, system_cap)
-        system_used = sum(_message_tokens(m) for m in trimmed_system)
-        remaining = max(0, input_cap - system_used)
-        kept_tail: List[Dict[str, Any]] = []
-        first_kept_idx: Optional[int] = None
-        for rev_i, msg in enumerate(reversed(non_system)):
-            orig_idx = len(non_system) - 1 - rev_i
-            need = _message_tokens(msg)
-            if need <= remaining:
-                if first_kept_idx is None:
-                    first_kept_idx = orig_idx
-                kept_tail.insert(0, msg)
-                remaining -= need
-                continue
-            if not kept_tail and remaining > 64:
-                first_kept_idx = orig_idx
-                kept_tail.insert(0, _truncate_message(msg, remaining))
-                remaining = 0
-            break
-        dropped_middle = non_system[:first_kept_idx] if first_kept_idx is not None else list(non_system)
-        result = list(trimmed_system)
-        if dropped_middle:
-            result.append({"role": "user", "content": _compress_history_stub(dropped_middle)})
-        result.extend(kept_tail)
-        final_tokens = sum(_message_tokens(m) for m in result)
-        return result, {
-            "tier": "local_roleplay",
-            "tier_budget_tokens": context_budget_for_tier("local_roleplay"),
-            "input_cap_tokens": input_cap,
-            "original_tokens_estimate": original_tokens,
-            "original_message_count": len(messages),
-            "trimmed": True,
-            "roleplay_bounded": True,
-            "dropped_turns": len(dropped_middle),
-            "kept_tail_turns": len(kept_tail),
-            "route_preview": route,
-            "final_tokens_estimate": final_tokens,
-            "final_message_count": len(result),
-            "compression": "roleplay_tail_preserve",
-        }
-
-    route = preview_route_for_request(model, messages)
-    tier = str(route.get("tier") or "local_hot")
-    tier_budget = context_budget_for_tier(tier)
-    input_cap = input_budget_for_tier(tier, extra_reserve_tokens=extra_reserve_tokens)
-
-    original_tokens = sum(_message_tokens(m) for m in messages)
-    meta: Dict[str, Any] = {
-        "tier": tier,
-        "tier_budget_tokens": tier_budget,
-        "input_cap_tokens": input_cap,
-        "original_tokens_estimate": original_tokens,
-        "original_message_count": len(messages),
-        "trimmed": False,
-        "route_preview": route,
-    }
-
-    if original_tokens <= input_cap:
-        meta["final_tokens_estimate"] = original_tokens
-        meta["final_message_count"] = len(messages)
-        return list(messages), meta
-
-    system_msgs = [m for m in messages if str(m.get("role")) == "system"]
-    non_system = [m for m in messages if str(m.get("role")) != "system"]
-
-    system_cap = max(512, int(input_cap * SYSTEM_BUDGET_RATIO))
-    trimmed_system = _truncate_messages(system_msgs, system_cap)
-    system_used = sum(_message_tokens(m) for m in trimmed_system)
-    remaining = max(0, input_cap - system_used)
-
-    kept_tail: List[Dict[str, Any]] = []
-    first_kept_idx: Optional[int] = None
-    for rev_i, msg in enumerate(reversed(non_system)):
-        orig_idx = len(non_system) - 1 - rev_i
-        need = _message_tokens(msg)
-        if need <= remaining:
-            if first_kept_idx is None:
-                first_kept_idx = orig_idx
-            kept_tail.insert(0, msg)
-            remaining -= need
-            continue
-        if not kept_tail and remaining > 64:
-            first_kept_idx = orig_idx
-            kept_tail.insert(0, _truncate_message(msg, remaining))
-            remaining = 0
-        break
-
-    if first_kept_idx is not None:
-        dropped_middle = non_system[:first_kept_idx]
-    else:
-        dropped_middle = list(non_system)
-
-    result: List[Dict[str, Any]] = list(trimmed_system)
-    if dropped_middle:
-        result.append({"role": "user", "content": _compress_history_stub(dropped_middle)})
-    result.extend(kept_tail)
-
-    final_tokens = sum(_message_tokens(m) for m in result)
-    if final_tokens > input_cap:
-        prompt_text = messages_to_prompt(result, max_chars=input_cap * 3)
-        result = [{"role": "user", "content": prompt_text}]
-        final_tokens = estimate_tokens(prompt_text)
-        meta["hard_cap_applied"] = True
-
-    meta.update(
-        {
-            "trimmed": True,
-            "dropped_turns": len(dropped_middle),
-            "kept_tail_turns": len(kept_tail),
-            "final_tokens_estimate": final_tokens,
-            "final_message_count": len(result),
-            "compression": "middle_history_stub",
-        }
-    )
-    return result, meta
-
-
-def messages_to_prompt(messages: List[Dict[str, Any]], max_chars: Optional[int] = None) -> str:
-    """Flatten chat messages into a single prompt for bridge_dispatch."""
-    parts: List[str] = []
-    for msg in messages or []:
-        role = str(msg.get("role", "user")).upper()
-        content = _extract_content(msg.get("content"))
-        if not content.strip():
-            continue
-        parts.append(f"{role}:\n{content}")
-    text = "\n\n".join(parts)
-    if max_chars is not None and len(text) > max_chars:
-        text = text[-max_chars:]
-    return text
-
-
-def _fifo_pressure_reserve_tokens() -> int:
-    """Tighten non-RP trim when FIFO depth is high (less prefill work per job)."""
-    try:
-        from inference_queue import get_inference_queue
-
-        waiting = int(get_inference_queue().snapshot().get("waiting_count") or 0)
-        if waiting >= 6:
-            return 4096
-        if waiting >= 3:
-            return 2048
-    except Exception:
-        pass
-    return 0
-
-
 def prepare_prompt_for_dispatch(
     messages: List[Dict[str, Any]],
     model: str,
@@ -1026,10 +741,6 @@ def prepare_prompt_for_dispatch(
     trimmed_messages, trim_meta = trim_messages_tier_aware(messages, model)
     prompt = messages_to_prompt(trimmed_messages)
     return prompt, trim_meta
-
-
-def estimate_context_tokens(messages: List[Dict[str, Any]]) -> int:
-    return sum(_message_tokens(m) for m in messages)
 
 
 def _unified_router_up() -> bool:
@@ -1941,7 +1652,13 @@ def resolve_roleplay_routing(
     model: str,
     body: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Discord/Hermes ingest: detect roleplay and override model + platform."""
+    """Session-id roleplay scan (not a Discord SDK call).
+
+    Mouth adapters (Discord/WA/voice) already flattened the turn into OpenAI
+    messages + optional phronesis body (chat_id/thread_id). This function only
+    maps those IDs + prompt markers onto local_roleplay. New mouths must not
+    add platform APIs here — stamp IDs in the body at the adapter.
+    """
     body = body or {}
     try:
         from roleplay_route_guard import extract_phronesis_body
@@ -1965,7 +1682,7 @@ def resolve_roleplay_routing(
 
     scan: Dict[str, Any] = {}
     try:
-        from discord_roleplay_connector import scan_messages_for_roleplay
+        from discord_roleplay_connector import scan_messages_for_roleplay  # session IDs, not Discord SDK
 
         scan = scan_messages_for_roleplay(
             messages,
@@ -3442,7 +3159,9 @@ def _self_test_trim() -> Dict[str, Any]:
     prompt = messages_to_prompt(trimmed)
 
     # Regression: oversized single user turn must not crash on non_system.index()
-    skill_blob = "y" * 50_000
+    # Must exceed local_hot input cap (~24k tok ~ 72k chars at len//3).
+    # 50k chars was 16k tok and never trimmed — test bug, not a trim crash.
+    skill_blob = "y" * 120_000
     single_turn = [{"role": "user", "content": skill_blob}]
     single_trimmed, single_meta = trim_messages_tier_aware(
         single_turn,
@@ -3456,6 +3175,8 @@ def _self_test_trim() -> Dict[str, Any]:
         "prompt_tokens_estimate": estimate_tokens(prompt),
         "under_cap": meta.get("final_tokens_estimate", 0) <= meta.get("input_cap_tokens", 0),
         "single_turn_ok": len(single_trimmed) > 0 and single_meta.get("trimmed") is True,
+        "single_turn_orig_tokens": single_meta.get("original_tokens_estimate"),
+        "single_turn_cap": single_meta.get("input_cap_tokens"),
     }
 
 

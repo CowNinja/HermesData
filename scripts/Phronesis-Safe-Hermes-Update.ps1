@@ -144,25 +144,40 @@ Write-Safe "quiet kitchen"
 & powershell -NoProfile -ExecutionPolicy Bypass -File $Quiet
 Start-Sleep -Seconds 3
 
-function Get-VenvHolderCount {
-    $rows = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-        $_.CommandLine -and ($_.CommandLine -like "*hermes-agent\venv*")
-    })
-    return $rows.Count
+$KitchenQuiet = Join-Path $HermesRoot "scripts\kitchen_quiet.py"
+function Get-KitchenHolderCount {
+    if (-not (Test-Path $Py) -or -not (Test-Path $KitchenQuiet)) {
+        $rows = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.CommandLine -and (
+                $_.CommandLine -like "*hermes-agent\venv*" -or
+                $_.CommandLine -like "*hermes-agent\.hermes-runtime*" -or
+                $_.CommandLine -like "*proxy_8091_supervisor*"
+            )
+        })
+        return $rows.Count
+    }
+    $n = & $Py $KitchenQuiet count 2>$null
+    try { return [int]("$n".Trim()) } catch { return 1 }
 }
 
-$holders = Get-VenvHolderCount
+$holders = Get-KitchenHolderCount
 if ($holders -gt 0) {
-    Write-Safe "venv holders remaining=$holders - extra StopAll sweep"
+    Write-Safe "kitchen holders remaining=$holders - kitchen_quiet wait"
+    & $Py $KitchenQuiet wait --timeout 40
+    $holders = Get-KitchenHolderCount
+}
+if ($holders -gt 0) {
+    Write-Safe "holders still=$holders - extra StopAll sweep"
     $stopAll = Join-Path $HermesRoot "scripts\Phronesis-Hermes-StopAll.ps1"
     if (Test-Path $stopAll) {
         & powershell -NoProfile -ExecutionPolicy Bypass -File $stopAll -Quiet
         Start-Sleep -Seconds 3
     }
-    $holders = Get-VenvHolderCount
+    & $Py $KitchenQuiet wait --timeout 20
+    $holders = Get-KitchenHolderCount
 }
 if ($holders -gt 0) {
-    Write-Host "Cannot update: $holders venv process(es) still running. Close Hermes Desktop and retry." -ForegroundColor Red
+    Write-Host "Cannot update: $holders kitchen holder(s) still running (gateway/meta/proxy/cli dashboard :9119). Not the Windows Desktop app unless Hermes.exe is open." -ForegroundColor Red
     if (-not $preexist["hermes_update.IN_PROGRESS"]) {
         Remove-Item (Join-Path $State "hermes_update.IN_PROGRESS") -Force -ErrorAction SilentlyContinue
     }

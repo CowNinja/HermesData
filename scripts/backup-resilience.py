@@ -594,7 +594,8 @@ def main() -> int:
         else:
             log("All phases completed without errors")
             print("\n[OK]")
-        return 0
+        # Cron last_status must match receipt. Silent OK-while-red hid missing helpers.
+        return 0 if ok else 1
     finally:
         _release_resilience_lock()
 

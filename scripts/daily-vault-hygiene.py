@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Daily vault hygiene MEASURE-only cron wrapper (06:00).
+"""Daily vault hygiene cron wrapper (06:00).
 
-ACT moves live in vault_gardener_tick.py (05:15). This job never mutates notes.
+ACT note-moves live in vault_gardener_tick.py (05:15). This job never moves notes.
+Stale idea_retention sqlite catch-up is allowed (cache, not note rewrite).
 
 2026-07-18 residual seal:
 - Child measure failures ? warn + receipt + exit 0 (advisory).
@@ -163,6 +164,18 @@ def main() -> int:
     else:
         print("living_unresolved_scan=skip (script missing)")
 
+    # 3c) Stale second-brain sqlite catch-up (not a new cron; not VaultWalker LIVE)
+    aut = Path(r"D:\HermesData\scripts\ops\vault_autonomy_once.py")
+    if aut.is_file():
+        ar = _run("vault_autonomy_stale_index", [py, str(aut), "run"], timeout=900)
+        steps.append(ar)
+        print(
+            f"vault_autonomy_run: code={ar.get('code')} ok={ar.get('ok')} "
+            f"(reindex only if idea_retention >48h; never LIVE relocate)"
+        )
+    else:
+        print("vault_autonomy_run=skip (script missing)")
+
     # 4) Optional deeper link audit if present ? advisory
     deep = VAULT / "scripts" / "vault_link_audit.py"
     if deep.is_file():
@@ -174,7 +187,7 @@ def main() -> int:
     payload = {
         "at": datetime.now(timezone.utc).isoformat(),
         "vault": str(VAULT),
-        "mode": "measure_only",
+        "mode": "measure_plus_stale_index",
         "measure_ok": measure_ok,
         "living_orphan_count": living_orphan_count,
         "living_unresolved_count": living_unresolved,
@@ -189,7 +202,7 @@ def main() -> int:
         ],
         "soft_fail": True,
         "seal": "2026-07-19-hygiene-living-unresolved",
-        "note": "ACT path is vault_gardener_tick @05:15 ? this job never moves notes. Living unresolved = CNS hygiene truth surface.",
+        "note": "Gardener owns note ACT @05:15. This job never moves notes. Stale idea_retention sqlite is caught up via vault_autonomy_once run.",
     }
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     _write_receipt(payload)

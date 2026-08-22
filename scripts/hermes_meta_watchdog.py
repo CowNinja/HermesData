@@ -211,6 +211,20 @@ def acquire() -> bool:
     return True
 
 
+def _kitchen_quiet() -> bool:
+    try:
+        if str(SCRIPTS) not in sys.path:
+            sys.path.insert(0, str(SCRIPTS))
+        import kitchen_quiet as kq
+
+        return bool(kq.is_quiet())
+    except Exception:
+        return any(
+            (STATE / n).is_file()
+            for n in ("hermes_update.IN_PROGRESS", "hermes_ops_quiet.ON")
+        )
+
+
 def main() -> int:
     if not acquire():
         return 0
@@ -221,6 +235,10 @@ def main() -> int:
     try:
         while True:
             try:
+                if _kitchen_quiet():
+                    log("quiet: skip restart (Safe-Update park)")
+                    time.sleep(INTERVAL)
+                    continue
                 if not service_alive():
                     log("gateway-service DEAD -> restart")
                     start_service()

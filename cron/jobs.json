@@ -502,15 +502,15 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 315
+        "completed": 316
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-08-22T19:15:10.052673-04:00",
-      "last_run_at": "2026-08-22T11:14:28.923032-04:00",
+      "next_run_at": "2026-08-22T19:15:25.217963-04:00",
+      "last_run_at": "2026-08-22T15:15:25.217963-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -526,10 +526,7 @@
         "terminal"
       ],
       "workdir": "D:\\HermesData",
-      "fire_claim": {
-        "at": "2026-08-22T15:15:10.084824-04:00",
-        "by": "DELLWinn11:7956:451500f241e84a1e9424844c78e7d114"
-      },
+      "fire_claim": null,
       "pinned": true,
       "failure_streak": 0
     },
@@ -1753,15 +1750,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 1838
+        "completed": 1844
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T18:14:58.028551-04:00",
-      "next_run_at": "2026-08-22T15:17:09.657200-04:00",
-      "last_run_at": "2026-08-22T14:47:09.657200-04:00",
+      "next_run_at": "2026-08-22T18:17:18.392605-04:00",
+      "last_run_at": "2026-08-22T17:47:18.392605-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1989,15 +1986,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 361
+        "completed": 363
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-20T17:16:35.981589-04:00",
-      "next_run_at": "2026-08-22T15:33:40.657011-04:00",
-      "last_run_at": "2026-08-22T13:33:40.657011-04:00",
+      "next_run_at": "2026-08-22T19:35:24.244573-04:00",
+      "last_run_at": "2026-08-22T17:35:24.244573-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2274,15 +2271,15 @@
       "schedule_display": "0 */4 * * *",
       "repeat": {
         "times": null,
-        "completed": 687
+        "completed": 688
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-21T22:40:15.971276+00:00",
-      "next_run_at": "2026-08-22T16:00:00-04:00",
-      "last_run_at": "2026-08-22T12:00:56.299038-04:00",
+      "next_run_at": "2026-08-22T20:00:00-04:00",
+      "last_run_at": "2026-08-22T16:00:19.882234-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2464,12 +2461,12 @@
         "times": null,
         "completed": 7
       },
-      "enabled": false,
-      "state": "paused",
-      "paused_at": "2026-08-05T14:40:50.719091+00:00",
-      "paused_reason": "housekeeping-20260805T144050Z: aggressive prune to minimal durable set (12 keep)",
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
       "created_at": "2026-07-27T08:25:12.214080-04:00",
-      "next_run_at": "2026-08-06T07:15:00-04:00",
+      "next_run_at": "2026-08-23T07:15:00-04:00",
       "last_run_at": "2026-08-05T07:19:26.685880-04:00",
       "last_status": "ok",
       "last_error": null,
@@ -3078,5 +3075,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-08-22T15:15:10.086335-04:00"
+  "updated_at": "2026-08-22T17:47:18.394723-04:00"
 }

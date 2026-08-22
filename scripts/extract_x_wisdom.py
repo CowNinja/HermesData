@@ -332,9 +332,16 @@ def main() -> int:
     entries = [e for e in entries if e.get("verified") or e.get("extracted")]
     new_n = save_wisdom(entries)
     triage_n = append_triage_pointers(entries) if args.triage else 0
+    ledger_n = 0
+    try:
+        from self_improve_ledger import record_from_x_entries
+
+        ledger_n = record_from_x_entries(entries)
+    except Exception:
+        ledger_n = 0
     print(
         f"InspirationOK list={args.list} candidates={len(entries)} "
-        f"new={new_n} triage={triage_n} file={WISDOM_FILE}"
+        f"new={new_n} triage={triage_n} ledger={ledger_n} file={WISDOM_FILE}"
     )
     if new_n == 0:
         print("[SILENT]")

@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""One-shot stack snapshot for Discord Hermes (cuts tasklist storms).
+"""Discord color/thrift snapshot (solidity_gate / propose_recovery).
+
+Jeff/SAT truth of the stack NOW is NOT this file. Use:
+  python D:/HermesData/scripts/ops/stack_snapshot_once.py
+Print: http://127.0.0.1:3001/architecture-print.html
+Heal:  python D:/HermesData/scripts/ops/speak_and_trust_once.py --heal
+
+This file stays for Discord router_color + thrift rollup consumed by
+sovereign_infra_solidity_gate / propose_recovery. Do not treat it as
+the dock/FIFO/print door. Do not dual-start from here.
 
 W3-P1 2026-07-21:
   - router_color = worst(ports, fleet, proxy_circuit) independent of orch
