@@ -101,8 +101,18 @@ def grok_auth_policy(config_path: Optional[Path] = None) -> Dict[str, Any]:
         "rate_limit_retries": int(cfg.get("rate_limit_retries") or 2),
         "rate_limit_max_wait_sec": int(cfg.get("rate_limit_max_wait_sec") or 120),
         "timeout_seconds": int(cfg.get("timeout_seconds") or xs.get("timeout_seconds") or 180),
-        "oauth_model": str(xs.get("oauth_model") or "grok-4.20-0309-reasoning"),
-        "api_model": str(xs.get("model") or "grok-4.20-reasoning"),
+        "oauth_model": str(
+            cfg.get("oauth_model")
+            or xs.get("oauth_model")
+            or ((raw.get("model") or {}).get("default") if isinstance(raw.get("model"), dict) else "")
+            or "grok-4.6"
+        ),
+        "api_model": str(
+            cfg.get("api_model")
+            or xs.get("model")
+            or ((raw.get("model") or {}).get("default") if isinstance(raw.get("model"), dict) else "")
+            or "grok-4.6"
+        ),
     }
     _POLICY_CACHE["cache_key"] = cache_key
     _POLICY_CACHE["loaded_at"] = now
@@ -212,8 +222,8 @@ def resolve_grok_model(
         return override
     pol = grok_auth_policy(config_path)
     if auth_provider == AUTH_OAUTH:
-        return str(pol.get("oauth_model") or "grok-4.20-0309-reasoning")
-    return str(pol.get("api_model") or "grok-4.20-reasoning")
+        return str(pol.get("oauth_model") or "grok-4.6")
+    return str(pol.get("api_model") or "grok-4.6")
 
 
 def _should_fallback_from_oauth(http_status: int, policy: Dict[str, Any]) -> bool:
@@ -224,7 +234,7 @@ def grok_chat_completion(
     messages: List[Dict[str, Any]],
     *,
     model: Optional[str] = None,
-    max_tokens: int = 4096,
+    max_tokens: int = 8192,
     temperature: float = 0.3,
     timeout: Optional[int] = None,
     user_agent: str = "PhronesisGrok/1.0",
@@ -426,7 +436,7 @@ def grok_chat_completion_text(
     messages: List[Dict[str, Any]],
     *,
     model: Optional[str] = None,
-    max_tokens: int = 4096,
+    max_tokens: int = 8192,
     temperature: float = 0.3,
     timeout: Optional[int] = None,
     user_agent: str = "PhronesisGrok/1.0",
@@ -451,7 +461,7 @@ def grok_user_prompt_completion(
     prompt: str,
     *,
     model: Optional[str] = None,
-    max_tokens: int = 4096,
+    max_tokens: int = 8192,
     temperature: float = 0.3,
     timeout: Optional[int] = None,
 ) -> Dict[str, Any]:

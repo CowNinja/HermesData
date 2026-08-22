@@ -29,14 +29,12 @@ ROLEPLAY_COLON_PREFIXES = (
 
 ROLEPLAY_MODEL = "phronesis-sovereign-roleplay"
 ALICE_ROLEPLAY_CHANNEL_ID = "1519509288286949466"
-# Belt-and-suspenders child threads (parent id still primary). Active heat +
-# infra children as of 2026-08-04 immersion/firewall cook.
-ALICE_ROLEPLAY_THREAD_IDS = frozenset({
+# IC heat only. T3 Grok and house-facts stay off here.
+ALICE_ROLEPLAY_HEAT_IDS = frozenset({
     "1519512763863666810",
     "1519522216851673190",
     "1519529411056242779",
     "1521146755985576116",
-    "1522330326733422713",
     "1523604530338730004",
     "1524821864956956793",  # Harem Image
     "1525174401740312707",  # New group / story+inline
@@ -44,9 +42,19 @@ ALICE_ROLEPLAY_THREAD_IDS = frozenset({
     "1532906132056838184",  # Millbrook Kingdom
     "1524552417096761384",  # Voyeur training
     "1524594840136843445",  # Character cards
-    "1522325123817013269",  # Sandbox central/infra (parent garden; no IC heat)
-    "1528335166462759102",  # Arch/firewall (ops, no IC)
 })
+# Under the sandbox parent but factual ops. Not IC. T3 may hop.
+ALICE_ROLEPLAY_OPS_IDS = frozenset({
+    "1522325123817013269",  # Sandbox infra
+    "1528335166462759102",  # Arch/firewall
+    "1522330326733422713",  # Interviews + character (grunt)
+})
+# Location wall (heat + ops). Do not use this for T3-block / IC layer.
+ALICE_ROLEPLAY_THREAD_IDS = ALICE_ROLEPLAY_HEAT_IDS | ALICE_ROLEPLAY_OPS_IDS
+
+
+def _id_set(*values: str) -> set[str]:
+    return {str(x).strip() for x in values if str(x).strip()}
 
 
 def is_alice_roleplay_discord_location(
@@ -55,17 +63,30 @@ def is_alice_roleplay_discord_location(
     parent_channel_id: str = "",
     thread_id: str = "",
 ) -> bool:
-    """True only for #alice-roleplay (1519509288286949466) and threads under it.
-
-    Location-bound sandbox ? never true for other Discord channels even if the
-    user pastes ROLEPLAY_MODE: or [platform: alice-roleplay] elsewhere.
-    """
-    ids = {str(x) for x in (chat_id, parent_channel_id, thread_id) if x}
+    """True for #alice-roleplay and every child (heat + ops). Sandbox wall."""
+    ids = _id_set(chat_id, parent_channel_id, thread_id)
     if ALICE_ROLEPLAY_CHANNEL_ID in ids:
         return True
     if parent_channel_id == ALICE_ROLEPLAY_CHANNEL_ID:
         return True
     return bool(ids & ALICE_ROLEPLAY_THREAD_IDS)
+
+
+def is_alice_roleplay_heat(
+    *,
+    chat_id: str = "",
+    parent_channel_id: str = "",
+    thread_id: str = "",
+) -> bool:
+    """IC heat only. Ops children (arch/infra/interviews) are False so T3 can hop."""
+    ids = _id_set(chat_id, thread_id)
+    if ids & ALICE_ROLEPLAY_OPS_IDS:
+        return False
+    if ids & ALICE_ROLEPLAY_HEAT_IDS:
+        return True
+    if ALICE_ROLEPLAY_CHANNEL_ID in ids:
+        return True
+    return False
 
 
 def has_explicit_roleplay_user_trigger(text: str) -> bool:

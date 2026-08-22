@@ -72,10 +72,10 @@ def is_uncensored_roleplay_route(
     try:
         from discord_roleplay_connector import (
             has_explicit_roleplay_user_trigger,
-            is_alice_roleplay_discord_location,
+            is_alice_roleplay_heat,
         )
 
-        in_alice = is_alice_roleplay_discord_location(
+        in_alice = is_alice_roleplay_heat(
             chat_id=str(routing.get("chat_id") or ph.get("chat_id") or ""),
             thread_id=str(routing.get("thread_id") or ph.get("thread_id") or ""),
             parent_channel_id=str(

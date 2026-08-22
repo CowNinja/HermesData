@@ -560,7 +560,7 @@ def _proactive_wants_t3(
             kind = "auto_strong"
     if kind == "explicit":
         return True
-    if kind in {"auto_strong", "auto_modest"} or int(routing.get("tool_fail_count") or 0) > 2:
+    if kind in {"auto_strong", "auto_modest"} or int(routing.get("tool_fail_count") or 0) > 0:
         blocked, reason = _grok_share_blocks_t3()
         if blocked:
             _log({"event": "t3_blocked_share_cap", "reason": reason})

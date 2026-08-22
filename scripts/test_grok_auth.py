@@ -27,11 +27,11 @@ def test_policy_defaults() -> None:
 
 
 def test_resolve_grok_model_oauth() -> None:
-    assert resolve_grok_model(AUTH_OAUTH) == "grok-4.20-0309-reasoning"
+    assert resolve_grok_model(AUTH_OAUTH) == "grok-4.6"
 
 
 def test_resolve_grok_model_api() -> None:
-    assert resolve_grok_model("xai") == "grok-4.20-reasoning"
+    assert resolve_grok_model("xai") == "grok-4.6"
 
 
 def test_oauth_preferred_over_api_key() -> None:
