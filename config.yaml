@@ -880,8 +880,8 @@ discord:
 
         HARD PIPELINE: 1) Gather: web_extract / web_search / read_file as needed.
         2) LAND (mandatory): terminal python D:/HermesData/scripts/ops/learn_land_once.py
-        "<distilled topic>". Bare x.com URL is OK (door fetches). --force CREATE for a
-        new named product/tool. Never image_generate. Never https-x-com-* names.
+        "<distilled topic>". Bare x.com URL is OK (door fetches). --force CREATE for
+        a new named product/tool. Never image_generate. Never https-x-com-* names.
         3) Verify path exists. Reply SHORT LANDING only: id + path + MERGED|CREATED
         + 3 bullets. Never paste full SKILL.md. Never 8k essays.
 

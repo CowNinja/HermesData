@@ -26,7 +26,7 @@ Mouths (Discord / WA / Voice) are **pipes**. New public mouth = gateway plugin a
 | **truth** | `stack_snapshot_once.py` | dock/FIFO/hold/engine/pin/shelf + print HTML + live_owner + **watch** (C: free, VRAM leftover, pin age) |
 | **heal** | `speak_and_trust_once.py` | CORE ports; `--heal` only when 8642/8091 DOWN |
 | kitchen | `../solid_stack_law_once.py` | called by SAT; never freestyle dual-start |
-| leaves | `architecture_live_facts_once.py`, `pin_age_once.py`, `model_shelf_status_once.py`, `mermaid_print_html_once.py`, `hub_panel_cache_clear_once.py`, `image_restore_verify_once.py`, `hardware_inventory_once.py`, `self_improve_status_once.py`, `continuity_status_once.py` | specialists; snapshot already composes facts/pin/shelf/ingest/print. Hardware + continuity are **leaves** (not auto-run from snapshot). |
+| leaves | `architecture_live_facts_once.py`, `pin_age_once.py`, `model_shelf_status_once.py`, `mermaid_print_html_once.py`, `hub_panel_cache_clear_once.py`, `image_restore_verify_once.py`, `hardware_inventory_once.py`, `self_improve_status_once.py`, `continuity_status_once.py`, `module_missions_once.py`, `verify_once.py` | specialists; snapshot already composes facts/pin/shelf/ingest/print. Hardware, continuity, missions, verify-observe are **leaves** (not auto-run from snapshot). |
 | **C: reclaim** | `c_drive_pressure_scout.py` then `c_drive_reclaim_p2a.py` + `c_drive_reclaim_p2b_safe.py` | on-demand when snapshot `C_FREE_LOW`; never a cron |
 | **pin write** | `alice_open_loops.py continuity` | Jeff-gated. Measure: `pin_age_once.py` / snapshot watch. Beat-only: `us-now` |
 | **leave shelf** | `refresh_free_rankings.py` / `capability_rank.py --status` / `model_shelf_status_once.py` | public grunt only; never Garden |
