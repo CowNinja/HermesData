@@ -42,6 +42,11 @@ PRIORITY_ETA_WEIGHT = {
 
 STUCK_WARN_SEC = 900
 STUCK_HEAL_SEC = 1680
+# Voice/ops interactive on the normal lane: fail a hung turn so the next waiter
+# can run. Roleplay lane is the same Qwythos GGUF with long context: 120s is a
+# healthy generation, not a stuck voice turn. Killing it unloads no weights but
+# burns the FIFO (re-queue + 503 Loading model + dual llama recover).
+INTERACTIVE_STUCK_SEC = 120.0
 MAX_QUEUE_WAIT_SEC = 1800
 STATE_PERSIST_INTERVAL_SEC = 5.0
 HEAL_COOLDOWN_SEC = 180
@@ -580,6 +585,29 @@ class InferenceQueue:
         except OSError:
             return False
 
+    def _maybe_reap_image_session(self) -> bool:
+        """End expired or stranded image holds so the dock can return to Qwythos.
+
+        Returns True if session-end/restore was invoked (caller must not also
+        attempt_moe_recovery -- that dual-starts llama-server).
+        """
+        try:
+            import image_session as imgsess  # type: ignore
+
+            expired = imgsess.reap_expired_hold(restore=True)
+            stranded = imgsess.reap_stranded_auto_hold(restore=True)
+            idle = None
+            if expired is None and stranded is None:
+                idle_rep = imgsess.idle_end_if_stranded(min_idle_s=180.0, only_auto=True)
+                if isinstance(idle_rep, dict) and str(idle_rep.get("action") or "") in (
+                    "end",
+                    "ended",
+                ):
+                    idle = idle_rep
+            return expired is not None or stranded is not None or idle is not None
+        except Exception:
+            return False
+
     def _maybe_heal(self, reason: str) -> Dict[str, Any]:
         now = time.time()
         if self._heal_in_progress or (now - self._last_heal_at) < HEAL_COOLDOWN_SEC:
@@ -595,12 +623,22 @@ class InferenceQueue:
             )
 
             if not self._port_up(8090):
-                result["recoveries"].append({"target": "8090", **attempt_moe_recovery()})
+                held, lock_reason = image_gpu_tenant_held()
+                if held:
+                    result["skipped"] = True
+                    result["reason"] = f"image_park:{lock_reason}"
+                    result["recoveries"].append({"target": "8090", "skipped": "restore_owns_image_park"})
+                else:
+                    result["recoveries"].append({"target": "8090", **attempt_moe_recovery()})
             elif not self._port_up(8091):
                 result["recoveries"].append({"target": "8091", **attempt_proxy_recovery()})
             else:
-                result["recoveries"].append({"target": "8090_stuck", **attempt_moe_recovery()})
-            self._stats["total_heals"] += 1
+                # Port is up: do not start a second llama-server (dual ngl=99).
+                result["skipped"] = True
+                result["reason"] = "8090_up_keep_resident"
+                result["recoveries"].append({"target": "8090_stuck", "skipped": "keep_resident_gguf"})
+            if not result.get("skipped"):
+                self._stats["total_heals"] += 1
             self._stats["last_heal_at"] = datetime.now(timezone.utc).isoformat()
             append_watchdog_log({"event": "inference_queue_heal", **result})
         except Exception as exc:
@@ -615,18 +653,30 @@ class InferenceQueue:
             active = self._active
             waiting_count = len(self._lanes[LANE_ROLEPLAY]) + len(self._lanes[LANE_NORMAL])
         if not active or not active.started_at:
-            if waiting_count > 0 and not self._port_up(8090):
-                heal_reason = "8090_down_with_waiters"
+            if not self._port_up(8090):
+                # Expired/stranded image hold owns restore (park-once-gen-many).
+                # Do not dual-start llama while that path is in flight.
+                if self._maybe_reap_image_session():
+                    # Restore is in flight -- do not also attempt_moe_recovery.
+                    self._last_heal_at = time.time()
+                    return
+                if waiting_count > 0:
+                    held, _ = image_gpu_tenant_held()
+                    if not held:
+                        heal_reason = "8090_down_with_waiters"
             if heal_reason:
                 self._maybe_heal(heal_reason)
             return
         run_so_far = time.time() - active.started_at
-        # Interactive voice/discord backlog: fail stuck active sooner so free-fleet
-        # / next job can run (STUCK_HEAL 1680s was far too long for voice).
-        if (
-            waiting_count >= 1
-            and run_so_far >= 120.0
-            and (active.priority_class == PRIORITY_INTERACTIVE or "discord" in (active.caller or "").lower())
+        llama_ready = self._port_up(8090)
+        # Voice/ops hung-turn only. Roleplay lane keeps the resident GGUF.
+        if should_force_fail_interactive(
+            lane=active.lane,
+            priority_class=active.priority_class,
+            caller=active.caller or "",
+            waiting_count=waiting_count,
+            run_so_far=run_so_far,
+            llama_ready=llama_ready,
         ):
             try:
                 failed = self.force_fail_active(
@@ -648,6 +698,14 @@ class InferenceQueue:
                 pass
             return
         if run_so_far >= STUCK_HEAL_SEC:
+            if llama_ready:
+                try:
+                    self.force_fail_active(
+                        f"active_exceeded_{STUCK_HEAL_SEC}s_keep_qwythos"
+                    )
+                except Exception:
+                    pass
+                return
             heal_reason = f"active_exceeded_{STUCK_HEAL_SEC}s"
         elif run_so_far >= STUCK_WARN_SEC:
             with self._lock:
@@ -710,6 +768,32 @@ def resolve_priority_class(caller: str, lane_id: int) -> str:
     if _is_interactive_caller(caller, lane_id):
         return PRIORITY_INTERACTIVE
     return PRIORITY_NORMAL
+
+
+def should_force_fail_interactive(
+    *,
+    lane: int,
+    priority_class: str,
+    caller: str,
+    waiting_count: int,
+    run_so_far: float,
+    llama_ready: bool = True,
+) -> bool:
+    """Voice/ops hung-turn gate. Never 120s-kill the roleplay lane.
+
+    RP jobs routinely exceed 120s on 9B with 20k-40k prompt tokens. Force-fail
+    then requeues them, which looks like a second GGUF swap and wastes the
+    resident Qwythos. Image-park Loading-model is also not a stuck turn.
+    """
+    if waiting_count < 1 or run_so_far < INTERACTIVE_STUCK_SEC:
+        return False
+    if not llama_ready:
+        return False
+    if int(lane) == LANE_ROLEPLAY:
+        return False
+    if priority_class == PRIORITY_INTERACTIVE:
+        return True
+    return "discord" in (caller or "").lower()
 
 
 def _priority_rank(priority_class: str) -> int:
@@ -940,10 +1024,34 @@ def should_defer_background_work() -> tuple[bool, str]:
     return False, "ok"
 
 
+def image_session_blocks_restore() -> tuple[bool, str]:
+    """True while a lawful image_session hold still owns the dock.
+
+    Stale lock PID is not enough to start Qwythos -- park-once-gen-many keeps
+    Forge warm across gens. Stranded auto-hold (Forge dead, lock dead) must
+    not block restore.
+    """
+    try:
+        import image_session as imgsess  # type: ignore
+
+        if imgsess.auto_hold_is_stranded():
+            return False, "stranded_auto_hold"
+        if imgsess.should_skip_restore_spawn():
+            try:
+                rem = int(float(imgsess.remaining_s() or 0))
+            except Exception:
+                rem = 0
+            return True, f"image_session_hold_{rem}s"
+        return False, "no_session_hold"
+    except Exception as exc:
+        return False, f"session_check_error:{type(exc).__name__}"
+
+
 def image_gpu_tenant_held() -> tuple[bool, str]:
     """True when hermes_image single-GPU lock is live (not stale).
 
     SSOT: image_job_lock.status() ? do not reimplement TTL/pid/orphan logic here.
+    Session hold also counts: lock may be stale between gens while Forge owns VRAM.
     Used to prefer fleet offload for non-RP work while Forge owns VRAM.
     Never raises ? proxy hot path must stay resilient.
     """
@@ -969,12 +1077,18 @@ def image_gpu_tenant_held() -> tuple[bool, str]:
             owner = str(meta.get("owner") or "image")
             job = str(meta.get("job") or "")[:48]
             return True, f"image_lock:{owner}" + (f":{job}" if job else "")
+        sess_held, sess_reason = image_session_blocks_restore()
+        if sess_held:
+            return True, sess_reason
         if st.get("stale"):
             return False, "stale_orphan"
         if st.get("released"):
             return False, "released"
         return False, "no_lock"
     except Exception as exc:
+        sess_held, sess_reason = image_session_blocks_restore()
+        if sess_held:
+            return True, sess_reason
         return False, f"lock_check_error:{type(exc).__name__}"
 
 

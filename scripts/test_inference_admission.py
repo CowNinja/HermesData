@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from inference_queue import (  # noqa: E402
     COMFY_YIELD_FIFO_DEPTH,
+    INTERACTIVE_STUCK_SEC,
     LANE_NORMAL,
     LANE_ROLEPLAY,
     MAX_INTERACTIVE_FIFO_DEPTH,
@@ -25,7 +26,9 @@ from inference_queue import (  # noqa: E402
     _is_interactive_caller,
     admission_snapshot,
     fifo_pressure_tier,
+    image_session_blocks_restore,
     resolve_priority_class,
+    should_force_fail_interactive,
 )
 
 
@@ -102,6 +105,71 @@ def test_queue_admission_rejected_attrs() -> None:
     assert exc.retry_after_sec == 60
 
 
+def test_rp_lane_survives_120s_interactive_stuck() -> None:
+    assert INTERACTIVE_STUCK_SEC == 120.0
+    assert (
+        should_force_fail_interactive(
+            lane=LANE_ROLEPLAY,
+            priority_class=PRIORITY_INTERACTIVE,
+            caller="alice-roleplay",
+            waiting_count=6,
+            run_so_far=180.0,
+            llama_ready=True,
+        )
+        is False
+    )
+
+
+def test_voice_interactive_still_fails_at_120s() -> None:
+    assert (
+        should_force_fail_interactive(
+            lane=LANE_NORMAL,
+            priority_class=PRIORITY_INTERACTIVE,
+            caller="discord",
+            waiting_count=2,
+            run_so_far=120.0,
+            llama_ready=True,
+        )
+        is True
+    )
+
+
+def test_no_force_fail_while_llama_loading() -> None:
+    assert (
+        should_force_fail_interactive(
+            lane=LANE_NORMAL,
+            priority_class=PRIORITY_INTERACTIVE,
+            caller="discord",
+            waiting_count=3,
+            run_so_far=180.0,
+            llama_ready=False,
+        )
+        is False
+    )
+
+
+def test_session_hold_blocks_restore() -> None:
+    from unittest.mock import patch
+
+    with patch("image_session.auto_hold_is_stranded", return_value=False), patch(
+        "image_session.should_skip_restore_spawn", return_value=True
+    ), patch("image_session.remaining_s", return_value=120.0):
+        held, reason = image_session_blocks_restore()
+        assert held is True
+        assert "image_session_hold_120s" in reason
+
+
+def test_stranded_auto_hold_does_not_block_restore() -> None:
+    from unittest.mock import patch
+
+    with patch("image_session.auto_hold_is_stranded", return_value=True), patch(
+        "image_session.should_skip_restore_spawn", return_value=True
+    ):
+        held, reason = image_session_blocks_restore()
+        assert held is False
+        assert reason == "stranded_auto_hold"
+
+
 def main() -> int:
     tests = [
         test_background_caller_markers,
@@ -112,6 +180,11 @@ def main() -> int:
         test_fifo_pressure_tier,
         test_comfy_yield_fields_depth_gate,
         test_queue_admission_rejected_attrs,
+        test_rp_lane_survives_120s_interactive_stuck,
+        test_voice_interactive_still_fails_at_120s,
+        test_no_force_fail_while_llama_loading,
+        test_session_hold_blocks_restore,
+        test_stranded_auto_hold_does_not_block_restore,
     ]
     failed = 0
     for fn in tests:
