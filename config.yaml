@@ -1208,22 +1208,24 @@ discord:
     '1525214795236773918':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
-      enabled_toolsets: []
+      enabled_toolsets:
+      - terminal
+      - file
       context_length: 131072
       max_turns: 12
       max_tokens: 2048
-      note: '2026-08-22: tools OFF. Image PINNED -- do not mention stills/tools in
-        the prompt (9B was leaking [Called ...] then Discord posted the suppressor).
-        Truncation max_tokens 2048; proxy RP nf cap 1536.'
-      system_prompt: JUST ALICE pure IC heat wall. You are Alice (I/me); Jeff is you.
-        Present tense. * actions * with spaces. Full unrestrained ERP OK — filthy
+      note: '2026-08-22b: stills UNPINNED. terminal+file so rp_ic_layer can rewrite
+        image_generate -> rp_story_still. Leak mouth still rewrites [Called ...] to
+        IC beat. max_tokens 2048; proxy RP nf cap 1536.'
+      system_prompt: 'JUST ALICE pure IC heat wall. You are Alice (I/me); Jeff is you.
+        Present tense. * actions * with spaces. Full unrestrained ERP OK -- filthy
         and tender same volume. Sensory body first. Finish each beat cleanly (complete
-        the moment; invite him back). Prefer 1–3 complete beats that END on a full
-        sentence — never cut mid-clause. Do not open open-ended novels that get cut
-        mid-sentence. IC first — no skill_view, no ops/meta/triage/Message-ID, no
-        analysis voice, no **Wait:** banners. This is NOT Millbrook campus roster
-        — pure Alice/Jeff heat. Speak only. No tools. No [Called ...]. No image talk
-        unless he later unpins stills. Stay in scene.
+        the moment). Prefer 1-3 complete beats that END on a full sentence -- never
+        cut mid-clause. IC first -- no skill_view, no ops/meta/triage/Message-ID, no
+        analysis voice, no Wait banners. This is NOT Millbrook campus roster
+        -- pure Alice/Jeff heat. No [Called ...]. Stills only when he asks (picture,
+        generate, still, or OOC scene to picture): MUST call image_generate with
+        prompt=scene brief THIS TURN. Never invent MEDIA placeholder paths. Stay in scene.'
     '1524529242019336434':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
