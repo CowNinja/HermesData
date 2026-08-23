@@ -22,15 +22,15 @@
       "schedule_display": "30 */12 * * *",
       "repeat": {
         "times": null,
-        "completed": 38
+        "completed": 39
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-08-03T19:27:05.616089+00:00",
-      "next_run_at": "2026-08-23T00:30:00-04:00",
-      "last_run_at": "2026-08-22T12:34:43.839837-04:00",
+      "next_run_at": "2026-08-23T12:30:00-04:00",
+      "last_run_at": "2026-08-23T00:30:43.140135-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -502,17 +502,17 @@
       "schedule_display": "every 240m",
       "repeat": {
         "times": null,
-        "completed": 317
+        "completed": 318
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-08-23T03:18:23.128206-04:00",
-      "last_run_at": "2026-08-22T19:17:47.608821-04:00",
-      "last_status": "error",
-      "last_error": "Script exited with code 1\nstdout:\n## backup_resilience_cron 2026-08-22T23:16:21.928483+00:00\nenv pins: SILO_BUDGET=240 SILO_TIMEOUT=300 K_TIMEOUT=900\nexec: D:\\HermesData\\hermes-agent\\.hermes-runtime\\python\\generation-1786733973-400-b9b0f8bc\\cpython-3.11-windows-x86_64-none\\python.exe D:\\HermesData\\scripts\\backup-resilience.py\n        \"ts\": \"2026-08-22T23:17:47.078572+00:00\",\n        \"error_count\": 1,\n        \"soft_error_count\": 0,\n        \"errors\": [\n          \"push main: fatal: unable to access 'https://github.com/CowNinja/HermesData.git/': Could not resolve host: github.com\"\n        ],\n        \"soft_errors\": [],\n        \"version\": 10\n      },\n      \"k_manifest_age_h\": 0.01836588356229994,\n      \"k_mirror_age_h\": 0.018365856806437174,\n      \"k_mirror_age_sources\": {\n        \"job_h\": 0.018568286111111113,\n        \"stamp_h\": 0.018365856806437174,\n        \"dir_h\": 356.84506462309093\n      },\n      \"k_mirror_job\": {\n        \"ok\": true,\n        \"ts\": \"2026-08-22T23:16:40.519458+00:00\",\n        \"errors\": [],\n        \"slices_ok\": 9,\n        \"slices_total\": 9\n      },\n      \"onedrive_recovery\": {\n        \"exists\": true\n      }\n    },\n    \"thresholds\": {\n      \"k_stale_hours\": 48.0,\n      \"clean_mirror_stale_hours\": 36.0,\n      \"critical_zip_stale_hours\": 48.0\n    },\n    \"notify\": \"pulse_file=D:\\\\HermesData\\\\state\\\\pulses\\\\backup_health_pulse.json\"\n  }\n\n## Summary\nHARD=1 SOFT=0 receipt_ok=False\n  HARD - push main: fatal: unable to access 'https://github.com/CowNinja/HermesData.git/': Could not resolve host: github.com\n\n[SOFT_ISSUES: hard=1 soft=0]\nEXIT:1",
+      "next_run_at": "2026-08-23T07:19:32.999209-04:00",
+      "last_run_at": "2026-08-22T23:18:54.218721-04:00",
+      "last_status": "ok",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
       "origin": {
@@ -527,11 +527,11 @@
       ],
       "workdir": "D:\\HermesData",
       "fire_claim": {
-        "at": "2026-08-22T23:18:23.161948-04:00",
-        "by": "DELLWinn11:23672:6b309854aebb4f7dabcf1ad2d8d14ebf"
+        "at": "2026-08-23T03:19:33.031119-04:00",
+        "by": "DELLWinn11:23672:70bc59c94b0c43419f35107480e9d940"
       },
       "pinned": true,
-      "failure_streak": 1
+      "failure_streak": 0
     },
     {
       "id": "cc127b21a784",
@@ -1520,15 +1520,15 @@
       "schedule_display": "0 3 * * *",
       "repeat": {
         "times": null,
-        "completed": 41
+        "completed": 42
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-12T17:42:17.659996-04:00",
-      "next_run_at": "2026-08-23T03:00:00-04:00",
-      "last_run_at": "2026-08-22T03:00:40.760864-04:00",
+      "next_run_at": "2026-08-24T03:00:00-04:00",
+      "last_run_at": "2026-08-23T03:01:05.093876-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1613,15 +1613,15 @@
       "schedule_display": "0 */6 * * *",
       "repeat": {
         "times": null,
-        "completed": 137
+        "completed": 138
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T15:10:42.663514-04:00",
-      "next_run_at": "2026-08-23T00:00:00-04:00",
-      "last_run_at": "2026-08-22T18:01:05.881881-04:00",
+      "next_run_at": "2026-08-23T06:00:00-04:00",
+      "last_run_at": "2026-08-23T00:00:29.689744-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1706,15 +1706,15 @@
       "schedule_display": "0 */6 * * *",
       "repeat": {
         "times": null,
-        "completed": 137
+        "completed": 138
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T16:22:54.715339-04:00",
-      "next_run_at": "2026-08-23T00:00:00-04:00",
-      "last_run_at": "2026-08-22T18:01:06.577093-04:00",
+      "next_run_at": "2026-08-23T06:00:00-04:00",
+      "last_run_at": "2026-08-23T00:00:30.063263-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1753,15 +1753,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 1854
+        "completed": 1862
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T18:14:58.028551-04:00",
-      "next_run_at": "2026-08-22T23:19:22.862269-04:00",
-      "last_run_at": "2026-08-22T22:49:22.862269-04:00",
+      "next_run_at": "2026-08-23T03:49:32.962637-04:00",
+      "last_run_at": "2026-08-23T02:49:32.284830-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1989,15 +1989,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 365
+        "completed": 367
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-20T17:16:35.981589-04:00",
-      "next_run_at": "2026-08-22T23:37:34.907095-04:00",
-      "last_run_at": "2026-08-22T21:37:34.907095-04:00",
+      "next_run_at": "2026-08-23T03:39:36.537363-04:00",
+      "last_run_at": "2026-08-23T01:39:36.537363-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2274,15 +2274,15 @@
       "schedule_display": "0 */4 * * *",
       "repeat": {
         "times": null,
-        "completed": 689
+        "completed": 690
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-21T22:40:15.971276+00:00",
-      "next_run_at": "2026-08-23T00:00:00-04:00",
-      "last_run_at": "2026-08-22T20:00:31.076077-04:00",
+      "next_run_at": "2026-08-23T04:00:00-04:00",
+      "last_run_at": "2026-08-23T00:00:34.371630-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -3078,5 +3078,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-08-22T23:18:23.164878-04:00"
+  "updated_at": "2026-08-23T03:19:33.033665-04:00"
 }
