@@ -227,6 +227,7 @@ if ($updRc -ne 0) {
     Write-Safe "update failed rc=$updRc - attempting overlay apply + Ensure anyway"
 }
 
+$applyRc = 0
 if (-not $NoReapply) {
     Write-Safe "overlay apply"
     $applyRc = Invoke-Overlay "apply"
@@ -270,6 +271,11 @@ Write-Safe "SAT --status-only (no heal)"
 if ($updRc -ne 0) {
     Write-Host "=== Safe update FAILED - kitchen restore attempted. Log: $Log ===" -ForegroundColor Red
     exit $updRc
+}
+if ($applyRc -ne 0) {
+    Write-Host "=== Safe update pulled core but overlay apply failed. Mouth/house may be missing. Log: $Log ===" -ForegroundColor Red
+    Write-Safe "done-with-overlay-fail rc=$applyRc"
+    exit $applyRc
 }
 
 Write-Host "=== Safe update complete. Overlay receipt: D:\HermesData\state\hermes_house_overlay_latest.json ===" -ForegroundColor Green
