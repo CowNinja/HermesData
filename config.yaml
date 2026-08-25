@@ -1366,7 +1366,7 @@ secrets:
     override_existing: true
     auto_install: true
     server_url: ''
-_config_version: 38
+_config_version: 39
 custom_providers:
 - name: phronesis-sovereign
   api_key: local
