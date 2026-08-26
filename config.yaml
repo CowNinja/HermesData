@@ -589,6 +589,12 @@ skills:
   - agentmail
   - blackbox
   - dogfood
+  - https-x-com-divyyanshishrma-status-2086071979510
+  - https-x-com-i-status-2086865960669983035
+  - https-x-com-i-status-2087208544332640498
+  - https-x-com-i-status-2087208544332640498-merge
+  - https-x-com-juliangoldieseo-status-2089109957253
+  - https-x-com-witcheer-status-2090309650721788036
 curator:
   enabled: true
   interval_hours: 168
@@ -850,16 +856,19 @@ discord:
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
       context_length: 131072
-      max_turns: 12
+      max_turns: 24
       enabled_toolsets:
       - hermes-discord
       - web
       - terminal
       - file
       - hermes-cli
-      note: '2026-08-12 Flock leak: Discord platform was hermes-discord-only so Qwythos
-        dumped message_id JSON. Enable web. max_turns 12 for search+answer. Live facts
-        fail-closed via factual_outbound_gate if no web tool ran.'
+      - skills
+      - memory
+      note: '2026-08-26 daily driver: skills+memory+24 turns so #hermes can work.
+        Still local-first (T3 hop via proxy, not Discord-wide Grok). Live facts
+        fail-closed via factual_outbound_gate if no web tool ran. 2026-08-12 Flock
+        leak: keep web so Qwythos does not dump message_id JSON.'
     '1519144758172192808':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
@@ -1298,8 +1307,8 @@ discord:
       - terminal
       - file
     '1540894882141311046':
-      model: phronesis-sovereign-auto
-      provider: custom:phronesis-sovereign
+      model: grok-4.6
+      provider: xai-oauth
       context_length: 131072
       max_turns: 24
       max_tokens: 8192
@@ -1325,9 +1334,11 @@ discord:
       - file
       - web
       - hermes-discord
-      note: '2026-08-23 Jeff-armed: this child of #hermes was inheriting local 9B
-        and faking Bitwarden/LinkedIn. Named grok-4.6 pin like hire room 152484. Not
-        Discord-wide hop-1. Garden/RP stay local. No password-stuffed LinkedIn login.'
+      - skills
+      - hermes-cli
+      note: '2026-08-26 restore Jeff-armed grok-4.6 pin (was overwritten back to
+        local 9B). Skills+cli so the room can actually work. Not Discord-wide hop-1.
+        Garden/RP stay local. No password-stuffed LinkedIn login.'
 approvals:
   destructive_slash_confirm: false
 command_allowlist:
@@ -1485,6 +1496,11 @@ platform_toolsets:
   discord:
   - hermes-discord
   - web
+  - terminal
+  - file
+  - skills
+  - hermes-cli
+  - memory
 known_plugin_toolsets:
   cli:
   - spotify
