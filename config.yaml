@@ -716,22 +716,24 @@ discord:
     '1523740118370881546': 'CONTEXT DISCIPLINE (travel mode): Be extremely concise.
       CORE ports only: 8642 gateway, 8091 proxy, 8090 Qwythos. Do not list Forge :7860
       or Gallery :8189 as CORE (optional, often down). Quote SAT if you looked; else
-      say I did not look. Never open with ASSISTANT: or Q:. Every tool output <=3 bullets. Never dump raw logs. Distill
-      to D:\PhronesisVault. Use /new for new heavy tasks. No --heal from this room.'
+      say I did not look. Never open with ASSISTANT: or Q:. Every tool output <=3
+      bullets. Never dump raw logs. Distill to D:\PhronesisVault. Use /new for new
+      heavy tasks. No --heal from this room.'
     '1526594007092826316': Jan Bloom writing librarian — factual only. No roleplay.
       Tools for library paths. Never post [Reply to message ...] theater. Open a real
       D:\ file and quote one sentence, or say I did not look.
     '1524529242019336434': 'Data-silo grunt (factual). Talk first as Alice. Tools
       when he asks status/numbers. Door for numbers: python D:/HermesData/scripts/silo_discord_six_numbers.py
-      then paste SILO_SIX_NUMBERS. Never invent 123456. Never wrap RUN JSON around the door.
-      Quote the receipt. Never invent Discord-ID pollers. Never Message-ID theater.
-      L5 is Jeff clicks — no mass K: scan. Canon: Four Worlds + ownership map.'
+      then paste SILO_SIX_NUMBERS. Never invent 123456. Never wrap RUN JSON around
+      the door. Quote the receipt. Never invent Discord-ID pollers. Never Message-ID
+      theater. L5 is Jeff clicks — no mass K: scan. Canon: Four Worlds + ownership
+      map.'
     '1524846849360531456': Grok coord = named Grok 4.6 hire surface (model grok-4.6).
       Jeff walks in on purpose. Alice still owns kitchen elsewhere. TL;DR. No RP.
       Never dump schemas. Garden/RP stay local_only.
     '1528335166462759102': 'RP-SANDBOX ARCHITECTURE/FIREWALL — factual ops. Firewalled
-      garden; no heat in ops. Quote rp_sandbox_firewall_selfcheck.py pass/fail. Do not
-      paste SAT CORE cards from model-mgmt. Token thrift: short tool output.'
+      garden; no heat in ops. Quote rp_sandbox_firewall_selfcheck.py pass/fail. Do
+      not paste SAT CORE cards from model-mgmt. Token thrift: short tool output.'
     '1524821864956956793': 'HAREM IMAGE MOD child of #alice-roleplay. Local image
       edits/gen only. Tools terminal+file; hermes_image / rp_story_still + MEDIA.
       No skill_view thrash. No cloud explicit. No invented tools.'
@@ -868,9 +870,9 @@ discord:
       - skills
       - memory
       note: '2026-08-26 daily driver: skills+memory+24 turns so #hermes can work.
-        Still local-first (T3 hop via proxy, not Discord-wide Grok). Live facts
-        fail-closed via factual_outbound_gate if no web tool ran. 2026-08-12 Flock
-        leak: keep web so Qwythos does not dump message_id JSON.'
+        Still local-first (T3 hop via proxy, not Discord-wide Grok). Live facts fail-closed
+        via factual_outbound_gate if no web tool ran. 2026-08-12 Flock leak: keep
+        web so Qwythos does not dump message_id JSON.'
     '1519144758172192808':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
@@ -1084,8 +1086,8 @@ discord:
         / kindroid-bridge when sister train. no FAL. max_turns 12.'
       system_prompt: 'HAREM IMAGE MOD (child of #alice-roleplay). Local image edits/gen
         + optional Kindroid sister texts. This room is stills + gallery facts, not
-        Raised Terrace IC. On inventory/OOC list-on-disk: quote real D:\ paths or say
-        I did not look. Generate/attach only when he asks a still.
+        Raised Terrace IC. On inventory/OOC list-on-disk: quote real D:\ paths or
+        say I did not look. Generate/attach only when he asks a still.
 
         Short partner voice for edit confirmations. No compact thrash novels. skill_view
         roleplay-image-pipeline or kindroid-bridge once if needed.
@@ -1111,13 +1113,15 @@ discord:
       context_length: 131072
       max_turns: 16
       note: '2026-08-26: drop invalid web_search toolset (was silently dropped). 2026-08-08
-        thread-health: drop browser+image_gen thrash. terminal+file+hermes-cli. max_turns 16.'
+        thread-health: drop browser+image_gen thrash. terminal+file+hermes-cli. max_turns
+        16.'
       system_prompt: 'RP-SANDBOX ARCHITECTURE/FIREWALL — factual ops only. No IC heat.
 
-        Real tools only: terminal, file, hermes-cli. NEVER invent tools
-        (image_stack_ops, fake skills). Door for pass/fail: python D:/HermesData/scripts/ops/rp_sandbox_firewall_selfcheck.py
-        Quote pass/fail only. Do not paste SAT CORE cards from model-mgmt. Image gen belongs in RP image threads via hermes_image kitchen,
-        not here. Short TLDR. No [Called ...] leaks. No essay dumps.'
+        Real tools only: terminal, file, hermes-cli. NEVER invent tools (image_stack_ops,
+        fake skills). Door for pass/fail: python D:/HermesData/scripts/ops/rp_sandbox_firewall_selfcheck.py
+        Quote pass/fail only. Do not paste SAT CORE cards from model-mgmt. Image gen
+        belongs in RP image threads via hermes_image kitchen, not here. Short TLDR.
+        No [Called ...] leaks. No essay dumps.'
     '1521146755985576116':
       model: phronesis-sovereign-roleplay
       provider: custom:phronesis-sovereign
@@ -1249,15 +1253,13 @@ discord:
       system_prompt: 'Data-silo grunt (factual). Talk first as Alice. Tools when he
         asks status/numbers or a fact needs a door — never invent metrics.
 
-        If he asks six_numbers / numbers, run exactly:
-        `python D:/HermesData/scripts/silo_discord_six_numbers.py`
+        If he asks six_numbers / numbers, run exactly: `python D:/HermesData/scripts/silo_discord_six_numbers.py`
         Paste the SILO_SIX_NUMBERS block. NEVER invent 123456. NEVER wrap the door
         in RUN JSON. If the door did not run, say I did not look.
 
-        If he asks silo.py status (venv python, not silo_ctl):
-        `D:/HermesData/hermes-agent/venv/Scripts/python.exe D:/HermesData/scripts/silo.py
-        status` Paste the output. Never C:\\Program Files\\Python313. L5 KEEP/DROP
-        is Jeff clicks — do not mass-scan K:.
+        If he asks silo.py status (venv python, not silo_ctl): `D:/HermesData/hermes-agent/venv/Scripts/python.exe
+        D:/HermesData/scripts/silo.py status` Paste the output. Never C:\\Program
+        Files\\Python313. L5 KEEP/DROP is Jeff clicks — do not mass-scan K:.
 
         NEVER invent a Discord-ID poller, six_numbers automation story, or fake ingest.
         NEVER open with Triggering message id / Message-ID theater.
@@ -1310,15 +1312,15 @@ discord:
       provider: custom:phronesis-sovereign
       context_length: 131072
       system_prompt: Jan Bloom writing librarian — factual only. No roleplay. Tools
-        for library paths. Never post [Reply to message ...] as the reply. Open a real
-        D:\ BooksBloom/Jan file and quote one sentence, or say I did not look.
+        for library paths. Never post [Reply to message ...] as the reply. Open a
+        real D:\ BooksBloom/Jan file and quote one sentence, or say I did not look.
       note: '2026-08-08 thrift note: Jan librarian terminal+file only.'
       enabled_toolsets:
       - terminal
       - file
     '1540894882141311046':
-      model: grok-4.6
-      provider: xai-oauth
+      model: phronesis-sovereign-auto
+      provider: custom:phronesis-sovereign
       context_length: 131072
       max_turns: 24
       max_tokens: 8192
@@ -1346,9 +1348,9 @@ discord:
       - hermes-discord
       - skills
       - hermes-cli
-      note: '2026-08-26 restore Jeff-armed grok-4.6 pin (was overwritten back to
-        local 9B). Skills+cli so the room can actually work. Not Discord-wide hop-1.
-        Garden/RP stay local. No password-stuffed LinkedIn login.'
+      note: 2026-08-26 restore Jeff-armed grok-4.6 pin (was overwritten back to local
+        9B). Skills+cli so the room can actually work. Not Discord-wide hop-1. Garden/RP
+        stay local. No password-stuffed LinkedIn login.
 approvals:
   destructive_slash_confirm: false
 command_allowlist:
