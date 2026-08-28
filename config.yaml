@@ -1250,6 +1250,7 @@ discord:
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
       context_length: 131072
+      max_turns: 16
       system_prompt: 'Data-silo grunt (factual). Talk first as Alice. Tools when he
         asks status/numbers or a fact needs a door — never invent metrics.
 
@@ -1268,9 +1269,8 @@ discord:
       enabled_toolsets:
       - terminal
       - file
-      note: '2026-08-04 thrift: silo kitchen terminal+file only (silo_ctl scripts).
-        Proven: fiction bleed + tool thrash. Policy: thread-tool-budget-thrift. Open
-        tools only if audit+Jeff OK. '
+      note: '2026-08-27: max_turns 16 so six_numbers + explain can finish. 2026-08-04
+        thrift: silo kitchen terminal+file only. Policy: thread-tool-budget-thrift.'
     '1524846849360531456':
       model: grok-4.6
       provider: xai-oauth
