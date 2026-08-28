@@ -157,9 +157,10 @@ def _hot_tick() -> int:
 
     n = hide_window_titles(bare_console_only=True)
     try:
-        from win_silent_proc import hide_hermes_stack_consoles
+        from win_silent_proc import hide_hermes_stack_consoles, hide_stt_interruptors
 
         n += hide_hermes_stack_consoles()
+        n += hide_stt_interruptors()
     except Exception:
         pass
     try:
