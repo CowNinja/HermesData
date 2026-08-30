@@ -176,6 +176,20 @@ def main() -> int:
     else:
         print("vault_autonomy_run=skip (script missing)")
 
+    # 3d) Unix /k /d Windows path-bug lint (advisory; living py/ps1 only)
+    unix_lint = Path(r"D:\HermesData\scripts") / "unix_drive_root_lint.py"
+    if unix_lint.is_file():
+        ur = _run("unix_drive_root_lint", [py, str(unix_lint)], timeout=60)
+        steps.append(ur)
+        print(
+            f"unix_drive_root_lint: code={ur.get('code')} ok={ur.get('ok')} "
+            "(ALERT if living py/ps1 uses Unix k-or-d roots as Windows paths)"
+        )
+        if ur.get("stdout_tail"):
+            print((ur["stdout_tail"] or "").strip()[:800])
+    else:
+        print("unix_drive_root_lint=skip (script missing)")
+
     # 4) Optional deeper link audit if present ? advisory
     deep = VAULT / "scripts" / "vault_link_audit.py"
     if deep.is_file():

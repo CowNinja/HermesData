@@ -1,4 +1,5 @@
 #!/bin/bash
+# MSYS bash only. /d/PhronesisModels here is D:\PhronesisModels, NOT D:\d\...
 # Launch Qwen3.6 MoE + MTP on port 8092
 # Uses b9850 binary (cuda12 variant, confirmed working on SM86)
 # Model: unsloth MTP GGUF (auto-downloaded, contains MTP heads)

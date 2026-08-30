@@ -138,6 +138,18 @@ def main() -> int:
     for name, root in roots.items():
         stats["roots"][name] = root.exists()
 
+    # 0) Windows unix-root folders (D:\k D:\d) are malformed drive letters, not K: / D:
+    for malformed in (Path(r"D:\k"), Path(r"D:\d")):
+        if not malformed.is_dir():
+            continue
+        try:
+            kids = sorted(p.name for p in malformed.iterdir())
+        except OSError:
+            kids = ["<unlistable>"]
+        findings["malformed_unix_drive_root"].append(
+            {"path": str(malformed), "children": kids[:12]}
+        )
+
     # 1) Explicit outside RP
     for name, root in roots.items():
         for p in iter_files(root):
@@ -248,6 +260,7 @@ def main() -> int:
             findings.get("suspicious_media_dirs_outside_rp") or []
         ),
         "policy_docs_mentioning_rp": len(findings.get("explicit_mentions_in_policy_docs") or []),
+        "malformed_unix_drive_root": len(findings.get("malformed_unix_drive_root") or []),
     }
 
     # Recommendations
@@ -265,6 +278,10 @@ def main() -> int:
     if summary["runtime_trees_on_k"]:
         recs.append(
             "Hermes/runtime-like trees on K: ? confirm backup vs active; prefer D:\\HermesData as SSOT for code."
+        )
+    if summary["malformed_unix_drive_root"]:
+        recs.append(
+            "D:\\k or D:\\d exist (Unix /k /d written as folders). Do not write_file those prefixes. Lint: unix_drive_root_lint.py."
         )
     if summary["suspicious_media_dirs_outside_rp"]:
         recs.append("Inspect media dirs outside RP; archive or move if heat/gallery content.")

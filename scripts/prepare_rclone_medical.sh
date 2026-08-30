@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# MSYS bash only. /d/HermesData here is D:\HermesData, NOT D:\d\HermesData.
 # prepare_rclone_medical.sh
 # Session 14+ helper - safe rclone setup and filtered Medical pull
 # Always targets D:\HermesData for main working data (C: only for temps/config if needed)

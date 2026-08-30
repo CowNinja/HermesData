@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# MSYS bash only. /d/HermesData here is D:\HermesData, NOT D:\d\HermesData.
+# Do not copy these prefixes into Python Path() or write_file.
 # Autonomous local mirror processor for old Google Drive backups
 # Use when rclone auth is not yet available but G: (or K:) mirrors are present.
 
