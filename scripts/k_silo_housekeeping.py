@@ -60,7 +60,9 @@ def main() -> int:
     root_idx.write_text(
         f"""# Personal Digital Silo (K:)
 
-**Role:** Jeff life footprint ? training + twin source of truth (copy-first).
+**Law:** `00-MASTER.md` in this folder. This index is a catalog, not a second constitution.
+
+**Role:** Jeff life footprint — training + twin source of truth (copy-first).
 
 ## Domains
 | Shelf | Intent |

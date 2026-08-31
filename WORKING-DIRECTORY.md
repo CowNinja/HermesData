@@ -1,5 +1,7 @@
 # D:\HermesData — Active Working / System Directory
 
+> Identity law: `K:\Phronesis-Sovereign\Personal-Digital-Silo\00-MASTER.md`. This file is Hermes runtime, not a second identity constitution.
+
 **Purpose:** All executable code, scripts, data pipelines, ingestion tools, live processing, and system files live here.
 
 **Canonical topology (2026-06-26):** See `D:\PhronesisVault\docs\agent-coordination\Sovereign-Storage-Topology-2026-06-26.md`

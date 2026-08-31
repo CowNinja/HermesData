@@ -69,11 +69,12 @@ def main() -> int:
 
     ok_n = sum(1 for s in shelves if s.get("ok"))
     lines = [
-        "# Personal Digital Silo ? World Index",
+        "# Personal Digital Silo — World Index",
         "",
-        f"_Auto world index ? {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
+        f"_Auto world index — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
         "",
-        "**Access:** catalog-first ? `python D:/HermesData/scripts/silo_retrieve.py \"?\"` or ask Hermes.",
+        "**Law:** `00-MASTER.md` in this folder. This file is a shelf catalog, not a second constitution.",
+        "**Access:** catalog-first — `python D:\\HermesData\\scripts\\silo_retrieve.py` or ask Hermes.",
         "**Depth:** domain shelves get `00-INDEX.md` from `silo_domain_indexes.py`.",
         "",
         f"- top-level shelves: **{len(shelves)}** (ok={ok_n})",

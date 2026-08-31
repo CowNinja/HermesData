@@ -66,12 +66,18 @@ def index_shelf(rel: str, max_scan: int = 25000) -> dict:
             except Exception:
                 samples.append(p.name[:80])
     approx_note = f" (scan capped at {max_scan} entries)" if capped else ""
+    human = (root / "README.md").is_file()
     lines = [
         f"# {rel}",
         "",
-        f"_Auto index ? {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
+        f"_Auto index — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
         "",
-        "**Access:** catalog-first ? `python D:/HermesData/scripts/silo_retrieve.py \"?\"` or ask Hermes.",
+    ]
+    if human:
+        lines.append("**Human map:** open `README.md` in this folder first. This file is the catalog sample.")
+        lines.append("")
+    lines += [
+        "**Access:** catalog-first — `python D:\\HermesData\\scripts\\silo_retrieve.py` or ask Hermes.",
         "**Layout:** nested `from-g-drive/<origin tree>/` (copy directory structure; open taxonomy).",
         "",
         f"- files (approx): **{files}**{approx_note}",
