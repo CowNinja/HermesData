@@ -177,7 +177,7 @@ def main() -> int:
         print("vault_autonomy_run=skip (script missing)")
 
     # 3d) Unix /k /d Windows path-bug lint (advisory; living py/ps1 only)
-    unix_lint = Path(r"D:\HermesData\scripts") / "unix_drive_root_lint.py"
+    unix_lint = Path(r"D:\HermesData\scripts\ops") / "unix_drive_root_lint.py"
     if unix_lint.is_file():
         ur = _run("unix_drive_root_lint", [py, str(unix_lint)], timeout=60)
         steps.append(ur)
