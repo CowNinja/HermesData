@@ -203,6 +203,29 @@ def ensure() -> int:
     return 0
 
 
+def boot_missing() -> None:
+    """Eager start of down CORE services in Brain -> Proxy -> Gateway order.
+
+    Only starts a service that fails a health probe. Never tears down a live :8090.
+    """
+    log("BOOT_SCAN")
+    for port, url, kind in TARGETS:
+        if probe(url):
+            log("BOOT_OK " + kind)
+            continue
+        log("BOOT_START " + kind)
+        restart(kind)
+        up = False
+        for _ in range(18):
+            time.sleep(5)
+            if probe(url):
+                log("BOOT_UP " + kind)
+                up = True
+                break
+        if not up:
+            log("BOOT_STILL_DOWN " + kind)
+
+
 def loop() -> int:
     STATE.mkdir(parents=True, exist_ok=True)
     PIDF.write_text(str(os.getpid()), encoding="utf-8")
@@ -215,6 +238,7 @@ def loop() -> int:
             pass
     fails = {k: 0 for k, _, _ in TARGETS}
     log("START pid=" + str(os.getpid()))
+    boot_missing()
     while not STOP.is_file():
         for port, url, kind in TARGETS:
             ok = probe(url)

@@ -1084,6 +1084,26 @@ def _load_golden_bank() -> list:
     return rows
 
 
+def _inject_entity_context(
+    messages: List[Dict[str, Any]],
+    routing: Optional[Dict[str, Any]] = None,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    routing = routing or {}
+    try:
+        import entity_pre_inject as epi
+    except Exception:
+        return list(messages or []), {}
+    try:
+        out, meta = epi.inject_messages(messages, routing)
+        return out, meta or {}
+    except Exception as exc:
+        try:
+            _log_event({"event": "entity_pre_inject_fail", "error": str(exc)[:160]})
+        except Exception:
+            pass
+        return list(messages or []), {}
+
+
 def _inject_golden_fewshot(
     messages: List[Dict[str, Any]],
     routing: Optional[Dict[str, Any]] = None,
@@ -1533,7 +1553,8 @@ def dispatch_via_native_router(
         if body.get("tools") and (not narrative_fast or tool_passthrough):
             forward["tools"] = body["tools"] if narrative_fast else _merge_atomic_tools(body.get("tools"))
         if factual_tools and body.get("tools") and not narrative_fast:
-            forward["tool_choice"] = "required"
+            if not routing.get("entity_skip_vault"):
+                forward["tool_choice"] = "required"
         elif body.get("tool_choice") is not None and (not narrative_fast or tool_passthrough):
             forward["tool_choice"] = body["tool_choice"]
 
@@ -1798,6 +1819,133 @@ def dispatch_via_native_router(
             for key in ("reasoning", "reasoning_content", "reasoning_details"):
                 msg.pop(key, None)
 
+    transmute_meta: Dict[str, Any] = {}
+    # Run even after grammar_retry_no_tools (that path sets narrative_fast=True).
+    # Skip only real RP. Explicit vault_search / vault narration still transmute.
+    if (
+        not msg.get("tool_calls")
+        and not _roleplay_route_active(routing, gateway_model, messages)
+        and not routing.get("no_transmute")
+        and not routing.get("entity_skip_vault")
+        and not body.get("_no_transmute")
+    ):
+        qinfo: Optional[Dict[str, Any]] = None
+        try:
+            import entity_pre_inject as epi
+
+            nq = epi.narration_query(str(msg.get("content") or ""))
+            uq = epi.user_vault_query(epi.last_user_text(messages))
+            if uq:
+                qinfo = uq
+            elif nq:
+                qinfo = {"query": nq, "roots": "vault", "max_hits": 8}
+        except Exception:
+            qinfo = None
+        if qinfo and qinfo.get("query"):
+            try:
+                import entity_pre_inject as epi
+
+                vs = epi.run_vault_search(
+                    str(qinfo["query"]),
+                    str(qinfo.get("roots") or "vault"),
+                    int(qinfo.get("max_hits") or 8),
+                )
+                md = str(vs.get("markdown") or json.dumps(vs))[:3500]
+                call_id = f"call_{uuid.uuid4().hex[:12]}"
+                args = {
+                    "query": qinfo["query"],
+                    "roots": qinfo.get("roots") or "vault",
+                }
+                follow_msgs = list(messages or []) + [
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": call_id,
+                                "type": "function",
+                                "function": {
+                                    "name": "vault_search",
+                                    "arguments": json.dumps(args),
+                                },
+                            }
+                        ],
+                    },
+                    {
+                        "role": "tool",
+                        "tool_call_id": call_id,
+                        "name": "vault_search",
+                        "content": md,
+                    },
+                ]
+                _log_event(
+                    {
+                        "event": "narration_transmute_vault",
+                        "query": str(qinfo["query"])[:80],
+                        "hit_count": vs.get("hit_count"),
+                    }
+                )
+                fres = _dispatch_payload(
+                    {
+                        "model": logical,
+                        "messages": follow_msgs,
+                        "max_tokens": min(int(body.get("max_tokens") or 256), 384),
+                        "temperature": 0.2,
+                        "stream": False,
+                    }
+                )
+                if fres.get("status") == 200 and isinstance(fres.get("data"), dict):
+                    data = fres["data"]
+                    choice = (data.get("choices") or [{}])[0]
+                    msg = dict(choice.get("message") or {})
+                    transmute_meta = {
+                        "narration_transmute": True,
+                        "vault_query": str(qinfo["query"])[:80],
+                        "vault_hits": vs.get("hit_count"),
+                    }
+                else:
+                    msg = {**msg, "content": md, "tool_calls": None}
+                    transmute_meta = {
+                        "narration_transmute": True,
+                        "followup_failed": True,
+                        "vault_query": str(qinfo["query"])[:80],
+                        "vault_hits": vs.get("hit_count"),
+                    }
+            except Exception as _tm_exc:
+                try:
+                    _log_event(
+                        {
+                            "event": "narration_transmute_fail",
+                            "error": str(_tm_exc)[:160],
+                        }
+                    )
+                except Exception:
+                    pass
+                msg = {
+                    **msg,
+                    "tool_calls": [
+                        {
+                            "id": f"call_{uuid.uuid4().hex[:12]}",
+                            "type": "function",
+                            "function": {
+                                "name": "vault_search",
+                                "arguments": json.dumps(
+                                    {
+                                        "query": qinfo["query"],
+                                        "roots": qinfo.get("roots") or "vault",
+                                    }
+                                ),
+                            },
+                        }
+                    ],
+                    "content": None,
+                }
+                transmute_meta = {
+                    "narration_transmute": True,
+                    "emitted_tool_call": True,
+                    "vault_query": str(qinfo["query"])[:80],
+                }
+
     choice = {**choice, "message": msg}
     if msg.get("tool_calls"):
         gw_names = set(routing.get("atomic_gw_names") or [])
@@ -1825,6 +1973,11 @@ def dispatch_via_native_router(
     }
     if trim_meta:
         prov["context_trim"] = trim_meta
+    if transmute_meta:
+        prov.update(transmute_meta)
+    if routing.get("entity_preinjected"):
+        prov["entity_preinjected"] = routing.get("entity_preinjected")
+        prov["entity_inject_ms"] = routing.get("entity_inject_ms")
 
     return {
         "success": True,
@@ -2259,6 +2412,8 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 "atomic_tools": list(ATOMIC_TOOL_NAMES),
                 "golden_bank_n": len(_load_golden_bank()),
                 "golden_bank_path": str(GOLDEN_BANK_PATH),
+                "entity_pre_inject": True,
+                "narration_transmute": True,
             }
             try:
                 payload["stack"] = matrix
@@ -2440,6 +2595,11 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         if not (routing.get("narrative_fast") or routing.get("roleplay") or routing.get("is_roleplay")):
             messages = _inject_qwythos_primer(messages, routing)
             messages = _inject_golden_fewshot(messages, routing)
+            messages, _ent = _inject_entity_context(messages, routing)
+            if _ent.get("injected"):
+                routing["entity_preinjected"] = _ent.get("injected")
+                routing["entity_skip_vault"] = bool(_ent.get("skip_vault"))
+                routing["entity_inject_ms"] = _ent.get("ms")
             body["tools"] = _merge_atomic_tools(body.get("tools"))
         if routing.get("tool_optimised_mode"):
             tier = str(routing.get("escalation_tier") or "T2")
@@ -3125,6 +3285,11 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             ),
             "native_passthrough": bool(prov.get("native_passthrough")),
             "tool_passthrough": bool(prov.get("tool_passthrough") or result.get("tool_calls")),
+            "entity_preinjected": prov.get("entity_preinjected") or routing.get("entity_preinjected"),
+            "entity_inject_ms": prov.get("entity_inject_ms") or routing.get("entity_inject_ms"),
+            "narration_transmute": bool(prov.get("narration_transmute")),
+            "vault_query": prov.get("vault_query"),
+            "vault_hits": prov.get("vault_hits"),
         }
         usage_in = usage_out = 0
         openai_resp = result.get("openai_response")
