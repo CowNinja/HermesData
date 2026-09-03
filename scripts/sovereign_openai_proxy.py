@@ -117,6 +117,9 @@ FACTUAL_TOOL_MARKERS = (
 PRIMER_PATH = HERMES_HOME / "state" / "prompts" / "qwythos_system_primer.md"
 _PRIMER_CACHE: Dict[str, Any] = {"mtime": None, "text": ""}
 ATOMIC_TOOL_NAMES = ("vault_search", "service_manager", "system_telemetry")
+GOLDEN_BANK_PATH = Path(r"D:\PhronesisModels\datasets\sovereign_tool_golden_bank.jsonl")
+_GOLDEN_BANK: list = []
+_GOLDEN_BANK_MTIME = None
 
 _THINK_BLOCK_RE = re.compile(
     r"<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\b[^>]*>.*?</(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>",
@@ -1054,6 +1057,70 @@ def _load_qwythos_primer() -> str:
     _PRIMER_CACHE["mtime"] = st.st_mtime
     _PRIMER_CACHE["text"] = text
     return text
+
+
+def _load_golden_bank() -> list:
+    global _GOLDEN_BANK, _GOLDEN_BANK_MTIME
+    try:
+        st = GOLDEN_BANK_PATH.stat()
+    except OSError:
+        return _GOLDEN_BANK
+    if _GOLDEN_BANK_MTIME == st.st_mtime and _GOLDEN_BANK:
+        return _GOLDEN_BANK
+    rows = []
+    with GOLDEN_BANK_PATH.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(rec, dict):
+                rows.append(rec)
+    _GOLDEN_BANK = rows
+    _GOLDEN_BANK_MTIME = st.st_mtime
+    return rows
+
+
+def _inject_golden_fewshot(
+    messages: List[Dict[str, Any]],
+    routing: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    routing = routing or {}
+    if routing.get("narrative_fast") or routing.get("roleplay") or routing.get("is_roleplay"):
+        return messages
+    blob = " ".join(
+        str(m.get("content") or "")[:400]
+        for m in (messages or [])
+        if isinstance(m, dict) and m.get("role") == "user"
+    ).lower()
+    if not blob:
+        return messages
+    bank = _load_golden_bank()
+    if not bank:
+        return messages
+    scored = []
+    for rec in bank:
+        u = str(rec.get("user") or "").lower()
+        hits = sum(1 for w in u.split() if len(w) > 3 and w in blob)
+        if hits:
+            scored.append((hits, rec))
+    scored.sort(key=lambda x: -x[0])
+    picks = [r for _, r in scored[:3]]
+    if not picks:
+        return messages
+    lines = ["GOLDEN TOOL EXAMPLES (copy the <tool_call> shape; never narrate):"]
+    for rec in picks:
+        lines.append("User: " + str(rec.get("user") or "")[:160])
+        block = rec.get("tool_call") or rec.get("assistant") or rec.get("refusal") or ""
+        lines.append(str(block)[:400])
+        lines.append("")
+    note = "\n".join(lines)[:1400]
+    out = list(messages or [])
+    out.insert(0, {"role": "system", "content": note})
+    return out
 
 
 def _inject_qwythos_primer(
@@ -2190,6 +2257,8 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 "connection_pool_hosts": list(_upstream_pool._pool.keys()),
                 "qwythos_primer": bool(_load_qwythos_primer()),
                 "atomic_tools": list(ATOMIC_TOOL_NAMES),
+                "golden_bank_n": len(_load_golden_bank()),
+                "golden_bank_path": str(GOLDEN_BANK_PATH),
             }
             try:
                 payload["stack"] = matrix
@@ -2370,6 +2439,7 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         routing["atomic_gw_names"] = sorted(_tool_schema_names(body.get("tools")))
         if not (routing.get("narrative_fast") or routing.get("roleplay") or routing.get("is_roleplay")):
             messages = _inject_qwythos_primer(messages, routing)
+            messages = _inject_golden_fewshot(messages, routing)
             body["tools"] = _merge_atomic_tools(body.get("tools"))
         if routing.get("tool_optimised_mode"):
             tier = str(routing.get("escalation_tier") or "T2")
