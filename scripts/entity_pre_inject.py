@@ -235,7 +235,15 @@ def inject_messages(messages: list, routing: dict | None = None) -> tuple[list, 
     if not hits:
         return list(messages or []), {"ms": round(ms, 3), "injected": []}
     block = render(hits)
-    out = list(messages or [])
+    out = []
+    for msg in messages or []:
+        if (
+            isinstance(msg, dict)
+            and str(msg.get("role") or "") == "system"
+            and "[RELEVANT ENTITY CONTEXT]" in str(msg.get("content") or "")
+        ):
+            continue
+        out.append(msg)
     out.insert(0, {"role": "system", "content": block})
     skip = not explicit_tool_intent(user)
     return out, {

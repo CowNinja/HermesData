@@ -1539,10 +1539,13 @@ def dispatch_via_native_router(
     factual_tools = _requires_factual_tool_use(messages, routing=routing, model=gateway_model)
     requested_max = int(body.get("max_tokens") or 2048)
     safe_max = max(512, live_ctx - prompt_tokens - tools_tokens - 256)
+    # Deep synthesis / factual tools: 2048. Conversational RP stays on nf_cap.
     cap = 4096 if (tool_passthrough or factual_tools) else 2048
     max_tokens = min(requested_max, safe_max, cap)
     if tool_passthrough or factual_tools:
         max_tokens = max(max_tokens, min(2048, safe_max))
+    elif not narrative_fast:
+        max_tokens = max(max_tokens, min(2048, safe_max, cap))
 
     # Proactive: flatten cloud/Grok tool-call history before first llama-server hit.
     # Prevents HTTP 400 "Unable to generate parser for this template / CallExpression"
@@ -1597,8 +1600,9 @@ def dispatch_via_native_router(
         # ("Response remained truncated after continuation attempts"). Prefer
         # complete short IC beats over silent mid-clause cuts. Voice/micro can
         # still pass a low max_tokens in the request body.
-        requested_nf = int(forward.get("max_tokens") or 1024)
+        requested_nf = int(forward.get("max_tokens") or 2048)
         # Pure IC heat needs ~1–3 finished beats (~800–1500 tok), not essay walls.
+        # 1024 was clipping mid-clause; 1536 keeps latency tight vs 2048 synthesis.
         nf_cap = 1536
         if requested_nf <= 256:
             # Explicit micro/voice budget — honor it
@@ -2625,7 +2629,11 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         routing["atomic_gw_names"] = sorted(_tool_schema_names(body.get("tools")))
         if not (routing.get("narrative_fast") or routing.get("roleplay") or routing.get("is_roleplay")):
             messages = _inject_qwythos_primer(messages, routing)
-            messages = _inject_golden_fewshot(messages, routing)
+            # Lean 9B path: primer + entity + last N turns + tool schemas.
+            # Golden fewshot is opt-in (HERMES_GOLDEN_FEWSHOT=1) — it burned
+            # context tokens duplicating the primer's tool-call contract.
+            if os.environ.get("HERMES_GOLDEN_FEWSHOT", "").strip() in ("1", "true", "yes"):
+                messages = _inject_golden_fewshot(messages, routing)
             messages, _ent = _inject_entity_context(messages, routing)
             if _ent.get("injected"):
                 routing["entity_preinjected"] = _ent.get("injected")

@@ -1,0 +1,599 @@
+{
+  "ts": "2026-09-03T15:31:37Z",
+  "since": "2026-08-20T15:31:37Z",
+  "until": "2026-09-03T15:31:37Z",
+  "logs": {
+    "n": 252,
+    "buckets": {
+      "finish_reason_length": 4,
+      "discord_2000": 0,
+      "tool_blob": 222,
+      "truncated_banner": 0,
+      "other": 26
+    },
+    "samples": [
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "gateway.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      },
+      {
+        "file": "agent.log",
+        "ts": "2026-09-02T19:00:41Z",
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "2026-09-02 19:00:41,893 WARNING [20260831_112220_01ccdded] agent.tool_executor: Tool terminal returned error (0.74s): {\"output\": \"Traceback (most recent call last):\\r\\n  File \\\"<stdin>\\\", line 12, in <module>\\r\\n  File \\\"<stdin>\\\", line 11, in find_ov\\r\\n  File \\\"<stdin>\\\", line 11, in find_ov\\r\\n  File \\\"<stdin>\\\","
+      },
+      {
+        "file": "agent.log",
+        "ts": "2026-09-02T23:43:42Z",
+        "kind": "(finish_reason[=:'\\\" ]+length|Response r",
+        "line": "2026-09-02 23:43:42,288 WARNING agent.context_compressor: Failed to generate context summary: Context compression summary was truncated (finish_reason=length): generation hit the output token cap and the summary is incomplete (provider=custom model=phronesis-sovereign-auto). Further summary attempts paused for 30 secon"
+      },
+      {
+        "file": "agent.log",
+        "ts": "2026-09-02T23:45:45Z",
+        "kind": "(finish_reason[=:'\\\" ]+length|Response r",
+        "line": "2026-09-02 23:45:45,187 WARNING agent.context_compressor: Failed to generate context summary: Context compression summary was truncated (finish_reason=length): generation hit the output token cap and the summary is incomplete (provider=custom model=phronesis-sovereign-auto). Further summary attempts paused for 30 secon"
+      },
+      {
+        "file": "errors.log",
+        "ts": null,
+        "kind": "(\\[Called\\s|</?tool_call>|Traceback \\(mo",
+        "line": "Traceback (most recent call last):"
+      }
+    ]
+  },
+  "discord": {
+    "channels_considered": 40,
+    "channels_scanned": 40,
+    "messages_bot_window": 548,
+    "active_threads": 142,
+    "active_error": null,
+    "findings": [
+      {
+        "channel": "1524529242019336434",
+        "channel_name": "data-silo",
+        "id": "1540537016402313226",
+        "ts": "2026-08-22T01:44:06.504000+00:00",
+        "len": 464,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] 2026-08-22 prove -- Data silo Classifier patched: this must NOT become the growth board. Optional /reset only if last sticky is XO / Message-ID.  PROMPT 1 (copy this exa"
+      },
+      {
+        "channel": "1528335166462759102",
+        "channel_name": "rp-arch",
+        "id": "1540479791726334083",
+        "ts": "2026-08-21T21:56:43.078000+00:00",
+        "len": 531,
+        "kind": "tool_blob",
+        "preview": "[GROK OPS] 2026-08-21 track card -- RP arch / firewall Last live (today): Android game ad / Many Adventures sandbox talk. Do NOT /reset (keeps that thread). Room stays local. No im"
+      },
+      {
+        "channel": "1528335166462759102",
+        "channel_name": "rp-arch",
+        "id": "1540536997452714127",
+        "ts": "2026-08-22T01:44:01.986000+00:00",
+        "len": 593,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] 2026-08-22 prove -- RP arch / firewall Last: local 9B repetition-stopped. T3 now uses grok-4.6 for hard architecture. Garden still local. No image_gen. Do not /reset (ke"
+      },
+      {
+        "channel": "1528335166462759102",
+        "channel_name": "rp-arch",
+        "id": "1540860098937888819",
+        "ts": "2026-08-22T23:07:55.383000+00:00",
+        "len": 1538,
+        "kind": "midword_cut",
+        "preview": "Here is the drafted reply to Jeff, synthesizing the infrastructure insights from the **Index.md** and the specific maintenance logs to address his query about bottlenecks.  ***  **"
+      },
+      {
+        "channel": "1526952913413607454",
+        "channel_name": "model-mgmt",
+        "id": "1540511793087254629",
+        "ts": "2026-08-22T00:03:52.797000+00:00",
+        "len": 436,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] 2026-08-21 re-paste -- Sovereign model mgmt Reset banner already PASS (phronesis-sovereign-auto). Last :8090 ask was intercepted by Do not SAT --heal. Classifier patched"
+      },
+      {
+        "channel": "1526952913413607454",
+        "channel_name": "model-mgmt",
+        "id": "1540537010161451139",
+        "ts": "2026-08-22T01:44:05.016000+00:00",
+        "len": 590,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] 2026-08-22 prove -- Sovereign model mgmt Classifier patched: this ask must NOT become a SAT/growth speech. Room stays local 9B unless T3 hops. Skip /reset if banner is a"
+      },
+      {
+        "channel": "1526594007092826316",
+        "channel_name": "jan-library",
+        "id": "1540537029211852880",
+        "ts": "2026-08-22T01:44:09.558000+00:00",
+        "len": 414,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] 2026-08-22 prove -- Jan Bloom librarian Last: invented Soil Prep, no path. Local grunt. No RP. No Grok hire.  PROMPT 1 What is the next open Jan/BooksBloom paragraph? Qu"
+      },
+      {
+        "channel": "1525214795236773918",
+        "channel_name": "just-alice",
+        "id": "1540511799156146246",
+        "ts": "2026-08-22T00:03:54.244000+00:00",
+        "len": 496,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] 2026-08-21 re-paste -- JUST ALICE (OOC) Last reply was the tool-syntax suppressor. Tools-off is on disk. Image PINNED. If the last Alice line is still I glitched... then"
+      },
+      {
+        "channel": "1525214795236773918",
+        "channel_name": "just-alice",
+        "id": "1540665085658136616",
+        "ts": "2026-08-22T10:13:00.594000+00:00",
+        "len": 561,
+        "kind": "tool_blob",
+        "preview": "[GROK OPS] 2026-08-22b prove -- JUST ALICE (OOC) Stills UNPINNED. Tools terminal+file. Leak mouth still rewrites [Called ...] to IC beat.  1) /reset once. Wait for the roleplay ban"
+      },
+      {
+        "channel": "1522330326733422713",
+        "channel_name": "",
+        "id": "1540479830573846638",
+        "ts": "2026-08-21T21:56:52.340000+00:00",
+        "len": 516,
+        "kind": "tool_blob",
+        "preview": "[GROK OPS] 2026-08-21 track card -- Interviews + character Quiet since July/Aug 16. Local grunt. Grok 4.6 is not this room. Optional /reset if sticky is XO / [GROK OPS]. PASS after"
+      },
+      {
+        "channel": "1522330326733422713",
+        "channel_name": "",
+        "id": "1540537035784323073",
+        "ts": "2026-08-22T01:44:11.125000+00:00",
+        "len": 419,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] 2026-08-22 prove -- Interviews + character Last: invented Wave G. Local grunt. Optional /reset if sticky is XO.  PROMPT 1 What is the next open ingest step? Talk first. "
+      },
+      {
+        "channel": "1521146755985576116",
+        "channel_name": "",
+        "id": "1540536964309327953",
+        "ts": "2026-08-22T01:43:54.084000+00:00",
+        "len": 415,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] 2026-08-22 prove -- Beauty/seed (OOC) Last: names started (Chloe Emily Lyra ...) then drifted. Image PINNED.  PROMPT 1 OOC only: list the ten names from the last stills,"
+      },
+      {
+        "channel": "1540785379559477432",
+        "channel_name": "",
+        "id": "1540786397521252622",
+        "ts": "2026-08-22T18:15:03.596000+00:00",
+        "len": 1544,
+        "kind": "midword_cut",
+        "preview": "The terminal output reveals that the script executed successfully (exit code 1 is expected for a \"decide\" that triggers an action), but the core logic concluded `REFUSED_URL_ONLY`."
+      },
+      {
+        "channel": "1540785379559477432",
+        "channel_name": "",
+        "id": "1540795810562969613",
+        "ts": "2026-08-22T18:52:27.840000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1540785249825587302",
+        "channel_name": "",
+        "id": "1540795802945855509",
+        "ts": "2026-08-22T18:52:26.024000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1540785175707787424",
+        "channel_name": "",
+        "id": "1540795796604194876",
+        "ts": "2026-08-22T18:52:24.512000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1540184325792862328",
+        "channel_name": "",
+        "id": "1540185681475670086",
+        "ts": "2026-08-21T02:28:01.730000+00:00",
+        "len": 1280,
+        "kind": "midword_cut",
+        "preview": "Here is the detailed breakdown of the skill **https-x-com-witcheer-status-2090309650721788036**, extracted from its metadata file.  ### \ud83d\udccb Skill Overview *   **Name:** `https-x-com-"
+      },
+      {
+        "channel": "1540184325792862328",
+        "channel_name": "",
+        "id": "1540795790350491838",
+        "ts": "2026-08-22T18:52:23.021000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1540183745376813066",
+        "channel_name": "",
+        "id": "1540795783736066079",
+        "ts": "2026-08-22T18:52:21.444000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1538726883858849793",
+        "channel_name": "",
+        "id": "1540795777574637628",
+        "ts": "2026-08-22T18:52:19.975000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1536773641755295825",
+        "channel_name": "",
+        "id": "1540795771421462568",
+        "ts": "2026-08-22T18:52:18.508000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1536750748787023882",
+        "channel_name": "",
+        "id": "1540795765218082836",
+        "ts": "2026-08-22T18:52:17.029000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1536750682974191636",
+        "channel_name": "",
+        "id": "1540795758129971353",
+        "ts": "2026-08-22T18:52:15.339000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535974388455706664",
+        "channel_name": "",
+        "id": "1540795751368757388",
+        "ts": "2026-08-22T18:52:13.727000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535957959656611910",
+        "channel_name": "",
+        "id": "1540795745094078524",
+        "ts": "2026-08-22T18:52:12.231000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535745181616312431",
+        "channel_name": "",
+        "id": "1540795737657446400",
+        "ts": "2026-08-22T18:52:10.458000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535738244715782184",
+        "channel_name": "",
+        "id": "1540795730221072407",
+        "ts": "2026-08-22T18:52:08.685000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535648840626208828",
+        "channel_name": "",
+        "id": "1540795723807719486",
+        "ts": "2026-08-22T18:52:07.156000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535588893972373645",
+        "channel_name": "",
+        "id": "1540795717474586705",
+        "ts": "2026-08-22T18:52:05.646000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535345647526617178",
+        "channel_name": "",
+        "id": "1540795710746787950",
+        "ts": "2026-08-22T18:52:04.042000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535272299534487643",
+        "channel_name": "",
+        "id": "1540795701053620254",
+        "ts": "2026-08-22T18:52:01.731000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535084946006352044",
+        "channel_name": "",
+        "id": "1540795693977968832",
+        "ts": "2026-08-22T18:52:00.044000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535004391059226767",
+        "channel_name": "",
+        "id": "1540795686843580517",
+        "ts": "2026-08-22T18:51:58.343000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535004277448118344",
+        "channel_name": "",
+        "id": "1540795680467984446",
+        "ts": "2026-08-22T18:51:56.823000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1535004173794541568",
+        "channel_name": "",
+        "id": "1540795673652494369",
+        "ts": "2026-08-22T18:51:55.198000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1534941887587160114",
+        "channel_name": "",
+        "id": "1540795666433835149",
+        "ts": "2026-08-22T18:51:53.477000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      },
+      {
+        "channel": "1534724658195206254",
+        "channel_name": "",
+        "id": "1540795659966357604",
+        "ts": "2026-08-22T18:51:51.935000+00:00",
+        "len": 754,
+        "kind": "midword_cut",
+        "preview": "[GROK OPS] LEARN TRACK -- follow this for THIS thread.  1. Gather: web_extract the x.com/URL (web_search if extract fails). Never image_generate. Never empty browser_exec. 2. Disti"
+      }
+    ]
+  }
+}
