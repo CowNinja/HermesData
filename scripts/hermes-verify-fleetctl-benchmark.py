@@ -40,7 +40,15 @@ def load_module(name):
 def subproc_ok(cmd, label, timeout=15):
     import subprocess
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, shell=True)
+        r = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            shell=True,
+            stdin=subprocess.DEVNULL,
+            creationflags=0x08000000 if sys.platform == "win32" else 0,
+        )
         if r.returncode != 0:
             fail(f"{label} -> exit {r.returncode}: {r.stderr[:200]}")
             return None

@@ -726,9 +726,10 @@ discord:
       the door. Quote the receipt. Never invent Discord-ID pollers. Never Message-ID
       theater. L5 is Jeff clicks — no mass K: scan. Canon: Four Worlds + ownership
       map.'
-    '1524846849360531456': Grok coord hire. grok-4.6 until 2026-09-03 00:00 America/New_York.
-      SAME WALLET as Heavy/4.5/Build/Composer — all xAI hops die then. Do not refuse
-      token-burn before sunset. After sunset this pin 401s; Alice 9B is the mouth.
+    '1524846849360531456': Grok coord = LOCAL Alice after xAI wallet sunset. Was grok-4.6
+      hire. SAME WALLET as Heavy/4.5/Build/Composer — all xAI hops die then. Do not
+      refuse token-burn before sunset. After sunset this pin 401s; Alice 9B is the
+      mouth.
     '1528335166462759102': 'RP-SANDBOX ARCHITECTURE/FIREWALL — factual ops. Firewalled
       garden; no heat in ops. Quote rp_sandbox_firewall_selfcheck.py pass/fail. Do
       not paste SAT CORE cards from model-mgmt. Token thrift: short tool output.'
@@ -1275,9 +1276,9 @@ discord:
       note: '2026-08-27: max_turns 16 so six_numbers + explain can finish. 2026-08-04
         thrift: silo kitchen terminal+file only. Policy: thread-tool-budget-thrift.'
     '1524846849360531456':
-      model: grok-4.6
-      provider: xai-oauth
-      context_length: 500000
+      model: phronesis-sovereign-auto
+      provider: custom:phronesis-sovereign
+      context_length: 131072
       max_turns: 28
       max_tokens: 8192
       system_prompt: 'Named Grok 4.6 hire surface until 2026-09-03 00:00 America/New_York.
@@ -1484,7 +1485,7 @@ grok_auth:
   api_model: grok-4.6
   timeout_seconds: 300
   prefer_subscription: true
-  oauth_refresh_on_auth_fail: true
+  oauth_refresh_on_auth_fail: false
   fallback_http_codes:
   - 401
   - 403

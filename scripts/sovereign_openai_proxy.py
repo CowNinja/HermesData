@@ -55,6 +55,37 @@ for _p in (HERMES_HOME, HERMES_SCRIPTS, VAULT_SCRIPTS):
     if _s not in sys.path:
         sys.path.insert(0, _s)
 
+try:
+    import proxy_json_repair as _pjr
+except Exception:
+    _pjr = None  # type: ignore
+
+
+def _loads_tool_json(text: Any) -> Any:
+    """json.loads with proxy_json_repair as a pre-parse fallback.
+
+    Additive: valid JSON is unchanged. Dirty LLM tool payloads (trailing
+    commas, missing closers, ```json fences, mixed quotes) are repaired
+    instead of becoming empty arguments.
+    """
+    if isinstance(text, (dict, list)):
+        return text
+    raw = str(text or "").strip()
+    if not raw:
+        raise json.JSONDecodeError("empty", raw, 0)
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    if _pjr is not None:
+        try:
+            got = _pjr.loads(raw)
+            if got is not None:
+                return got
+        except Exception:
+            pass
+    return json.loads(raw)
+
 DEFAULT_PORT = 8091
 UNIFIED_ROUTER_PORT = 8090
 UNIFIED_ROUTER_CHAT = f"http://127.0.0.1:{UNIFIED_ROUTER_PORT}/v1/chat/completions"
@@ -1306,7 +1337,7 @@ def _extract_tool_from_payload(payload: dict) -> tuple[str | None, dict]:
     args = payload.get("arguments") or payload.get("parameters") or {}
     if isinstance(args, str):
         try:
-            args = json.loads(args)
+            args = _loads_tool_json(args)
         except Exception:
             args = {}
     if not isinstance(args, dict):
@@ -1327,14 +1358,14 @@ def _normalize_llamacpp_tool_message(message: Dict[str, Any]) -> Dict[str, Any]:
     for pattern in _TOOL_XML_PATTERNS:
         for match in pattern.finditer(content):
             try:
-                payload = json.loads(match.group(1))
+                payload = _loads_tool_json(match.group(1))
             except Exception:
                 continue
             name = payload.get("name") or payload.get("tool")
             args = payload.get("arguments") or payload.get("parameters") or {}
             if isinstance(args, str):
                 try:
-                    args = json.loads(args)
+                    args = _loads_tool_json(args)
                 except Exception:
                     args = {}
             if not isinstance(args, dict):
@@ -1355,7 +1386,7 @@ def _normalize_llamacpp_tool_message(message: Dict[str, Any]) -> Dict[str, Any]:
             )
     if not extracted and content.strip().startswith("{"):
         try:
-            payload = json.loads(content.strip())
+            payload = _loads_tool_json(content.strip())
             name, args = _extract_tool_from_payload(payload)
             if name and name not in _COLLAB_BLOCKED_TOOLS:
                 extracted.append(
@@ -1376,7 +1407,7 @@ def _normalize_llamacpp_tool_message(message: Dict[str, Any]) -> Dict[str, Any]:
             if not line.startswith("{"):
                 continue
             try:
-                payload = json.loads(line)
+                payload = _loads_tool_json(line)
             except Exception:
                 continue
             name, args = _extract_tool_from_payload(payload)
