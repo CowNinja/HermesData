@@ -35,7 +35,7 @@ ROLEPLAY_PLATFORMS = frozenset({
 BACKEND_LOCAL = "local"
 BACKEND_FREE = "free"
 BACKEND_GROK = "grok"
-DEFAULT_HOP = (BACKEND_LOCAL, BACKEND_FREE, BACKEND_GROK)
+DEFAULT_HOP = (BACKEND_LOCAL, BACKEND_FREE)
 
 _FLEET_POLICY_CACHE: Dict[str, Any] = {"loaded_at": 0.0, "policy": {}}
 _FLEET_POLICY_TTL_SEC = 30.0
@@ -93,8 +93,8 @@ def fleet_policy() -> Dict[str, Any]:
         "proactive_realtime_triggers": bool(fleet.get("proactive_realtime_triggers", True)),
         "proactive_offload": bool(fleet.get("proactive_offload", True)),
         # Policy B: auto T3 for hard prompts; share caps mirror thrift gate
-        "grok_policy": str(fleet.get("grok_policy") or "B").upper(),
-        "hard_prompt_auto_t3": bool(fleet.get("hard_prompt_auto_t3", True)),
+        "grok_policy": "OFF",
+        "hard_prompt_auto_t3": False,
         "grok_share_cap_yellow": float(fleet.get("grok_share_cap_yellow", 0.12)),
         "grok_share_cap_red": float(fleet.get("grok_share_cap_red", 0.28)),
         "registry": str(fleet.get("registry") or HERMES_ROOT / "config" / "fleet_registry.yaml"),
@@ -429,58 +429,22 @@ def try_t2_fleet_dispatch(
 
 
 def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Tier 3 -- heavy reasoning. Grok first, free backup.
-
-    prefer_free_before_grok is grunt law (T1/T2). Public brains skip 9B/free
-    as the first thinker. Garden / RP never enter this function.
-    Grok auth via grok_auth.py (subscription OAuth first, console API key fallback).
-    """
+    """xAI untethered. T3 is OpenRouter free (T2). Never grok_auth."""
     if is_roleplay_route(routing):
         return {"success": False, "tier": "paid", "error": "roleplay_blocked"}
-
-    ok, block_reason, fleet_prompt, mask_map = _prepare_fleet_prompt(prompt, routing)
-    if not ok:
-        return {"success": False, "tier": "paid", "error": f"fleet_blocked:{block_reason}"}
-
-    from grok_auth import grok_user_prompt_completion
-    from privacy_mask_rehydrate import rehydrate_result
-
-    result = grok_user_prompt_completion(fleet_prompt)
-    if result.get("success"):
-        result = rehydrate_result(result, mask_map)
-        prov = result.setdefault("provenance", {})
-        prov["escalation_tier"] = "T3"
-        prov["selected_backend"] = "grok"
-        _log({
-            "event": "t3_ok",
-            "model": result.get("model"),
-            "billing": prov.get("billing"),
-            "auth_provider": prov.get("provider"),
-            "latency_sec": result.get("latency_sec"),
-        })
-        return result
-
-    err_msg = str(result.get("error") or result.get("response") or "t3_dispatch_failed")
-    _log({"event": "t3_fail", "error": err_msg})
-
-    # Free backup after Grok miss — never the other way around on T3
     t2 = try_t2_fleet_dispatch(prompt, routing, local_failed=True)
     if t2.get("success"):
         prov = t2.setdefault("provenance", {})
-        prov["t3_fallback_to_t2"] = True
-        prov["t3_grok_error"] = err_msg[:240]
+        prov["t3_untethered_to_t2"] = True
+        prov["selected_backend"] = "free"
         return t2
-
     return {
         "success": False,
         "escalation": True,
-        "tier": "grok_escalation",
-        "response": f"[T3 PAID ESCALATION] {err_msg}",
-        "provenance": result.get("provenance") or {
-            "selected_backend": "paid_grok",
-            "escalation_tier": "T3",
-        },
+        "tier": "xai_untethered",
+        "error": "xai_wallet_dead",
+        "response": "[T3 UNTETHERED] no paid Grok; OpenRouter free missed",
+        "provenance": {"selected_backend": "none", "escalation_tier": "T3_dead"},
     }
 
 
@@ -874,11 +838,9 @@ def resolve_post_local_dispatch(
     pol = fleet_policy()
     tier = str(routing.get("escalation_tier") or "")
     hop_first = hop[0] if hop else ""
-    brains_first = hop_first == BACKEND_GROK or tier == "T3"
-    want_free = BACKEND_FREE in hop and (
-        (not brains_first) and pol.get("prefer_free_before_grok", True)
-    )
-    want_grok = BACKEND_GROK in hop or brains_first
+    brains_first = False
+    want_free = BACKEND_FREE in hop
+    want_grok = False
 
     # Public brains: Grok first even after local miss. Grunt: free first.
     if brains_first and want_grok:

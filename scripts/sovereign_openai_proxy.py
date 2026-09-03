@@ -109,7 +109,14 @@ FACTUAL_TOOL_MARKERS = (
     "quote the json",
     "autonomy_growth",
     "--orchestrate",
+    "vault_search",
+    "service_manager",
+    "system_telemetry",
 )
+
+PRIMER_PATH = HERMES_HOME / "state" / "prompts" / "qwythos_system_primer.md"
+_PRIMER_CACHE: Dict[str, Any] = {"mtime": None, "text": ""}
+ATOMIC_TOOL_NAMES = ("vault_search", "service_manager", "system_telemetry")
 
 _THINK_BLOCK_RE = re.compile(
     r"<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\b[^>]*>.*?</(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>",
@@ -1017,11 +1024,101 @@ def _inject_tool_optimised_mode(
 ) -> List[Dict[str, Any]]:
     note = (
         f"You are now in tool-optimised mode ({tier}). "
-        "Emit real tool_calls with exact JSON arguments; do not narrate tools in prose."
+        "Do NOT describe tool use in prose. Do NOT write [Called ...]. "
+        "Prefer vault_search, service_manager, or system_telemetry over raw PowerShell. "
+        'Emit ONLY a raw tool call: <tool_call>{"name":"system_telemetry","arguments":{}}</tool_call> then stop.'
     )
     out = list(messages or [])
     out.insert(0, {"role": "system", "content": note})
     return out
+
+
+def _load_qwythos_primer() -> str:
+    path = PRIMER_PATH
+    try:
+        import yaml  # type: ignore
+
+        cfg = yaml.safe_load(Path(r"D:\HermesData\config.yaml").read_text(encoding="utf-8")) or {}
+        cfg_path = str(((cfg.get("local_sovereign") or {}).get("system_primer") or "")).strip()
+        if cfg_path:
+            path = Path(cfg_path)
+    except Exception:
+        pass
+    try:
+        st = path.stat()
+    except OSError:
+        return str(_PRIMER_CACHE.get("text") or "")
+    if _PRIMER_CACHE.get("mtime") == st.st_mtime and _PRIMER_CACHE.get("text"):
+        return str(_PRIMER_CACHE["text"])
+    text = path.read_text(encoding="utf-8", errors="replace").strip()
+    _PRIMER_CACHE["mtime"] = st.st_mtime
+    _PRIMER_CACHE["text"] = text
+    return text
+
+
+def _inject_qwythos_primer(
+    messages: List[Dict[str, Any]],
+    routing: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    routing = routing or {}
+    if routing.get("narrative_fast") or routing.get("roleplay") or routing.get("is_roleplay"):
+        return messages
+    text = _load_qwythos_primer()
+    if not text:
+        return messages
+    for msg in (messages or [])[:4]:
+        if isinstance(msg, dict) and "QWYTHOS 9B SYSTEM PRIMER" in str(msg.get("content") or ""):
+            return messages
+    out = list(messages or [])
+    out.insert(0, {"role": "system", "content": text})
+    return out
+
+
+def _atomic_catalogue():
+    try:
+        tools_dir = str(HERMES_SCRIPTS / "tools")
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        import atomic_tool_catalogue as cat  # type: ignore
+
+        return cat
+    except Exception:
+        return None
+
+
+def _tool_schema_names(tools: Optional[List[Any]]) -> set:
+    names: set = set()
+    for t in tools or []:
+        if not isinstance(t, dict):
+            continue
+        fn = t.get("function") if isinstance(t.get("function"), dict) else t
+        n = fn.get("name") if isinstance(fn, dict) else None
+        if n:
+            names.add(str(n))
+    return names
+
+
+def _merge_atomic_tools(tools: Optional[List[Any]]) -> List[Dict[str, Any]]:
+    cat = _atomic_catalogue()
+    if cat is None:
+        return list(tools or [])
+    try:
+        return cat.merge_atomic_schemas(tools)
+    except Exception:
+        return list(tools or [])
+
+
+def _rewrite_atomic_tool_calls(
+    tool_calls: Optional[List[Dict[str, Any]]],
+    gateway_names: Optional[set] = None,
+) -> Optional[List[Dict[str, Any]]]:
+    cat = _atomic_catalogue()
+    if cat is None or not tool_calls:
+        return tool_calls
+    try:
+        return cat.rewrite_tool_calls(tool_calls, set(gateway_names or ()))
+    except Exception:
+        return tool_calls
 
 
 def _synthesize_factual_terminal_call(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -1283,6 +1380,28 @@ def dispatch_via_native_router(
 ) -> Dict[str, Any]:
     """Forward full OpenAI chat payload to llama-server on 8090 (tools + messages)."""
     routing = routing or {}
+    llama_port = UNIFIED_ROUTER_PORT
+    try:
+        import yaml  # type: ignore
+        from pathlib import Path as _P
+
+        _ls = (yaml.safe_load(_P(r"D:\HermesData\config.yaml").read_text(encoding="utf-8")) or {}).get("local_sovereign") or {}
+        if _ls.get("deep_reasoning_mode") and str(routing.get("task_type") or "") in {
+            "deep_analysis",
+            "synthesis",
+            "code",
+        }:
+            _p = int(((_ls.get("deep_reasoner") or {}).get("port") or 8092))
+            s = socket.socket()
+            s.settimeout(0.4)
+            try:
+                if s.connect_ex(("127.0.0.1", _p)) == 0:
+                    llama_port = _p
+                    routing["deep_reasoner"] = True
+            finally:
+                s.close()
+    except Exception:
+        llama_port = UNIFIED_ROUTER_PORT
     logical = resolve_backend_logical_model(gateway_model, routing)
     gateway_model = str(routing.get("model") or gateway_model or "")
     narrative_fast = is_narrative_fast_path(messages, body, routing)
@@ -1345,7 +1464,7 @@ def dispatch_via_native_router(
     # (enable_thinking off already). Factual required tools still prefer non-fast.
     if tool_passthrough or factual_tools:
         if body.get("tools") and (not narrative_fast or tool_passthrough):
-            forward["tools"] = body["tools"]
+            forward["tools"] = body["tools"] if narrative_fast else _merge_atomic_tools(body.get("tools"))
         if factual_tools and body.get("tools") and not narrative_fast:
             forward["tool_choice"] = "required"
         elif body.get("tool_choice") is not None and (not narrative_fast or tool_passthrough):
@@ -1413,7 +1532,8 @@ def dispatch_via_native_router(
 
         def _dispatch_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
             raw = json.dumps(payload).encode("utf-8")
-            return _dispatch_upstream_with_pool(UNIFIED_ROUTER_CHAT, raw)
+            chat_url = f"http://127.0.0.1:{llama_port}/v1/chat/completions"
+            return _dispatch_upstream_with_pool(chat_url, raw)
 
         result = _dispatch_payload(forward)
         if result["status"] != 200:
@@ -1612,6 +1732,12 @@ def dispatch_via_native_router(
                 msg.pop(key, None)
 
     choice = {**choice, "message": msg}
+    if msg.get("tool_calls"):
+        gw_names = set(routing.get("atomic_gw_names") or [])
+        rewritten = _rewrite_atomic_tool_calls(msg.get("tool_calls"), gw_names)
+        if rewritten is not None:
+            msg["tool_calls"] = rewritten
+            choice = {**choice, "message": msg}
     if msg.get("tool_calls") and choice.get("finish_reason") in (None, "stop"):
         choice["finish_reason"] = "tool_calls"
     data = {**data, "choices": [choice] + list(data.get("choices") or [])[1:]}
@@ -1728,24 +1854,15 @@ def resolve_roleplay_routing(
         image_timeout = any(
             k in blob for k in ("image_gen_timeout", "image timeout", "comfy timeout", "generation timed out")
         )
-        if tool_fails > 2 or image_timeout:
-            routing["escalation_tier"] = "T3"
+        if tool_fails > 1 or image_timeout:
+            routing["escalation_tier"] = "T2"
             routing["tool_optimised_mode"] = True
             reasons = list(routing.get("reasons") or [])
-            if tool_fails > 2:
+            if tool_fails > 1:
                 reasons.append(f"tool_fail_count={tool_fails}")
             if image_timeout:
                 reasons.append("image_gen_timeout")
             routing["reasons"] = reasons
-        elif tool_fails > 1:
-            routing["escalation_tier"] = "T2"
-            routing["tool_optimised_mode"] = True
-            reasons = list(routing.get("reasons") or [])
-            reasons.append(f"tool_fail_count={tool_fails}")
-            routing["reasons"] = reasons
-        elif any(k in blob for k in ("heavy reasoning", "grok heavy", "tier 3", "t3 escalate")):
-            routing["escalation_tier"] = "T3"
-            routing["tool_optimised_mode"] = True
     nf = is_narrative_fast_path(messages, body, routing)
     routing["narrative_fast"] = nf
     routing["suppress_reasoning"] = nf
@@ -1774,7 +1891,7 @@ def dispatch_via_bridge(
         context_tokens_estimate=estimate_tokens(prompt) + 4000,
         modality="text",
         tool_fail_count=int(route.get("tool_fail_count") or 0),
-        explicit_grok_flag=bool(route.get("escalation_tier") in ("T2", "T3")),
+        explicit_grok_flag=False,
         chat_id=str(route.get("chat_id") or ""),
         thread_id=str(route.get("thread_id") or ""),
         parent_channel_id=str(route.get("parent_channel_id") or ""),
@@ -2071,6 +2188,8 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                 "prompt_cache": _prompt_cache.stats,
                 "circuit_breakers": breaker_states,
                 "connection_pool_hosts": list(_upstream_pool._pool.keys()),
+                "qwythos_primer": bool(_load_qwythos_primer()),
+                "atomic_tools": list(ATOMIC_TOOL_NAMES),
             }
             try:
                 payload["stack"] = matrix
@@ -2248,6 +2367,10 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         stream = bool(body.get("stream", False))
         routing = resolve_roleplay_routing(messages, model, body)
         model = str(routing.get("model") or model)
+        routing["atomic_gw_names"] = sorted(_tool_schema_names(body.get("tools")))
+        if not (routing.get("narrative_fast") or routing.get("roleplay") or routing.get("is_roleplay")):
+            messages = _inject_qwythos_primer(messages, routing)
+            body["tools"] = _merge_atomic_tools(body.get("tools"))
         if routing.get("tool_optimised_mode"):
             tier = str(routing.get("escalation_tier") or "T2")
             messages = _inject_tool_optimised_mode(messages, tier=tier)

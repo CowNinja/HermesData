@@ -1,8 +1,9 @@
 model:
-  default: grok-4.6
-  provider: xai-oauth
+  default: phronesis-sovereign-auto
+  provider: custom:phronesis-sovereign
   max_tokens: 8192
-  base_url: ''
+  base_url: http://127.0.0.1:8091/v1
+  context_length: 131072
 fallback_providers:
 - provider: openrouter
   model: openrouter/free
@@ -12,9 +13,6 @@ fallback_providers:
   model: google/gemma-4-26b-a4b-it:free
 - provider: openrouter
   model: poolside/laguna-s-2.1:free
-- provider: xai-oauth
-  model: grok-4.5
-  api_mode: chat_completions
 toolsets:
 - hermes-cli
 - browser
@@ -32,13 +30,13 @@ agent:
   parallel_tool_call_guidance: false
   environment_probe: false
   environment_hint: 'Phronesis Sovereign Stack: Qwythos-9B Q6_K @ 131072 ctx on llama-server:8090
-    via phronesis-sovereign proxy:8091. Model rotation is LOCKED ? 9B only, no 14B
-    fallback. Talk first as Alice. For disk/system facts, run terminal/file — never
-    invent command output. Never dump tool schemas. Deliver clean final answers only;
-    no scratch reasoning in replies. INTERVIEW/CLARIFY UX: never fake dialogue with
-    Jeff; multi-choice = one clarify(4) then STOP, or one batch of <=10 A-D (~2k chars);
-    no MCQ novels; no invent skills; no [Called ...] leaks. Skills: discord-clarify-interview,
-    jeff-about-me-interview (About-me thread).'
+    via phronesis-sovereign proxy:8091. Model rotation is LOCKED - 9B only, no 14B
+    fallback. ALWAYS invoke terminal/file tools for factual queries (disk space, file
+    listings, system state) - never hallucinate command output. Deliver clean final
+    answers only; no scratch reasoning in replies. INTERVIEW/CLARIFY UX: never fake
+    dialogue with Jeff; multi-choice = one clarify(4) then STOP, or one batch of <=10
+    A-D (~2k chars); no MCQ novels; no invent skills; no [Called ...] leaks. Skills:
+    discord-clarify-interview, jeff-about-me-interview (About-me thread).'
   coding_context: auto
   verify_on_stop: false
   gateway_timeout_warning: 900
@@ -48,7 +46,7 @@ agent:
   image_input_mode: auto
   disabled_toolsets: []
   verbose_schema: false
-  reasoning_effort: high
+  reasoning_effort: low
   personalities:
     technical: You are Alice / Hermes — Jeff's first-person local partner on this
       private stack. Speak as I/me; address him as you. Warm, direct, high-agency.
@@ -442,7 +440,7 @@ moa:
       max_tokens: 4096
       fanout: per_iteration
     Grok:
-      enabled: true
+      enabled: false
       reference_models:
       - provider: custom:phronesis-sovereign
         model: phronesis-sovereign-auto
@@ -456,7 +454,7 @@ moa:
       max_tokens: 4096
       fanout: per_iteration
     Grok + Phronesis:
-      enabled: true
+      enabled: false
       reference_models:
       - provider: custom:phronesis-sovereign
         model: phronesis-sovereign-auto
@@ -474,7 +472,7 @@ moa:
       max_tokens: 4096
       fanout: per_iteration
     Just xAi:
-      enabled: true
+      enabled: false
       reference_models:
       - provider: xai-oauth
         model: grok-build-0.1
@@ -517,7 +515,7 @@ moa:
   fanout: per_iteration
   enabled: false
   Just xAi:
-    enabled: true
+    enabled: false
     reference_models:
     - provider: xai-oauth
       model: grok-build-0.1
@@ -728,9 +726,9 @@ discord:
       the door. Quote the receipt. Never invent Discord-ID pollers. Never Message-ID
       theater. L5 is Jeff clicks — no mass K: scan. Canon: Four Worlds + ownership
       map.'
-    '1524846849360531456': Grok coord = named Grok 4.6 hire surface (model grok-4.6).
-      Jeff walks in on purpose. Alice still owns kitchen elsewhere. TL;DR. No RP.
-      Never dump schemas. Garden/RP stay local_only.
+    '1524846849360531456': Grok coord hire. grok-4.6 until 2026-09-03 00:00 America/New_York.
+      SAME WALLET as Heavy/4.5/Build/Composer — all xAI hops die then. Do not refuse
+      token-burn before sunset. After sunset this pin 401s; Alice 9B is the mouth.
     '1528335166462759102': 'RP-SANDBOX ARCHITECTURE/FIREWALL — factual ops. Firewalled
       garden; no heat in ops. Quote rp_sandbox_firewall_selfcheck.py pass/fail. Do
       not paste SAT CORE cards from model-mgmt. Token thrift: short tool output.'
@@ -1282,14 +1280,12 @@ discord:
       context_length: 500000
       max_turns: 28
       max_tokens: 8192
-      system_prompt: 'Named Grok 4.6 hire surface. Hard architecture / judgment only.
-        Jeff armed this room to grok-4.6 (desktop switch 2026-08-16). Alice owns kitchen
-        elsewhere. Kitchen/SAT and run/quote growth are receipt doors. Design talk
-        stays here. Quote SAT/growth receipts or say you did not run a door. Discord
-        2000 cap = short replies. FORBIDDEN: RP voice (*actions*, babe, flirty), invented
-        organs (trunks, vector core, self-evolving state, harvest daemons, MODE_PROACTIVE),
-        claiming system-wide patches you did not ship. Never dump tool schemas. Garden/RP
-        stay local_only.'
+      system_prompt: 'Named Grok 4.6 hire surface until 2026-09-03 00:00 America/New_York.
+        SAME WALLET as Heavy, 4.5, Build, Composer — every xAI hop dies at that clock.
+        Do not refuse token-burn or local-setup work before sunset. After sunset this
+        pin 401s; Alice on 9B + OpenRouter free is the mouth. Hard architecture /
+        judgment. Alice owns kitchen elsewhere. Discord 2000 cap. FORBIDDEN: RP voice,
+        invented organs, claiming patches you did not ship. Garden/RP stay local_only.'
       enabled_toolsets:
       - terminal
       - file
@@ -1329,8 +1325,8 @@ discord:
       context_length: 131072
       max_turns: 24
       max_tokens: 8192
-      system_prompt: 'LINKEDIN JOB HUNT — named Grok 4.6 room (thread 1540894882141311046).
-        Jeff wants part-time remote work. Profile https://www.linkedin.com/in/jjbloom
+      system_prompt: 'LINKEDIN JOB HUNT — local 9B room (thread 1540894882141311046).
+        Not xAI after 2026-09-03. Jeff wants part-time remote work. Profile https://www.linkedin.com/in/jjbloom
         (Jeffrey Bloom / CowNinja / Navy IT NSVT / Suffolk).
 
         DO REAL WORK. Never invent a bws probe, Playwright login, or LinkedIn API
@@ -1424,11 +1420,19 @@ custom_providers:
     phronesis-sovereign-deep:
       context_length: 131072
 local_sovereign:
+  system_primer: D:\HermesData\state\prompts\qwythos_system_primer.md
   boot_integrity:
     enabled: false
     mode: fast
     on_fail: warn
     timeout_seconds: 20
+  deep_reasoning_mode: false
+  deep_reasoner:
+    port: 8092
+    n_gpu_layers: 24
+    ctx_size: 16384
+    note: Partial GPU offload + RAM. Single-tenant 12GB. Launcher 02-start-llama-hybrid-reasoner.ps1.
+      Default off so 9B keeps :8090.
   opportunistic_fleet:
     enabled: true
     registry: D:/HermesData/config/fleet_registry.yaml
@@ -1437,8 +1441,8 @@ local_sovereign:
     fallback_on_local_fail: true
     proactive_realtime_triggers: true
     proactive_offload: true
-    grok_policy: B
-    hard_prompt_auto_t3: true
+    grok_policy: false
+    hard_prompt_auto_t3: false
     grok_share_cap_yellow: 0.22
     grok_share_cap_red: 0.4
   gateway_name: phronesis-moe-gateway
@@ -1463,12 +1467,13 @@ local_sovereign:
     policy:
       private_explicit_secrets: local_only
       grunt: local_then_free
-      novel_high_value: grok_first_via_proxy_t3
+      novel_high_value: local_then_free
       token_exhaustion: never_hard_fail_use_local_free
-    updated_at: '2026-08-13T18:00:00Z'
-    note: Discord channel_overrides must not pin xai-oauth; hop policy in proxy. Garden/RP/ERP
-      = local_only. Deep ops may select Grok 4.6 via T3. Never hop-1 Discord-wide.
-      Jeff-armed 2026-08-22 more T3 reasoning while weekly budget remains.
+    updated_at: '2026-09-02T23:30:00Z'
+    note: Discord channel_overrides must not pin xai-oauth after 2026-09-03. Garden/RP/ERP
+      = local_only. xAI wallet (Heavy/4.6/4.5/Build/Composer) dies 2026-09-03 00:00
+      America/New_York. T3 grok hops are then 401s. Hire room unpins via grok_wallet_sunset.py.
+      Never hop-1 Discord-wide.
 fallback_model:
 - provider: custom:phronesis-sovereign
   model: phronesis-sovereign-auto
