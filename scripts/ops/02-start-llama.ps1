@@ -27,6 +27,20 @@ $Ngl      = if ($Ngl) { $Ngl } else { [int]$core.n_gpu_layers }
 if (-not (Test-Path $llamaServer)) { Write-Host "FATAL: $llamaServer not found" -ForegroundColor Red; exit 1 }
 if (-not (Test-Path $Model))       { Write-Host "FATAL: $Model not found" -ForegroundColor Red; exit 1 }
 
+# FM-430 2026-09-03 VRAM lock: no second llama-server, no bounce of a healthy CORE.
+$probePort = if ($Port) { [int]$Port } else { 8090 }
+if ($probePort -ne 8090) {
+    Write-Host "FM-430 VRAM lock: refusing llama-server on :$probePort. CORE is :8090 only." -ForegroundColor Red
+    exit 2
+}
+try {
+    $h = Invoke-WebRequest -Uri "http://127.0.0.1:$probePort/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+    if ($h.StatusCode -ge 200 -and $h.StatusCode -lt 300) {
+        Write-Host "FM-430 VRAM lock: 127.0.0.1:$probePort already healthy. Refusing restart / second spawn." -ForegroundColor Yellow
+        exit 0
+    }
+} catch { }
+
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "Phronesis-Llama-Process.ps1")
 if (Stop-LlamaOnPort -Port $Port) { Start-Sleep -Seconds 1 }
 

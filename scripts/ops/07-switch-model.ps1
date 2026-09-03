@@ -6,6 +6,9 @@ param(
     [int]$Ngl
 )
 
+# FM-430 2026-09-03 VRAM lock: switching GGUF loads extra weights. Hard refuse.
+Write-Host "FM-430 VRAM lock: refusing model switch. CORE :8090 stays as-is." -ForegroundColor Red
+exit 2
 $corePath = Join-Path (Split-Path $PSScriptRoot -Parent) "phronesis-core.json"
 $core = Get-Content $corePath -Raw | ConvertFrom-Json
 if ($core.model_locked -or $core.model_rotation_locked) {

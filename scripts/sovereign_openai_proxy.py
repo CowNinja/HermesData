@@ -2008,6 +2008,9 @@ def dispatch_via_native_router(
     }
     if trim_meta:
         prov["context_trim"] = trim_meta
+        slide = trim_meta.get("sliding_window") or {}
+        prov["resurrection_trimmed"] = bool(slide.get("dropped_convo"))
+    prov["token_ceiling"] = int(forward.get("max_tokens") or max_tokens or 2048)
     if transmute_meta:
         prov.update(transmute_meta)
     if routing.get("entity_preinjected"):
@@ -2605,6 +2608,64 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
                     "action": action or "status",
                     "breaker": br.snapshot(),
                     "ts": _utc_now(),
+                },
+            )
+            return
+        if path in ("/v1/trim_inspect", "/trim_inspect"):
+            # Loopback-only. Trim + token ceiling. Never calls llama-server :8090.
+            if not self._client_is_loopback():
+                self._send_json(403, {"error": "loopback_only"})
+                return
+            try:
+                body = self._read_json()
+            except Exception as exc:
+                self._send_json(400, {"error": f"invalid JSON: {exc}"})
+                return
+            if body.get("__error__"):
+                return
+            model = str(body.get("model") or "phronesis-sovereign-auto")
+            messages = body.get("messages") or []
+            routing = resolve_roleplay_routing(messages, model, body)
+            model = str(routing.get("model") or model)
+            if not (routing.get("narrative_fast") or routing.get("roleplay") or routing.get("is_roleplay")):
+                messages = _inject_qwythos_primer(messages, routing)
+                messages, _ent = _inject_entity_context(messages, routing)
+            try:
+                trimmed, trim_meta = trim_messages_tier_aware(messages, model)
+            except Exception as exc:
+                self._send_json(400, {"error": f"trim failed: {exc}"})
+                return
+            narrative_fast = is_narrative_fast_path(messages, body, routing)
+            tool_passthrough = _request_needs_tool_passthrough(body, messages)
+            factual_tools = _requires_factual_tool_use(messages, routing=routing, model=model)
+            requested_max = int(body.get("max_tokens") or 2048)
+            cap = 4096 if (tool_passthrough or factual_tools) else 2048
+            max_tokens = min(requested_max, cap)
+            if not narrative_fast:
+                max_tokens = max(max_tokens, min(2048, cap))
+            elif narrative_fast:
+                max_tokens = min(max_tokens, 1536)
+            slide = (trim_meta or {}).get("sliding_window") or {}
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "llama_touched": False,
+                    "kept_n": len(trimmed),
+                    "kept_roles": [str(m.get("role")) for m in trimmed],
+                    "anchor_n": int(slide.get("anchor_n") or 0),
+                    "tail_n": int(slide.get("tail_n") or 0),
+                    "dropped_convo": int(slide.get("dropped_convo") or 0),
+                    "phronesis_provenance": {
+                        "token_ceiling": int(max_tokens),
+                        "resurrection_trimmed": bool(slide.get("dropped_convo")),
+                        "sliding_window": slide,
+                        "context_trim": {
+                            "trimmed": bool((trim_meta or {}).get("trimmed")),
+                            "original_message_count": (trim_meta or {}).get("original_message_count"),
+                            "final_message_count": (trim_meta or {}).get("final_message_count"),
+                        },
+                    },
                 },
             )
             return
@@ -3318,6 +3379,11 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
             "resolved_model": resolved_model,
             "uncensored_route": prov.get("uncensored_route"),
             "context_trim": trim_meta,
+            "token_ceiling": int(prov.get("token_ceiling") or 2048),
+            "resurrection_trimmed": bool(
+                prov.get("resurrection_trimmed")
+                or ((trim_meta.get("sliding_window") or {}).get("dropped_convo") if trim_meta else 0)
+            ),
             "narrative_fast": bool(routing.get("narrative_fast") or result.get("narrative_fast")),
             "suppress_reasoning": bool(
                 routing.get("suppress_reasoning") or result.get("narrative_fast")
