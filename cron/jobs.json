@@ -22,15 +22,15 @@
       "schedule_display": "30 */12 * * *",
       "repeat": {
         "times": null,
-        "completed": 77
+        "completed": 78
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-08-03T19:27:05.616089+00:00",
-      "next_run_at": "2026-09-11T12:30:00-04:00",
-      "last_run_at": "2026-09-11T00:30:38.795121-04:00",
+      "next_run_at": "2026-09-12T00:30:00-04:00",
+      "last_run_at": "2026-09-11T12:30:52.751398-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -46,9 +46,9 @@
       "fire_claim": null,
       "failure_streak": 0,
       "last_dispatch": {
-        "scheduled_at": "2026-09-11T00:30:00-04:00",
-        "dispatched_at": "2026-09-11T00:30:13.908106-04:00",
-        "lateness_seconds": 13.9,
+        "scheduled_at": "2026-09-11T12:30:00-04:00",
+        "dispatched_at": "2026-09-11T12:30:46.824377-04:00",
+        "lateness_seconds": 46.8,
         "kind": "on_time"
       }
     },
@@ -524,7 +524,7 @@
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-26T15:30:17.865991-04:00",
-      "next_run_at": "2026-09-11T16:25:14.938276-04:00",
+      "next_run_at": "2026-09-11T20:25:46.402958-04:00",
       "last_run_at": "2026-09-11T01:42:53.496521-04:00",
       "last_status": "ok",
       "last_error": null,
@@ -542,16 +542,16 @@
       ],
       "workdir": "D:\\HermesData",
       "fire_claim": {
-        "at": "2026-09-11T12:25:15.200150-04:00",
-        "by": "DELLWinn11:28952:3c74274ca37f4c909921aadf3590abf1"
+        "at": "2026-09-11T16:25:46.426030-04:00",
+        "by": "DELLWinn11:29476:8116eed00320497fa83f6ad109490f9f"
       },
       "pinned": true,
       "failure_streak": 0,
       "last_dispatch": {
-        "scheduled_at": "2026-09-11T05:42:53.496521-04:00",
-        "dispatched_at": "2026-09-11T12:25:14.329595-04:00",
-        "lateness_seconds": 24140.8,
-        "kind": "catch_up"
+        "scheduled_at": "2026-09-11T16:25:14.938276-04:00",
+        "dispatched_at": "2026-09-11T16:25:46.342507-04:00",
+        "lateness_seconds": 31.4,
+        "kind": "on_time"
       }
     },
     {
@@ -1095,7 +1095,7 @@
       "schedule_display": "0 9 * * *",
       "repeat": {
         "times": null,
-        "completed": 65
+        "completed": 66
       },
       "enabled": true,
       "state": "scheduled",
@@ -1103,7 +1103,7 @@
       "paused_reason": null,
       "created_at": "2026-07-03T13:04:52.909373-04:00",
       "next_run_at": "2026-09-12T09:00:00-04:00",
-      "last_run_at": "2026-09-10T09:00:35.842768-04:00",
+      "last_run_at": "2026-09-11T12:25:31.536135-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1111,10 +1111,7 @@
       "origin": null,
       "enabled_toolsets": null,
       "workdir": "D:\\HermesData",
-      "fire_claim": {
-        "at": "2026-09-11T12:25:15.824868-04:00",
-        "by": "DELLWinn11:28952:0cc1389a227b4fd4a8aa6d96c3396a2d"
-      },
+      "fire_claim": null,
       "failure_streak": 0,
       "last_dispatch": {
         "scheduled_at": "2026-09-11T09:00:00-04:00",
@@ -1237,7 +1234,7 @@
       "schedule_display": "0 4 * * *",
       "repeat": {
         "times": null,
-        "completed": 61
+        "completed": 62
       },
       "enabled": true,
       "state": "scheduled",
@@ -1245,7 +1242,7 @@
       "paused_reason": null,
       "created_at": "2026-07-10T16:34:35.672126+00:00",
       "next_run_at": "2026-09-12T04:00:00-04:00",
-      "last_run_at": "2026-09-10T04:00:46.644617-04:00",
+      "last_run_at": "2026-09-11T12:25:54.679376-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1258,10 +1255,7 @@
         "terminal"
       ],
       "workdir": "D:\\HermesData",
-      "fire_claim": {
-        "at": "2026-09-11T12:25:15.592368-04:00",
-        "by": "DELLWinn11:28952:8f54e45094ac420caab018de5db67172"
-      },
+      "fire_claim": null,
       "pinned": false,
       "failure_streak": 0,
       "last_dispatch": {
@@ -1820,15 +1814,15 @@
       "schedule_display": "every 30m",
       "repeat": {
         "times": null,
-        "completed": 2773
+        "completed": 2780
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-18T18:14:58.028551-04:00",
-      "next_run_at": "2026-09-11T12:55:17.593920-04:00",
-      "last_run_at": "2026-09-11T12:25:17.593920-04:00",
+      "next_run_at": "2026-09-11T16:26:45.581870-04:00",
+      "last_run_at": "2026-09-11T15:56:45.581870-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -1850,10 +1844,10 @@
       "description": "cadence-cook-2026-07-26 spaced to 30m (was every 15m; measure-only)",
       "failure_streak": 0,
       "last_dispatch": {
-        "scheduled_at": "2026-09-11T04:01:23.132833-04:00",
-        "dispatched_at": "2026-09-11T12:25:14.329595-04:00",
-        "lateness_seconds": 30231.2,
-        "kind": "catch_up"
+        "scheduled_at": "2026-09-11T15:56:44.532435-04:00",
+        "dispatched_at": "2026-09-11T15:56:45.073913-04:00",
+        "lateness_seconds": 0.5,
+        "kind": "on_time"
       }
     },
     {
@@ -2062,15 +2056,15 @@
       "schedule_display": "every 120m",
       "repeat": {
         "times": null,
-        "completed": 594
+        "completed": 596
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-20T17:16:35.981589-04:00",
-      "next_run_at": "2026-09-11T14:25:15.045933-04:00",
-      "last_run_at": "2026-09-11T03:51:35.551024-04:00",
+      "next_run_at": "2026-09-11T16:26:21.917157-04:00",
+      "last_run_at": "2026-09-11T14:26:21.917157-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2084,16 +2078,13 @@
       },
       "enabled_toolsets": null,
       "workdir": null,
-      "fire_claim": {
-        "at": "2026-09-11T12:25:15.536920-04:00",
-        "by": "DELLWinn11:28952:a30cbe7304b7462f8ece9c16b8563f65"
-      },
+      "fire_claim": null,
       "failure_streak": 0,
       "last_dispatch": {
-        "scheduled_at": "2026-09-11T05:51:35.551024-04:00",
-        "dispatched_at": "2026-09-11T12:25:14.329595-04:00",
-        "lateness_seconds": 23618.8,
-        "kind": "catch_up"
+        "scheduled_at": "2026-09-11T14:25:39.270704-04:00",
+        "dispatched_at": "2026-09-11T14:26:14.180047-04:00",
+        "lateness_seconds": 34.9,
+        "kind": "on_time"
       }
     },
     {
@@ -2356,15 +2347,15 @@
       "schedule_display": "0 */4 * * *",
       "repeat": {
         "times": null,
-        "completed": 804
+        "completed": 806
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-07-21T22:40:15.971276+00:00",
-      "next_run_at": "2026-09-11T16:00:00-04:00",
-      "last_run_at": "2026-09-11T00:00:18.798026-04:00",
+      "next_run_at": "2026-09-11T20:00:00-04:00",
+      "last_run_at": "2026-09-11T16:00:49.982481-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2377,19 +2368,16 @@
       },
       "enabled_toolsets": null,
       "workdir": "D:\\HermesData\\scripts",
-      "fire_claim": {
-        "at": "2026-09-11T12:25:15.879927-04:00",
-        "by": "DELLWinn11:28952:03e648f8a1f84a2e89eb55213281d121"
-      },
+      "fire_claim": null,
       "provider_snapshot": null,
       "model_snapshot": null,
       "pinned": true,
       "failure_streak": 0,
       "last_dispatch": {
-        "scheduled_at": "2026-09-11T04:00:00-04:00",
-        "dispatched_at": "2026-09-11T12:25:14.329595-04:00",
-        "lateness_seconds": 30314.3,
-        "kind": "catch_up"
+        "scheduled_at": "2026-09-11T16:00:00-04:00",
+        "dispatched_at": "2026-09-11T16:00:45.313975-04:00",
+        "lateness_seconds": 45.3,
+        "kind": "on_time"
       }
     },
     {
@@ -2553,7 +2541,7 @@
       "schedule_display": "15 7 * * *",
       "repeat": {
         "times": null,
-        "completed": 26
+        "completed": 27
       },
       "enabled": true,
       "state": "scheduled",
@@ -2561,7 +2549,7 @@
       "paused_reason": null,
       "created_at": "2026-07-27T08:25:12.214080-04:00",
       "next_run_at": "2026-09-12T07:15:00-04:00",
-      "last_run_at": "2026-09-10T07:15:46.029408-04:00",
+      "last_run_at": "2026-09-11T12:25:35.556382-04:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -2575,10 +2563,7 @@
       },
       "enabled_toolsets": null,
       "workdir": "D:\\HermesData",
-      "fire_claim": {
-        "at": "2026-09-11T12:25:15.936615-04:00",
-        "by": "DELLWinn11:28952:d1d4d2bba4594dee85eb0454ab02e92b"
-      },
+      "fire_claim": null,
       "failure_streak": 0,
       "last_dispatch": {
         "scheduled_at": "2026-09-11T07:15:00-04:00",
@@ -3179,5 +3164,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-09-11T12:25:17.602276-04:00"
+  "updated_at": "2026-09-11T16:25:46.429031-04:00"
 }

@@ -109,7 +109,10 @@ def test_grok_falls_back_to_api_on_oauth_403() -> None:
     with patch("grok_auth.plan_grok_auth_attempts", return_value=[oauth_auth, api_auth]):
         with patch("grok_auth.resolve_grok_credentials", return_value=refreshed_auth):
             with patch("grok_auth._grok_http_post", side_effect=[oauth_fail, oauth_fail, api_ok]):
-                result = grok_chat_completion([{"role": "user", "content": "ping"}])
+                result = grok_chat_completion(
+                    [{"role": "user", "content": "ping"}],
+                    hire=True,
+                )
 
     assert result.get("success"), result
     assert result.get("response") == "ok from api"
@@ -124,7 +127,10 @@ def test_t3_uses_grok_auth() -> None:
     }
     with patch("escalation_router.fleet_policy", return_value={"prefer_free_before_grok": False}):
         with patch("grok_auth.grok_user_prompt_completion", return_value=ok):
-            result = try_t3_paid_dispatch("Explain system design.", {"task_type": "research"})
+            result = try_t3_paid_dispatch(
+                "needs Grok on this plan",
+                {"chat_id": "1524846849360531456"},
+            )
     assert result.get("success")
     assert result.get("response") == "t3 ok"
 

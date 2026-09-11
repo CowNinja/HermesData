@@ -96,6 +96,9 @@ def grok_auth_policy(config_path: Optional[Path] = None) -> Dict[str, Any]:
     policy = {
         "prefer_subscription": bool(cfg.get("prefer_subscription", True)),
         "oauth_refresh_on_auth_fail": bool(cfg.get("oauth_refresh_on_auth_fail", True)),
+        "oauth_refresh_on_auth_fail_hire": bool(
+            cfg.get("oauth_refresh_on_auth_fail_hire", False)
+        ),
         "oauth_fallback_http": oauth_fallback_http,
         "transient_retry": bool(cfg.get("transient_retry", True)),
         "rate_limit_retries": int(cfg.get("rate_limit_retries") or 2),
@@ -238,6 +241,7 @@ def grok_chat_completion(
     temperature: float = 0.3,
     timeout: Optional[int] = None,
     user_agent: str = "PhronesisGrok/1.0",
+    hire: bool = False,
 ) -> Dict[str, Any]:
     """
     Chat completion with uniform auth ladder.
@@ -298,9 +302,12 @@ def grok_chat_completion(
         http_status = int(result.get("http_status") or 0)
         last_result = result
 
+        refresh_ok = bool(pol.get("oauth_refresh_on_auth_fail"))
+        if hire and pol.get("oauth_refresh_on_auth_fail_hire"):
+            refresh_ok = True
         if (
             auth.get("auth_provider") == AUTH_OAUTH
-            and pol.get("oauth_refresh_on_auth_fail")
+            and refresh_ok
             and http_status in AUTH_REFRESH_HTTP
             and not oauth_refreshed
         ):
@@ -440,6 +447,7 @@ def grok_chat_completion_text(
     temperature: float = 0.3,
     timeout: Optional[int] = None,
     user_agent: str = "PhronesisGrok/1.0",
+    hire: bool = False,
 ) -> str:
     result = grok_chat_completion(
         messages,
@@ -448,6 +456,7 @@ def grok_chat_completion_text(
         temperature=temperature,
         timeout=timeout,
         user_agent=user_agent,
+        hire=hire,
     )
     if not result.get("success"):
         raise RuntimeError(str(result.get("error") or result.get("response") or "grok_chat_failed"))
@@ -464,6 +473,7 @@ def grok_user_prompt_completion(
     max_tokens: int = 8192,
     temperature: float = 0.3,
     timeout: Optional[int] = None,
+    hire: bool = False,
 ) -> Dict[str, Any]:
     """Single user-turn completion (T3 / proactive offload)."""
     return grok_chat_completion(
@@ -472,6 +482,7 @@ def grok_user_prompt_completion(
         max_tokens=max_tokens,
         temperature=temperature,
         timeout=timeout,
+        hire=hire,
     )
 
 

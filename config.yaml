@@ -726,10 +726,9 @@ discord:
       the door. Quote the receipt. Never invent Discord-ID pollers. Never Message-ID
       theater. L5 is Jeff clicks — no mass K: scan. Canon: Four Worlds + ownership
       map.'
-    '1524846849360531456': Grok coord = LOCAL Alice after xAI wallet sunset. Was grok-4.6
-      hire. SAME WALLET as Heavy/4.5/Build/Composer — all xAI hops die then. Do not
-      refuse token-burn before sunset. After sunset this pin 401s; Alice 9B is the
-      mouth.
+    '1524846849360531456': Grok coord = named grok-4.6 / xai-oauth hire. SuperGrok
+      share-capped, not Alice. Garden/RP stay local. Thrift; remaining unknown unless
+      Jeff pastes Usage %. Next reset hint 2026-09-12.
     '1528335166462759102': 'RP-SANDBOX ARCHITECTURE/FIREWALL — factual ops. Firewalled
       garden; no heat in ops. Quote rp_sandbox_firewall_selfcheck.py pass/fail. Do
       not paste SAT CORE cards from model-mgmt. Token thrift: short tool output.'
@@ -1276,17 +1275,17 @@ discord:
       note: '2026-08-27: max_turns 16 so six_numbers + explain can finish. 2026-08-04
         thrift: silo kitchen terminal+file only. Policy: thread-tool-budget-thrift.'
     '1524846849360531456':
-      model: phronesis-sovereign-auto
-      provider: custom:phronesis-sovereign
-      context_length: 131072
+      model: grok-4.6
+      provider: xai-oauth
+      context_length: 500000
       max_turns: 28
       max_tokens: 8192
-      system_prompt: 'Named Grok 4.6 hire surface until 2026-09-03 00:00 America/New_York.
-        SAME WALLET as Heavy, 4.5, Build, Composer — every xAI hop dies at that clock.
-        Do not refuse token-burn or local-setup work before sunset. After sunset this
-        pin 401s; Alice on 9B + OpenRouter free is the mouth. Hard architecture /
-        judgment. Alice owns kitchen elsewhere. Discord 2000 cap. FORBIDDEN: RP voice,
-        invented organs, claiming patches you did not ship. Garden/RP stay local_only.'
+      system_prompt: 'Named Grok 4.6 hire surface. SuperGrok subscription, share-capped.
+        You are Grok, not Alice. Alice owns kitchen/garden/RP elsewhere. Hard architecture
+        / judgment only. Discord 2000 cap. FORBIDDEN: RP voice, invented organs, claiming
+        patches you did not ship. Garden/RP stay local_only. Thrift: do not spend
+        like Heavy. Weekly remaining unknown unless Jeff pastes Usage %. Next reset
+        hint 2026-09-12.'
       enabled_toolsets:
       - terminal
       - file
@@ -1294,9 +1293,8 @@ discord:
       - skills
       - hermes-cli
       - hermes-discord
-      note: '2026-08-26: web_search is not a toolset (was dropped). web+skills+cli
-        so this Grok 4.6 hire room can actually search and skill_view. 2026-08-16b
-        pin grok-4.6 / xai-oauth @ 500000. Garden/RP/voice stay local. max_turns 28.'
+      note: '2026-09-11: re-pin grok-4.6 / xai-oauth @ 500000 after SuperGrok-still-works
+        eval. Named hire only. Garden/RP/voice stay local. max_turns 28.'
     '1526952913413607454':
       model: phronesis-sovereign-auto
       provider: custom:phronesis-sovereign
@@ -1470,11 +1468,11 @@ local_sovereign:
       grunt: local_then_free
       novel_high_value: local_then_free
       token_exhaustion: never_hard_fail_use_local_free
-    updated_at: '2026-09-02T23:30:00Z'
-    note: Discord channel_overrides must not pin xai-oauth after 2026-09-03. Garden/RP/ERP
-      = local_only. xAI wallet (Heavy/4.6/4.5/Build/Composer) dies 2026-09-03 00:00
-      America/New_York. T3 grok hops are then 401s. Hire room unpins via grok_wallet_sunset.py.
-      Never hop-1 Discord-wide.
+    updated_at: '2026-09-11T18:00:00Z'
+    note: Discord-wide must not pin xai-oauth. Garden/RP/ERP = local_only. Named hire
+      thread 152484 may pin grok-4.6 / xai-oauth (SuperGrok share-capped). T3 scalpel
+      is hire/explicit/armed only. Never hop-1 Discord-wide. novel_high_value stays
+      local_then_free globally.
 fallback_model:
 - provider: custom:phronesis-sovereign
   model: phronesis-sovereign-auto
@@ -1486,6 +1484,7 @@ grok_auth:
   timeout_seconds: 300
   prefer_subscription: true
   oauth_refresh_on_auth_fail: false
+  oauth_refresh_on_auth_fail_hire: true
   fallback_http_codes:
   - 401
   - 403

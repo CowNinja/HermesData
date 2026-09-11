@@ -2887,6 +2887,47 @@ class SovereignProxyHandler(BaseHTTPRequestHandler):
         except Exception as pref_exc:
             _log_event({"event": "prefer_fleet_check_error", "error": str(pref_exc)[:160]})
 
+        # C: hard public (code/long/planning/vault) skips 9B even when :8090 is up.
+        try:
+            from escalation_router import is_roleplay_route as _rp_hard
+            from router_backend_policy import pick_backend as _pick_hard
+
+            if not _rp_hard(routing) and not prefer_fleet_now:
+                _user_q = ""
+                for _m in reversed(trimmed_messages or []):
+                    if isinstance(_m, dict) and str(_m.get("role") or "").lower() == "user":
+                        _user_q = _extract_content(_m.get("content"))
+                        break
+                _dec = _pick_hard(
+                    prompt=_user_q or prompt,
+                    task_type=routing.get("task_type"),
+                    routing=routing,
+                    local_available=True,
+                )
+                _skip = str(getattr(_dec, "skip_local_reason", "") or "")
+                _hop0 = (list(_dec.hop_order or [])[:1] or [""])[0]
+                if _skip == "task_too_small_for_9b" or _hop0 == "free":
+                    prefer_fleet_now = True
+                    use_native = False
+                    prefer_fleet_reason = _skip or "hard_public_free"
+                    routing = {
+                        **routing,
+                        "prefer_fleet": True,
+                        "prefer_fleet_reason": prefer_fleet_reason,
+                        "local_fail_reason": prefer_fleet_reason,
+                        "backend_policy": _dec.to_dict(),
+                        "user_prompt": _user_q or prompt,
+                    }
+                    _log_event(
+                        {
+                            "event": "hard_public_skip_local",
+                            "reason": prefer_fleet_reason,
+                            "hop": list(_dec.hop_order or []),
+                        }
+                    )
+        except Exception as hard_exc:
+            _log_event({"event": "hard_public_skip_local_error", "error": str(hard_exc)[:160]})
+
         if use_native and not proactive_handled:
             try:
                 from inference_queue import (

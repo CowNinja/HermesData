@@ -133,7 +133,7 @@ def is_roleplay_route(routing: Optional[Dict[str, Any]]) -> bool:
 
 
 # Named hire surface only. Jeff walks into this thread on purpose.
-# Hop stays proxy T3 (Grok 4.6) — never pin xai-oauth on Discord overrides.
+# Hire room MAY pin grok-4.6 / xai-oauth. Never pin xai-oauth Discord-wide.
 GROK_HIRE_CHAT_IDS = frozenset(
     {
         "1524846849360531456",  # Grok coord / Grok 4.6
@@ -429,23 +429,46 @@ def try_t2_fleet_dispatch(
 
 
 def try_t3_paid_dispatch(prompt: str, routing: Dict[str, Any]) -> Dict[str, Any]:
-    """xAI untethered. T3 is OpenRouter free (T2). Never grok_auth."""
+    """Locked T3 scalpel: hire / explicit needs-Grok / armed only. Never garden."""
     if is_roleplay_route(routing):
         return {"success": False, "tier": "paid", "error": "roleplay_blocked"}
-    t2 = try_t2_fleet_dispatch(prompt, routing, local_failed=True)
-    if t2.get("success"):
-        prov = t2.setdefault("provenance", {})
-        prov["t3_untethered_to_t2"] = True
-        prov["selected_backend"] = "free"
-        return t2
-    return {
-        "success": False,
-        "escalation": True,
-        "tier": "xai_untethered",
-        "error": "xai_wallet_dead",
-        "response": "[T3 UNTETHERED] no paid Grok; OpenRouter free missed",
-        "provenance": {"selected_backend": "none", "escalation_tier": "T3_dead"},
-    }
+    allowed = is_grok_hire_chat(routing)
+    try:
+        from router_backend_policy import public_hard_needs_grok
+
+        allowed = allowed or bool(public_hard_needs_grok(prompt, routing))
+    except Exception:
+        pass
+    if not allowed:
+        return {
+            "success": False,
+            "tier": "paid",
+            "error": "t3_locked_not_hire_or_explicit",
+            "provenance": {"selected_backend": "none", "escalation_tier": "T3_locked"},
+        }
+    try:
+        from grok_auth import grok_user_prompt_completion
+
+        res = grok_user_prompt_completion(prompt, model="grok-4.6", hire=True)
+        if res.get("success"):
+            res.setdefault("provenance", {})
+            res["provenance"]["selected_backend"] = "grok"
+            res["provenance"]["escalation_tier"] = "T3"
+            res["tier"] = "paid"
+            return res
+        return {
+            "success": False,
+            "tier": "paid",
+            "error": str(res.get("error") or "t3_grok_fail")[:200],
+            "provenance": {"selected_backend": "none", "escalation_tier": "T3"},
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "tier": "paid",
+            "error": str(exc)[:200],
+            "provenance": {"selected_backend": "none", "escalation_tier": "T3"},
+        }
 
 
 def _grok_share_blocks_t3() -> tuple[bool, str]:
@@ -524,12 +547,14 @@ def _proactive_wants_t3(
             kind = "auto_strong"
     if kind == "explicit":
         return True
-    if kind in {"auto_strong", "auto_modest"} or int(routing.get("tool_fail_count") or 0) > 0:
-        blocked, reason = _grok_share_blocks_t3()
-        if blocked:
-            _log({"event": "t3_blocked_share_cap", "reason": reason})
-            return False
-        return True
+    try:
+        from router_backend_policy import public_hard_needs_grok
+
+        if public_hard_needs_grok(prompt, routing):
+            return True
+    except Exception:
+        pass
+    # Auto modest/strong stay on free 120B, not SuperGrok.
     return False
 
 
@@ -785,7 +810,7 @@ def resolve_post_local_dispatch(
         from router_backend_policy import pick_backend
 
         decision = pick_backend(
-            prompt=prompt or "",
+            prompt=str(routing.get("user_prompt") or prompt or ""),
             task_type=routing.get("task_type"),
             routing=routing,
             local_available=bool(local_result.get("success")),
@@ -808,15 +833,26 @@ def resolve_post_local_dispatch(
         decision = None
 
     if local_result.get("success"):
-        prov = local_result.setdefault("provenance", {})
-        prov.setdefault("path", path_stamp)
-        if decision is not None and hasattr(decision, "to_dict"):
-            prov.setdefault("backend_policy", decision.to_dict())
-            prov.setdefault("selected_backend", "local")
-            prov.setdefault("tier_bucket", "local")
-        if prov.get("context_augment"):
+        skip_task = ""
+        hop_now: List[str] = []
+        if decision is not None:
+            skip_task = str(getattr(decision, "skip_local_reason", "") or "")
+            hop_now = list(getattr(decision, "hop_order", None) or [])
+        if skip_task == "task_too_small_for_9b" and BACKEND_FREE in hop_now:
+            local_result = dict(local_result)
+            local_result["success"] = False
+            local_result["error"] = "task_too_small_for_9b"
+            local_result.setdefault("provenance", {})["skipped_local_task_hard"] = True
+        else:
+            prov = local_result.setdefault("provenance", {})
+            prov.setdefault("path", path_stamp)
+            if decision is not None and hasattr(decision, "to_dict"):
+                prov.setdefault("backend_policy", decision.to_dict())
+                prov.setdefault("selected_backend", "local")
+                prov.setdefault("tier_bucket", "local")
+            if prov.get("context_augment"):
+                return local_result
             return local_result
-        return local_result
 
     hop = list(DEFAULT_HOP if decision is None else (decision.hop_order or DEFAULT_HOP))
     # If pick_backend skipped free (RP/adult), do not fleet
@@ -824,7 +860,8 @@ def resolve_post_local_dispatch(
     if decision is not None:
         blocked_free = getattr(decision, "blocked_free_reason", None)
 
-    ok, block_reason, fleet_prompt, mask_map = _prepare_fleet_prompt(prompt, routing)
+    fleet_src = str(routing.get("user_prompt") or prompt)
+    ok, block_reason, fleet_prompt, mask_map = _prepare_fleet_prompt(fleet_src, routing)
     if blocked_free:
         ok = False
         block_reason = blocked_free
@@ -880,7 +917,7 @@ def resolve_post_local_dispatch(
     # Free fleet first on local fail (prefer_free_before_grok).
     # Pass original prompt so try_t2 owns mask_map + rehydrate.
     if want_free and fleet_routing_enabled():
-        t2 = try_t2_fleet_dispatch(prompt, routing, local_failed=True)
+        t2 = try_t2_fleet_dispatch(fleet_src, routing, local_failed=True)
         if t2.get("success"):
             prov = t2.setdefault("provenance", {})
             prov["path"] = path_stamp

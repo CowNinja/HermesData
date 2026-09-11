@@ -226,6 +226,12 @@ _PUBLIC_OFFLOAD_INTENTS = (
     "open source",
     "trends in",
     "overview of",
+    "traceback",
+    "refactor",
+    "multi-file",
+    "multi-silo",
+    "write a plan",
+    "code review",
 )
 
 # Weak classify intents — free only when not companion-depth and prompt has grunt length.
@@ -377,7 +383,7 @@ def _public_offload_intent(prompt: str, routing: Dict[str, Any]) -> Tuple[bool, 
         if phrase in low:
             weak.append(f"intent:{phrase}")
     task = str(routing.get("task_type") or "").lower()
-    if task in ("research", "web", "summarize"):
+    if task in ("research", "web", "summarize", "code", "coding", "plan", "planning", "vault", "silo"):
         matched.append(f"task_type:{task}")
         strong = True
     if re.search(r"\b(today|this week|202[4-9])\b", low) and any(
@@ -468,12 +474,26 @@ def classify_proactive_routing(
         }
 
     if _has_tool_context(messages, body):
-        return {
-            "mode": ROUTING_LOCAL_ONLY,
-            "eligible": False,
-            "reasons": ["tools_or_local_ops_required"],
-            "sanitized_prompt": prompt,
-        }
+        hard_public = False
+        try:
+            from router_backend_policy import public_task_too_small_for_9b
+
+            hard_public = bool(
+                public_task_too_small_for_9b(
+                    task_type=routing.get("task_type"),
+                    prompt=prompt or "",
+                    routing=routing,
+                )
+            )
+        except Exception:
+            hard_public = False
+        if not hard_public:
+            return {
+                "mode": ROUTING_LOCAL_ONLY,
+                "eligible": False,
+                "reasons": ["tools_or_local_ops_required"],
+                "sanitized_prompt": prompt,
+            }
 
     blob = _message_blob(messages)
     # Phase 4: hard-local (RP/explicit/HIPAA/identity) always; maskable spans may
